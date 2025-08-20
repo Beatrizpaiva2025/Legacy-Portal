@@ -1,34 +1,29 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Custom styles for Legacy Translations Portal */
+.App {
+  @apply min-h-screen bg-gray-50;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Custom animations */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+.animate-spin {
+    animation: spin 1s linear infinite;
 }
 
-.App-link {
-    color: #61dafb;
+/* Service card hover effects */
+.service-card-transition {
+    transition: all 0.3s ease;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+/* Upload area styles */
+.upload-area-hover:hover {
+    @apply border-teal-500 bg-teal-50;
+}
+
+/* Focus styles for better accessibility */
+input:focus, select:focus, textarea:focus {
+    @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
 }
