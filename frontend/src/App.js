@@ -26,7 +26,54 @@ const TranslationPortal = () => {
   }, [wordCount, selectedService, urgency, translateFrom, translateTo]);
 
   const calculateQuote = async () => {
-    if (!projectReference) return;
+    if (!projectReference) {
+      // Calculate a local quote even if no reference is provided
+      const pages = Math.ceil(wordCount / 250);
+      let basePrice;
+      
+      if (selectedService === "standard") {
+        basePrice = wordCount * 0.02;
+      } else if (selectedService === "professional") {
+        basePrice = pages * 23.99;
+      } else if (selectedService === "specialist") {
+        basePrice = wordCount * 0.13;
+      } else {
+        basePrice = pages * 23.99;
+      }
+      
+      let urgencyFee = 0;
+      if (urgency === "priority") {
+        urgencyFee = 3.75;
+      } else if (urgency === "urgent") {
+        urgencyFee = 15.00;
+      }
+      
+      const totalPrice = basePrice + urgencyFee;
+      const today = new Date();
+      let deliveryDate;
+      let daysText;
+      
+      if (urgency === "urgent") {
+        deliveryDate = new Date(today.getTime() + 12 * 60 * 60 * 1000);
+        daysText = "12 hours";
+      } else if (urgency === "priority") {
+        deliveryDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        daysText = "24 hours";
+      } else {
+        deliveryDate = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000);
+        daysText = "2 days";
+      }
+      
+      const estimatedDelivery = `${deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} (${daysText})`;
+      
+      setQuote({
+        base_price: basePrice,
+        urgency_fee: urgencyFee,
+        total_price: totalPrice,
+        estimated_delivery: estimatedDelivery
+      });
+      return;
+    }
 
     try {
       const quoteData = {
