@@ -161,8 +161,10 @@ async def extract_text_from_file(file: UploadFile) -> str:
             return text
             
         else:
-            raise HTTPException(status_code=400, detail="Unsupported file type")
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_extension}")
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error extracting text from file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
