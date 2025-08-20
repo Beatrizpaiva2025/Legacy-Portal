@@ -101,12 +101,12 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
     else:
         base_price = pages * 23.99  # Default to professional
     
-    # Urgency fees
+    # Urgency fees based on percentage of base price
     urgency_fee = 0
     if urgency == "priority":
-        urgency_fee = 3.75
+        urgency_fee = base_price * 0.20  # 20% of base price
     elif urgency == "urgent":
-        urgency_fee = 15.00
+        urgency_fee = base_price * 1.00  # 100% of base price
     
     total_price = base_price + urgency_fee
     
