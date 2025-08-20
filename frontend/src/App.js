@@ -405,8 +405,8 @@ const TranslationPortal = () => {
               <div className="space-y-3">
                 {[
                   { id: 'no', label: 'No', fee: '' },
-                  { id: 'priority', label: 'Priority (24 hours)', fee: '+$3.75' },
-                  { id: 'urgent', label: 'Urgent (12 hours)', fee: '+$15.00' }
+                  { id: 'priority', label: 'Priority (24h)', fee: '+20%' },
+                  { id: 'urgent', label: 'Urgent (12h)', fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center cursor-pointer">
                     <input
