@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -6,8 +6,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timedelta
 import aiofiles
@@ -18,6 +18,13 @@ from docx import Document
 import io
 import tempfile
 import re
+
+# Emergent integrations
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+
+# SendGrid imports
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -39,6 +46,81 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Email Service Class
+class EmailDeliveryError(Exception):
+    pass
+
+class EmailService:
+    def __init__(self):
+        self.api_key = os.environ.get('SENDGRID_API_KEY')
+        self.sender_email = os.environ.get('SENDER_EMAIL')
+        
+    async def send_email(self, to: str, subject: str, content: str, content_type: str = "html"):
+        """Send email via SendGrid"""
+        message = Mail(
+            from_email=self.sender_email,
+            to_emails=to,
+            subject=subject,
+            html_content=content if content_type == "html" else None,
+            plain_text_content=content if content_type == "plain" else None
+        )
+
+        try:
+            sg = SendGridAPIClient(self.api_key)
+            response = sg.send(message)
+            return response.status_code == 202
+        except Exception as e:
+            logger.error(f"Failed to send email: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email: {str(e)}")
+    
+    async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
+        """Send order confirmation email"""
+        subject = f"Translation Order Confirmation - {order_details.get('reference', 'N/A')}"
+        
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2c5aa0;">Translation Order Confirmation</h2>
+                    
+                    <p>{'Thank you for your order!' if is_partner else 'New order received from partner portal.'}</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                        <h3 style="margin-top: 0;">Order Details:</h3>
+                        <p><strong>Reference:</strong> {order_details.get('reference', 'N/A')}</p>
+                        <p><strong>Service Type:</strong> {order_details.get('service_type', 'N/A').title()}</p>
+                        <p><strong>Language Pair:</strong> {order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</p>
+                        <p><strong>Word Count:</strong> {order_details.get('word_count', 0)} words</p>
+                        <p><strong>Urgency:</strong> {order_details.get('urgency', 'standard').title()}</p>
+                        <p><strong>Estimated Delivery:</strong> {order_details.get('estimated_delivery', 'N/A')}</p>
+                    </div>
+                    
+                    <div style="background-color: #e8f5e8; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                        <h3 style="margin-top: 0; color: #2c5aa0;">Pricing Summary:</h3>
+                        <p><strong>Base Price:</strong> ${order_details.get('base_price', 0):.2f}</p>
+                        {f"<p><strong>Urgency Fee:</strong> ${order_details.get('urgency_fee', 0):.2f}</p>" if order_details.get('urgency_fee', 0) > 0 else ""}
+                        <p style="font-size: 18px; font-weight: bold; color: #2c5aa0;"><strong>Total: ${order_details.get('total_price', 0):.2f}</strong></p>
+                    </div>
+                    
+                    <div style="margin: 30px 0;">
+                        <p>If you have any questions about your order, please don't hesitate to contact us at <a href="mailto:contact@legacytranslations.com">contact@legacytranslations.com</a></p>
+                        <p>Thank you for choosing Legacy Translations!</p>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
+                        <p>Legacy Translations - Professional Translation Services</p>
+                        <p>This is an automated email. Please do not reply to this message.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        return await self.send_email(recipient_email, subject, html_content, "html")
+
+# Initialize email service
+email_service = EmailService()
 
 # Models
 class StatusCheck(BaseModel):
@@ -76,6 +158,28 @@ class DocumentUploadResponse(BaseModel):
     word_count: int
     file_size: int
     message: str
+
+# Payment Models
+class PaymentTransaction(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    quote_id: str
+    amount: float
+    currency: str = "usd"
+    payment_status: str = "pending"  # pending, paid, failed, expired
+    status: str = "initiated"  # initiated, pending, completed, expired
+    metadata: Optional[Dict[str, str]] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PaymentCheckoutRequest(BaseModel):
+    quote_id: str
+    origin_url: str
+
+class EmailNotificationRequest(BaseModel):
+    quote_id: str
+    partner_email: EmailStr
+    send_to_company: bool = True
 
 # Utility functions
 def count_words(text: str) -> int:
@@ -278,6 +382,269 @@ async def get_word_count(text: str = Form(...)):
     """Get word count from provided text"""
     word_count = count_words(text)
     return {"word_count": word_count, "text_length": len(text)}
+
+# Stripe Payment Integration
+@api_router.post("/payment/checkout", response_model=CheckoutSessionResponse)
+async def create_payment_checkout(request: PaymentCheckoutRequest):
+    """Create Stripe checkout session for quote payment"""
+    
+    try:
+        # Get quote from database
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+        
+        quote_obj = TranslationQuote(**quote)
+        
+        # Initialize Stripe checkout
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key:
+            raise HTTPException(status_code=500, detail="Stripe API key not configured")
+        
+        # Create success and cancel URLs
+        success_url = f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{request.origin_url}?payment_cancelled=true"
+        
+        # Prepare metadata for the session
+        metadata = {
+            "quote_id": request.quote_id,
+            "reference": quote_obj.reference,
+            "service_type": quote_obj.service_type,
+            "word_count": str(quote_obj.word_count),
+            "source": "partner_portal"
+        }
+        
+        # Initialize Stripe checkout with webhook URL
+        host_url = request.origin_url.replace(request.origin_url.split('://')[1].split('/')[0], 
+                                            request.origin_url.split('://')[1].split('/')[0])
+        webhook_url = f"https://{request.origin_url.split('://')[1].split('/')[0]}/api/webhook/stripe"
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
+        
+        # Create checkout session request - amount must be float
+        checkout_request = CheckoutSessionRequest(
+            amount=float(quote_obj.total_price),  # Ensure float format
+            currency="usd",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata=metadata
+        )
+        
+        # Create checkout session
+        session = await stripe_checkout.create_checkout_session(checkout_request)
+        
+        # Create payment transaction record
+        payment_transaction = PaymentTransaction(
+            session_id=session.session_id,
+            quote_id=request.quote_id,
+            amount=float(quote_obj.total_price),
+            currency="usd",
+            payment_status="pending",
+            status="initiated",
+            metadata=metadata
+        )
+        
+        # Save payment transaction to database
+        await db.payment_transactions.insert_one(payment_transaction.dict())
+        
+        logger.info(f"Created payment checkout session: {session.session_id} for quote: {request.quote_id}")
+        
+        return session
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating payment checkout: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+@api_router.get("/payment/status/{session_id}", response_model=CheckoutStatusResponse)
+async def get_payment_status(session_id: str):
+    """Get payment status for a checkout session"""
+    
+    try:
+        # Get payment transaction from database
+        payment_transaction = await db.payment_transactions.find_one({"session_id": session_id})
+        if not payment_transaction:
+            raise HTTPException(status_code=404, detail="Payment session not found")
+        
+        # Initialize Stripe checkout
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key:
+            raise HTTPException(status_code=500, detail="Stripe API key not configured")
+        
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+        
+        # Get checkout status from Stripe
+        status_response = await stripe_checkout.get_checkout_status(session_id)
+        
+        # Update payment transaction if status changed and not already processed
+        if (status_response.payment_status != payment_transaction.get("payment_status") and 
+            payment_transaction.get("payment_status") != "paid"):
+            
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {
+                    "$set": {
+                        "payment_status": status_response.payment_status,
+                        "status": status_response.status,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+            
+            # If payment is successful, send confirmation emails
+            if status_response.payment_status == "paid" and payment_transaction.get("payment_status") != "paid":
+                await handle_successful_payment(session_id, payment_transaction)
+        
+        return status_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting payment status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment status")
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    
+    try:
+        # Get request body and signature
+        body = await request.body()
+        signature = request.headers.get("Stripe-Signature")
+        
+        if not signature:
+            raise HTTPException(status_code=400, detail="Missing Stripe signature")
+        
+        # Initialize Stripe checkout for webhook handling
+        stripe_api_key = os.environ.get('STRIPE_API_KEY')
+        if not stripe_api_key:
+            raise HTTPException(status_code=500, detail="Stripe API key not configured")
+        
+        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+        
+        # Handle webhook
+        webhook_response = await stripe_checkout.handle_webhook(body, signature)
+        
+        # Process webhook event based on type
+        if webhook_response.event_type in ["checkout.session.completed", "payment_intent.succeeded"]:
+            session_id = webhook_response.session_id
+            
+            # Update payment transaction
+            payment_transaction = await db.payment_transactions.find_one({"session_id": session_id})
+            if payment_transaction and payment_transaction.get("payment_status") != "paid":
+                await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {
+                        "$set": {
+                            "payment_status": "paid",
+                            "status": "completed",
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
+                
+                # Send confirmation emails
+                await handle_successful_payment(session_id, payment_transaction)
+        
+        return {"status": "success"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Webhook handling failed")
+
+async def handle_successful_payment(session_id: str, payment_transaction: dict):
+    """Handle successful payment by sending confirmation emails"""
+    
+    try:
+        # Get quote details
+        quote_id = payment_transaction.get("quote_id")
+        quote = await db.translation_quotes.find_one({"id": quote_id})
+        
+        if not quote:
+            logger.error(f"Quote not found for payment session: {session_id}")
+            return
+        
+        # Prepare order details for email
+        order_details = {
+            "reference": quote.get("reference"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count"),
+            "urgency": quote.get("urgency"),
+            "estimated_delivery": quote.get("estimated_delivery"),
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price")
+        }
+        
+        # Send confirmation email to company
+        try:
+            await email_service.send_order_confirmation_email(
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False
+            )
+            logger.info(f"Sent order confirmation to company for session: {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to send company confirmation email: {str(e)}")
+        
+        logger.info(f"Successfully processed payment for session: {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling successful payment for session {session_id}: {str(e)}")
+
+# Email notification endpoint
+@api_router.post("/send-email-notification")
+async def send_email_notification(request: EmailNotificationRequest, background_tasks: BackgroundTasks):
+    """Send email notification for quote"""
+    
+    try:
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+        
+        # Prepare order details
+        order_details = {
+            "reference": quote.get("reference"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count"),
+            "urgency": quote.get("urgency"),
+            "estimated_delivery": quote.get("estimated_delivery"),
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price")
+        }
+        
+        # Send email to partner
+        background_tasks.add_task(
+            email_service.send_order_confirmation_email,
+            request.partner_email,
+            order_details,
+            is_partner=True
+        )
+        
+        # Send email to company if requested
+        if request.send_to_company:
+            background_tasks.add_task(
+                email_service.send_order_confirmation_email,
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False
+            )
+        
+        return {"status": "success", "message": "Email notifications queued for delivery"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending email notification: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send email notification")
 
 # Include the router in the main app
 app.include_router(api_router)
