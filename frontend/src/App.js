@@ -43,9 +43,9 @@ const TranslationPortal = () => {
       
       let urgencyFee = 0;
       if (urgency === "priority") {
-        urgencyFee = 3.75;
+        urgencyFee = basePrice * 0.20; // 20% of base price
       } else if (urgency === "urgent") {
-        urgencyFee = 15.00;
+        urgencyFee = basePrice * 1.00; // 100% of base price
       }
       
       const totalPrice = basePrice + urgencyFee;
