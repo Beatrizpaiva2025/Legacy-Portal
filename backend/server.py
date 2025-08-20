@@ -80,7 +80,9 @@ class DocumentUploadResponse(BaseModel):
 # Utility functions
 def count_words(text: str) -> int:
     """Count words in text"""
-    words = re.findall(r'\b\w+\b', text.lower())
+    # Simple word counting by splitting on whitespace and filtering empty strings
+    words = text.strip().split()
+    words = [word for word in words if word.strip()]
     return len(words)
 
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
