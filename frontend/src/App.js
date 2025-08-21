@@ -18,7 +18,74 @@ const TranslationPortal = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
-  const [quote, setQuote] = useState(null);
+  // Payment handling
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const handleAcceptQuote = async () => {
+    if (!quote || !quote.id) {
+      alert('Please calculate a quote first');
+      return;
+    }
+
+    if (!projectReference.trim()) {
+      alert('Please enter a project reference before proceeding');
+      return;
+    }
+
+    setIsProcessingPayment(true);
+
+    try {
+      // Create checkout session
+      const paymentData = {
+        quote_id: quote.id,
+        origin_url: window.location.origin
+      };
+
+      const response = await axios.post(`${API}/payment/checkout`, paymentData);
+      
+      // Redirect to Stripe checkout
+      if (response.data.url) {
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Error creating payment session. Please try again.');
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Check for payment result on page load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    const paymentSuccess = urlParams.get('payment_success');
+    const paymentCancelled = urlParams.get('payment_cancelled');
+
+    if (sessionId && paymentSuccess) {
+      checkPaymentStatus(sessionId);
+    } else if (paymentCancelled) {
+      alert('Payment was cancelled. You can try again when ready.');
+    }
+  }, []);
+
+  const checkPaymentStatus = async (sessionId) => {
+    try {
+      const response = await axios.get(`${API}/payment/status/${sessionId}`);
+      
+      if (response.data.payment_status === 'paid') {
+        alert('Payment successful! Your translation order has been confirmed. You will receive an email confirmation shortly.');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        alert('Payment is being processed. Please check your email for confirmation.');
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      alert('Error checking payment status. Please contact support if you completed the payment.');
+    }
+  };
 
   // Calculate quote whenever relevant values change
   useEffect(() => {
