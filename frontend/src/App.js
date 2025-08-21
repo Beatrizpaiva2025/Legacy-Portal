@@ -452,18 +452,20 @@ const TranslationPortal = () => {
                   <div className="flex">
                     <input
                       type="number"
-                      value={wordCount}
-                      onChange={(e) => setWordCount(parseInt(e.target.value) || 0)}
+                      value={pageCount}
+                      onChange={(e) => {
+                        const pages = parseInt(e.target.value) || 1;
+                        setPageCount(pages);
+                        setWordCount(pages * 250); // Convert pages to words (250 words per page)
+                      }}
                       className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                      placeholder="Number of words"
+                      placeholder="Number of pages"
+                      min="1"
                     />
                     <div className="px-4 py-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
-                      words
+                      page
                     </div>
                   </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Click here to read more about file types supported.
-                  </p>
                 </div>
               </div>
 
