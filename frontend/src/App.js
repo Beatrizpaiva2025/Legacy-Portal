@@ -88,23 +88,6 @@ const TranslationPortal = () => {
     }
   }, [checkPaymentStatus]);
 
-  const checkPaymentStatus = async (sessionId) => {
-    try {
-      const response = await axios.get(`${API}/payment/status/${sessionId}`);
-      
-      if (response.data.payment_status === 'paid') {
-        alert('Payment successful! Your translation order has been confirmed. You will receive an email confirmation shortly.');
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
-        alert('Payment is being processed. Please check your email for confirmation.');
-      }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      alert('Error checking payment status. Please contact support if you completed the payment.');
-    }
-  };
-
   // Calculate quote whenever relevant values change
   useEffect(() => {
     calculateQuote();
