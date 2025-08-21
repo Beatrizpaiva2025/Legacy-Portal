@@ -480,28 +480,28 @@ const TranslationPortal = () => {
 
             {/* Urgency Section */}
             <div className="mb-8">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
                 Do you require your translation urgently?
-              </h4>
-              <div className="space-y-3">
+              </label>
+              <div className="space-y-2">
                 {[
                   { id: 'no', label: 'No', fee: '' },
                   { id: 'priority', label: 'Priority (24h)', fee: '+20%' },
                   { id: 'urgent', label: 'Urgent (12h)', fee: '+100%' }
                 ].map((option) => (
-                  <label key={option.id} className="flex items-center cursor-pointer">
+                  <label key={option.id} className="flex items-center cursor-pointer p-3 border rounded-md hover:bg-gray-50">
                     <input
                       type="radio"
                       name="urgency"
                       value={option.id}
                       checked={urgency === option.id}
                       onChange={(e) => setUrgency(e.target.value)}
-                      className="mr-3 text-teal-600 focus:ring-teal-500"
+                      className="mr-3 text-teal-500"
                     />
-                    <span className="text-gray-900">
-                      {option.label} 
-                      {option.fee && <span className="text-gray-600 ml-1">{option.fee}</span>}
-                    </span>
+                    <span className="flex-1">{option.label}</span>
+                    {option.fee && (
+                      <span className="text-sm text-gray-600 font-medium">{option.fee}</span>
+                    )}
                   </label>
                 ))}
               </div>
