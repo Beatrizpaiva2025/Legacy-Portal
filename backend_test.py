@@ -266,6 +266,185 @@ class LegacyTranslationsAPITester:
             self.log_test("Invalid File Upload Rejection", False, str(e))
             return False
 
+    def test_protemos_create_quote_for_testing(self):
+        """Create a test quote for Protemos integration testing"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROTEMOS-001",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 500,
+                "urgency": "priority"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                self.protemos_test_quote_id = data['id']
+                details = f"Created quote ID: {data['id']}, Total: ${data['total_price']:.2f}"
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Create Test Quote for Protemos", success, details)
+            return success, data if success else {}
+            
+        except Exception as e:
+            self.log_test("Create Test Quote for Protemos", False, str(e))
+            return False, {}
+
+    def test_protemos_create_project(self):
+        """Test Protemos project creation"""
+        try:
+            if not hasattr(self, 'protemos_test_quote_id'):
+                self.log_test("Protemos Create Project", False, "No test quote ID available")
+                return False
+            
+            project_data = {
+                "quote_id": self.protemos_test_quote_id
+            }
+            
+            response = requests.post(f"{self.api_url}/protemos/create-project", json=project_data, timeout=15)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Status: {data.get('status')}, Project ID: {data.get('protemos_project_id')}"
+                
+                # Verify response contains required fields
+                required_fields = ['status', 'protemos_project_id', 'protemos_response']
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    success = False
+                    details += f", Missing fields: {missing_fields}"
+                elif data.get('status') != 'success':
+                    success = False
+                    details += ", Status not success"
+                    
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Protemos Create Project", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Protemos Create Project", False, str(e))
+            return False
+
+    def test_protemos_get_all_projects(self):
+        """Test Protemos project retrieval - all projects"""
+        try:
+            response = requests.get(f"{self.api_url}/protemos/projects", timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                projects_count = len(data.get('projects', []))
+                details = f"Retrieved {projects_count} Protemos projects"
+                
+                # Verify response structure
+                if 'projects' not in data:
+                    success = False
+                    details += ", Missing 'projects' field in response"
+                    
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Protemos Get All Projects", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Protemos Get All Projects", False, str(e))
+            return False
+
+    def test_protemos_get_project_by_quote(self):
+        """Test Protemos project retrieval by quote ID"""
+        try:
+            if not hasattr(self, 'protemos_test_quote_id'):
+                self.log_test("Protemos Get Project by Quote", False, "No test quote ID available")
+                return False
+            
+            response = requests.get(f"{self.api_url}/protemos/projects/{self.protemos_test_quote_id}", timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Project ID: {data.get('protemos_project_id')}, Status: {data.get('protemos_status')}"
+                
+                # Verify response contains project data
+                required_fields = ['quote_id', 'protemos_project_id', 'protemos_status']
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    success = False
+                    details += f", Missing fields: {missing_fields}"
+                elif data.get('quote_id') != self.protemos_test_quote_id:
+                    success = False
+                    details += ", Quote ID mismatch"
+                    
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Protemos Get Project by Quote", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Protemos Get Project by Quote", False, str(e))
+            return False
+
+    def test_protemos_error_handling_invalid_quote(self):
+        """Test Protemos error handling with invalid quote ID"""
+        try:
+            project_data = {
+                "quote_id": "invalid-quote-id-12345"
+            }
+            
+            response = requests.post(f"{self.api_url}/protemos/create-project", json=project_data, timeout=10)
+            success = response.status_code == 404  # Should return 404 for invalid quote
+            
+            details = f"Status: {response.status_code} (expected 404 for invalid quote)"
+            
+            if response.status_code == 404:
+                try:
+                    error_data = response.json()
+                    if 'detail' in error_data:
+                        details += f", Error: {error_data['detail']}"
+                except:
+                    pass
+            
+            self.log_test("Protemos Error Handling - Invalid Quote", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Protemos Error Handling - Invalid Quote", False, str(e))
+            return False
+
+    def test_protemos_get_nonexistent_project(self):
+        """Test Protemos project retrieval with non-existent quote ID"""
+        try:
+            response = requests.get(f"{self.api_url}/protemos/projects/nonexistent-quote-id", timeout=10)
+            success = response.status_code == 404  # Should return 404 for non-existent project
+            
+            details = f"Status: {response.status_code} (expected 404 for non-existent project)"
+            
+            if response.status_code == 404:
+                try:
+                    error_data = response.json()
+                    if 'detail' in error_data:
+                        details += f", Error: {error_data['detail']}"
+                except:
+                    pass
+            
+            self.log_test("Protemos Get Non-existent Project", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Protemos Get Non-existent Project", False, str(e))
+            return False
+
     def run_all_tests(self):
         """Run all backend API tests"""
         print("🚀 Starting Legacy Translations API Tests")
