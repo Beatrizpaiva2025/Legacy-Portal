@@ -688,7 +688,7 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Webhook handling failed")
 
 async def handle_successful_payment(session_id: str, payment_transaction: dict):
-    """Handle successful payment by sending confirmation emails"""
+    """Handle successful payment by sending confirmation emails and creating Protemos project"""
     
     try:
         # Get quote details
@@ -710,8 +710,29 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             "estimated_delivery": quote.get("estimated_delivery"),
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
-            "total_price": quote.get("total_price")
+            "total_price": quote.get("total_price"),
+            "client_email": "partner@legacytranslations.com"  # Default for partner portal
         }
+        
+        # Create project in Protemos
+        try:
+            protemos_response = await protemos_client.create_project(order_details)
+            logger.info(f"Created Protemos project for session {session_id}: {protemos_response.get('id')}")
+            
+            # Update payment transaction with Protemos project ID
+            await db.payment_transactions.update_one(
+                {"session_id": session_id},
+                {
+                    "$set": {
+                        "protemos_project_id": protemos_response.get("id"),
+                        "protemos_status": protemos_response.get("status", "created")
+                    }
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to create Protemos project for session {session_id}: {str(e)}")
+            # Don't fail the entire process if Protemos fails
         
         # Send confirmation email to company
         try:
