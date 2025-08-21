@@ -750,6 +750,80 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
     except Exception as e:
         logger.error(f"Error handling successful payment for session {session_id}: {str(e)}")
 
+# Protemos Integration Endpoints
+class ProtemosProjectRequest(BaseModel):
+    quote_id: str
+
+@api_router.post("/protemos/create-project")
+async def create_protemos_project(request: ProtemosProjectRequest):
+    """Manually create a Protemos project from a quote"""
+    
+    try:
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+        
+        # Prepare order details for Protemos
+        order_details = {
+            "reference": quote.get("reference"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count"),
+            "urgency": quote.get("urgency"),
+            "estimated_delivery": quote.get("estimated_delivery"),
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "client_email": "partner@legacytranslations.com"
+        }
+        
+        # Create project in Protemos
+        protemos_response = await protemos_client.create_project(order_details)
+        
+        # Save Protemos project details to database
+        protemos_project = {
+            "id": str(uuid.uuid4()),
+            "quote_id": request.quote_id,
+            "protemos_project_id": protemos_response.get("id"),
+            "protemos_status": protemos_response.get("status", "created"),
+            "project_name": protemos_response.get("name"),
+            "created_at": datetime.utcnow(),
+            "order_details": order_details
+        }
+        
+        await db.protemos_projects.insert_one(protemos_project)
+        
+        logger.info(f"Created Protemos project: {protemos_response.get('id')} for quote: {request.quote_id}")
+        
+        return {
+            "status": "success",
+            "message": "Protemos project created successfully",
+            "protemos_project_id": protemos_response.get("id"),
+            "protemos_response": protemos_response
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Protemos project: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create Protemos project")
+
+@api_router.get("/protemos/projects")
+async def get_protemos_projects():
+    """Get all Protemos projects"""
+    projects = await db.protemos_projects.find().sort("created_at", -1).to_list(100)
+    return {"projects": projects}
+
+@api_router.get("/protemos/projects/{quote_id}")
+async def get_protemos_project_by_quote(quote_id: str):
+    """Get Protemos project by quote ID"""
+    project = await db.protemos_projects.find_one({"quote_id": quote_id})
+    if not project:
+        raise HTTPException(status_code=404, detail="Protemos project not found for this quote")
+    return project
+
 # Email notification endpoint
 @api_router.post("/send-email-notification")
 async def send_email_notification(request: EmailNotificationRequest, background_tasks: BackgroundTasks):
