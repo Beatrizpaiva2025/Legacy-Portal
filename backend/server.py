@@ -18,6 +18,7 @@ from docx import Document
 import io
 import tempfile
 import re
+import asyncio
 
 # Emergent integrations
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
