@@ -314,58 +314,62 @@ const TranslationPortal = () => {
 
             {/* Service Type Selection */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                What type of translation do you require?
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                Check Prices & Place Order
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              
+              <div className="space-y-4 mb-6">
                 {[
                   {
                     id: 'standard',
-                    title: 'Standard',
-                    features: ['🤖 Machine Translation', '📝 Professional Review'],
-                    price: 'Min $18.00'
+                    title: 'Standard Certified Translation',
+                    price: 'Min $18.00',
+                    recommended: true
                   },
                   {
-                    id: 'professional',
-                    title: 'Professional',
-                    features: ['👨‍💼 Professional Translator', '📖 Proofreader'],
-                    price: '$23.99 / page'
+                    id: 'professional', 
+                    title: 'Professional Translation',
+                    price: '$23.99 / page',
+                    recommended: false
                   },
                   {
                     id: 'specialist',
-                    title: 'Specialist',
-                    features: ['🎯 Specialist Translator', '🏆 Domain Expertise'],
-                    price: 'Min $29.00'
+                    title: 'Specialist Translation',
+                    price: 'Min $29.00',
+                    recommended: false
                   }
                 ].map((service) => (
                   <div
                     key={service.id}
                     onClick={() => setSelectedService(service.id)}
-                    className={`border-2 rounded-lg p-6 cursor-pointer transition-all ${
+                    className={`relative border rounded-lg p-4 cursor-pointer transition-all flex items-center justify-between ${
                       selectedService === service.id
-                        ? 'border-teal-500 bg-teal-500 text-white'
-                        : 'border-gray-200 bg-white hover:border-teal-300'
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 hover:border-teal-300'
                     }`}
                   >
-                    <h4 className="text-lg font-semibold mb-3">{service.title}</h4>
-                    <ul className="text-sm mb-4 space-y-1">
-                      {service.features.map((feature, idx) => (
-                        <li key={idx} className="opacity-90">{feature}</li>
-                      ))}
-                    </ul>
-                    <div className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                      selectedService === service.id
-                        ? 'bg-white bg-opacity-20 text-white'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {service.price}
+                    <div className="flex items-center">
+                      <input
+                        type="radio"
+                        checked={selectedService === service.id}
+                        onChange={() => setSelectedService(service.id)}
+                        className="mr-4 text-teal-500"
+                      />
+                      <div>
+                        <h4 className="font-medium text-gray-900">{service.title}</h4>
+                        {service.recommended && (
+                          <span className="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-1">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-gray-900">{service.price}</div>
                     </div>
                   </div>
                 ))}
               </div>
-              <a href="#" className="text-blue-600 text-sm hover:underline">
-                Click here to read more about our different translation options.
-              </a>
             </div>
 
             {/* Language Selection */}
