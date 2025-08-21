@@ -74,41 +74,6 @@ const TranslationPortal = () => {
     }
   };
 
-  const handleAcceptQuote = async () => {
-    if (!quote || !quote.id) {
-      alert('Please calculate a quote first');
-      return;
-    }
-
-    if (!projectReference.trim()) {
-      alert('Please enter a project reference before proceeding');
-      return;
-    }
-
-    setIsProcessingPayment(true);
-
-    try {
-      // Create checkout session
-      const paymentData = {
-        quote_id: quote.id,
-        origin_url: window.location.origin
-      };
-
-      const response = await axios.post(`${API}/payment/checkout`, paymentData);
-      
-      // Redirect to Stripe checkout
-      if (response.data.url) {
-        window.location.href = response.data.url;
-      } else {
-        throw new Error('No checkout URL received');
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert('Error creating payment session. Please try again.');
-      setIsProcessingPayment(false);
-    }
-  };
-
   // Check for payment result on page load
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -121,7 +86,7 @@ const TranslationPortal = () => {
     } else if (paymentCancelled) {
       alert('Payment was cancelled. You can try again when ready.');
     }
-  }, []);
+  }, [checkPaymentStatus]);
 
   const checkPaymentStatus = async (sessionId) => {
     try {
