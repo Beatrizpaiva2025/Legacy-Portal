@@ -101,3 +101,35 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Legacy Translations Partner Portal MVP with core functionalities: document upload with OCR, automatic word counting, price calculation, Stripe payments, SendGrid email notifications, and Protemos integration for translation management."
+
+backend:
+  - task: "Protemos Integration - Create Project API"
+    implemented: true
+    working: false
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "main"
+        comment: "Protemos integration code exists but not connected to payment flow. Need to integrate create_project into handle_successful_payment function."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Protemos Integration - Create Project API"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Found existing Protemos integration code but it's not connected to the payment success flow. Will integrate protemos_client.create_project() into handle_successful_payment function and add manual endpoint for testing."
