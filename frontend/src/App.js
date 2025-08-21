@@ -317,6 +317,7 @@ const TranslationPortal = () => {
               <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
                 Check Prices & Place Order
               </h3>
+              <div className="text-xs text-red-500 text-center mb-2">TEST: NEW DESIGN LOADED v2.0</div>
               
               <div className="space-y-4 mb-6">
                 {[
