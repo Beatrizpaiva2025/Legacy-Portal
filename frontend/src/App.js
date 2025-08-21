@@ -196,6 +196,7 @@ const TranslationPortal = () => {
       });
 
       setWordCount(response.data.word_count);
+      setPageCount(Math.ceil(response.data.word_count / 250)); // Update page count based on words
       setIsProcessing(false);
     } catch (error) {
       console.error('Error processing file:', error);
