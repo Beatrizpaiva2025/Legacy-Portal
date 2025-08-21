@@ -14,6 +14,7 @@ const TranslationPortal = () => {
   const [translateFrom, setTranslateFrom] = useState('italian');
   const [translateTo, setTranslateTo] = useState('english');
   const [wordCount, setWordCount] = useState(200);
+  const [pageCount, setPageCount] = useState(1);
   const [urgency, setUrgency] = useState('no');
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
