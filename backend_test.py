@@ -571,6 +571,9 @@ class LegacyTranslationsAPITester:
         self.test_protemos_error_handling_invalid_quote()
         self.test_protemos_get_nonexistent_project()
         
+        # Test payment integration
+        self.test_protemos_payment_integration_verification()
+        
         # Print summary
         print("\n" + "=" * 50)
         print(f"📊 Protemos Test Results: {self.tests_passed}/{self.tests_run} tests passed")
