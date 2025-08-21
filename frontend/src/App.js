@@ -412,38 +412,59 @@ const TranslationPortal = () => {
               </div>
             </div>
 
-            {/* Upload Section */}
+            {/* Upload and Word Count Section */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                Upload the documents you need translated
-              </h3>
-              <div
-                {...getRootProps()}
-                className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                  isDragActive
-                    ? 'border-teal-500 bg-teal-50'
-                    : 'border-gray-300 hover:border-teal-500'
-                }`}
-              >
-                <input {...getInputProps()} />
-                <div className="text-2xl text-teal-500 mb-4">📁</div>
-                <div className="text-lg font-semibold text-teal-500 mb-2">
-                  + Upload File(s)
-                </div>
-                <p className="text-sm text-gray-500">
-                  Drag and drop files here, or click to select files
-                </p>
-              </div>
-
-              {/* File Info */}
-              {uploadedFile && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                  <div className="text-sm font-medium">File: {uploadedFile.name}</div>
-                  <div className="text-sm text-gray-600">
-                    Size: {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Upload Section */}
+                <div>
+                  <div
+                    {...getRootProps()}
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      isDragActive
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-300 hover:border-teal-500'
+                    }`}
+                  >
+                    <input {...getInputProps()} />
+                    <div className="text-2xl text-teal-500 mb-3">📁</div>
+                    <div className="text-base font-semibold text-teal-500 mb-2">
+                      + Upload File(s)
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Drag and drop or click to select
+                    </p>
                   </div>
+
+                  {/* File Info */}
+                  {uploadedFile && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                      <div className="text-sm font-medium">{uploadedFile.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Word Count Section */}
+                <div>
+                  <div className="flex">
+                    <input
+                      type="number"
+                      value={wordCount}
+                      onChange={(e) => setWordCount(parseInt(e.target.value) || 0)}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      placeholder="Number of words"
+                    />
+                    <div className="px-4 py-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
+                      words
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Click here to read more about file types supported.
+                  </p>
+                </div>
+              </div>
 
               {/* Processing Status */}
               {isProcessing && (
@@ -455,27 +476,6 @@ const TranslationPortal = () => {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Word Count Section */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Number of words to be translated
-              </h3>
-              <div className="flex">
-                <input
-                  type="number"
-                  value={wordCount}
-                  onChange={(e) => setWordCount(parseInt(e.target.value) || 0)}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-                <div className="px-4 py-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
-                  words
-                </div>
-              </div>
-              <a href="#" className="text-blue-600 text-sm hover:underline mt-2 inline-block">
-                Click here to read more about file types supported.
-              </a>
             </div>
 
             {/* Urgency Section */}
