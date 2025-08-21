@@ -18,6 +18,7 @@ const TranslationPortal = () => {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [quote, setQuote] = useState(null);
   // Payment handling
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
