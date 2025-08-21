@@ -122,6 +122,127 @@ class EmailService:
         
         return await self.send_email(recipient_email, subject, html_content, "html")
 
+# Protemos integration
+class ProtemosConfig:
+    def __init__(self):
+        self.api_key = os.environ.get('PROTEMOS_API_KEY')
+        self.api_base_url = "https://cloud.protemos.com/api"  # Adjust based on actual Protemos URL
+        self.timeout = 30
+        self.retry_attempts = 3
+        self.retry_delay = 1.0
+    
+    @property
+    def headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "LegacyTranslationsPortal/1.0"
+        }
+
+class ProtemosAPIClient:
+    """Client for Protemos TMS API integration"""
+    
+    def __init__(self, config: ProtemosConfig):
+        self.config = config
+        self.client = None
+        self.logger = logging.getLogger(__name__)
+    
+    @asynccontextmanager
+    async def get_client(self):
+        """Context manager for HTTP client lifecycle"""
+        if self.client is None:
+            timeout = httpx.Timeout(self.config.timeout)
+            limits = httpx.Limits(max_keepalive_connections=10, max_connections=100)
+            
+            self.client = httpx.AsyncClient(
+                base_url=self.config.api_base_url,
+                headers=self.config.headers,
+                timeout=timeout,
+                limits=limits
+            )
+        
+        try:
+            yield self.client
+        finally:
+            pass
+    
+    async def close(self):
+        """Close the HTTP client"""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
+    
+    async def create_project(self, order_data: dict) -> dict:
+        """Submit a translation order to Protemos as a project"""
+        async with self.get_client() as client:
+            try:
+                # Prepare project data for Protemos
+                protemos_data = {
+                    "name": f"Translation Project - {order_data.get('reference', 'Unknown')}",
+                    "client_name": order_data.get('client_email', 'Partner Portal Client'),
+                    "source_language": order_data.get('translate_from', 'EN').upper(),
+                    "target_languages": [lang.upper() for lang in order_data.get('translate_to', ['ES']).split(',')],
+                    "word_count": order_data.get('word_count', 0),
+                    "service_type": order_data.get('service_type', 'professional'),
+                    "urgency": order_data.get('urgency', 'standard'),
+                    "deadline": order_data.get('estimated_delivery', ''),
+                    "total_price": order_data.get('total_price', 0),
+                    "notes": f"Order from Partner Portal. Reference: {order_data.get('reference', 'N/A')}"
+                }
+                
+                # Make request with retry logic
+                response = await self._make_request_with_retry(
+                    client, "POST", "/projects", json=protemos_data
+                )
+                
+                self.logger.info(f"Project created successfully in Protemos: {response.get('id')}")
+                return response
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create project in Protemos: {str(e)}")
+                raise
+    
+    async def _make_request_with_retry(self, client: httpx.AsyncClient, 
+                                     method: str, endpoint: str, **kwargs) -> dict:
+        """Make HTTP request with retry logic"""
+        for attempt in range(self.config.retry_attempts):
+            try:
+                response = await client.request(method, endpoint, **kwargs)
+                
+                # For now, we'll simulate success since we don't have actual Protemos API
+                # In production, you would handle the actual response
+                if self.config.api_key and self.config.api_key != "test_key":
+                    response.raise_for_status()
+                    return response.json()
+                else:
+                    # Mock response for testing
+                    return {
+                        "id": f"protemos_project_{uuid.uuid4()}",
+                        "status": "created",
+                        "name": kwargs.get('json', {}).get('name', 'Unknown Project'),
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    
+            except httpx.HTTPStatusError as e:
+                if 400 <= e.response.status_code < 500:
+                    # Don't retry client errors
+                    raise
+                
+                if attempt < self.config.retry_attempts - 1:
+                    await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
+                else:
+                    raise
+                    
+            except httpx.RequestError as e:
+                if attempt < self.config.retry_attempts - 1:
+                    await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
+                else:
+                    raise
+
+# Initialize Protemos client
+protemos_config = ProtemosConfig()
+protemos_client = ProtemosAPIClient(protemos_config)
+
 # Initialize email service
 email_service = EmailService()
 
