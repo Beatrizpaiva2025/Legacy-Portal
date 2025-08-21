@@ -195,13 +195,22 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
     # Convert words to pages (250 words = 1 page)
     pages = max(1, word_count / 250)
     
-    # Base price per word/page depending on service type
+    # Base price depending on service type
     if service_type == "standard":
-        base_price = word_count * 0.02  # $0.02 per word
+        # Standard: Minimum $18.00 (up to 250 words), then $0.02 per word
+        if word_count <= 250:
+            base_price = 18.00
+        else:
+            base_price = 18.00 + ((word_count - 250) * 0.02)
     elif service_type == "professional":
-        base_price = pages * 23.99  # $23.99 per page
+        # Professional: $23.99 per page (250 words = 1 page)
+        base_price = pages * 23.99
     elif service_type == "specialist":
-        base_price = word_count * 0.13  # $0.13 per word
+        # Specialist: Minimum $29.00 for first page, then $0.13 per word for additional
+        if word_count <= 250:
+            base_price = 29.00
+        else:
+            base_price = 29.00 + ((word_count - 250) * 0.13)
     else:
         base_price = pages * 23.99  # Default to professional
     
