@@ -370,8 +370,8 @@ const TranslationPortal = () => {
                     </div>
                   </div>
                 ))}
-              </div>}}
               </div>
+            </div>
               <a href="#" className="text-blue-600 text-sm hover:underline">
                 Click here to read more about our different translation options.
               </a>
