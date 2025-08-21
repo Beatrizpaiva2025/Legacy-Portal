@@ -825,6 +825,12 @@ async def create_protemos_project(request: ProtemosProjectRequest):
 async def get_protemos_projects():
     """Get all Protemos projects"""
     projects = await db.protemos_projects.find().sort("created_at", -1).to_list(100)
+    
+    # Remove MongoDB ObjectId fields to avoid serialization issues
+    for project in projects:
+        if '_id' in project:
+            del project['_id']
+    
     return {"projects": projects}
 
 @api_router.get("/protemos/projects/{quote_id}")
@@ -833,6 +839,11 @@ async def get_protemos_project_by_quote(quote_id: str):
     project = await db.protemos_projects.find_one({"quote_id": quote_id})
     if not project:
         raise HTTPException(status_code=404, detail="Protemos project not found for this quote")
+    
+    # Remove MongoDB ObjectId field to avoid serialization issues
+    if '_id' in project:
+        del project['_id']
+    
     return project
 
 # Email notification endpoint
