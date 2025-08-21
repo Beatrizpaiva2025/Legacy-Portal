@@ -580,8 +580,16 @@ const TranslationPortal = () => {
               >
                 Save Quote
               </button>
-              <button className="px-6 py-3 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors">
-                Accept Quote & Start Order ✓
+              <button 
+                onClick={handleAcceptQuote}
+                disabled={isProcessingPayment || !quote}
+                className={`px-6 py-3 text-white rounded-md transition-colors ${
+                  isProcessingPayment || !quote
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-orange-500 hover:bg-orange-600'
+                }`}
+              >
+                {isProcessingPayment ? 'Processing...' : 'Accept Quote & Start Order ✓'}
               </button>
             </div>
           </div>
