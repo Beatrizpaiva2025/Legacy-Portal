@@ -323,22 +323,19 @@ const TranslationPortal = () => {
                     id: 'standard',
                     title: 'Standard',
                     features: ['🤖 Machine Translation', '📝 Professional Review'],
-                    price: 'Min $18.00',
-                    note: 'Up to 250 words, then $0.02/word'
+                    price: 'Min $18.00'
                   },
                   {
                     id: 'professional',
                     title: 'Professional',
                     features: ['👨‍💼 Professional Translator', '📖 Proofreader'],
-                    price: '$23.99 / page',
-                    note: 'Up to 250 words per page'
+                    price: '$23.99 / page'
                   },
                   {
                     id: 'specialist',
                     title: 'Specialist',
                     features: ['🎯 Specialist Translator', '🏆 Domain Expertise'],
-                    price: 'Min $29.00',
-                    note: '1 page = 250 words'
+                    price: 'Min $29.00'
                   }
                 ].map((service) => (
                   <div
@@ -356,17 +353,12 @@ const TranslationPortal = () => {
                         <li key={idx} className="opacity-90">{feature}</li>
                       ))}
                     </ul>
-                    <div className={`text-xs font-semibold px-3 py-1 rounded-full mb-2 ${
+                    <div className={`text-xs font-semibold px-3 py-1 rounded-full ${
                       selectedService === service.id
                         ? 'bg-white bg-opacity-20 text-white'
                         : 'bg-gray-100 text-gray-700'
                     }`}>
                       {service.price}
-                    </div>
-                    <div className={`text-xs opacity-75 ${
-                      selectedService === service.id ? 'text-white' : 'text-gray-600'
-                    }`}>
-                      {service.note}
                     </div>
                   </div>
                 ))}
