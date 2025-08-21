@@ -292,6 +292,8 @@ class PaymentTransaction(BaseModel):
     currency: str = "usd"
     payment_status: str = "pending"  # pending, paid, failed, expired
     status: str = "initiated"  # initiated, pending, completed, expired
+    protemos_project_id: Optional[str] = None
+    protemos_status: Optional[str] = None
     metadata: Optional[Dict[str, str]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
