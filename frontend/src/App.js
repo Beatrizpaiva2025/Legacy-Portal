@@ -374,10 +374,7 @@ const TranslationPortal = () => {
 
             {/* Language Selection */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                What language are you translating from, and into?
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Translate From
@@ -385,14 +382,14 @@ const TranslationPortal = () => {
                   <select
                     value={translateFrom}
                     onChange={(e) => setTranslateFrom(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
-                    <option value="italian">Italian</option>
-                    <option value="english">English</option>
+                    <option value="english">English (USA)</option>
                     <option value="spanish">Spanish</option>
                     <option value="french">French</option>
                     <option value="german">German</option>
                     <option value="portuguese">Portuguese</option>
+                    <option value="italian">Italian</option>
                   </select>
                 </div>
                 <div>
@@ -402,7 +399,7 @@ const TranslationPortal = () => {
                   <select
                     value={translateTo}
                     onChange={(e) => setTranslateTo(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
                     <option value="english">English (USA)</option>
                     <option value="spanish">Spanish</option>
