@@ -215,6 +215,7 @@ const TranslationPortal = () => {
           
           const extractedWordCount = countWords(result.data.text);
           setWordCount(extractedWordCount);
+          setPageCount(Math.ceil(extractedWordCount / 250)); // Update page count based on words
           setIsProcessing(false);
         } catch (ocrError) {
           console.error('OCR Error:', ocrError);
