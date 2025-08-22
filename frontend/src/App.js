@@ -451,13 +451,29 @@ const TranslationPortal = () => {
                 </p>
               </div>
 
-              {/* File Info */}
-              {uploadedFile && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                  <div className="text-sm font-medium">{uploadedFile.name}</div>
-                  <div className="text-sm text-gray-600">
-                    {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                  </div>
+              {/* File Info - Multiple Files */}
+              {uploadedFiles && uploadedFiles.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {uploadedFiles.map((file, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded-md">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-sm font-medium">{file.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </div>
+                        <div className="text-sm text-green-600">
+                          ✓ Uploaded
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {uploadedFiles.length > 1 && (
+                    <div className="text-sm text-gray-600 text-center pt-2">
+                      Total: {uploadedFiles.length} files
+                    </div>
+                  )}
                 </div>
               )}
 
