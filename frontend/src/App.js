@@ -481,10 +481,20 @@ const TranslationPortal = () => {
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
-                  <div className="text-blue-800 font-medium">Processing document with OCR...</div>
+                  <div className="text-blue-800 font-medium">
+                    {uploadedFiles && uploadedFiles.length > 1 
+                      ? `Processing ${uploadedFiles.length} documents with OCR...`
+                      : 'Processing document with OCR...'
+                    }
+                  </div>
                   <div className="text-blue-600 text-sm">
                     Progress: {processingProgress}%
                   </div>
+                  {uploadedFiles && uploadedFiles.length > 1 && (
+                    <div className="text-blue-600 text-xs mt-1">
+                      Enhanced OCR for images and scanned PDFs
+                    </div>
+                  )}
                 </div>
               )}
             </div>
