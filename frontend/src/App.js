@@ -550,63 +550,81 @@ const TranslationPortal = () => {
             </div>
           </div>
 
-          {/* Right Panel - Quote Summary */}
-          <div className="bg-white rounded-lg shadow-sm p-8 h-fit sticky top-24">
-            <h2 className="text-2xl font-semibold text-blue-800 mb-6">Quote Summary</h2>
+          {/* Quote Summary */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold text-blue-600 mb-4">Quote Summary</h2>
             
-            <div className="space-y-4 mb-6">
+            <div className="space-y-3 mb-4">
               <div className="flex justify-between">
                 <span className="text-gray-600">Service</span>
-                <span className="font-medium">Translation Service</span>
+                <strong className="text-gray-900">
+                  {selectedService === 'standard' ? 'Standard Translation' :
+                   selectedService === 'professional' ? 'Professional Translation' :
+                   selectedService === 'specialist' ? 'Specialist Translation' : 'Translation Service'}
+                </strong>
               </div>
+              
               <div className="flex justify-between">
                 <span className="text-gray-600">Translation Type</span>
-                <span className="font-medium">{getServiceName(selectedService)}</span>
+                <strong className="text-gray-900">
+                  {selectedService === 'standard' ? 'Standard' :
+                   selectedService === 'professional' ? 'Professional' :
+                   selectedService === 'specialist' ? 'Specialist' : 'Professional'}
+                </strong>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Price per page</span>
+                <strong className="text-gray-900">
+                  {selectedService === 'standard' ? (pageCount <= 1 ? '$18.00' : `$18.00 + $${((wordCount - 250) * 0.02).toFixed(2)}`) :
+                   selectedService === 'professional' ? '$23.99' :
+                   selectedService === 'specialist' ? (pageCount <= 1 ? '$29.00' : `$29.00 + $${((wordCount - 250) * 0.13).toFixed(2)}`) : '$23.99'}
+                </strong>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Pages (billable)</span>
+                <strong className="text-gray-900">{pageCount} {pageCount === 1 ? 'page' : 'pages'}</strong>
+              </div>
+              
+              {urgency !== 'no' && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Urgency Fee ({urgency === 'priority' ? '+20%' : '+100%'})</span>
+                  <strong className="text-gray-900">${calculateUrgencyFee().toFixed(2)}</strong>
+                </div>
+              )}
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Discount</span>
+                <strong className="text-gray-900">$0.00</strong>
               </div>
             </div>
-
-            {quote && (
-              <>
-                <div className="bg-gray-50 rounded-lg p-5 mb-6">
-                  <div className="font-semibold text-gray-900 mb-3">
-                    Pricing ({getServicePrice(selectedService)})
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>{getPages()} page{getPages() !== 1 ? 's' : ''}</span>
-                    <span>{formatPrice(quote.base_price)}</span>
-                  </div>
-                  {quote.urgency_fee > 0 && (
-                    <div className="flex justify-between text-sm mt-2">
-                      <span>Urgency Fee</span>
-                      <span>{formatPrice(quote.urgency_fee)}</span>
-                    </div>
-                  )}
-                  <input
-                    type="text"
-                    placeholder="Enter Discount Code"
-                    className="w-full mt-4 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  />
-                </div>
-
-                <div className="flex justify-between mb-6">
-                  <span className="text-gray-600">Estimated Delivery</span>
-                  <span className="font-medium">{quote.estimated_delivery}</span>
-                </div>
-
-                <div className="bg-blue-800 text-white rounded-lg p-5 text-center mb-8">
-                  <div className="text-3xl font-bold">
-                    Total: {formatPrice(quote.total_price)}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Trustpilot Section */}
-            <div className="text-center">
-              <div className="text-lg font-semibold mb-1">Legacy Translations is rated</div>
-              <div className="text-2xl font-bold mb-2">Excellent</div>
-              <div className="text-green-500 text-xl mb-2">★★★★★</div>
-              <div className="text-green-600 font-bold">Trustpilot</div>
+            
+            <div className="border-t pt-3">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-medium text-gray-900">Total</span>
+                <strong className="text-2xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</strong>
+              </div>
+            </div>
+            
+            <div className="mt-4 text-center">
+              <div className="text-gray-600 text-sm mb-2">Estimated Delivery</div>
+              <div className="font-medium text-gray-900">
+                {urgency === 'urgent' ? 'Tomorrow (12h)' :
+                 urgency === 'priority' ? 'Saturday, August 23 (24h)' :
+                 'Saturday, August 23 (2 days)'}
+              </div>
+            </div>
+            
+            <div className="mt-6 text-center">
+              <div className="text-sm text-gray-600 mb-2">Legacy Translations is rated</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">Excellent</div>
+              <div className="flex justify-center items-center space-x-1 mb-2">
+                {[1,2,3,4,5].map(star => (
+                  <span key={star} className="text-green-500 text-lg">★</span>
+                ))}
+              </div>
+              <div className="text-sm text-green-600 font-medium">Trustpilot</div>
             </div>
           </div>
         </div>
