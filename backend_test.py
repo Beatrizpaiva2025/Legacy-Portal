@@ -43,15 +43,15 @@ class LegacyTranslationsAPITester:
             self.log_test("API Health Check", False, str(e))
             return False
 
-    def test_calculate_quote_professional(self):
-        """Test quote calculation for professional service"""
+    def test_calculate_quote_professional_200_words_no_urgency(self):
+        """Test professional service with 200 words, no urgency = $15.00"""
         try:
             quote_data = {
-                "reference": "Test Project Professional",
+                "reference": "TEST-PROF-200-NO-URGENCY",
                 "service_type": "professional",
-                "translate_from": "italian",
-                "translate_to": "english",
-                "word_count": 500,
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
                 "urgency": "no"
             }
             
@@ -60,26 +60,120 @@ class LegacyTranslationsAPITester:
             
             if success:
                 data = response.json()
-                # Verify pricing calculation: 500 words = 2 pages, $23.99 per page = $47.98
-                expected_pages = max(1, 500 / 250)  # 2 pages
-                expected_base_price = expected_pages * 23.99  # $47.98
+                # Professional: 200 words × $0.075 = $15.00
+                expected_base_price = 15.00
+                expected_urgency_fee = 0.00
+                expected_total = 15.00
                 
-                details = f"Base price: ${data['base_price']:.2f}, Expected: ${expected_base_price:.2f}"
-                price_correct = abs(data['base_price'] - expected_base_price) < 0.01
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
                 
                 if not price_correct:
                     success = False
-                    details += " - Price calculation incorrect"
+                    details += " - PRICING MISMATCH"
                 
             else:
                 details = f"Status: {response.status_code}, Response: {response.text}"
             
-            self.log_test("Calculate Quote - Professional", success, details)
+            self.log_test("Professional 200 words no urgency = $15.00", success, details)
             return success, response.json() if success else {}
             
         except Exception as e:
-            self.log_test("Calculate Quote - Professional", False, str(e))
+            self.log_test("Professional 200 words no urgency = $15.00", False, str(e))
             return False, {}
+
+    def test_calculate_quote_professional_200_words_priority(self):
+        """Test professional service with 200 words, priority urgency = $18.75"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROF-200-PRIORITY",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "priority"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Professional: 200 words × $0.075 = $15.00 base + 25% urgency = $3.75 = $18.75 total
+                expected_base_price = 15.00
+                expected_urgency_fee = 3.75
+                expected_total = 18.75
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Professional 200 words priority = $18.75", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Professional 200 words priority = $18.75", False, str(e))
+            return False
+
+    def test_calculate_quote_professional_200_words_urgent(self):
+        """Test professional service with 200 words, urgent urgency = $30.00"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROF-200-URGENT",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "urgent"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Professional: 200 words × $0.075 = $15.00 base + 100% urgency = $15.00 = $30.00 total
+                expected_base_price = 15.00
+                expected_urgency_fee = 15.00
+                expected_total = 30.00
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Professional 200 words urgent = $30.00", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Professional 200 words urgent = $30.00", False, str(e))
+            return False
 
     def test_calculate_quote_with_urgency(self):
         """Test quote calculation with urgency fees"""
