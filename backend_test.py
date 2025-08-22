@@ -834,7 +834,15 @@ class LegacyTranslationsAPITester:
 
 def main():
     tester = LegacyTranslationsAPITester()
-    success = tester.run_all_tests()
+    
+    # Check if we should run pricing tests specifically
+    if len(sys.argv) > 1 and sys.argv[1] == "pricing":
+        success = tester.run_pricing_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "protemos":
+        success = tester.run_protemos_tests_only()
+    else:
+        success = tester.run_all_tests()
+    
     return 0 if success else 1
 
 if __name__ == "__main__":
