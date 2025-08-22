@@ -632,11 +632,11 @@ const TranslationPortal = () => {
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-600">Price per page</span>
+                <span className="text-gray-600">Price per word</span>
                 <strong className="text-gray-900">
-                  {selectedService === 'standard' ? (pageCount <= 1 ? '$18.00' : `$18.00 + $${((wordCount - 250) * 0.02).toFixed(2)}`) :
-                   selectedService === 'professional' ? '$23.99' :
-                   selectedService === 'specialist' ? (pageCount <= 1 ? '$29.00' : `$29.00 + $${((wordCount - 250) * 0.13).toFixed(2)}`) : '$23.99'}
+                  {selectedService === 'professional' ? '$0.08' :
+                   selectedService === 'standard' ? (wordCount <= 250 ? '$18.00 min' : '$0.02') :
+                   selectedService === 'specialist' ? (wordCount <= 250 ? '$29.00 min' : '$0.13') : '$0.08'}
                 </strong>
               </div>
               
