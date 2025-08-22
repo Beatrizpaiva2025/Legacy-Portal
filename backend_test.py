@@ -746,7 +746,54 @@ class LegacyTranslationsAPITester:
             print("⚠️  Some pricing tests failed. Check details above.")
             return False
 
-    def run_protemos_tests_only(self):
+    def run_all_tests(self):
+        """Run all backend API tests"""
+        print("🚀 Starting Legacy Translations API Tests")
+        print("=" * 50)
+        
+        # Test API health first
+        if not self.test_api_health():
+            print("❌ API is not accessible. Stopping tests.")
+            return False
+        
+        # Run core functionality tests
+        self.test_calculate_quote_professional_200_words_no_urgency()
+        self.test_calculate_quote_with_urgency()
+        self.test_calculate_quote_standard_200_words()
+        self.test_upload_text_file()
+        self.test_word_count_endpoint()
+        self.test_get_quotes()
+        self.test_invalid_file_upload()
+        
+        # Run Protemos integration tests
+        print("\n🔗 Testing Protemos Integration")
+        print("-" * 30)
+        
+        # Create test quote for Protemos testing
+        quote_success, quote_data = self.test_protemos_create_quote_for_testing()
+        
+        if quote_success:
+            # Test Protemos project creation
+            self.test_protemos_create_project()
+            
+            # Test Protemos project retrieval
+            self.test_protemos_get_all_projects()
+            self.test_protemos_get_project_by_quote()
+        
+        # Test error handling
+        self.test_protemos_error_handling_invalid_quote()
+        self.test_protemos_get_nonexistent_project()
+        
+        # Print summary
+        print("\n" + "=" * 50)
+        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All backend tests passed!")
+            return True
+        else:
+            print("⚠️  Some backend tests failed. Check details above.")
+            return False
         """Run only Protemos integration tests"""
         print("🔗 Starting Protemos Integration Tests")
         print("=" * 50)
