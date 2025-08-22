@@ -217,16 +217,16 @@ class LegacyTranslationsAPITester:
             self.log_test("Calculate Quote - With Urgency", False, str(e))
             return False
 
-    def test_calculate_quote_standard(self):
-        """Test quote calculation for standard service"""
+    def test_calculate_quote_standard_200_words(self):
+        """Test standard service with 200 words = $18.00 (minimum)"""
         try:
             quote_data = {
-                "reference": "Test Project Standard",
+                "reference": "TEST-STANDARD-200",
                 "service_type": "standard",
-                "translate_from": "french",
-                "translate_to": "english", 
-                "word_count": 1000,
-                "urgency": "priority"
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "no"
             }
             
             response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
@@ -234,28 +234,132 @@ class LegacyTranslationsAPITester:
             
             if success:
                 data = response.json()
-                # Verify: 1000 words * $0.02 = $20.00 + $3.75 priority = $23.75
-                expected_base = 1000 * 0.02  # $20.00
-                expected_urgency = 3.75
-                expected_total = expected_base + expected_urgency
+                # Standard: Minimum $18.00 for up to 250 words
+                expected_base_price = 18.00
+                expected_urgency_fee = 0.00
+                expected_total = 18.00
                 
-                details = f"Total: ${data['total_price']:.2f}, Expected: ${expected_total:.2f}"
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
                 
-                price_correct = (abs(data['base_price'] - expected_base) < 0.01 and 
-                               abs(data['urgency_fee'] - expected_urgency) < 0.01)
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['total_price'] - expected_total) < 0.01)
                 
                 if not price_correct:
                     success = False
-                    details += " - Price calculation incorrect"
-                    
+                    details += " - PRICING MISMATCH"
+                
             else:
                 details = f"Status: {response.status_code}, Response: {response.text}"
             
-            self.log_test("Calculate Quote - Standard", success, details)
+            self.log_test("Standard 200 words = $18.00", success, details)
             return success
             
         except Exception as e:
-            self.log_test("Calculate Quote - Standard", False, str(e))
+            self.log_test("Standard 200 words = $18.00", False, str(e))
+            return False
+
+    def test_calculate_quote_specialist_200_words(self):
+        """Test specialist service with 200 words = $29.00 (minimum)"""
+        try:
+            quote_data = {
+                "reference": "TEST-SPECIALIST-200",
+                "service_type": "specialist",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Specialist: Minimum $29.00 for up to 250 words
+                expected_base_price = 29.00
+                expected_urgency_fee = 0.00
+                expected_total = 29.00
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Specialist 200 words = $29.00", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Specialist 200 words = $29.00", False, str(e))
+            return False
+
+    def test_urgency_percentages_verification(self):
+        """Test that urgency percentages are correct: Priority=25%, Urgent=100%"""
+        try:
+            # Test with a base amount that makes percentage calculation clear
+            test_cases = [
+                {
+                    "urgency": "priority",
+                    "expected_percentage": 0.25,
+                    "description": "Priority = 25%"
+                },
+                {
+                    "urgency": "urgent", 
+                    "expected_percentage": 1.00,
+                    "description": "Urgent = 100%"
+                }
+            ]
+            
+            all_success = True
+            details_list = []
+            
+            for case in test_cases:
+                quote_data = {
+                    "reference": f"TEST-URGENCY-{case['urgency'].upper()}",
+                    "service_type": "professional",
+                    "translate_from": "english",
+                    "translate_to": "spanish",
+                    "word_count": 400,  # 400 * 0.075 = $30.00 base for easy calculation
+                    "urgency": case["urgency"]
+                }
+                
+                response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    base_price = data['base_price']
+                    urgency_fee = data['urgency_fee']
+                    
+                    # Calculate actual percentage
+                    actual_percentage = urgency_fee / base_price if base_price > 0 else 0
+                    
+                    percentage_correct = abs(actual_percentage - case['expected_percentage']) < 0.01
+                    
+                    case_details = f"{case['description']}: ${urgency_fee:.2f} on ${base_price:.2f} = {actual_percentage:.1%}"
+                    
+                    if not percentage_correct:
+                        all_success = False
+                        case_details += f" (expected {case['expected_percentage']:.1%})"
+                    
+                    details_list.append(case_details)
+                else:
+                    all_success = False
+                    details_list.append(f"{case['description']}: API Error {response.status_code}")
+            
+            details = "; ".join(details_list)
+            self.log_test("Urgency Percentages Verification", all_success, details)
+            return all_success
+            
+        except Exception as e:
+            self.log_test("Urgency Percentages Verification", False, str(e))
             return False
 
     def test_upload_text_file(self):
