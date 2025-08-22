@@ -17,8 +17,10 @@ const TranslationPortal = () => {
   const [pageCount, setPageCount] = useState(1);
   const [urgency, setUrgency] = useState('no');
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [totalWordCount, setTotalWordCount] = useState(0);
   const [quote, setQuote] = useState(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
