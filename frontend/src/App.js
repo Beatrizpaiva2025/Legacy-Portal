@@ -231,13 +231,14 @@ const TranslationPortal = () => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.bmp', '.tiff'],
+      'image/*': ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp', '.gif'],
       'application/pdf': ['.pdf'],
-      'application/msword': ['.doc'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
       'text/plain': ['.txt']
     },
-    multiple: false
+    multiple: true,
+    maxSize: 50 * 1024 * 1024 // 50MB per file
   });
 
   // Utility functions
