@@ -26,6 +26,8 @@ typer>=0.9.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
 PyPDF2>=3.0.1
+pdfplumber>=0.10.0
+pymupdf>=1.23.0
 python-docx>=0.8.11
 aiofiles>=23.1.0
 emergentintegrations
