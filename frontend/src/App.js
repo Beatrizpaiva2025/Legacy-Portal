@@ -478,6 +478,9 @@ const TranslationPortal = () => {
                       page
                     </div>
                   </div>
+                  <div className="text-sm text-gray-500 mt-2">
+                    1 page = 250 words max
+                  </div>
                 </div>
               </div>
 
