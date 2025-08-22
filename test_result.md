@@ -120,6 +120,18 @@ backend:
         agent: "testing"
         comment: "✅ PROTEMOS INTEGRATION FULLY TESTED AND WORKING: All endpoints tested successfully - POST /api/protemos/create-project creates projects with mock responses, GET /api/protemos/projects retrieves all projects, GET /api/protemos/projects/{quote_id} retrieves specific projects, payment integration verified with protemos_project_id and protemos_status fields, error handling works correctly for invalid quotes. Fixed MongoDB ObjectId serialization issue and configured mock responses for testing environment. Integration is ready for production."
 
+  - task: "Professional Translation Pricing Calculation"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PROFESSIONAL TRANSLATION PRICING FULLY TESTED AND VERIFIED: All requested pricing scenarios tested successfully - Professional service with 200 words + no urgency = $15.00 (200 × $0.075) ✅, Professional + 200 words + priority urgency = $18.75 (base $15.00 + 25% = $3.75) ✅, Professional + 200 words + urgent urgency = $30.00 (base $15.00 + 100% = $15.00) ✅. Other service types verified working: Standard 200 words = $18.00 minimum ✅, Specialist 200 words = $29.00 minimum ✅. Urgency percentages confirmed: Priority = 25% (updated from 20%) ✅, Urgent = 100% ✅. All calculations match exact reference pricing structure from screenshots."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
