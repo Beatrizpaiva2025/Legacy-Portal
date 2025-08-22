@@ -403,14 +403,69 @@ async def extract_text_from_file(file: UploadFile) -> str:
     file_extension = file.filename.split('.')[-1].lower()
     
     try:
-        if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff']:
-            # Image OCR
-            image = Image.open(io.BytesIO(content))
-            text = pytesseract.image_to_string(image)
-            return text
+        if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'gif']:
+            # Enhanced Image OCR with preprocessing
+            try:
+                image = Image.open(io.BytesIO(content))
+                
+                # Image preprocessing for better OCR
+                # Convert to RGB if needed
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                
+                # Enhance image for better OCR results
+                from PIL import ImageEnhance, ImageFilter
+                
+                # Increase contrast
+                enhancer = ImageEnhance.Contrast(image)
+                image = enhancer.enhance(2.0)
+                
+                # Sharpen image
+                image = image.filter(ImageFilter.SHARPEN)
+                
+                # Scale up small images (OCR works better on larger images)
+                width, height = image.size
+                if width < 1000 or height < 1000:
+                    scale_factor = max(1000/width, 1000/height)
+                    new_width = int(width * scale_factor)
+                    new_height = int(height * scale_factor)
+                    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                # Try different OCR configurations for better results
+                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!?;:-()[]{}@#$%&*+=/<>|"'
+                
+                text = pytesseract.image_to_string(image, config=custom_config)
+                
+                # If text is too short, try different PSM modes
+                if len(text.strip()) < 50:
+                    logger.info("Trying alternative OCR configuration for better results")
+                    configs = [
+                        r'--oem 3 --psm 3',  # Fully automatic page segmentation
+                        r'--oem 3 --psm 4',  # Assume a single column of text
+                        r'--oem 3 --psm 8',  # Treat the image as a single word
+                        r'--oem 3 --psm 12', # Sparse text
+                    ]
+                    
+                    best_text = text
+                    for config in configs:
+                        try:
+                            alt_text = pytesseract.image_to_string(image, config=config)
+                            if len(alt_text.strip()) > len(best_text.strip()):
+                                best_text = alt_text
+                        except:
+                            continue
+                    
+                    text = best_text
+                
+                logger.info(f"Successfully extracted text from image using OCR: {len(text)} characters")
+                return text
+                
+            except Exception as e:
+                logger.error(f"Image OCR failed: {str(e)}")
+                return ""
             
         elif file_extension == 'pdf':
-            # Try multiple PDF extraction methods for better reliability
+            # Enhanced PDF processing with image-based PDF support
             text = ""
             
             # Method 1: Try pdfplumber first (most reliable for text-based PDFs)
@@ -443,7 +498,7 @@ async def extract_text_from_file(file: UploadFile) -> str:
             except Exception as e:
                 logger.warning(f"PyMuPDF extraction failed: {str(e)}")
             
-            # Method 3: Try PyPDF2 as final fallback
+            # Method 3: Try PyPDF2 as fallback
             try:
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
                 for page in pdf_reader.pages:
@@ -457,11 +512,34 @@ async def extract_text_from_file(file: UploadFile) -> str:
             except Exception as e:
                 logger.warning(f"PyPDF2 extraction failed: {str(e)}")
             
-            # If all PDF methods fail, check if it might be an image-based PDF
+            # Method 4: If all text extraction fails, try OCR on PDF pages (for image-based PDFs)
             if not text.strip():
-                logger.warning("PDF appears to be image-based or encrypted. Consider OCR processing.")
-                # For now, return empty text but log the issue
-                return ""
+                logger.info("PDF appears to be image-based. Attempting OCR extraction...")
+                try:
+                    pdf_document = fitz.open(stream=content, filetype="pdf")
+                    
+                    for page_num in range(min(pdf_document.page_count, 10)):  # Limit to first 10 pages for performance
+                        page = pdf_document[page_num]
+                        
+                        # Convert PDF page to image
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
+                        img_data = pix.tobytes("png")
+                        
+                        # Process with OCR
+                        image = Image.open(io.BytesIO(img_data))
+                        page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                        
+                        if page_text.strip():
+                            text += page_text + "\n"
+                    
+                    pdf_document.close()
+                    
+                    if text.strip():
+                        logger.info(f"Successfully extracted text from image-based PDF using OCR: {len(text)} characters")
+                        return text
+                        
+                except Exception as e:
+                    logger.warning(f"PDF OCR extraction failed: {str(e)}")
             
             return text
             
@@ -472,9 +550,17 @@ async def extract_text_from_file(file: UploadFile) -> str:
             return text
             
         elif file_extension == 'txt':
-            # Plain text
-            text = content.decode('utf-8')
-            return text
+            # Plain text - try multiple encodings
+            encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+            for encoding in encodings:
+                try:
+                    text = content.decode(encoding)
+                    return text
+                except UnicodeDecodeError:
+                    continue
+            
+            # If all encodings fail
+            raise HTTPException(status_code=400, detail="Unable to decode text file")
             
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_extension}")
