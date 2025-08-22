@@ -175,49 +175,74 @@ const TranslationPortal = () => {
     }
   };
 
-  // File upload handling
+  // File upload handling - Multiple files support
   const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+    if (acceptedFiles.length === 0) return;
 
-    setUploadedFile(file);
+    setUploadedFiles(acceptedFiles);
     setIsProcessing(true);
     setProcessingProgress(0);
 
+    let totalWords = 0;
+    let processedFiles = 0;
+
     try {
-      // Upload to backend for processing
-      const formData = new FormData();
-      formData.append('file', file);
+      // Process each file
+      for (const file of acceptedFiles) {
+        setProcessingProgress(Math.round((processedFiles / acceptedFiles.length) * 100));
+        
+        const formData = new FormData();
+        formData.append('file', file);
 
-      const response = await axios.post(`${API}/upload-document`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (progressEvent) => {
-          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setProcessingProgress(progress);
+        try {
+          const response = await axios.post(`${API}/upload-document`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+
+          if (response.data && response.data.word_count) {
+            totalWords += response.data.word_count;
+          }
+          
+          processedFiles++;
+        } catch (fileError) {
+          console.error(`Error processing file ${file.name}:`, fileError);
+          processedFiles++; // Continue with other files
         }
-      });
+      }
 
-      setWordCount(response.data.word_count);
-      setPageCount(Math.ceil(response.data.word_count / 250)); // Update page count based on words
-      setIsProcessing(false);
+      // Update total word count and page count
+      setWordCount(totalWords);
+      setTotalWordCount(totalWords);
+      setPageCount(Math.ceil(totalWords / 250));
+      setProcessingProgress(100);
+
+      // Auto-calculate quote after processing
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 500);
+
     } catch (error) {
-      console.error('Error processing file:', error);
+      console.error('Error processing files:', error);
       setIsProcessing(false);
       
-      // Fallback to frontend OCR for images
-      if (file.type.startsWith('image/')) {
+      // Fallback to frontend OCR for single image files
+      if (acceptedFiles.length === 1 && acceptedFiles[0].type.startsWith('image/')) {
         try {
-          const result = await Tesseract.recognize(file, 'eng', {
+          setProcessingProgress(50);
+          const result = await Tesseract.recognize(acceptedFiles[0], 'eng', {
             logger: m => {
               if (m.status === 'recognizing text') {
-                setProcessingProgress(Math.round(m.progress * 100));
+                setProcessingProgress(50 + Math.round(m.progress * 40));
               }
             }
           });
           
           const extractedWordCount = countWords(result.data.text);
           setWordCount(extractedWordCount);
-          setPageCount(Math.ceil(extractedWordCount / 250)); // Update page count based on words
+          setTotalWordCount(extractedWordCount);
+          setPageCount(Math.ceil(extractedWordCount / 250));
           setIsProcessing(false);
         } catch (ocrError) {
           console.error('OCR Error:', ocrError);
