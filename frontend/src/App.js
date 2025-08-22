@@ -269,6 +269,16 @@ const TranslationPortal = () => {
     return Math.ceil(wordCount / 250);
   };
 
+  const calculateUrgencyFee = () => {
+    if (!quote) return 0;
+    return quote.urgency_fee || 0;
+  };
+
+  const calculateTotal = () => {
+    if (!quote) return 0;
+    return quote.total_price || 0;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
