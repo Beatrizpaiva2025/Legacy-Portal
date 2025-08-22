@@ -380,7 +380,7 @@ def get_estimated_delivery(urgency: str) -> str:
     return f"{formatted_date} ({days_text})"
 
 async def extract_text_from_file(file: UploadFile) -> str:
-    """Extract text from uploaded file using appropriate method"""
+    """Extract text from uploaded file using appropriate method with multiple fallbacks"""
     content = await file.read()
     file_extension = file.filename.split('.')[-1].lower()
     
@@ -392,11 +392,59 @@ async def extract_text_from_file(file: UploadFile) -> str:
             return text
             
         elif file_extension == 'pdf':
-            # PDF text extraction
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+            # Try multiple PDF extraction methods for better reliability
             text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
+            
+            # Method 1: Try pdfplumber first (most reliable for text-based PDFs)
+            try:
+                with pdfplumber.open(io.BytesIO(content)) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+                
+                if text.strip():
+                    logger.info(f"Successfully extracted text using pdfplumber: {len(text)} characters")
+                    return text
+            except Exception as e:
+                logger.warning(f"pdfplumber extraction failed: {str(e)}")
+            
+            # Method 2: Try PyMuPDF (fitz) as fallback
+            try:
+                pdf_document = fitz.open(stream=content, filetype="pdf")
+                for page_num in range(pdf_document.page_count):
+                    page = pdf_document[page_num]
+                    page_text = page.get_text()
+                    if page_text:
+                        text += page_text + "\n"
+                pdf_document.close()
+                
+                if text.strip():
+                    logger.info(f"Successfully extracted text using PyMuPDF: {len(text)} characters")
+                    return text
+            except Exception as e:
+                logger.warning(f"PyMuPDF extraction failed: {str(e)}")
+            
+            # Method 3: Try PyPDF2 as final fallback
+            try:
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+                for page in pdf_reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                
+                if text.strip():
+                    logger.info(f"Successfully extracted text using PyPDF2: {len(text)} characters")
+                    return text
+            except Exception as e:
+                logger.warning(f"PyPDF2 extraction failed: {str(e)}")
+            
+            # If all PDF methods fail, check if it might be an image-based PDF
+            if not text.strip():
+                logger.warning("PDF appears to be image-based or encrypted. Consider OCR processing.")
+                # For now, return empty text but log the issue
+                return ""
+            
             return text
             
         elif file_extension in ['docx', 'doc']:
