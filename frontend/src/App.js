@@ -365,13 +365,13 @@ const TranslationPortal = () => {
                     id: 'standard',
                     title: 'Standard Certified Translation',
                     price: 'Min $18.00',
-                    recommended: true
+                    recommended: false
                   },
                   {
                     id: 'professional', 
                     title: 'Professional Translation',
-                    price: '$23.99 / page',
-                    recommended: false
+                    price: '$0.08 / word',
+                    recommended: true
                   },
                   {
                     id: 'specialist',
