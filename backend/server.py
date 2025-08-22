@@ -320,11 +320,29 @@ class EmailNotificationRequest(BaseModel):
 
 # Utility functions
 def count_words(text: str) -> int:
-    """Count words in text"""
-    # Simple word counting by splitting on whitespace and filtering empty strings
-    words = text.strip().split()
-    words = [word for word in words if word.strip()]
-    return len(words)
+    """Count words in text with improved accuracy"""
+    if not text or not text.strip():
+        return 0
+    
+    # Clean the text: remove extra whitespace, normalize line breaks
+    cleaned_text = re.sub(r'\s+', ' ', text.strip())
+    
+    # Split by whitespace and filter out empty strings and very short strings
+    words = [word.strip() for word in cleaned_text.split() if word.strip() and len(word.strip()) > 1]
+    
+    # Filter out common PDF artifacts and noise
+    filtered_words = []
+    for word in words:
+        # Skip common PDF extraction artifacts
+        if not re.match(r'^[^\w\s]*$', word):  # Skip words that are only punctuation
+            # Skip very short words that are likely artifacts (but keep common short words)
+            if len(word) > 2 or word.lower() in ['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'is', 'as', 'or', 'if', 'it', 'be', 'we', 'he', 'me', 'my', 'no', 'so', 'up', 'do', 'go']:
+                filtered_words.append(word)
+    
+    word_count = len(filtered_words)
+    logger.info(f"Word count: {word_count} (original: {len(words)}, filtered: {len(filtered_words)})")
+    
+    return word_count
 
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
     """Calculate pricing based on word count, service type, and urgency"""
