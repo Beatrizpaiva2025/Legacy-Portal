@@ -697,9 +697,9 @@ class LegacyTranslationsAPITester:
             self.log_test("Protemos Payment Integration Verification", False, str(e))
             return False
 
-    def run_all_tests(self):
-        """Run all backend API tests"""
-        print("🚀 Starting Legacy Translations API Tests")
+    def run_pricing_tests(self):
+        """Run specific pricing calculation tests as requested in review"""
+        print("💰 Starting Pricing Calculation Tests")
         print("=" * 50)
         
         # Test API health first
@@ -707,43 +707,43 @@ class LegacyTranslationsAPITester:
             print("❌ API is not accessible. Stopping tests.")
             return False
         
-        # Run core functionality tests
-        self.test_calculate_quote_professional()
-        self.test_calculate_quote_with_urgency()
-        self.test_calculate_quote_standard()
-        self.test_upload_text_file()
-        self.test_word_count_endpoint()
-        self.test_get_quotes()
-        self.test_invalid_file_upload()
+        # Run the specific pricing tests requested
+        print("\n🎯 Testing Professional Translation Pricing")
+        print("-" * 40)
         
-        # Run Protemos integration tests
-        print("\n🔗 Testing Protemos Integration")
-        print("-" * 30)
+        # Test 1: Professional + 200 words + no urgency = $15.00
+        self.test_calculate_quote_professional_200_words_no_urgency()
         
-        # Create test quote for Protemos testing
-        quote_success, quote_data = self.test_protemos_create_quote_for_testing()
+        # Test 2: Professional + 200 words + priority = $18.75
+        self.test_calculate_quote_professional_200_words_priority()
         
-        if quote_success:
-            # Test Protemos project creation
-            self.test_protemos_create_project()
-            
-            # Test Protemos project retrieval
-            self.test_protemos_get_all_projects()
-            self.test_protemos_get_project_by_quote()
+        # Test 3: Professional + 200 words + urgent = $30.00
+        self.test_calculate_quote_professional_200_words_urgent()
         
-        # Test error handling
-        self.test_protemos_error_handling_invalid_quote()
-        self.test_protemos_get_nonexistent_project()
+        print("\n🔍 Testing Other Service Types Still Work")
+        print("-" * 40)
+        
+        # Test 4: Standard service with 200 words = $18.00
+        self.test_calculate_quote_standard_200_words()
+        
+        # Test 5: Specialist service with 200 words = $29.00
+        self.test_calculate_quote_specialist_200_words()
+        
+        print("\n📊 Testing Urgency Percentages")
+        print("-" * 40)
+        
+        # Test 6: Verify urgency percentages
+        self.test_urgency_percentages_verification()
         
         # Print summary
         print("\n" + "=" * 50)
-        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        print(f"📊 Pricing Test Results: {self.tests_passed}/{self.tests_run} tests passed")
         
         if self.tests_passed == self.tests_run:
-            print("🎉 All backend tests passed!")
+            print("🎉 All pricing tests passed!")
             return True
         else:
-            print("⚠️  Some backend tests failed. Check details above.")
+            print("⚠️  Some pricing tests failed. Check details above.")
             return False
 
     def run_protemos_tests_only(self):
