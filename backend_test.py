@@ -176,14 +176,14 @@ class LegacyTranslationsAPITester:
             return False
 
     def test_calculate_quote_with_urgency(self):
-        """Test quote calculation with urgency fees"""
+        """Test quote calculation with urgency fees - updated for new pricing"""
         try:
             quote_data = {
-                "reference": "Test Project Urgent",
+                "reference": "Test Project Urgent Updated",
                 "service_type": "professional", 
                 "translate_from": "spanish",
                 "translate_to": "english",
-                "word_count": 250,
+                "word_count": 200,  # Changed to 200 for $15.00 base
                 "urgency": "urgent"
             }
             
@@ -192,29 +192,31 @@ class LegacyTranslationsAPITester:
             
             if success:
                 data = response.json()
-                # Verify: 250 words = 1 page, $23.99 + $15.00 urgent fee = $38.99
-                expected_base = 23.99
+                # Professional: 200 words × $0.075 = $15.00 + 100% urgent fee = $15.00 = $30.00 total
+                expected_base = 15.00
                 expected_urgency = 15.00
-                expected_total = expected_base + expected_urgency
+                expected_total = 30.00
                 
-                details = f"Total: ${data['total_price']:.2f}, Expected: ${expected_total:.2f}"
-                details += f", Urgency fee: ${data['urgency_fee']:.2f}"
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
                 
                 price_correct = (abs(data['base_price'] - expected_base) < 0.01 and 
-                               abs(data['urgency_fee'] - expected_urgency) < 0.01)
+                               abs(data['urgency_fee'] - expected_urgency) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
                 
                 if not price_correct:
                     success = False
-                    details += " - Price calculation incorrect"
+                    details += " - PRICING MISMATCH"
                     
             else:
                 details = f"Status: {response.status_code}, Response: {response.text}"
             
-            self.log_test("Calculate Quote - With Urgency", success, details)
+            self.log_test("Calculate Quote - With Urgency (Updated)", success, details)
             return success
             
         except Exception as e:
-            self.log_test("Calculate Quote - With Urgency", False, str(e))
+            self.log_test("Calculate Quote - With Urgency (Updated)", False, str(e))
             return False
 
     def test_calculate_quote_standard_200_words(self):
