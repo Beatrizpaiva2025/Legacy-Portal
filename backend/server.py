@@ -14,6 +14,8 @@ import aiofiles
 import pytesseract
 from PIL import Image
 import PyPDF2
+import pdfplumber
+import fitz  # PyMuPDF
 from docx import Document
 import io
 import tempfile
