@@ -641,8 +641,8 @@ const TranslationPortal = () => {
               </div>
               
               <div className="flex justify-between">
-                <span className="text-gray-600">Pages (billable)</span>
-                <strong className="text-gray-900">{pageCount} {pageCount === 1 ? 'page' : 'pages'}</strong>
+                <span className="text-gray-600">Words</span>
+                <strong className="text-gray-900">{wordCount} words</strong>
               </div>
               
               {urgency !== 'no' && (
