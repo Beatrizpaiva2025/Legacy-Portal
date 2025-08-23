@@ -363,19 +363,22 @@ const TranslationPortal = () => {
                 {[
                   {
                     id: 'standard',
-                    title: 'Standard Certified Translation',
-                    price: 'Min $18.00',
-                    recommended: false
+                    title: 'Certified Translation',
+                    subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
+                    price: '$24.99 / page',
+                    recommended: true
                   },
                   {
                     id: 'professional', 
                     title: 'Professional Translation',
+                    subtitle: 'Standard, regular translation for individual and business use.',
                     price: '$0.08 / word',
-                    recommended: true
+                    recommended: false
                   },
                   {
                     id: 'specialist',
                     title: 'Specialist Translation',
+                    subtitle: 'Expert translation for technical and specialized content.',
                     price: 'Min $29.00',
                     recommended: false
                   }
