@@ -429,7 +429,7 @@ async def extract_text_from_file(file: UploadFile) -> str:
                     image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
                 # Try different OCR configurations for better results
-                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!?;:-()[]{}@#$%&*+=/<>|"'
+                custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .,!?;:-()[]{}@#$%&*+=/<>|'
                 
                 text = pytesseract.image_to_string(image, config=custom_config)
                 
