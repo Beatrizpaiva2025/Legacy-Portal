@@ -132,6 +132,18 @@ backend:
         agent: "testing"
         comment: "✅ PROFESSIONAL TRANSLATION PRICING FULLY TESTED AND VERIFIED: All requested pricing scenarios tested successfully - Professional service with 200 words + no urgency = $15.00 (200 × $0.075) ✅, Professional + 200 words + priority urgency = $18.75 (base $15.00 + 25% = $3.75) ✅, Professional + 200 words + urgent urgency = $30.00 (base $15.00 + 100% = $15.00) ✅. Other service types verified working: Standard 200 words = $18.00 minimum ✅, Specialist 200 words = $29.00 minimum ✅. Urgency percentages confirmed: Priority = 25% (updated from 20%) ✅, Urgent = 100% ✅. All calculations match exact reference pricing structure from screenshots."
 
+  - task: "Certified Translation Pricing Calculation"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ CERTIFIED TRANSLATION PRICING FULLY TESTED AND VERIFIED: All requested pricing scenarios tested successfully and match Translayte reference exactly - Standard service (Certified Translation) with 250 words (1 page) + no urgency = $24.99 (1 page × $24.99) ✅, Standard + 500 words (2 pages) + no urgency = $49.98 (2 pages × $24.99) ✅, Standard + 250 words + priority urgency = $31.24 (base $24.99 + 25% urgency fee $6.25) ✅, Standard + 250 words + urgent urgency = $49.98 (base $24.99 + 100% urgency fee $24.99) ✅. Professional translation verified still working: 200 words + no urgency = $15.00 (200 × $0.075) ✅. All calculations are precise and match the expected Translayte reference pricing structure. POST /api/calculate-quote endpoint working flawlessly for all service types."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
