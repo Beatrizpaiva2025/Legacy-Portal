@@ -764,9 +764,8 @@ async def get_payment_status(session_id: str):
             raise HTTPException(status_code=404, detail="Payment session not found")
         
         # Initialize Stripe checkout
-        stripe_api_key = os.environ.get('STRIPE_API_KEY')
-        if not stripe_api_key:
-            raise HTTPException(status_code=500, detail="Stripe API key not configured")
+        # Force the correct test API key
+        stripe_api_key = "sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C"
         
         stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
         
