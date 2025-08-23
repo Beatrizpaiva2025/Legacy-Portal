@@ -218,8 +218,11 @@ const TranslationPortal = () => {
       setPageCount(Math.ceil(totalWords / 250));
       setProcessingProgress(100);
 
-      // Auto-calculate quote after processing
+      // Update quote if we have enough data
       setTimeout(() => {
+        if (reference && selectedService && translateFrom && translateTo && totalWords > 0) {
+          updateQuote();
+        }
         setIsProcessing(false);
       }, 500);
 
