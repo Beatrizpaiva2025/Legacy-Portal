@@ -401,8 +401,11 @@ const TranslationPortal = () => {
                       />
                       <div>
                         <h4 className="font-medium text-gray-900">{service.title}</h4>
+                        {service.subtitle && (
+                          <p className="text-sm text-gray-600 mt-1">{service.subtitle}</p>
+                        )}
                         {service.recommended && (
-                          <span className="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-1">
+                          <span className="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-2">
                             Recommended
                           </span>
                         )}
