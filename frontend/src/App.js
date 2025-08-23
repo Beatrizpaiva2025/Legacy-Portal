@@ -307,6 +307,11 @@ const TranslationPortal = () => {
     return quote.total_price || 0;
   };
 
+  const calculateBasePrice = () => {
+    if (!quote) return 0;
+    return quote.base_price || 0;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
