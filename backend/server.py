@@ -745,48 +745,57 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
 
-@api_router.get("/payment/status/{session_id}", response_model=CheckoutStatusResponse)
+@api_router.get("/payment-status/{session_id}")
 async def get_payment_status(session_id: str):
-    """Get payment status for a checkout session"""
+    """Get payment status from Stripe and database"""
     
     try:
-        # Get payment transaction from database
-        payment_transaction = await db.payment_transactions.find_one({"session_id": session_id})
-        if not payment_transaction:
+        # Get transaction from database
+        transaction = await db.payment_transactions.find_one({"session_id": session_id})
+        if not transaction:
             raise HTTPException(status_code=404, detail="Payment session not found")
         
-        # Initialize Stripe checkout
-        # Force the correct test API key
-        stripe_api_key = "sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C"
+        # Get session from Stripe
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
         
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url="")
+        # Update transaction status based on Stripe session
+        stripe_status = checkout_session.payment_status
+        status_mapping = {
+            'paid': 'completed',
+            'unpaid': 'pending',
+            'no_payment_required': 'completed'
+        }
         
-        # Get checkout status from Stripe
-        status_response = await stripe_checkout.get_checkout_status(session_id)
+        new_status = status_mapping.get(stripe_status, 'pending')
         
-        # Update payment transaction if status changed and not already processed
-        if (status_response.payment_status != payment_transaction.get("payment_status") and 
-            payment_transaction.get("payment_status") != "paid"):
-            
+        # Update database if status changed
+        if transaction['status'] != new_status:
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
-                        "payment_status": status_response.payment_status,
-                        "status": status_response.status,
+                        "status": new_status,
+                        "payment_status": stripe_status,
                         "updated_at": datetime.utcnow()
                     }
                 }
             )
             
-            # If payment is successful, send confirmation emails
-            if status_response.payment_status == "paid" and payment_transaction.get("payment_status") != "paid":
-                await handle_successful_payment(session_id, payment_transaction)
+            # Handle successful payment
+            if new_status == 'completed':
+                await handle_successful_payment(session_id, transaction)
         
-        return status_response
+        return {
+            "session_id": session_id,
+            "status": new_status,
+            "payment_status": stripe_status,
+            "amount": transaction['amount'],
+            "currency": transaction['currency']
+        }
         
-    except HTTPException:
-        raise
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error getting payment status: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
     except Exception as e:
         logger.error(f"Error getting payment status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get payment status")
