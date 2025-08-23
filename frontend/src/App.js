@@ -45,7 +45,7 @@ const TranslationPortal = () => {
         origin_url: window.location.origin
       };
 
-      const response = await axios.post(`${API}/payment/checkout`, paymentData);
+      const response = await axios.post(`${API}/create-payment-checkout`, paymentData);
       
       // Redirect to Stripe checkout
       if (response.data.url) {
