@@ -62,7 +62,7 @@ const TranslationPortal = () => {
 
   const checkPaymentStatus = async (sessionId) => {
     try {
-      const response = await axios.get(`${API}/payment/status/${sessionId}`);
+      const response = await axios.get(`${API}/payment-status/${sessionId}`);
       
       if (response.data.payment_status === 'paid') {
         alert('Payment successful! Your translation order has been confirmed. You will receive an email confirmation shortly.');
