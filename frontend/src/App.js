@@ -627,9 +627,18 @@ const TranslationPortal = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Service</span>
                 <strong className="text-gray-900">
-                  {selectedService === 'standard' ? 'Standard Translation' :
+                  {selectedService === 'standard' ? 'Certified Translation' :
                    selectedService === 'professional' ? 'Professional Translation' :
-                   selectedService === 'specialist' ? 'Specialist Translation' : 'Translation Service'}
+                   selectedService === 'specialist' ? 'Specialist Translation' : 'Certified Translation'}
+                </strong>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Certification Type</span>
+                <strong className="text-gray-900">
+                  {selectedService === 'standard' ? 'Standard Certified Translation' :
+                   selectedService === 'professional' ? 'Professional Translation' :
+                   selectedService === 'specialist' ? 'Specialist Translation' : 'Standard Certified Translation'}
                 </strong>
               </div>
               
@@ -638,34 +647,41 @@ const TranslationPortal = () => {
                 <strong className="text-gray-900">
                   {selectedService === 'standard' ? 'Standard' :
                    selectedService === 'professional' ? 'Professional' :
-                   selectedService === 'specialist' ? 'Specialist' : 'Professional'}
+                   selectedService === 'specialist' ? 'Specialist' : 'Standard'}
                 </strong>
               </div>
               
-              <div className="flex justify-between">
-                <span className="text-gray-600">Price per word</span>
-                <strong className="text-gray-900">
-                  {selectedService === 'professional' ? '$0.08' :
-                   selectedService === 'standard' ? (wordCount <= 250 ? '$18.00 min' : '$0.02') :
-                   selectedService === 'specialist' ? (wordCount <= 250 ? '$29.00 min' : '$0.13') : '$0.08'}
-                </strong>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Words</span>
-                <strong className="text-gray-900">{wordCount} words</strong>
+              <div className="mt-6 mb-4">
+                <h4 className="text-lg font-semibold text-gray-800 mb-3">
+                  Pricing ({selectedService === 'standard' ? '$24.99 / page' : 
+                           selectedService === 'professional' ? '$0.08 / word' : 
+                           'Min $29.00'})
+                </h4>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">
+                    {selectedService === 'standard' ? `${pageCount} page${pageCount !== 1 ? 's' : ''}` :
+                     selectedService === 'professional' ? `${wordCount} words` :
+                     `${pageCount} page${pageCount !== 1 ? 's' : ''}`}
+                  </span>
+                  <strong className="text-gray-900">
+                    ${calculateBasePrice().toFixed(2)}
+                  </strong>
+                </div>
               </div>
               
               {urgency !== 'no' && (
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Urgency Fee ({urgency === 'priority' ? '+20%' : '+100%'})</span>
+                  <span className="text-gray-600">Urgency Fee ({urgency === 'priority' ? '+25%' : '+100%'})</span>
                   <strong className="text-gray-900">${calculateUrgencyFee().toFixed(2)}</strong>
                 </div>
               )}
               
-              <div className="flex justify-between">
-                <span className="text-gray-600">Discount</span>
-                <strong className="text-gray-900">$0.00</strong>
+              <div className="mt-4">
+                <input
+                  type="text"
+                  placeholder="Enter Discount Code"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
               </div>
             </div>
             
