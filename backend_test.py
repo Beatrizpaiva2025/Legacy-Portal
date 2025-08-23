@@ -697,6 +697,182 @@ class LegacyTranslationsAPITester:
             self.log_test("Protemos Payment Integration Verification", False, str(e))
             return False
 
+    def test_certified_translation_250_words_no_urgency(self):
+        """Test Certified Translation (Standard service) with 250 words (1 page), no urgency = $24.99"""
+        try:
+            quote_data = {
+                "reference": "TEST-CERTIFIED-250-NO-URGENCY",
+                "service_type": "standard",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 250,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Certified Translation: 250 words = 1 page × $24.99 = $24.99
+                expected_base_price = 24.99
+                expected_urgency_fee = 0.00
+                expected_total = 24.99
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Certified Translation 250 words (1 page) no urgency = $24.99", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Certified Translation 250 words (1 page) no urgency = $24.99", False, str(e))
+            return False
+
+    def test_certified_translation_500_words_no_urgency(self):
+        """Test Certified Translation (Standard service) with 500 words (2 pages), no urgency = $49.98"""
+        try:
+            quote_data = {
+                "reference": "TEST-CERTIFIED-500-NO-URGENCY",
+                "service_type": "standard",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 500,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Certified Translation: 500 words = 2 pages × $24.99 = $49.98
+                expected_base_price = 49.98
+                expected_urgency_fee = 0.00
+                expected_total = 49.98
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Certified Translation 500 words (2 pages) no urgency = $49.98", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Certified Translation 500 words (2 pages) no urgency = $49.98", False, str(e))
+            return False
+
+    def test_certified_translation_250_words_priority_urgency(self):
+        """Test Certified Translation (Standard service) with 250 words + priority urgency = $31.24"""
+        try:
+            quote_data = {
+                "reference": "TEST-CERTIFIED-250-PRIORITY",
+                "service_type": "standard",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 250,
+                "urgency": "priority"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Certified Translation: 250 words = 1 page × $24.99 = $24.99 base + 25% urgency = $6.25 = $31.24 total
+                expected_base_price = 24.99
+                expected_urgency_fee = 6.25  # 25% of $24.99 = $6.2475, rounded to $6.25
+                expected_total = 31.24
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Certified Translation 250 words + priority urgency = $31.24", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Certified Translation 250 words + priority urgency = $31.24", False, str(e))
+            return False
+
+    def test_certified_translation_250_words_urgent_urgency(self):
+        """Test Certified Translation (Standard service) with 250 words + urgent urgency = $49.98"""
+        try:
+            quote_data = {
+                "reference": "TEST-CERTIFIED-250-URGENT",
+                "service_type": "standard",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 250,
+                "urgency": "urgent"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Certified Translation: 250 words = 1 page × $24.99 = $24.99 base + 100% urgency = $24.99 = $49.98 total
+                expected_base_price = 24.99
+                expected_urgency_fee = 24.99  # 100% of $24.99
+                expected_total = 49.98
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Certified Translation 250 words + urgent urgency = $49.98", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Certified Translation 250 words + urgent urgency = $49.98", False, str(e))
+            return False
+
     def run_pricing_tests(self):
         """Run specific pricing calculation tests as requested in review"""
         print("💰 Starting Pricing Calculation Tests")
