@@ -117,13 +117,6 @@ const TranslationPortal = () => {
       const response = await axios.post(`${API}/calculate-quote`, quoteData);
       setQuote(response.data);
       
-      // Save to backend
-      try {
-        const response = await axios.post(`${API}/calculate-quote`, quoteData);
-        setQuote(prev => ({ ...prev, id: response.data.id })); // Update with backend ID
-      } catch (error) {
-        console.error('Error saving quote to backend:', error);
-      }
     } catch (error) {
       console.error('Error calculating quote:', error);
     }
