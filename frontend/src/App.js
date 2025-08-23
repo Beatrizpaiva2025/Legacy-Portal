@@ -97,81 +97,35 @@ const TranslationPortal = () => {
   }, [wordCount, selectedService, urgency, translateFrom, translateTo]);
 
   const calculateQuote = async () => {
-    // Calculate a local quote (updated pricing logic)
-    const pages = Math.ceil(wordCount / 250);
-    let basePrice;
-    
-    if (selectedService === "standard") {
-      // Standard: Minimum $18.00 (up to 250 words), then $0.02 per word
-      if (wordCount <= 250) {
-        basePrice = 18.00;
-      } else {
-        basePrice = 18.00 + ((wordCount - 250) * 0.02);
-      }
-    } else if (selectedService === "professional") {
-      // Professional: $23.99 per page (250 words = 1 page)
-      basePrice = pages * 23.99;
-    } else if (selectedService === "specialist") {
-      // Specialist: Minimum $29.00 for first page, then $0.13 per word for additional
-      if (wordCount <= 250) {
-        basePrice = 29.00;
-      } else {
-        basePrice = 29.00 + ((wordCount - 250) * 0.13);
-      }
-    } else {
-      basePrice = pages * 23.99;
+    // Don't do local calculation - always use backend
+    if (!projectReference || !selectedService || !translateFrom || !translateTo) {
+      console.log('Missing required fields for quote calculation');
+      return;
     }
-    
-    let urgencyFee = 0;
-    if (urgency === "priority") {
-      urgencyFee = basePrice * 0.20; // 20% of base price
-    } else if (urgency === "urgent") {
-      urgencyFee = basePrice * 1.00; // 100% of base price
-    }
-    
-    const totalPrice = basePrice + urgencyFee;
-    const today = new Date();
-    let deliveryDate;
-    let daysText;
-    
-    if (urgency === "urgent") {
-      deliveryDate = new Date(today.getTime() + 12 * 60 * 60 * 1000);
-      daysText = "12 hours";
-    } else if (urgency === "priority") {
-      deliveryDate = new Date(today.getTime() + 24 * 60 * 60 * 1000);  
-      daysText = "24 hours";
-    } else {
-      deliveryDate = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000);
-      daysText = "2 days";
-    }
-    
-    const estimatedDelivery = `${deliveryDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} (${daysText})`;
-    
-    setQuote({
-      base_price: basePrice,
-      urgency_fee: urgencyFee,
-      total_price: totalPrice,
-      estimated_delivery: estimatedDelivery,
-      id: `local-${Date.now()}` // For payment processing
-    });
 
-    // If project reference exists, also save to backend
-    if (projectReference) {
+    try {
+      // Send to backend for accurate pricing
+      const quoteData = {
+        reference: projectReference,
+        service_type: selectedService,
+        translate_from: translateFrom,
+        translate_to: translateTo,
+        word_count: wordCount,
+        urgency: urgency
+      };
+
+      const response = await axios.post(`${API}/calculate-quote`, quoteData);
+      setQuote(response.data);
+      
+      // Save to backend
       try {
-        const quoteData = {
-          reference: projectReference,
-          service_type: selectedService,
-          translate_from: translateFrom,
-          translate_to: translateTo,
-          word_count: wordCount,
-          urgency: urgency
-        };
-
         const response = await axios.post(`${API}/calculate-quote`, quoteData);
         setQuote(prev => ({ ...prev, id: response.data.id })); // Update with backend ID
       } catch (error) {
         console.error('Error saving quote to backend:', error);
       }
+    } catch (error) {
+      console.error('Error calculating quote:', error);
     }
   };
 
