@@ -873,6 +873,49 @@ class LegacyTranslationsAPITester:
             self.log_test("Certified Translation 250 words + urgent urgency = $49.98", False, str(e))
             return False
 
+    def run_certified_translation_pricing_tests(self):
+        """Run specific certified translation pricing calculation tests as requested in review"""
+        print("💰 Starting Certified Translation Pricing Tests")
+        print("=" * 50)
+        
+        # Test API health first
+        if not self.test_api_health():
+            print("❌ API is not accessible. Stopping tests.")
+            return False
+        
+        # Run the specific certified translation pricing tests requested
+        print("\n🎯 Testing Certified Translation (Standard Service) Pricing")
+        print("-" * 50)
+        
+        # Test 1: 250 words (1 page) + no urgency = $24.99
+        self.test_certified_translation_250_words_no_urgency()
+        
+        # Test 2: 500 words (2 pages) + no urgency = $49.98
+        self.test_certified_translation_500_words_no_urgency()
+        
+        # Test 3: 250 words + priority urgency = $31.24
+        self.test_certified_translation_250_words_priority_urgency()
+        
+        # Test 4: 250 words + urgent urgency = $49.98
+        self.test_certified_translation_250_words_urgent_urgency()
+        
+        print("\n🔍 Verifying Professional Translation Still Works")
+        print("-" * 50)
+        
+        # Test 5: Professional service with 200 words + no urgency = $15.00
+        self.test_calculate_quote_professional_200_words_no_urgency()
+        
+        # Print summary
+        print("\n" + "=" * 50)
+        print(f"📊 Certified Translation Pricing Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All certified translation pricing tests passed!")
+            return True
+        else:
+            print("⚠️  Some certified translation pricing tests failed. Check details above.")
+            return False
+
     def run_pricing_tests(self):
         """Run specific pricing calculation tests as requested in review"""
         print("💰 Starting Pricing Calculation Tests")
