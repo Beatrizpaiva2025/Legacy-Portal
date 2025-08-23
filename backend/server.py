@@ -347,13 +347,13 @@ def count_words(text: str) -> int:
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
     """Calculate pricing based on word count, service type, and urgency"""
     
+    # Convert words to pages (250 words = 1 page)
+    pages = max(1, word_count / 250)
+    
     # Base price depending on service type
     if service_type == "standard":
-        # Standard: Minimum $18.00 (up to 250 words), then $0.02 per word
-        if word_count <= 250:
-            base_price = 18.00
-        else:
-            base_price = 18.00 + ((word_count - 250) * 0.02)
+        # Standard/Certified Translation: $24.99 per page (250 words = 1 page)
+        base_price = pages * 24.99
     elif service_type == "professional":
         # Professional: $0.075 per word (displays as $0.08/word but calculates to $15.00 for 200 words)
         base_price = word_count * 0.075
@@ -364,14 +364,14 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
         else:
             base_price = 29.00 + ((word_count - 250) * 0.13)
     else:
-        base_price = word_count * 0.075  # Default to professional
+        base_price = pages * 24.99  # Default to standard certified
     
     # Urgency fees based on percentage of base price
     urgency_fee = 0
     if urgency == "priority":
-        urgency_fee = base_price * 0.25  # 25% of base price (matches +$3.75 for $15.00 base)
+        urgency_fee = base_price * 0.25  # 25% of base price
     elif urgency == "urgent":
-        urgency_fee = base_price * 1.00  # 100% of base price (matches +$15.00 for $15.00 base)
+        urgency_fee = base_price * 1.00  # 100% of base price
     
     total_price = base_price + urgency_fee
     
