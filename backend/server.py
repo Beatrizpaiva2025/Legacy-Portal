@@ -24,6 +24,9 @@ import asyncio
 import httpx
 from contextlib import asynccontextmanager
 
+# Set Tesseract path
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+
 # Emergent integrations
 from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
