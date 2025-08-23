@@ -687,73 +687,60 @@ async def get_word_count(text: str = Form(...)):
     return {"word_count": word_count, "text_length": len(text)}
 
 # Stripe Payment Integration
-@api_router.post("/payment/checkout", response_model=CheckoutSessionResponse)
+@api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
-    """Create Stripe checkout session for quote payment"""
+    """Create a Stripe checkout session"""
     
     try:
-        # Get quote from database
+        # Get quote
         quote = await db.translation_quotes.find_one({"id": request.quote_id})
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found")
         
-        quote_obj = TranslationQuote(**quote)
-        
-        # Initialize Stripe checkout
-        # Force the correct test API key
-        stripe_api_key = "sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C"
-        
-        # Create success and cancel URLs
-        success_url = f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url = f"{request.origin_url}?payment_cancelled=true"
-        
-        # Prepare metadata for the session
-        metadata = {
-            "quote_id": request.quote_id,
-            "reference": quote_obj.reference,
-            "service_type": quote_obj.service_type,
-            "word_count": str(quote_obj.word_count),
-            "source": "partner_portal"
-        }
-        
-        # Initialize Stripe checkout with webhook URL
-        host_url = request.origin_url.replace(request.origin_url.split('://')[1].split('/')[0], 
-                                            request.origin_url.split('://')[1].split('/')[0])
-        webhook_url = f"https://{request.origin_url.split('://')[1].split('/')[0]}/api/webhook/stripe"
-        stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-        
-        # Create checkout session request - amount must be float
-        checkout_request = CheckoutSessionRequest(
-            amount=float(quote_obj.total_price),  # Ensure float format
-            currency="usd",
-            success_url=success_url,
-            cancel_url=cancel_url,
-            metadata=metadata
-        )
-        
-        # Create checkout session
-        session = await stripe_checkout.create_checkout_session(checkout_request)
-        
         # Create payment transaction record
-        payment_transaction = PaymentTransaction(
-            session_id=session.session_id,
+        transaction = PaymentTransaction(
+            session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
-            amount=float(quote_obj.total_price),
+            amount=quote["total_price"],
             currency="usd",
             payment_status="pending",
-            status="initiated",
-            metadata=metadata
+            status="initiated"
         )
         
-        # Save payment transaction to database
-        await db.payment_transactions.insert_one(payment_transaction.dict())
+        # Create Stripe checkout session
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Translation Service - {quote["service_type"].title()}',
+                        'description': f'From {quote["translate_from"]} to {quote["translate_to"]} - {quote["word_count"]} words',
+                    },
+                    'unit_amount': int(quote["total_price"] * 100),  # Stripe expects cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{request.origin_url}?payment_cancelled=true",
+            metadata={
+                'quote_id': request.quote_id,
+                'transaction_id': transaction.id
+            }
+        )
         
-        logger.info(f"Created payment checkout session: {session.session_id} for quote: {request.quote_id}")
+        # Update transaction with session ID
+        transaction.session_id = checkout_session.id
+        await db.payment_transactions.insert_one(transaction.dict())
         
-        return session
+        return {
+            "status": "success",
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id,
+            "transaction_id": transaction.id
+        }
         
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
