@@ -221,7 +221,7 @@ const TranslationPortal = () => {
       // Update quote if we have enough data
       setTimeout(() => {
         if (projectReference && selectedService && translateFrom && translateTo && totalWords > 0) {
-          updateQuote();
+          calculateQuote();
         }
         setIsProcessing(false);
       }, 500);
