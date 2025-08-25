@@ -13,19 +13,8 @@ const TranslationPortal = () => {
   const [selectedService, setSelectedService] = useState('professional');
   const [translateFrom, setTranslateFrom] = useState('italian');
   const [translateTo, setTranslateTo] = useState('english');
-  const [wordCount, setWordCount] = useState(250);  // Default for Certified (1 page)
+  const [wordCount, setWordCount] = useState(200);
   const [pageCount, setPageCount] = useState(1);
-  
-  // Update word count when service changes
-  React.useEffect(() => {
-    if (selectedService === 'professional') {
-      setWordCount(200);  // Default 200 words for Professional
-      setPageCount(Math.ceil(200 / 250));
-    } else {
-      setWordCount(250);  // Default 1 page = 250 words for Certified
-      setPageCount(1);
-    }
-  }, [selectedService]);
   const [urgency, setUrgency] = useState('no');
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
