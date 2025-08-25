@@ -577,26 +577,23 @@ const TranslationPortal = () => {
                 <span className="text-gray-600">Service</span>
                 <strong className="text-gray-900">
                   {selectedService === 'standard' ? 'Certified Translation' :
-                   selectedService === 'professional' ? 'Professional Translation' :
-                   selectedService === 'specialist' ? 'Specialist Translation' : 'Certified Translation'}
+                   selectedService === 'professional' ? 'Professional Translation' : 'Certified Translation'}
                 </strong>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-600">Certification Type</span>
                 <strong className="text-gray-900">
-                  {selectedService === 'standard' ? 'Standard Certified Translation' :
-                   selectedService === 'professional' ? 'Professional Translation' :
-                   selectedService === 'specialist' ? 'Specialist Translation' : 'Standard Certified Translation'}
+                  {selectedService === 'standard' ? 'Certified Translation' :
+                   selectedService === 'professional' ? 'Professional Translation' : 'Certified Translation'}
                 </strong>
               </div>
               
               <div className="flex justify-between">
                 <span className="text-gray-600">Translation Type</span>
                 <strong className="text-gray-900">
-                  {selectedService === 'standard' ? 'Standard' :
-                   selectedService === 'professional' ? 'Professional' :
-                   selectedService === 'specialist' ? 'Specialist' : 'Standard'}
+                  {selectedService === 'standard' ? 'Certified' :
+                   selectedService === 'professional' ? 'Professional' : 'Certified'}
                 </strong>
               </div>
               
