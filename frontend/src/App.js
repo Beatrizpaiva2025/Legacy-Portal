@@ -609,9 +609,7 @@ const TranslationPortal = () => {
                 </h4>
                 <div className="flex justify-between">
                   <span className="text-gray-600">
-                    {selectedService === 'standard' ? `${pageCount} page${pageCount !== 1 ? 's' : ''}` :
-                     selectedService === 'professional' ? `${wordCount} words` :
-                     `${pageCount} page${pageCount !== 1 ? 's' : ''}`}
+                    {pageCount} page{pageCount !== 1 ? 's' : ''}
                   </span>
                   <strong className="text-gray-900">
                     ${calculateBasePrice().toFixed(2)}
