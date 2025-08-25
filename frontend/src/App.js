@@ -343,59 +343,54 @@ const TranslationPortal = () => {
                 Check Prices & Place Order
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div className="space-y-4 mb-6">
                 {[
                   {
                     id: 'standard',
-                    title: 'Certified Translation',
-                    subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
-                    price: '$24.99 / page',
-                    recommended: false,
-                    highlighted: true
+                    title: 'Standard Certified Translation',
+                    price: 'Min $18.00',
+                    recommended: false
                   },
                   {
                     id: 'professional', 
                     title: 'Professional Translation',
-                    subtitle: 'Standard, regular translation for individual and business use.',
-                    price: '$0.08 / word',
-                    recommended: false,
-                    highlighted: false
+                    price: '$24.99 / page',
+                    recommended: true
+                  },
+                  {
+                    id: 'specialist',
+                    title: 'Specialist Translation',
+                    price: 'Min $29.00',
+                    recommended: false
                   }
                 ].map((service) => (
                   <div
                     key={service.id}
                     onClick={() => setSelectedService(service.id)}
-                    className={`relative rounded-lg p-8 cursor-pointer transition-all ${
-                      service.highlighted 
-                        ? 'bg-teal-600 text-white' 
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    } ${
+                    className={`relative border rounded-lg p-4 cursor-pointer transition-all flex items-center justify-between ${
                       selectedService === service.id
-                        ? 'ring-4 ring-teal-300'
-                        : ''
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 hover:border-teal-300'
                     }`}
                   >
-                    <div className="mb-6">
+                    <div className="flex items-center">
                       <input
                         type="radio"
                         checked={selectedService === service.id}
                         onChange={() => setSelectedService(service.id)}
-                        className="sr-only"
+                        className="mr-4 text-teal-500"
                       />
-                      <h4 className="text-2xl font-bold mb-4">{service.title}</h4>
-                      <p className={`text-lg leading-relaxed ${
-                        service.highlighted ? 'text-white' : 'text-gray-600'
-                      }`}>
-                        {service.subtitle}
-                      </p>
-                    </div>
-                    
-                    <div className="mt-auto">
-                      <div className={`text-sm font-medium ${
-                        service.highlighted ? 'text-teal-100' : 'text-gray-500'
-                      }`}>
-                        Price: {service.price}
+                      <div>
+                        <h4 className="font-medium text-gray-900">{service.title}</h4>
+                        {service.recommended && (
+                          <span className="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-1">
+                            Recommended
+                          </span>
+                        )}
                       </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-gray-900">{service.price}</div>
                     </div>
                   </div>
                 ))}
