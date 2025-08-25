@@ -328,7 +328,7 @@ const TranslationPortal = () => {
                     id: 'professional', 
                     title: 'Professional Translation',
                     subtitle: 'Standard, regular translation for individual and business use.',
-                    price: '$24.99 / page',
+                    price: '$0.08 / word',
                     recommended: false,
                     highlighted: false
                   }
