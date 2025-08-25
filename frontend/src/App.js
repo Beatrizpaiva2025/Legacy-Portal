@@ -599,9 +599,7 @@ const TranslationPortal = () => {
               
               <div className="mt-6 mb-4">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3">
-                  Pricing ({selectedService === 'standard' ? '$24.99 / page' : 
-                           selectedService === 'professional' ? '$0.08 / word' : 
-                           'Min $29.00'})
+                  Pricing ($24.99 / page)
                 </h4>
                 <div className="flex justify-between">
                   <span className="text-gray-600">
