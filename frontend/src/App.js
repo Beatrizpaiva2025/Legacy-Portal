@@ -346,7 +346,8 @@ const TranslationPortal = () => {
                     title: 'Professional Translation',
                     subtitle: 'Standard, regular translation for individual and business use.',
                     price: '$0.08 / word',
-                    recommended: true
+                    recommended: true,
+                    highlighted: false
                   }
                 ].map((service) => (
                   <div
