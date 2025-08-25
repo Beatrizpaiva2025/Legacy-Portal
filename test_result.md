@@ -132,6 +132,18 @@ backend:
         agent: "testing"
         comment: "✅ PROFESSIONAL TRANSLATION PRICING FULLY TESTED AND VERIFIED: All requested pricing scenarios tested successfully - Professional service with 200 words + no urgency = $15.00 (200 × $0.075) ✅, Professional + 200 words + priority urgency = $18.75 (base $15.00 + 25% = $3.75) ✅, Professional + 200 words + urgent urgency = $30.00 (base $15.00 + 100% = $15.00) ✅. Other service types verified working: Standard 200 words = $18.00 minimum ✅, Specialist 200 words = $29.00 minimum ✅. Urgency percentages confirmed: Priority = 25% (updated from 20%) ✅, Urgent = 100% ✅. All calculations match exact reference pricing structure from screenshots."
 
+  - task: "Professional Service Updated Pricing ($24.99 per page)"
+    implemented: true
+    working: false
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ PROFESSIONAL SERVICE PRICING DISCREPANCY IDENTIFIED: Tested updated Professional service pricing as requested in review. Current implementation uses fractional page calculation instead of rounded-up pages. Results: 250 words = $24.99 ✅ (matches), 500 words = $49.98 ✅ (matches), 554 words = $55.38 ❌ (expected $74.97). Backend calculates 554/250 = 2.216 pages × $24.99 = $55.38, but review expects ceil(554/250) = 3 pages × $24.99 = $74.97. Both Standard and Professional services use same fractional page calculation. Backend pricing logic needs update to use Math.ceil() for page calculation if rounded-up pricing is required. API is working correctly per current implementation but doesn't match review expectations for partial page scenarios."
+
   - task: "Certified Translation Pricing Calculation"
     implemented: true
     working: true
