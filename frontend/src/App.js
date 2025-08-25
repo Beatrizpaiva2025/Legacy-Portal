@@ -325,10 +325,10 @@ const TranslationPortal = () => {
                   },
                   {
                     id: 'professional', 
-                    title: 'Professional Translation',
-                    subtitle: 'Standard, regular translation for individual and business use.',
+                    title: 'Certified/Sworn Translation',
+                    subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
                     price: '$0.08 / word',
-                    recommended: false
+                    recommended: true
                   },
                   {
                     id: 'specialist',
