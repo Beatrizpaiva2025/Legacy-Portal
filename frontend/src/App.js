@@ -327,7 +327,7 @@ const TranslationPortal = () => {
                     id: 'professional', 
                     title: 'Certified/Sworn Translation',
                     subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
-                    price: '$0.08 / word',
+                    price: '$24.99 / page',
                     recommended: true
                   },
                   {
