@@ -873,6 +873,172 @@ class LegacyTranslationsAPITester:
             self.log_test("Certified Translation 250 words + urgent urgency = $49.98", False, str(e))
             return False
 
+    def test_professional_service_250_words_updated_pricing(self):
+        """Test Professional service with 250 words (1 page), no urgency = $24.99 (UPDATED PRICING)"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROF-250-UPDATED",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 250,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Professional: 250 words = 1 page × $24.99 = $24.99
+                expected_base_price = 24.99
+                expected_urgency_fee = 0.00
+                expected_total = 24.99
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Professional 250 words (1 page) = $24.99 [UPDATED]", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Professional 250 words (1 page) = $24.99 [UPDATED]", False, str(e))
+            return False
+
+    def test_professional_service_500_words_updated_pricing(self):
+        """Test Professional service with 500 words (2 pages), no urgency = $49.98 (UPDATED PRICING)"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROF-500-UPDATED",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 500,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Professional: 500 words = 2 pages × $24.99 = $49.98
+                expected_base_price = 49.98
+                expected_urgency_fee = 0.00
+                expected_total = 49.98
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Professional 500 words (2 pages) = $49.98 [UPDATED]", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Professional 500 words (2 pages) = $49.98 [UPDATED]", False, str(e))
+            return False
+
+    def test_professional_service_554_words_updated_pricing(self):
+        """Test Professional service with 554 words (3 pages), no urgency = $74.97 (UPDATED PRICING)"""
+        try:
+            quote_data = {
+                "reference": "TEST-PROF-554-UPDATED",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 554,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                # Professional: 554 words = 3 pages (554/250 = 2.216 pages, rounded up to 3) × $24.99 = $74.97
+                expected_base_price = 74.97
+                expected_urgency_fee = 0.00
+                expected_total = 74.97
+                
+                details = f"Base: ${data['base_price']:.2f} (exp: ${expected_base_price:.2f}), "
+                details += f"Urgency: ${data['urgency_fee']:.2f} (exp: ${expected_urgency_fee:.2f}), "
+                details += f"Total: ${data['total_price']:.2f} (exp: ${expected_total:.2f})"
+                
+                price_correct = (abs(data['base_price'] - expected_base_price) < 0.01 and 
+                               abs(data['urgency_fee'] - expected_urgency_fee) < 0.01 and
+                               abs(data['total_price'] - expected_total) < 0.01)
+                
+                if not price_correct:
+                    success = False
+                    details += " - PRICING MISMATCH"
+                
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Professional 554 words (3 pages) = $74.97 [UPDATED]", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Professional 554 words (3 pages) = $74.97 [UPDATED]", False, str(e))
+            return False
+
+    def run_professional_service_updated_pricing_tests(self):
+        """Run specific Professional service pricing tests as requested in review (UPDATED $24.99 per page)"""
+        print("💰 Starting Professional Service Updated Pricing Tests")
+        print("=" * 60)
+        
+        # Test API health first
+        if not self.test_api_health():
+            print("❌ API is not accessible. Stopping tests.")
+            return False
+        
+        # Run the specific Professional service pricing tests requested
+        print("\n🎯 Testing Professional Service Updated Pricing ($24.99 per page)")
+        print("-" * 60)
+        
+        # Test 1: 250 words (1 page) + no urgency = $24.99
+        self.test_professional_service_250_words_updated_pricing()
+        
+        # Test 2: 500 words (2 pages) + no urgency = $49.98
+        self.test_professional_service_500_words_updated_pricing()
+        
+        # Test 3: 554 words (3 pages) + no urgency = $74.97
+        self.test_professional_service_554_words_updated_pricing()
+        
+        # Print summary
+        print("\n" + "=" * 60)
+        print(f"📊 Professional Service Updated Pricing Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        
+        if self.tests_passed == self.tests_run:
+            print("🎉 All Professional service updated pricing tests passed!")
+            return True
+        else:
+            print("⚠️  Some Professional service updated pricing tests failed. Check details above.")
+            return False
+
     def run_certified_translation_pricing_tests(self):
         """Run specific certified translation pricing calculation tests as requested in review"""
         print("💰 Starting Certified Translation Pricing Tests")
