@@ -252,6 +252,7 @@ class ProtemosAPIClient:
                     
             except httpx.RequestError as e:
                 if attempt < self.config.retry_attempts - 1:
+                    import asyncio
                     await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
                 else:
                     raise
