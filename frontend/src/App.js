@@ -484,30 +484,43 @@ const TranslationPortal = () => {
               )}
             </div>
 
-            {/* Pages Count Section */}
+            {/* Dynamic Count Section - Pages or Words based on service */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Number of pages to be translated
+                {selectedService === 'professional' 
+                  ? 'Number of words to be translated'
+                  : 'Number of pages to be translated'
+                }
               </h3>
               <div className="flex">
                 <input
                   type="number"
-                  value={pageCount}
+                  value={selectedService === 'professional' ? wordCount : pageCount}
                   onChange={(e) => {
-                    const pages = parseInt(e.target.value) || 1;
-                    setPageCount(pages);
-                    setWordCount(pages * 250); // Convert pages to words (250 words per page)
+                    const value = parseInt(e.target.value) || (selectedService === 'professional' ? 200 : 1);
+                    if (selectedService === 'professional') {
+                      // Professional: direct word count
+                      setWordCount(value);
+                      setPageCount(Math.ceil(value / 250));
+                    } else {
+                      // Certified: page count that converts to words
+                      setPageCount(value);
+                      setWordCount(value * 250);
+                    }
                   }}
                   className="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                  placeholder="Number of pages"
-                  min="1"
+                  placeholder={selectedService === 'professional' ? 'Number of words' : 'Number of pages'}
+                  min={selectedService === 'professional' ? 1 : 1}
                 />
                 <div className="px-4 py-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
-                  page
+                  {selectedService === 'professional' ? 'words' : 'page'}
                 </div>
               </div>
               <div className="text-sm text-gray-500 mt-2">
-                1 page = 250 words max
+                {selectedService === 'professional' 
+                  ? 'Enter the number of words in your document'
+                  : '1 page = 250 words max'
+                }
               </div>
             </div>
 
