@@ -1221,7 +1221,9 @@ def main():
     tester = LegacyTranslationsAPITester()
     
     # Check if we should run specific tests
-    if len(sys.argv) > 1 and sys.argv[1] == "certified":
+    if len(sys.argv) > 1 and sys.argv[1] == "professional":
+        success = tester.run_professional_service_updated_pricing_tests()
+    elif len(sys.argv) > 1 and sys.argv[1] == "certified":
         success = tester.run_certified_translation_pricing_tests()
     elif len(sys.argv) > 1 and sys.argv[1] == "pricing":
         success = tester.run_pricing_tests()
