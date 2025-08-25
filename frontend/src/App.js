@@ -10,7 +10,7 @@ const API = `${BACKEND_URL}/api`;
 const TranslationPortal = () => {
   // State management
   const [projectReference, setProjectReference] = useState('');
-  const [selectedService, setSelectedService] = useState('standard');
+  const [selectedService, setSelectedService] = useState('professional');
   const [translateFrom, setTranslateFrom] = useState('italian');
   const [translateTo, setTranslateTo] = useState('english');
   const [wordCount, setWordCount] = useState(250);  // Default for Certified (1 page)
