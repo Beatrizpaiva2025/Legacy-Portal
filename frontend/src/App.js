@@ -321,21 +321,16 @@ const TranslationPortal = () => {
                     title: 'Certified Translation',
                     subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
                     price: '$24.99 / page',
-                    recommended: false
+                    recommended: false,
+                    highlighted: true
                   },
                   {
                     id: 'professional', 
-                    title: 'Certified/Sworn Translation',
-                    subtitle: 'Certified, sworn, notarised and legalised translations, acceptable globally.',
+                    title: 'Professional Translation',
+                    subtitle: 'Standard, regular translation for individual and business use.',
                     price: '$24.99 / page',
-                    recommended: true
-                  },
-                  {
-                    id: 'specialist',
-                    title: 'Specialist Translation',
-                    subtitle: 'Expert translation for technical and specialized content.',
-                    price: 'Min $29.00',
-                    recommended: false
+                    recommended: false,
+                    highlighted: false
                   }
                 ].map((service) => (
                   <div
