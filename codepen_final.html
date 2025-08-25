@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy Translations Partner Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .dropzone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .dropzone:hover {
+            border-color: #14b8a6;
+            background-color: #f0fdfa;
+        }
+        .dropzone.dragover {
+            border-color: #14b8a6;
+            background-color: #f0fdfa;
+        }
+        .processing {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Legacy Translations</h1>
+            <h2 class="text-2xl font-semibold text-blue-600 mb-2">Partner Portal</h2>
+            <p class="text-gray-600">Professional translation services with instant quotes</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Form -->
+            <div class="lg:col-span-2 bg-white rounded-lg shadow-md p-8">
+                <!-- Reference Field -->
+                <div class="mb-8">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Project Reference</label>
+                    <input type="text" id="projectReference" placeholder="Enter project reference"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                </div>
+
+                <!-- Service Selection -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">
+                        Check Prices & Place Order
+                    </h3>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="service-option border rounded-lg p-6 cursor-pointer transition-all border-gray-200 hover:border-teal-300"
+                             data-service="standard" onclick="selectService('standard')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input type="radio" name="service" value="standard" class="mr-4 text-teal-500">
+                                    <div>
+                                        <h4 class="text-lg font-medium text-gray-900">Certified Translation</h4>
+                                        <p class="text-sm text-gray-600 mt-1">Certified, sworn, notarised and legalised translations, acceptable globally.</p>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold text-gray-900">$24.99 / page</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="service-option border rounded-lg p-6 cursor-pointer transition-all border-teal-500 bg-teal-50"
+                             data-service="professional" onclick="selectService('professional')">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input type="radio" name="service" value="professional" checked class="mr-4 text-teal-500">
+                                    <div>
+                                        <h4 class="text-lg font-medium text-gray-900">Professional Translation</h4>
+                                        <p class="text-sm text-gray-600 mt-1">Standard, regular translation for individual and business use.</p>
+                                        <span class="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-2">
+                                            Recommended
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold text-gray-900">$0.08 / word</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Language Selection -->
+                <div class="mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Translate From</label>
+                            <select id="translateFrom" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <option value="english">English (USA)</option>
+                                <option value="spanish">Spanish</option>
+                                <option value="french">French</option>
+                                <option value="german">German</option>
+                                <option value="portuguese">Portuguese</option>
+                                <option value="italian">Italian</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Translate To</label>
+                            <select id="translateTo" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <option value="spanish">Spanish</option>
+                                <option value="english">English (USA)</option>
+                                <option value="french">French</option>
+                                <option value="german">German</option>
+                                <option value="portuguese">Portuguese</option>
+                                <option value="italian">Italian</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        Upload the documents you need translated
+                    </h3>
+                    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                        <div class="text-2xl text-teal-500 mb-3">📁</div>
+                        <div class="text-base font-semibold text-teal-500 mb-2">
+                            + Upload File(s)
+                        </div>
+                        <p class="text-sm text-gray-500">
+                            Drag and drop or click to select
+                        </p>
+                        <input type="file" id="fileInput" style="display: none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.bmp,.tiff" multiple>
+                    </div>
+
+                    <!-- File Info -->
+                    <div id="fileInfo" class="mt-3 hidden"></div>
+
+                    <!-- Processing Status -->
+                    <div id="processingStatus" class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md text-center hidden">
+                        <div class="processing rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+                        <div class="text-blue-800 font-medium">Processing document with OCR...</div>
+                        <div class="text-blue-600 text-sm">
+                            Progress: <span id="progress">0</span>%
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pages Count Section -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        Number of pages to be translated
+                    </h3>
+                    <div class="flex">
+                        <input type="number" id="pageCount" value="1" min="1"
+                               class="flex-1 px-4 py-3 border border-gray-300 rounded-l-md focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                               placeholder="Number of pages" onchange="updateWordCount()">
+                        <div class="px-4 py-3 bg-gray-50 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
+                            page
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500 mt-2">
+                        1 page = 250 words max
+                    </div>
+                </div>
+
+                <!-- Urgency Section -->
+                <div class="mb-8">
+                    <label class="block text-sm font-medium text-gray-700 mb-3">
+                        Do you require your translation urgently?
+                    </label>
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer p-3 border rounded-md hover:bg-gray-50">
+                            <input type="radio" name="urgency" value="no" checked class="mr-3 text-teal-500" onchange="calculateQuote()">
+                            <span class="flex-1">No</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer p-3 border rounded-md hover:bg-gray-50">
+                            <input type="radio" name="urgency" value="priority" class="mr-3 text-teal-500" onchange="calculateQuote()">
+                            <span class="flex-1">Priority (24 hours)</span>
+                            <span class="text-sm text-gray-600 font-medium">+25%</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer p-3 border rounded-md hover:bg-gray-50">
+                            <input type="radio" name="urgency" value="urgent" class="mr-3 text-teal-500" onchange="calculateQuote()">
+                            <span class="flex-1">Urgent (12 hours)</span>
+                            <span class="text-sm text-gray-600 font-medium">+100%</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Calculate Button -->
+                <div class="text-center">
+                    <button onclick="calculateQuote()" 
+                            class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                        Calculate Quote
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quote Summary -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-6 sticky top-8">
+                    <h2 class="text-xl font-bold text-blue-600 mb-4">Quote Summary</h2>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Service</span>
+                            <strong class="text-gray-900" id="serviceName">Professional Translation</strong>
+                        </div>
+                        
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Translation Type</span>
+                            <strong class="text-gray-900" id="translationType">Professional</strong>
+                        </div>
+                        
+                        <div class="mt-6 mb-4">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-3">
+                                Pricing (<span id="pricingType">$0.08 / word</span>)
+                            </h4>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600" id="quantityLabel">200 words</span>
+                                <strong class="text-gray-900" id="basePrice">$15.00</strong>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-between" id="urgencyFeeRow" style="display: none;">
+                            <span class="text-gray-600" id="urgencyLabel">Urgency Fee</span>
+                            <strong class="text-gray-900" id="urgencyFee">$0.00</strong>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <input type="text" placeholder="Enter Discount Code"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-lg font-medium text-gray-900">Total</span>
+                            <strong class="text-2xl font-bold text-blue-600" id="totalPrice">$15.00</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <div class="text-gray-600 text-sm mb-2">Estimated Delivery</div>
+                        <div class="font-medium text-gray-900" id="deliveryTime">
+                            Saturday, August 23 (2 days)
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 text-center">
+                        <button onclick="acceptQuote()" 
+                                class="w-full bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-colors">
+                            Accept Quote & Start Order
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 text-center">
+                        <div class="text-sm text-gray-600 mb-2">Legacy Translations is rated</div>
+                        <div class="text-2xl font-bold text-gray-900 mb-2">Excellent</div>
+                        <div class="flex justify-center items-center space-x-1 mb-2">
+                            <span class="text-green-500 text-lg">★★★★★</span>
+                        </div>
+                        <div class="text-sm text-green-600 font-medium">Trustpilot</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentService = 'professional';
+        let wordCount = 200;
+        let pageCount = 1;
+
+        function selectService(serviceType) {
+            currentService = serviceType;
+            
+            // Update visual selection
+            document.querySelectorAll('.service-option').forEach(option => {
+                option.classList.remove('border-teal-500', 'bg-teal-50');
+                option.classList.add('border-gray-200');
+            });
+            
+            document.querySelector(`[data-service="${serviceType}"]`).classList.add('border-teal-500', 'bg-teal-50');
+            document.querySelector(`[data-service="${serviceType}"]`).classList.remove('border-gray-200');
+            
+            // Update radio buttons
+            document.querySelectorAll('input[name="service"]').forEach(radio => {
+                radio.checked = radio.value === serviceType;
+            });
+            
+            // Update quote summary
+            if (serviceType === 'standard') {
+                document.getElementById('serviceName').textContent = 'Certified Translation';
+                document.getElementById('translationType').textContent = 'Certified';
+                document.getElementById('pricingType').textContent = '$24.99 / page';
+                
+                // Convert words to pages
+                pageCount = Math.ceil(wordCount / 250);
+                document.getElementById('pageCount').value = pageCount;
+                document.getElementById('quantityLabel').textContent = `${pageCount} page${pageCount !== 1 ? 's' : ''}`;
+            } else {
+                document.getElementById('serviceName').textContent = 'Professional Translation';
+                document.getElementById('translationType').textContent = 'Professional';
+                document.getElementById('pricingType').textContent = '$0.08 / word';
+                document.getElementById('quantityLabel').textContent = `${wordCount} words`;
+            }
+            
+            calculateQuote();
+        }
+
+        function updateWordCount() {
+            const pages = parseInt(document.getElementById('pageCount').value) || 1;
+            pageCount = pages;
+            wordCount = pages * 250;
+            
+            if (currentService === 'professional') {
+                document.getElementById('quantityLabel').textContent = `${wordCount} words`;
+            } else {
+                document.getElementById('quantityLabel').textContent = `${pageCount} page${pageCount !== 1 ? 's' : ''}`;
+            }
+            
+            calculateQuote();
+        }
+
+        function calculateQuote() {
+            let basePrice;
+            
+            // Calculate base price
+            if (currentService === 'standard') {
+                basePrice = pageCount * 24.99; // Certified: $24.99 per page
+            } else {
+                basePrice = wordCount * 0.075; // Professional: $0.075 per word (shows as $0.08)
+            }
+            
+            // Get urgency
+            const urgency = document.querySelector('input[name="urgency"]:checked').value;
+            let urgencyFee = 0;
+            let urgencyMultiplier = '';
+            
+            if (urgency === 'priority') {
+                urgencyFee = basePrice * 0.25; // 25%
+                urgencyMultiplier = ' (+25%)';
+                document.getElementById('urgencyFeeRow').style.display = 'flex';
+            } else if (urgency === 'urgent') {
+                urgencyFee = basePrice * 1.0; // 100%
+                urgencyMultiplier = ' (+100%)';
+                document.getElementById('urgencyFeeRow').style.display = 'flex';
+            } else {
+                document.getElementById('urgencyFeeRow').style.display = 'none';
+            }
+            
+            const totalPrice = basePrice + urgencyFee;
+            
+            // Update display
+            document.getElementById('basePrice').textContent = `$${basePrice.toFixed(2)}`;
+            document.getElementById('urgencyFee').textContent = `$${urgencyFee.toFixed(2)}`;
+            document.getElementById('urgencyLabel').textContent = `Urgency Fee${urgencyMultiplier}`;
+            document.getElementById('totalPrice').textContent = `$${totalPrice.toFixed(2)}`;
+            
+            // Update delivery time
+            let deliveryText = 'Saturday, August 23 (2 days)';
+            if (urgency === 'priority') {
+                deliveryText = 'Saturday, August 23 (24h)';
+            } else if (urgency === 'urgent') {
+                deliveryText = 'Tomorrow (12h)';
+            }
+            document.getElementById('deliveryTime').textContent = deliveryText;
+        }
+
+        function acceptQuote() {
+            const reference = document.getElementById('projectReference').value;
+            const translateFrom = document.getElementById('translateFrom').value;
+            const translateTo = document.getElementById('translateTo').value;
+            
+            if (!reference || !translateFrom || !translateTo) {
+                alert('Please fill in all required fields (Reference, Languages)');
+                return;
+            }
+            
+            alert('🎉 Quote accepted! In the real system, this would redirect to Stripe payment processing.');
+        }
+
+        // File upload simulation
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                simulateFileProcessing(files);
+            }
+        });
+
+        function simulateFileProcessing(files) {
+            const fileInfo = document.getElementById('fileInfo');
+            const processingStatus = document.getElementById('processingStatus');
+            
+            // Show files
+            let fileHtml = '';
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const size = (file.size / 1024 / 1024).toFixed(2);
+                fileHtml += `
+                    <div class="p-3 bg-gray-50 rounded-md mb-2">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-sm font-medium">${file.name}</div>
+                                <div class="text-sm text-gray-600">${size} MB</div>
+                            </div>
+                            <div class="text-sm text-green-600">✓ Uploaded</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            fileInfo.innerHTML = fileHtml;
+            fileInfo.classList.remove('hidden');
+            
+            // Simulate processing
+            processingStatus.classList.remove('hidden');
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                document.getElementById('progress').textContent = progress;
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    processingStatus.classList.add('hidden');
+                    
+                    // Simulate OCR result
+                    const simulatedWords = Math.floor(Math.random() * 800) + 200; // 200-1000 words
+                    wordCount = simulatedWords;
+                    pageCount = Math.ceil(simulatedWords / 250);
+                    
+                    document.getElementById('pageCount').value = pageCount;
+                    
+                    if (currentService === 'professional') {
+                        document.getElementById('quantityLabel').textContent = `${wordCount} words`;
+                    } else {
+                        document.getElementById('quantityLabel').textContent = `${pageCount} page${pageCount !== 1 ? 's' : ''}`;
+                    }
+                    
+                    calculateQuote();
+                    
+                    alert(`✅ OCR Complete! Detected: ${simulatedWords} words (${pageCount} pages)`);
+                }
+            }, 200);
+        }
+
+        // Drag and drop
+        const dropzone = document.getElementById('dropzone');
+        
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+        
+        dropzone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+        });
+        
+        dropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                simulateFileProcessing(files);
+            }
+        });
+
+        // Initialize
+        selectService('professional');
+        calculateQuote();
+    </script>
+</body>
+</html>
