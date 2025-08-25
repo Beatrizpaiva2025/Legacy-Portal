@@ -362,8 +362,8 @@ def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[f
         # Standard/Certified Translation: $24.99 per page (250 words = 1 page)
         base_price = pages * 24.99
     elif service_type == "professional":
-        # Professional Translation: $24.99 per page (250 words = 1 page)
-        base_price = pages * 24.99
+        # Professional Translation: $0.08 per word (0.075 actual to get $15.00 for 200 words)
+        base_price = word_count * 0.075
     else:
         # Default to standard pricing
         base_price = pages * 24.99
