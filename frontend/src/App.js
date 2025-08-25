@@ -612,11 +612,14 @@ const TranslationPortal = () => {
               
               <div className="mt-6 mb-4">
                 <h4 className="text-lg font-semibold text-gray-800 mb-3">
-                  Pricing ($24.99 / page)
+                  Pricing ({selectedService === 'professional' ? '$0.08 / word' : '$24.99 / page'})
                 </h4>
                 <div className="flex justify-between">
                   <span className="text-gray-600">
-                    {pageCount} page{pageCount !== 1 ? 's' : ''}
+                    {selectedService === 'professional' 
+                      ? `${wordCount} words`
+                      : `${pageCount} page${pageCount !== 1 ? 's' : ''}`
+                    }
                   </span>
                   <strong className="text-gray-900">
                     ${calculateBasePrice().toFixed(2)}
