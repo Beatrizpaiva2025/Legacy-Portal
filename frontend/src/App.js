@@ -135,7 +135,12 @@ const TranslationPortal = () => {
 
   // File upload handling - Multiple files support
   const onDrop = useCallback(async (acceptedFiles) => {
-    if (acceptedFiles.length === 0) return;
+    console.log('onDrop called with files:', acceptedFiles);
+    
+    if (acceptedFiles.length === 0) {
+      console.log('No files accepted');
+      return;
+    }
 
     setUploadedFiles(acceptedFiles);
     setIsProcessing(true);
@@ -147,17 +152,21 @@ const TranslationPortal = () => {
     try {
       // Process each file
       for (const file of acceptedFiles) {
+        console.log('Processing file:', file.name, 'Size:', file.size);
         setProcessingProgress(Math.round((processedFiles / acceptedFiles.length) * 100));
         
         const formData = new FormData();
         formData.append('file', file);
 
         try {
+          console.log('Sending file to backend...');
           const response = await axios.post(`${API}/upload-document`, formData, {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
           });
+
+          console.log('Backend response:', response.data);
 
           if (response.data && response.data.word_count) {
             totalWords += response.data.word_count;
@@ -170,6 +179,8 @@ const TranslationPortal = () => {
         }
       }
 
+      console.log('Total words processed:', totalWords);
+
       // Update total word count and page count
       setWordCount(totalWords);
       setTotalWordCount(totalWords);
@@ -179,6 +190,7 @@ const TranslationPortal = () => {
       // Update quote if we have enough data
       setTimeout(() => {
         if (projectReference && selectedService && translateFrom && translateTo && totalWords > 0) {
+          console.log('Calculating quote...');
           calculateQuote();
         }
         setIsProcessing(false);
@@ -191,6 +203,7 @@ const TranslationPortal = () => {
       // Fallback to frontend OCR for single image files
       if (acceptedFiles.length === 1 && acceptedFiles[0].type.startsWith('image/')) {
         try {
+          console.log('Falling back to frontend OCR...');
           setProcessingProgress(50);
           const result = await Tesseract.recognize(acceptedFiles[0], 'eng', {
             logger: m => {
@@ -205,6 +218,11 @@ const TranslationPortal = () => {
           setTotalWordCount(extractedWordCount);
           setPageCount(Math.ceil(extractedWordCount / 250));
           setIsProcessing(false);
+          
+          // Update quote
+          if (projectReference && selectedService && translateFrom && translateTo) {
+            calculateQuote();
+          }
         } catch (ocrError) {
           console.error('OCR Error:', ocrError);
           setIsProcessing(false);
@@ -212,7 +230,7 @@ const TranslationPortal = () => {
         }
       }
     }
-  }, []);
+  }, [API, projectReference, selectedService, translateFrom, translateTo, calculateQuote]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
