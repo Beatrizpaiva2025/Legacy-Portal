@@ -314,7 +314,7 @@ const TranslationPortal = () => {
                 Check Prices & Place Order
               </h3>
               
-              <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 {[
                   {
                     id: 'standard',
@@ -336,33 +336,37 @@ const TranslationPortal = () => {
                   <div
                     key={service.id}
                     onClick={() => setSelectedService(service.id)}
-                    className={`relative border rounded-lg p-4 cursor-pointer transition-all flex items-center justify-between ${
+                    className={`relative rounded-lg p-8 cursor-pointer transition-all ${
+                      service.highlighted 
+                        ? 'bg-teal-600 text-white' 
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    } ${
                       selectedService === service.id
-                        ? 'border-teal-500 bg-teal-50'
-                        : 'border-gray-200 hover:border-teal-300'
+                        ? 'ring-4 ring-teal-300'
+                        : ''
                     }`}
                   >
-                    <div className="flex items-center">
+                    <div className="mb-6">
                       <input
                         type="radio"
                         checked={selectedService === service.id}
                         onChange={() => setSelectedService(service.id)}
-                        className="mr-4 text-teal-500"
+                        className="sr-only"
                       />
-                      <div>
-                        <h4 className="font-medium text-gray-900">{service.title}</h4>
-                        {service.subtitle && (
-                          <p className="text-sm text-gray-600 mt-1">{service.subtitle}</p>
-                        )}
-                        {service.recommended && (
-                          <span className="inline-block bg-teal-500 text-white text-xs px-2 py-1 rounded-full mt-2">
-                            Recommended
-                          </span>
-                        )}
-                      </div>
+                      <h4 className="text-2xl font-bold mb-4">{service.title}</h4>
+                      <p className={`text-lg leading-relaxed ${
+                        service.highlighted ? 'text-white' : 'text-gray-600'
+                      }`}>
+                        {service.subtitle}
+                      </p>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-gray-900">{service.price}</div>
+                    
+                    <div className="mt-auto">
+                      <div className={`text-sm font-medium ${
+                        service.highlighted ? 'text-teal-100' : 'text-gray-500'
+                      }`}>
+                        Price: {service.price}
+                      </div>
                     </div>
                   </div>
                 ))}
