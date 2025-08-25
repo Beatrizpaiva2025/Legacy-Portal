@@ -354,8 +354,8 @@ def count_words(text: str) -> int:
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
     """Calculate pricing based on word count, service type, and urgency"""
     
-    # Convert words to pages (250 words = 1 page)
-    pages = max(1, word_count / 250)
+    # Convert words to pages (250 words = 1 page) - round up to next page
+    pages = max(1, math.ceil(word_count / 250))
     
     # Base price depending on service type
     if service_type == "standard":
