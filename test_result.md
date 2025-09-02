@@ -166,9 +166,14 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Backend API endpoints testing"
+    - "Document upload and OCR processing"
+    - "Quote calculation accuracy"
+    - "Stripe payment integration"
+    - "Protemos integration verification"
   stuck_tasks: []
-  test_all: false
+  test_all: true
   test_priority: "high_first"
 
 frontend:
