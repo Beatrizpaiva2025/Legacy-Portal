@@ -1131,28 +1131,238 @@ class LegacyTranslationsAPITester:
             print("⚠️  Some pricing tests failed. Check details above.")
             return False
 
-    def run_all_tests(self):
-        """Run all backend API tests"""
-        print("🚀 Starting Legacy Translations API Tests")
-        print("=" * 50)
+    def test_stripe_payment_checkout(self):
+        """Test Stripe payment checkout creation"""
+        try:
+            # First create a quote
+            quote_data = {
+                "reference": "TEST-STRIPE-CHECKOUT",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            if response.status_code != 200:
+                self.log_test("Stripe Payment Checkout", False, "Failed to create test quote")
+                return False
+            
+            quote = response.json()
+            
+            # Create payment checkout
+            checkout_data = {
+                "quote_id": quote['id'],
+                "origin_url": "https://test.example.com"
+            }
+            
+            response = requests.post(f"{self.api_url}/create-payment-checkout", json=checkout_data, timeout=15)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                required_fields = ['status', 'checkout_url', 'session_id', 'transaction_id']
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    success = False
+                    details = f"Missing fields: {missing_fields}"
+                elif data.get('status') != 'success':
+                    success = False
+                    details = f"Status not success: {data.get('status')}"
+                else:
+                    details = f"Checkout URL created, Session ID: {data.get('session_id')}"
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Stripe Payment Checkout", success, details)
+            return success, data if success else {}
+            
+        except Exception as e:
+            self.log_test("Stripe Payment Checkout", False, str(e))
+            return False, {}
+
+    def test_payment_status_retrieval(self):
+        """Test payment status retrieval"""
+        try:
+            # First create a payment checkout
+            success, checkout_data = self.test_stripe_payment_checkout()
+            if not success:
+                self.log_test("Payment Status Retrieval", False, "Failed to create checkout session")
+                return False
+            
+            session_id = checkout_data.get('session_id')
+            
+            # Get payment status
+            response = requests.get(f"{self.api_url}/payment-status/{session_id}", timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                required_fields = ['session_id', 'status', 'payment_status', 'amount', 'currency']
+                missing_fields = [field for field in required_fields if field not in data]
+                
+                if missing_fields:
+                    success = False
+                    details = f"Missing fields: {missing_fields}"
+                else:
+                    details = f"Status: {data.get('status')}, Payment Status: {data.get('payment_status')}, Amount: ${data.get('amount'):.2f}"
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Payment Status Retrieval", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Payment Status Retrieval", False, str(e))
+            return False
+
+    def test_get_specific_quote(self):
+        """Test getting a specific quote by ID"""
+        try:
+            # First create a quote
+            quote_data = {
+                "reference": "TEST-GET-SPECIFIC",
+                "service_type": "professional",
+                "translate_from": "english",
+                "translate_to": "spanish",
+                "word_count": 200,
+                "urgency": "no"
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=quote_data, timeout=10)
+            if response.status_code != 200:
+                self.log_test("Get Specific Quote", False, "Failed to create test quote")
+                return False
+            
+            quote = response.json()
+            quote_id = quote['id']
+            
+            # Get the specific quote
+            response = requests.get(f"{self.api_url}/quotes/{quote_id}", timeout=10)
+            success = response.status_code == 200
+            
+            if success:
+                data = response.json()
+                details = f"Retrieved quote ID: {data.get('id')}, Reference: {data.get('reference')}, Total: ${data.get('total_price', 0):.2f}"
+                
+                # Verify the quote data matches
+                if data.get('id') != quote_id:
+                    success = False
+                    details += " - Quote ID mismatch"
+                elif data.get('reference') != quote_data['reference']:
+                    success = False
+                    details += " - Reference mismatch"
+            else:
+                details = f"Status: {response.status_code}, Response: {response.text}"
+            
+            self.log_test("Get Specific Quote", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Get Specific Quote", False, str(e))
+            return False
+
+    def test_error_handling_invalid_quote_id(self):
+        """Test error handling for invalid quote ID"""
+        try:
+            response = requests.get(f"{self.api_url}/quotes/invalid-quote-id-12345", timeout=10)
+            success = response.status_code == 404  # Should return 404 for invalid quote
+            
+            details = f"Status: {response.status_code} (expected 404 for invalid quote)"
+            
+            if response.status_code == 404:
+                try:
+                    error_data = response.json()
+                    if 'detail' in error_data:
+                        details += f", Error: {error_data['detail']}"
+                except:
+                    pass
+            
+            self.log_test("Error Handling - Invalid Quote ID", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Error Handling - Invalid Quote ID", False, str(e))
+            return False
+
+    def test_error_handling_missing_fields(self):
+        """Test error handling for missing required fields in quote calculation"""
+        try:
+            # Test with missing required fields
+            incomplete_data = {
+                "reference": "TEST-INCOMPLETE",
+                "service_type": "professional"
+                # Missing translate_from, translate_to, word_count
+            }
+            
+            response = requests.post(f"{self.api_url}/calculate-quote", json=incomplete_data, timeout=10)
+            success = response.status_code == 422  # Should return 422 for validation error
+            
+            details = f"Status: {response.status_code} (expected 422 for missing fields)"
+            
+            self.log_test("Error Handling - Missing Required Fields", success, details)
+            return success
+            
+        except Exception as e:
+            self.log_test("Error Handling - Missing Required Fields", False, str(e))
+            return False
+
+    def run_comprehensive_review_tests(self):
+        """Run comprehensive tests based on the review request"""
+        print("🔍 Starting Comprehensive Review Tests")
+        print("=" * 60)
         
         # Test API health first
         if not self.test_api_health():
             print("❌ API is not accessible. Stopping tests.")
             return False
         
-        # Run core functionality tests
-        self.test_calculate_quote_professional_200_words_no_urgency()
-        self.test_calculate_quote_with_urgency()
-        self.test_calculate_quote_standard_200_words()
+        # 1. Core API Endpoints Testing
+        print("\n🎯 Testing Core API Endpoints")
+        print("-" * 40)
+        
+        # Document upload and OCR processing
         self.test_upload_text_file()
         self.test_word_count_endpoint()
-        self.test_get_quotes()
         self.test_invalid_file_upload()
         
-        # Run Protemos integration tests
+        # Quote calculation and retrieval
+        self.test_calculate_quote_professional_200_words_no_urgency()
+        self.test_get_quotes()
+        self.test_get_specific_quote()
+        
+        # Stripe payment integration
+        self.test_stripe_payment_checkout()
+        self.test_payment_status_retrieval()
+        
+        # 2. Pricing Logic Verification
+        print("\n💰 Testing Pricing Logic")
+        print("-" * 40)
+        
+        # Professional service: $0.075/word (minimum $15 for 200 words)
+        self.test_calculate_quote_professional_200_words_no_urgency()
+        self.test_calculate_quote_professional_200_words_priority()
+        self.test_calculate_quote_professional_200_words_urgent()
+        
+        # Certified service: $24.99/page (using Math.ceil for page calculation)
+        self.test_certified_translation_250_words_no_urgency()
+        self.test_certified_translation_500_words_no_urgency()
+        self.test_certified_translation_250_words_priority_urgency()
+        self.test_certified_translation_250_words_urgent_urgency()
+        
+        # Professional service updated pricing ($24.99 per page)
+        self.test_professional_service_250_words_updated_pricing()
+        self.test_professional_service_500_words_updated_pricing()
+        self.test_professional_service_554_words_updated_pricing()
+        
+        # Urgency fees verification
+        self.test_urgency_percentages_verification()
+        
+        # 3. Protemos Integration
         print("\n🔗 Testing Protemos Integration")
-        print("-" * 30)
+        print("-" * 40)
         
         # Create test quote for Protemos testing
         quote_success, quote_data = self.test_protemos_create_quote_for_testing()
@@ -1169,16 +1379,27 @@ class LegacyTranslationsAPITester:
         self.test_protemos_error_handling_invalid_quote()
         self.test_protemos_get_nonexistent_project()
         
+        # 4. Error Handling
+        print("\n⚠️  Testing Error Handling")
+        print("-" * 40)
+        
+        self.test_error_handling_invalid_quote_id()
+        self.test_error_handling_missing_fields()
+        
         # Print summary
-        print("\n" + "=" * 50)
-        print(f"📊 Test Results: {self.tests_passed}/{self.tests_run} tests passed")
+        print("\n" + "=" * 60)
+        print(f"📊 Comprehensive Review Test Results: {self.tests_passed}/{self.tests_run} tests passed")
         
         if self.tests_passed == self.tests_run:
-            print("🎉 All backend tests passed!")
+            print("🎉 All comprehensive review tests passed!")
             return True
         else:
-            print("⚠️  Some backend tests failed. Check details above.")
+            print("⚠️  Some comprehensive review tests failed. Check details above.")
             return False
+
+    def run_all_tests(self):
+        """Run all backend API tests"""
+        return self.run_comprehensive_review_tests()
         """Run only Protemos integration tests"""
         print("🔗 Starting Protemos Integration Tests")
         print("=" * 50)
