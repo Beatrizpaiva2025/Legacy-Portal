@@ -1041,6 +1041,11 @@ async def send_email_notification(request: EmailNotificationRequest, background_
 # Include the router in the main app
 app.include_router(api_router)
 
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Legacy Translations API", "status": "online", "api_docs": "/docs"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
