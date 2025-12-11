@@ -2,13 +2,12 @@
 # https://render.com/docs/blueprint-spec
 
 services:
-  # Backend - FastAPI
+  # Backend - FastAPI with Docker (includes Tesseract OCR)
   - type: web
-    name: legacy-portal-backend
-    runtime: python
+    name: legacy-portal
+    runtime: docker
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: MONGO_URL
         sync: false
@@ -24,15 +23,13 @@ services:
         sync: false
       - key: PROTEMOS_API_KEY
         sync: false
-      - key: PYTHON_VERSION
-        value: "3.11"
 
   # Frontend - React
   - type: web
     name: legacy-portal-frontend
     runtime: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --legacy-peer-deps && npm run build
     staticPublishPath: build
     routes:
       - type: rewrite
@@ -40,7 +37,4 @@ services:
         destination: /index.html
     envVars:
       - key: REACT_APP_BACKEND_URL
-        fromService:
-          name: legacy-portal-backend
-          type: web
-          property: url
+        value: https://legacy-portal.onrender.com
