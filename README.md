@@ -1,6 +1,6 @@
 # Legacy Translations Partner Portal
 
-Portal para parceiros da Legacy Translations com sistema de cotações, tracking de pedidos e integracoes com Stripe, SendGrid e Protemos.
+Portal para parceiros da Legacy Translations com sistema de cotacoes, tracking de pedidos e integracoes com Stripe, SendGrid e Protemos.
 
 ## Estrutura do Projeto
 
@@ -9,6 +9,7 @@ Legacy-Portal/
 ├── backend/
 │   ├── server.py           # API FastAPI (Python)
 │   ├── requirements.txt    # Dependencias Python
+│   ├── build.sh            # Script de build para Render
 │   ├── .env.example        # Template de variaveis de ambiente
 │   └── .env                # Variaveis de ambiente (criar a partir do .example)
 ├── frontend/
@@ -17,6 +18,7 @@ Legacy-Portal/
 │   ├── package.json        # Dependencias Node.js
 │   ├── .env.example        # Template de variaveis de ambiente
 │   └── .env                # Variaveis de ambiente (criar a partir do .example)
+├── render.yaml             # Configuracao de deploy Render
 └── README.md
 ```
 
@@ -103,37 +105,59 @@ O frontend estara disponivel em `http://localhost:3000`
 |----------|-----------|
 | REACT_APP_BACKEND_URL | URL da API backend |
 
-## Deploy
+## Deploy no Render (Recomendado)
 
-### Frontend (Vercel)
+O projeto inclui um arquivo `render.yaml` que configura automaticamente o deploy do frontend e backend.
 
-1. Conecte seu repositorio ao Vercel
-2. Configure o diretorio root como `frontend`
-3. Adicione a variavel de ambiente `REACT_APP_BACKEND_URL`
-4. Deploy automatico a cada push
+### Opcao 1: Deploy Automatico com Blueprint
 
-### Frontend (Netlify)
+1. Acesse **https://render.com** e faca login
+2. Clique em **"New"** → **"Blueprint"**
+3. Conecte seu repositorio GitHub **Legacy-Portal**
+4. O Render vai detectar o `render.yaml` automaticamente
+5. Configure as variaveis de ambiente secretas:
+   - `MONGO_URL` - URL do MongoDB Atlas
+   - `SENDGRID_API_KEY` - Sua chave SendGrid
+   - `SENDER_EMAIL` - Email remetente
+   - `STRIPE_API_KEY` - Sua chave Stripe
+   - `PROTEMOS_API_KEY` - Sua chave Protemos
+6. Clique em **"Apply"**
 
-1. Conecte seu repositorio ao Netlify
-2. Build command: `npm run build`
-3. Publish directory: `frontend/build`
-4. Adicione a variavel de ambiente `REACT_APP_BACKEND_URL`
+### Opcao 2: Deploy Manual
 
-### Backend (Railway)
+#### Backend (Web Service)
 
-1. Conecte seu repositorio ao Railway
-2. Configure o diretorio root como `backend`
-3. Adicione todas as variaveis de ambiente
-4. Start command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
-
-### Backend (Render)
-
-1. Crie um novo Web Service
+1. Clique em **"New"** → **"Web Service"**
 2. Conecte seu repositorio
-3. Root Directory: `backend`
-4. Build Command: `pip install -r requirements.txt`
-5. Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
-6. Adicione todas as variaveis de ambiente
+3. Configure:
+   - **Name**: `legacy-portal-backend`
+   - **Root Directory**: `backend`
+   - **Runtime**: `Python 3`
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn server:app --host 0.0.0.0 --port $PORT`
+4. Adicione as variaveis de ambiente
+5. Clique em **"Create Web Service"**
+
+#### Frontend (Static Site)
+
+1. Clique em **"New"** → **"Static Site"**
+2. Conecte seu repositorio
+3. Configure:
+   - **Name**: `legacy-portal-frontend`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm install && npm run build`
+   - **Publish Directory**: `build`
+4. Adicione a variavel de ambiente:
+   - `REACT_APP_BACKEND_URL` = URL do backend (ex: `https://legacy-portal-backend.onrender.com`)
+5. Clique em **"Create Static Site"**
+
+### MongoDB Atlas (Banco de Dados)
+
+1. Acesse **https://cloud.mongodb.com**
+2. Crie um cluster gratuito (M0)
+3. Crie um usuario de banco de dados
+4. Adicione seu IP a whitelist (ou 0.0.0.0/0 para acesso de qualquer lugar)
+5. Copie a connection string e use como `MONGO_URL`
 
 ## APIs Integradas
 

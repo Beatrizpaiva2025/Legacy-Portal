@@ -1,0 +1,46 @@
+# Render Blueprint - Deploy Frontend + Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Backend - FastAPI
+  - type: web
+    name: legacy-portal-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: legacy_translations
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: STRIPE_API_KEY
+        sync: false
+      - key: PROTEMOS_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  # Frontend - React
+  - type: web
+    name: legacy-portal-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        fromService:
+          name: legacy-portal-backend
+          type: web
+          property: url
