@@ -7,6 +7,16 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Translation stages for order tracking
+const TRANSLATION_STAGES = [
+  { id: 1, name: 'Order Received', icon: '📥' },
+  { id: 2, name: 'In Translation', icon: '✍️' },
+  { id: 3, name: 'Quality Review', icon: '🔍' },
+  { id: 4, name: 'Final Review', icon: '✅' },
+  { id: 5, name: 'Ready for Delivery', icon: '📦' },
+  { id: 6, name: 'Delivered', icon: '🎉' }
+];
+
 // Sample orders data (in a real app, this would come from the backend)
 const sampleOrders = [
   {
@@ -16,8 +26,9 @@ const sampleOrders = [
     sourceLanguage: 'Arabic (Saudi Arabia)',
     targetLanguage: 'English (USA)',
     amount: 31.24,
-    status: 'Completed',
+    currentStage: 6, // Delivered
     createdAt: 'December 9th, 2025, 8:32pm',
+    estimatedDelivery: 'December 11th, 2025',
     flag: '🇺🇸'
   },
   {
@@ -27,8 +38,9 @@ const sampleOrders = [
     sourceLanguage: 'French',
     targetLanguage: 'English (USA)',
     amount: 102.22,
-    status: 'Completed',
+    currentStage: 4, // Final Review
     createdAt: 'December 3rd, 2025, 11:40pm',
+    estimatedDelivery: 'December 12th, 2025',
     flag: '🇺🇸'
   },
   {
@@ -38,8 +50,9 @@ const sampleOrders = [
     sourceLanguage: 'Portuguese (Brazil)',
     targetLanguage: 'English (USA)',
     amount: 24.99,
-    status: 'Completed',
+    currentStage: 3, // Quality Review
     createdAt: 'November 25th, 2025, 3:34pm',
+    estimatedDelivery: 'December 13th, 2025',
     flag: '🇺🇸'
   },
   {
@@ -49,8 +62,9 @@ const sampleOrders = [
     sourceLanguage: 'Portuguese (Brazil)',
     targetLanguage: 'English (USA)',
     amount: 65.25,
-    status: 'Completed',
+    currentStage: 2, // In Translation
     createdAt: 'November 25th, 2025, 9:02am',
+    estimatedDelivery: 'December 14th, 2025',
     flag: '🇺🇸'
   },
   {
@@ -60,8 +74,9 @@ const sampleOrders = [
     sourceLanguage: 'French',
     targetLanguage: 'English (USA)',
     amount: 31.24,
-    status: 'Quote',
+    currentStage: 1, // Order Received
     createdAt: 'November 17th, 2025, 8:32pm',
+    estimatedDelivery: 'December 15th, 2025',
     flag: '🇺🇸'
   },
   {
@@ -71,8 +86,9 @@ const sampleOrders = [
     sourceLanguage: 'Thai',
     targetLanguage: 'English (USA)',
     amount: 71.47,
-    status: 'Completed',
+    currentStage: 5, // Ready for Delivery
     createdAt: 'November 14th, 2025, 11:28am',
+    estimatedDelivery: 'December 10th, 2025',
     flag: '🇺🇸'
   }
 ];
@@ -82,7 +98,6 @@ const Sidebar = ({ activeTab, setActiveTab, messageCount = 2 }) => {
   const menuItems = [
     { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'orders', label: 'Orders', icon: '🛒' },
-    { id: 'tasks', label: 'Tasks', icon: '📋' },
     { id: 'messages', label: 'Messages', icon: '✉️', badge: messageCount },
     { id: 'payouts', label: 'Payouts', icon: '💰' }
   ];
@@ -121,24 +136,53 @@ const Sidebar = ({ activeTab, setActiveTab, messageCount = 2 }) => {
   );
 };
 
+// Progress Tracker Component
+const ProgressTracker = ({ currentStage }) => {
+  return (
+    <div className="flex items-center space-x-1">
+      {TRANSLATION_STAGES.map((stage, index) => {
+        const isCompleted = stage.id <= currentStage;
+        const isCurrent = stage.id === currentStage;
+
+        return (
+          <React.Fragment key={stage.id}>
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
+                  isCompleted
+                    ? isCurrent
+                      ? 'bg-teal-500 text-white ring-4 ring-teal-200'
+                      : 'bg-teal-500 text-white'
+                    : 'bg-gray-200 text-gray-400'
+                }`}
+                title={stage.name}
+              >
+                {stage.icon}
+              </div>
+              <span className={`text-xs mt-1 text-center max-w-16 leading-tight ${
+                isCompleted ? 'text-teal-600 font-medium' : 'text-gray-400'
+              }`}>
+                {stage.name.split(' ').slice(0, 2).join(' ')}
+              </span>
+            </div>
+            {index < TRANSLATION_STAGES.length - 1 && (
+              <div
+                className={`flex-1 h-1 min-w-4 mt-[-16px] ${
+                  stage.id < currentStage ? 'bg-teal-500' : 'bg-gray-200'
+                }`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+};
+
 // Orders Page Component
 const OrdersPage = () => {
   const [orders, setOrders] = useState(sampleOrders);
-
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'completed':
-        return 'bg-teal-500 text-white';
-      case 'quote':
-        return 'bg-gray-200 text-gray-700';
-      case 'pending':
-        return 'bg-yellow-500 text-white';
-      case 'in progress':
-        return 'bg-blue-500 text-white';
-      default:
-        return 'bg-gray-200 text-gray-700';
-    }
-  };
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const getServiceColor = (service) => {
     if (service.toLowerCase().includes('certified')) {
@@ -147,56 +191,108 @@ const OrdersPage = () => {
     return 'text-purple-600';
   };
 
+  const getCurrentStageName = (stageId) => {
+    const stage = TRANSLATION_STAGES.find(s => s.id === stageId);
+    return stage ? stage.name : 'Unknown';
+  };
+
+  const getStageColor = (stageId) => {
+    if (stageId === 6) return 'bg-green-500 text-white';
+    if (stageId >= 4) return 'bg-teal-500 text-white';
+    if (stageId >= 2) return 'bg-blue-500 text-white';
+    return 'bg-yellow-500 text-white';
+  };
+
   return (
     <div className="p-8">
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-4 px-6 font-semibold text-gray-600">ID</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-600">Client</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-600">Service</th>
-                <th className="text-right py-4 px-6 font-semibold text-gray-600">Amount</th>
-                <th className="text-left py-4 px-6 font-semibold text-gray-600">Status</th>
-                <th className="text-center py-4 px-6 font-semibold text-gray-600"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-4 px-6">
-                    <a href="#" className="text-teal-600 hover:underline font-medium">
-                      {order.id}
-                    </a>
-                  </td>
-                  <td className="py-4 px-6 text-gray-800">
-                    {order.client}
-                  </td>
-                  <td className="py-4 px-6">
+      <div className="mb-6">
+        <h2 className="text-lg text-gray-600">Track your translation orders progress</h2>
+      </div>
+
+      {/* Orders List */}
+      <div className="space-y-4">
+        {orders.map((order) => (
+          <div
+            key={order.id}
+            className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden"
+          >
+            {/* Order Header */}
+            <div
+              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => setSelectedOrder(selectedOrder === order.id ? null : order.id)}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <span className="text-2xl">{order.flag}</span>
+                  <div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-teal-600 font-semibold text-lg">#{order.id}</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStageColor(order.currentStage)}`}>
+                        {getCurrentStageName(order.currentStage)}
+                      </span>
+                    </div>
                     <div className={`font-medium ${getServiceColor(order.service)}`}>
-                      {order.service}: {order.sourceLanguage} {'>'} {order.targetLanguage}
+                      {order.service}: {order.sourceLanguage} → {order.targetLanguage}
                     </div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      Created: {order.createdAt}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-gray-800">${order.amount.toFixed(2)}</div>
+                  <div className="text-sm text-gray-500">
+                    {order.currentStage === 6 ? 'Delivered' : `Est. Delivery: ${order.estimatedDelivery}`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Tracker */}
+              <div className="mt-4">
+                <ProgressTracker currentStage={order.currentStage} />
+              </div>
+            </div>
+
+            {/* Expanded Details */}
+            {selectedOrder === order.id && (
+              <div className="border-t border-gray-100 bg-gray-50 p-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-500">Client</div>
+                    <div className="font-medium text-gray-800">{order.client}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Created</div>
+                    <div className="font-medium text-gray-800">{order.createdAt}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Estimated Delivery</div>
+                    <div className="font-medium text-gray-800">{order.estimatedDelivery}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Current Stage</div>
+                    <div className="font-medium text-teal-600">{getCurrentStageName(order.currentStage)}</div>
+                  </div>
+                </div>
+
+                {order.currentStage === 6 && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-2 text-green-700">
+                      <span className="text-xl">🎉</span>
+                      <span className="font-medium">Translation delivered successfully!</span>
                     </div>
-                  </td>
-                  <td className="py-4 px-6 text-right text-gray-800 font-medium">
-                    ${order.amount.toFixed(2)}
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <span className="text-2xl">{order.flag}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                )}
+
+                {order.currentStage === 5 && (
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2 text-blue-700">
+                      <span className="text-xl">📦</span>
+                      <span className="font-medium">Your translation is ready and will be delivered soon!</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -828,16 +924,6 @@ const TranslationPortal = () => {
         return <QuotePortal />;
       case 'orders':
         return <OrdersPage />;
-      case 'tasks':
-        return (
-          <div className="p-8">
-            <div className="bg-white rounded-lg shadow-sm p-8 text-center text-gray-500">
-              <span className="text-4xl mb-4 block">📋</span>
-              <h2 className="text-xl font-semibold mb-2">Tasks</h2>
-              <p>No tasks available at the moment.</p>
-            </div>
-          </div>
-        );
       case 'messages':
         return (
           <div className="p-8">
