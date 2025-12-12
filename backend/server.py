@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -25,6 +26,8 @@ import httpx
 from contextlib import asynccontextmanager
 import stripe
 import json
+import hashlib
+import secrets
 
 # Set Tesseract path
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
@@ -324,6 +327,121 @@ class EmailNotificationRequest(BaseModel):
     quote_id: str
     partner_email: EmailStr
     send_to_company: bool = True
+
+# Partner Models
+class Partner(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    company_name: str
+    email: EmailStr
+    password_hash: str
+    contact_name: str
+    phone: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PartnerCreate(BaseModel):
+    company_name: str
+    email: EmailStr
+    password: str
+    contact_name: str
+    phone: Optional[str] = None
+
+class PartnerLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class PartnerResponse(BaseModel):
+    id: str
+    company_name: str
+    email: str
+    contact_name: str
+    phone: Optional[str] = None
+    token: str
+
+# Translation Order Models (with invoice tracking)
+class TranslationOrder(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_number: str = Field(default_factory=lambda: f"ORD-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    partner_id: str
+    partner_company: str
+    # Client info (end customer)
+    client_name: str
+    client_email: EmailStr
+    # Translation details
+    service_type: str  # standard (certified), professional
+    translate_from: str
+    translate_to: str
+    word_count: int
+    page_count: int
+    urgency: str  # no, priority, urgent
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    # Pricing
+    base_price: float
+    urgency_fee: float
+    total_price: float
+    # Status tracking
+    translation_status: str = "received"  # received, in_translation, review, ready, delivered
+    payment_status: str = "pending"  # pending, paid, overdue
+    # Dates
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_date: Optional[datetime] = None
+    payment_date: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    # Protemos integration
+    protemos_project_id: Optional[str] = None
+    # Files
+    document_filename: Optional[str] = None
+
+class TranslationOrderCreate(BaseModel):
+    client_name: str
+    client_email: EmailStr
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    document_filename: Optional[str] = None
+
+class TranslationOrderUpdate(BaseModel):
+    translation_status: Optional[str] = None
+    payment_status: Optional[str] = None
+    payment_date: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+# Helper functions for authentication
+def hash_password(password: str) -> str:
+    """Hash password with salt"""
+    salt = secrets.token_hex(16)
+    hash_obj = hashlib.sha256((password + salt).encode())
+    return f"{salt}:{hash_obj.hexdigest()}"
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify password against hash"""
+    try:
+        salt, hash_value = password_hash.split(":")
+        hash_obj = hashlib.sha256((password + salt).encode())
+        return hash_obj.hexdigest() == hash_value
+    except:
+        return False
+
+def generate_token() -> str:
+    """Generate a simple session token"""
+    return secrets.token_urlsafe(32)
+
+# In-memory token storage (in production, use Redis or database)
+active_tokens: Dict[str, str] = {}  # token -> partner_id
+
+async def get_current_partner(token: str = None) -> Optional[dict]:
+    """Get current partner from token"""
+    if not token or token not in active_tokens:
+        return None
+    partner_id = active_tokens[token]
+    partner = await db.partners.find_one({"id": partner_id})
+    return partner
 
 # Utility functions
 def count_words(text: str) -> int:
@@ -1031,12 +1149,414 @@ async def send_email_notification(request: EmailNotificationRequest, background_
             )
         
         return {"status": "success", "message": "Email notifications queued for delivery"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error sending email notification: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send email notification")
+
+# ==================== PARTNER AUTHENTICATION ====================
+
+@api_router.post("/auth/register")
+async def register_partner(partner_data: PartnerCreate):
+    """Register a new partner"""
+    try:
+        # Check if email already exists
+        existing = await db.partners.find_one({"email": partner_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create partner
+        partner = Partner(
+            company_name=partner_data.company_name,
+            email=partner_data.email,
+            password_hash=hash_password(partner_data.password),
+            contact_name=partner_data.contact_name,
+            phone=partner_data.phone
+        )
+
+        await db.partners.insert_one(partner.dict())
+
+        # Generate token
+        token = generate_token()
+        active_tokens[token] = partner.id
+
+        return PartnerResponse(
+            id=partner.id,
+            company_name=partner.company_name,
+            email=partner.email,
+            contact_name=partner.contact_name,
+            phone=partner.phone,
+            token=token
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering partner: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register partner")
+
+@api_router.post("/auth/login")
+async def login_partner(login_data: PartnerLogin):
+    """Login partner and return token"""
+    try:
+        # Find partner by email
+        partner = await db.partners.find_one({"email": login_data.email})
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Verify password
+        if not verify_password(login_data.password, partner["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if active
+        if not partner.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+
+        # Generate token
+        token = generate_token()
+        active_tokens[token] = partner["id"]
+
+        return PartnerResponse(
+            id=partner["id"],
+            company_name=partner["company_name"],
+            email=partner["email"],
+            contact_name=partner["contact_name"],
+            phone=partner.get("phone"),
+            token=token
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in partner: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to login")
+
+@api_router.post("/auth/logout")
+async def logout_partner(token: str):
+    """Logout partner"""
+    if token in active_tokens:
+        del active_tokens[token]
+    return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.get("/auth/me")
+async def get_current_partner_info(token: str):
+    """Get current partner info from token"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return {
+        "id": partner["id"],
+        "company_name": partner["company_name"],
+        "email": partner["email"],
+        "contact_name": partner["contact_name"],
+        "phone": partner.get("phone")
+    }
+
+# ==================== TRANSLATION ORDERS ====================
+
+@api_router.post("/orders/create")
+async def create_order(order_data: TranslationOrderCreate, token: str):
+    """Create a new translation order"""
+    try:
+        # Verify partner
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            order_data.word_count,
+            order_data.service_type,
+            order_data.urgency
+        )
+
+        # Calculate page count
+        page_count = max(1, math.ceil(order_data.word_count / 250))
+
+        # Set due date (30 days from now for payment)
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        # Create order
+        order = TranslationOrder(
+            partner_id=partner["id"],
+            partner_company=partner["company_name"],
+            client_name=order_data.client_name,
+            client_email=order_data.client_email,
+            service_type=order_data.service_type,
+            translate_from=order_data.translate_from,
+            translate_to=order_data.translate_to,
+            word_count=order_data.word_count,
+            page_count=page_count,
+            urgency=order_data.urgency,
+            reference=order_data.reference,
+            notes=order_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            due_date=due_date,
+            document_filename=order_data.document_filename
+        )
+
+        await db.translation_orders.insert_one(order.dict())
+
+        # Send to Protemos
+        try:
+            protemos_data = {
+                "reference": order.order_number,
+                "client_email": order.client_email,
+                "translate_from": order.translate_from,
+                "translate_to": order.translate_to,
+                "word_count": order.word_count,
+                "service_type": order.service_type,
+                "urgency": order.urgency,
+                "total_price": order.total_price,
+                "estimated_delivery": get_estimated_delivery(order.urgency)
+            }
+            protemos_response = await protemos_client.create_project(protemos_data)
+
+            # Update order with Protemos ID
+            await db.translation_orders.update_one(
+                {"id": order.id},
+                {"$set": {"protemos_project_id": protemos_response.get("id")}}
+            )
+            order.protemos_project_id = protemos_response.get("id")
+
+        except Exception as e:
+            logger.error(f"Failed to create Protemos project: {str(e)}")
+
+        # Send email notifications
+        try:
+            order_details = {
+                "reference": order.order_number,
+                "service_type": order.service_type,
+                "translate_from": order.translate_from,
+                "translate_to": order.translate_to,
+                "word_count": order.word_count,
+                "urgency": order.urgency,
+                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "base_price": order.base_price,
+                "urgency_fee": order.urgency_fee,
+                "total_price": order.total_price,
+                "client_name": order.client_name,
+                "client_email": order.client_email
+            }
+
+            # Notify partner
+            await email_service.send_order_confirmation_email(
+                partner["email"],
+                order_details,
+                is_partner=True
+            )
+
+            # Notify company
+            await email_service.send_order_confirmation_email(
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send order emails: {str(e)}")
+
+        return {
+            "status": "success",
+            "order": order.dict(),
+            "message": "Order created successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+@api_router.get("/orders")
+async def get_orders(token: str, status: Optional[str] = None):
+    """Get all orders for a partner"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Build query
+        query = {"partner_id": partner["id"]}
+        if status:
+            query["payment_status"] = status
+
+        orders = await db.translation_orders.find(query).sort("created_at", -1).to_list(100)
+
+        # Clean up MongoDB fields
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+
+        return {"orders": orders}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get orders")
+
+@api_router.get("/orders/{order_id}")
+async def get_order(order_id: str, token: str):
+    """Get specific order"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        order = await db.translation_orders.find_one({
+            "id": order_id,
+            "partner_id": partner["id"]
+        })
+
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if '_id' in order:
+            del order['_id']
+
+        return order
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get order")
+
+# ==================== ADMIN ENDPOINTS (for you to manage orders) ====================
+
+@api_router.get("/admin/orders")
+async def admin_get_all_orders(admin_key: str):
+    """Get all orders (admin only)"""
+    # Simple admin key check (in production, use proper admin auth)
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+
+    for order in orders:
+        if '_id' in order:
+            del order['_id']
+
+    # Calculate summary
+    total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
+    total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
+    total_overdue = sum(1 for o in orders if o.get("payment_status") == "overdue")
+    total_value = sum(o.get("total_price", 0) for o in orders)
+    pending_value = sum(o.get("total_price", 0) for o in orders if o.get("payment_status") == "pending")
+
+    return {
+        "orders": orders,
+        "summary": {
+            "total_orders": len(orders),
+            "pending": total_pending,
+            "paid": total_paid,
+            "overdue": total_overdue,
+            "total_value": total_value,
+            "pending_value": pending_value
+        }
+    }
+
+@api_router.put("/admin/orders/{order_id}")
+async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
+    """Update order status (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Build update dict
+        update_dict = {}
+        if update_data.translation_status:
+            update_dict["translation_status"] = update_data.translation_status
+        if update_data.payment_status:
+            update_dict["payment_status"] = update_data.payment_status
+        if update_data.payment_date:
+            update_dict["payment_date"] = update_data.payment_date
+        if update_data.delivered_at:
+            update_dict["delivered_at"] = update_data.delivered_at
+        if update_data.notes:
+            update_dict["notes"] = update_data.notes
+
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No update data provided")
+
+        result = await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": update_dict}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Get updated order
+        order = await db.translation_orders.find_one({"id": order_id})
+        if '_id' in order:
+            del order['_id']
+
+        # Send notification if delivered
+        if update_data.translation_status == "delivered":
+            try:
+                # Get partner email
+                partner = await db.partners.find_one({"id": order["partner_id"]})
+                if partner:
+                    # Send delivery notification to partner
+                    await email_service.send_email(
+                        partner["email"],
+                        f"Translation Delivered - {order['order_number']}",
+                        f"""
+                        <html><body>
+                        <h2>Your translation has been delivered!</h2>
+                        <p>Order: {order['order_number']}</p>
+                        <p>Client: {order['client_name']}</p>
+                        <p>The translation has been sent to your client at {order['client_email']}.</p>
+                        </body></html>
+                        """
+                    )
+
+                    # Send to client
+                    await email_service.send_email(
+                        order["client_email"],
+                        f"Your Translation is Ready - {order['order_number']}",
+                        f"""
+                        <html><body>
+                        <h2>Your translation is ready!</h2>
+                        <p>Dear {order['client_name']},</p>
+                        <p>Your translation order #{order['order_number']} has been completed and delivered.</p>
+                        <p>Thank you for choosing Legacy Translations!</p>
+                        </body></html>
+                        """
+                    )
+            except Exception as e:
+                logger.error(f"Failed to send delivery notification: {str(e)}")
+
+        return {"status": "success", "order": order}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update order")
+
+@api_router.post("/admin/orders/{order_id}/mark-paid")
+async def admin_mark_order_paid(order_id: str, admin_key: str):
+    """Mark order as paid (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    return {"status": "success", "message": "Order marked as paid"}
 
 # Include the router in the main app
 app.include_router(api_router)
