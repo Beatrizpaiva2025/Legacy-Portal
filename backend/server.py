@@ -34,7 +34,8 @@ pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
 # SendGrid imports
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -87,6 +88,32 @@ class EmailService:
             logger.error(f"Failed to send email: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email: {str(e)}")
     
+    async def send_email_with_attachment(self, to: str, subject: str, content: str,
+                                          file_content: str, filename: str, file_type: str = "application/pdf"):
+        """Send email with file attachment via SendGrid"""
+        message = Mail(
+            from_email=self.sender_email,
+            to_emails=to,
+            subject=subject,
+            html_content=content
+        )
+
+        # Add attachment
+        attachment = Attachment()
+        attachment.file_content = FileContent(file_content)  # Already base64 encoded
+        attachment.file_name = FileName(filename)
+        attachment.file_type = FileType(file_type)
+        attachment.disposition = Disposition("attachment")
+        message.attachment = attachment
+
+        try:
+            sg = SendGridAPIClient(self.api_key)
+            response = sg.send(message)
+            return response.status_code == 202
+        except Exception as e:
+            logger.error(f"Failed to send email with attachment: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
+
     async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
         """Send order confirmation email"""
         subject = f"Translation Order Confirmation - {order_details.get('reference', 'N/A')}"
@@ -392,6 +419,8 @@ class TranslationOrder(BaseModel):
     protemos_project_id: Optional[str] = None
     # Files
     document_filename: Optional[str] = None
+    translated_file: Optional[str] = None  # Base64 encoded translated file
+    translated_filename: Optional[str] = None
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -1557,6 +1586,127 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Order not found")
 
     return {"status": "success", "message": "Order marked as paid"}
+
+@api_router.post("/admin/orders/{order_id}/upload-translation")
+async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFile = File(...)):
+    """Upload translated file for an order (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Read and encode file
+    file_content = await file.read()
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Determine file type
+    file_extension = file.filename.split('.')[-1].lower() if '.' in file.filename else 'pdf'
+    file_types = {
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'txt': 'text/plain'
+    }
+    file_type = file_types.get(file_extension, 'application/octet-stream')
+
+    # Update order with translated file
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "translated_file": file_base64,
+            "translated_filename": file.filename,
+            "translated_file_type": file_type
+        }}
+    )
+
+    return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
+
+@api_router.post("/admin/orders/{order_id}/deliver")
+async def admin_deliver_order(order_id: str, admin_key: str):
+    """Mark order as delivered and send translation to client (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Get partner
+    partner = await db.partners.find_one({"id": order["partner_id"]})
+
+    # Update order status
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "translation_status": "delivered",
+            "delivered_at": datetime.utcnow()
+        }}
+    )
+
+    # Send emails
+    try:
+        # Check if translated file exists
+        has_attachment = order.get("translated_file") and order.get("translated_filename")
+
+        if has_attachment:
+            # Send to client WITH attachment
+            await email_service.send_email_with_attachment(
+                order["client_email"],
+                f"Your Translation is Ready - {order['order_number']}",
+                f"""
+                <html><body>
+                <h2>Your translation is ready!</h2>
+                <p>Dear {order['client_name']},</p>
+                <p>Your translation order #{order['order_number']} has been completed.</p>
+                <p>Please find your translated document attached to this email.</p>
+                <p>Thank you for choosing Legacy Translations!</p>
+                <br>
+                <p>Best regards,<br>Legacy Translations Team</p>
+                </body></html>
+                """,
+                order["translated_file"],
+                order["translated_filename"],
+                order.get("translated_file_type", "application/pdf")
+            )
+        else:
+            # Send to client WITHOUT attachment
+            await email_service.send_email(
+                order["client_email"],
+                f"Your Translation is Ready - {order['order_number']}",
+                f"""
+                <html><body>
+                <h2>Your translation is ready!</h2>
+                <p>Dear {order['client_name']},</p>
+                <p>Your translation order #{order['order_number']} has been completed and delivered.</p>
+                <p>Thank you for choosing Legacy Translations!</p>
+                </body></html>
+                """
+            )
+
+        # Send notification to partner
+        if partner:
+            await email_service.send_email(
+                partner["email"],
+                f"Translation Delivered - {order['order_number']}",
+                f"""
+                <html><body>
+                <h2>Translation has been delivered!</h2>
+                <p>Order: {order['order_number']}</p>
+                <p>Client: {order['client_name']}</p>
+                <p>The translation has been sent to your client at {order['client_email']}.</p>
+                </body></html>
+                """
+            )
+
+        return {"status": "success", "message": "Order delivered and emails sent", "attachment_sent": has_attachment}
+
+    except Exception as e:
+        logger.error(f"Failed to send delivery emails: {str(e)}")
+        return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
 
 # Include the router in the main app
 app.include_router(api_router)
