@@ -249,14 +249,15 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
   // Calculate quote when relevant fields change
   useEffect(() => {
-    if (wordCount > 0) {
+    if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [wordCount, formData.service_type, formData.urgency]);
+  }, [uploadedFiles, formData.service_type, formData.urgency]);
 
   const calculateQuote = () => {
     let basePrice = 0;
-    const pages = Math.max(1, Math.ceil(wordCount / 250));
+    // Sum individual file pages instead of calculating from total words
+    const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
 
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;  // Certified Translation
@@ -569,7 +570,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
                     );
                   })}
                   <div className="text-lg font-semibold text-teal-600">
-                    Total: {Math.max(1, Math.ceil(wordCount / 250))} {Math.ceil(wordCount / 250) === 1 ? 'page' : 'pages'}
+                    Total: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? 'page' : 'pages'}
                   </div>
                 </div>
               )}
