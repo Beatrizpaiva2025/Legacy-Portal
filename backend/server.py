@@ -32,6 +32,26 @@ import secrets
 # Set Tesseract path
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
+# AWS Textract for better OCR
+import boto3
+from botocore.exceptions import ClientError
+
+# Initialize AWS Textract client (if credentials are available)
+textract_client = None
+try:
+    if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY'):
+        textract_client = boto3.client(
+            'textract',
+            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+        )
+        logger.info("AWS Textract initialized successfully")
+    else:
+        logger.info("AWS credentials not found, using Tesseract OCR as fallback")
+except Exception as e:
+    logger.warning(f"Failed to initialize AWS Textract: {e}, using Tesseract as fallback")
+
 # SendGrid imports (keeping for backwards compatibility)
 # from sendgrid import SendGridAPIClient
 # from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
@@ -483,25 +503,49 @@ def count_words(text: str) -> int:
     """Count words in text with improved accuracy"""
     if not text or not text.strip():
         return 0
-    
+
     # Clean the text: remove extra whitespace, normalize line breaks
     cleaned_text = re.sub(r'\s+', ' ', text.strip())
-    
-    # Split by whitespace and filter out empty strings and very short strings
-    words = [word.strip() for word in cleaned_text.split() if word.strip() and len(word.strip()) > 1]
-    
-    # Filter out common PDF artifacts and noise
+
+    # Split by whitespace and filter out empty strings
+    words = [word.strip() for word in cleaned_text.split() if word.strip()]
+
+    # Common short words in English and Portuguese (2 chars or less)
+    common_short_words = {
+        # English
+        'a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'is', 'as',
+        'or', 'if', 'it', 'be', 'we', 'he', 'me', 'my', 'no', 'so', 'up', 'do', 'go',
+        'i', 'am', 'us', 'vs',
+        # Portuguese
+        'de', 'da', 'do', 'em', 'um', 'se', 'ao', 'os', 'as', 'no', 'na', 'ou',
+        'eu', 'tu', 'me', 'te', 'lhe', 'nos', 'vos', 'ja', 'e', 'o', 'a', 'que',
+        'por', 'para', 'com', 'sem', 'sob', 'mais', 'menos', 'mas', 'nem',
+        # Spanish
+        'el', 'la', 'en', 'un', 'una', 'es', 'de', 'del', 'al', 'lo', 'los', 'las',
+        'y', 'que', 'su', 'sus', 'mi', 'tu', 'se', 'si', 'por', 'para', 'con', 'sin'
+    }
+
+    # Filter out PDF artifacts and noise
     filtered_words = []
     for word in words:
-        # Skip common PDF extraction artifacts
-        if not re.match(r'^[^\w\s]*$', word):  # Skip words that are only punctuation
-            # Skip very short words that are likely artifacts (but keep common short words)
-            if len(word) > 2 or word.lower() in ['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'is', 'as', 'or', 'if', 'it', 'be', 'we', 'he', 'me', 'my', 'no', 'so', 'up', 'do', 'go']:
-                filtered_words.append(word)
-    
+        # Remove leading/trailing punctuation for checking
+        cleaned_word = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+
+        # Skip empty after cleaning or words that are only punctuation/numbers
+        if not cleaned_word:
+            continue
+
+        # Skip if it's just numbers (like page numbers, dates, etc.)
+        if cleaned_word.isdigit() and len(cleaned_word) < 4:
+            continue
+
+        # Keep the word if it's longer than 2 chars OR it's a common short word
+        if len(cleaned_word) > 2 or cleaned_word.lower() in common_short_words:
+            filtered_words.append(word)
+
     word_count = len(filtered_words)
-    logger.info(f"Word count: {word_count} (original: {len(words)}, filtered: {len(filtered_words)})")
-    
+    logger.info(f"Word count: {word_count} (original split: {len(words)}, after filter: {len(filtered_words)})")
+
     return word_count
 
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
@@ -549,92 +593,131 @@ def get_estimated_delivery(urgency: str) -> str:
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text})"
 
+def extract_text_with_textract(content: bytes, file_extension: str) -> str:
+    """Extract text using AWS Textract (best quality OCR)"""
+    if not textract_client:
+        return None
+
+    try:
+        # For images, use detect_document_text directly
+        if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff']:
+            response = textract_client.detect_document_text(
+                Document={'Bytes': content}
+            )
+
+            # Extract text from response
+            text_parts = []
+            for block in response.get('Blocks', []):
+                if block['BlockType'] == 'LINE':
+                    text_parts.append(block['Text'])
+
+            text = '\n'.join(text_parts)
+            logger.info(f"AWS Textract extracted {len(text)} characters from image")
+            return text
+
+        # For PDFs, convert pages to images first
+        elif file_extension == 'pdf':
+            text = ""
+            try:
+                pdf_document = fitz.open(stream=content, filetype="pdf")
+
+                for page_num in range(min(pdf_document.page_count, 15)):  # Limit to 15 pages
+                    page = pdf_document[page_num]
+
+                    # Convert PDF page to PNG image
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+                    img_data = pix.tobytes("png")
+
+                    # Send to Textract
+                    response = textract_client.detect_document_text(
+                        Document={'Bytes': img_data}
+                    )
+
+                    # Extract text from response
+                    for block in response.get('Blocks', []):
+                        if block['BlockType'] == 'LINE':
+                            text += block['Text'] + '\n'
+
+                    text += '\n'  # Page separator
+
+                pdf_document.close()
+                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({pdf_document.page_count} pages)")
+                return text
+
+            except Exception as e:
+                logger.warning(f"Textract PDF processing failed: {e}")
+                return None
+
+    except ClientError as e:
+        logger.warning(f"AWS Textract error: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Textract extraction failed: {e}")
+        return None
+
+    return None
+
+
 async def extract_text_from_file(file: UploadFile) -> str:
-    """Extract text from uploaded file using appropriate method with multiple fallbacks"""
+    """Extract text from uploaded file using AWS Textract (primary) or Tesseract (fallback)"""
     content = await file.read()
     file_extension = file.filename.split('.')[-1].lower()
-    
+
     try:
+        # For images - try Textract first, then Tesseract
         if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'gif']:
-            # Enhanced Image OCR with preprocessing
+            # Try AWS Textract first (best quality)
+            if textract_client:
+                logger.info("Using AWS Textract for image OCR...")
+                text = extract_text_with_textract(content, file_extension)
+                if text and len(text.strip()) > 10:
+                    return text
+                logger.info("Textract returned insufficient text, trying Tesseract...")
+
+            # Fallback to Tesseract
             try:
                 image = Image.open(io.BytesIO(content))
-                
-                # Image preprocessing for better OCR
-                # Convert to RGB if needed
                 if image.mode != 'RGB':
                     image = image.convert('RGB')
-                
-                # Enhance image for better OCR results
+
                 from PIL import ImageEnhance, ImageFilter
-                
-                # Increase contrast
                 enhancer = ImageEnhance.Contrast(image)
                 image = enhancer.enhance(2.0)
-                
-                # Sharpen image
                 image = image.filter(ImageFilter.SHARPEN)
-                
-                # Scale up small images (OCR works better on larger images)
+
                 width, height = image.size
                 if width < 1000 or height < 1000:
                     scale_factor = max(1000/width, 1000/height)
                     new_width = int(width * scale_factor)
                     new_height = int(height * scale_factor)
                     image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                # Try different OCR configurations for better results
-                custom_config = r'--oem 3 --psm 6'
-                
-                text = pytesseract.image_to_string(image, config=custom_config)
-                
-                # If text is too short, try different PSM modes
-                if len(text.strip()) < 50:
-                    logger.info("Trying alternative OCR configuration for better results")
-                    configs = [
-                        r'--oem 3 --psm 3',  # Fully automatic page segmentation
-                        r'--oem 3 --psm 4',  # Assume a single column of text
-                        r'--oem 3 --psm 8',  # Treat the image as a single word
-                        r'--oem 3 --psm 12', # Sparse text
-                    ]
-                    
-                    best_text = text
-                    for config in configs:
-                        try:
-                            alt_text = pytesseract.image_to_string(image, config=config)
-                            if len(alt_text.strip()) > len(best_text.strip()):
-                                best_text = alt_text
-                        except:
-                            continue
-                    
-                    text = best_text
-                
-                logger.info(f"Successfully extracted text from image using OCR: {len(text)} characters")
+
+                text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                logger.info(f"Tesseract extracted {len(text)} characters from image")
                 return text
-                
+
             except Exception as e:
                 logger.error(f"Image OCR failed: {str(e)}")
                 return ""
-            
+
         elif file_extension == 'pdf':
-            # Enhanced PDF processing with image-based PDF support
             text = ""
-            
-            # Method 1: Try pdfplumber first (most reliable for text-based PDFs)
+
+            # Method 1: Try pdfplumber first (for text-based PDFs - fastest)
             try:
                 with pdfplumber.open(io.BytesIO(content)) as pdf:
                     for page in pdf.pages:
                         page_text = page.extract_text()
                         if page_text:
                             text += page_text + "\n"
-                
-                if text.strip():
-                    logger.info(f"Successfully extracted text using pdfplumber: {len(text)} characters")
+
+                if text.strip() and len(text.strip()) > 50:
+                    logger.info(f"pdfplumber extracted {len(text)} characters (text-based PDF)")
                     return text
             except Exception as e:
                 logger.warning(f"pdfplumber extraction failed: {str(e)}")
-            
-            # Method 2: Try PyMuPDF (fitz) as fallback
+
+            # Method 2: Try PyMuPDF for text
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
                 for page_num in range(pdf_document.page_count):
@@ -643,66 +726,54 @@ async def extract_text_from_file(file: UploadFile) -> str:
                     if page_text:
                         text += page_text + "\n"
                 pdf_document.close()
-                
-                if text.strip():
-                    logger.info(f"Successfully extracted text using PyMuPDF: {len(text)} characters")
+
+                if text.strip() and len(text.strip()) > 50:
+                    logger.info(f"PyMuPDF extracted {len(text)} characters")
                     return text
             except Exception as e:
                 logger.warning(f"PyMuPDF extraction failed: {str(e)}")
-            
-            # Method 3: Try PyPDF2 as fallback
+
+            # Method 3: PDF is likely image-based - use AWS Textract (best quality)
+            if textract_client:
+                logger.info("PDF appears to be image-based. Using AWS Textract...")
+                textract_text = extract_text_with_textract(content, file_extension)
+                if textract_text and len(textract_text.strip()) > 10:
+                    return textract_text
+                logger.info("Textract returned insufficient text, trying Tesseract...")
+
+            # Method 4: Fallback to Tesseract OCR
+            logger.info("Using Tesseract OCR for image-based PDF...")
             try:
-                pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-                for page in pdf_reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
+                pdf_document = fitz.open(stream=content, filetype="pdf")
+
+                for page_num in range(min(pdf_document.page_count, 10)):
+                    page = pdf_document[page_num]
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                    img_data = pix.tobytes("png")
+
+                    image = Image.open(io.BytesIO(img_data))
+                    page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+
+                    if page_text.strip():
                         text += page_text + "\n"
-                
+
+                pdf_document.close()
+
                 if text.strip():
-                    logger.info(f"Successfully extracted text using PyPDF2: {len(text)} characters")
+                    logger.info(f"Tesseract extracted {len(text)} characters from image-based PDF")
                     return text
+
             except Exception as e:
-                logger.warning(f"PyPDF2 extraction failed: {str(e)}")
-            
-            # Method 4: If all text extraction fails, try OCR on PDF pages (for image-based PDFs)
-            if not text.strip():
-                logger.info("PDF appears to be image-based. Attempting OCR extraction...")
-                try:
-                    pdf_document = fitz.open(stream=content, filetype="pdf")
-                    
-                    for page_num in range(min(pdf_document.page_count, 10)):  # Limit to first 10 pages for performance
-                        page = pdf_document[page_num]
-                        
-                        # Convert PDF page to image
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better OCR
-                        img_data = pix.tobytes("png")
-                        
-                        # Process with OCR
-                        image = Image.open(io.BytesIO(img_data))
-                        page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
-                        
-                        if page_text.strip():
-                            text += page_text + "\n"
-                    
-                    pdf_document.close()
-                    
-                    if text.strip():
-                        logger.info(f"Successfully extracted text from image-based PDF using OCR: {len(text)} characters")
-                        return text
-                        
-                except Exception as e:
-                    logger.warning(f"PDF OCR extraction failed: {str(e)}")
-            
+                logger.warning(f"PDF OCR extraction failed: {str(e)}")
+
             return text
-            
+
         elif file_extension in ['docx', 'doc']:
-            # Word document
             doc = Document(io.BytesIO(content))
             text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
             return text
-            
+
         elif file_extension == 'txt':
-            # Plain text - try multiple encodings
             encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
             for encoding in encodings:
                 try:
@@ -710,10 +781,8 @@ async def extract_text_from_file(file: UploadFile) -> str:
                     return text
                 except UnicodeDecodeError:
                     continue
-            
-            # If all encodings fail
             raise HTTPException(status_code=400, detail="Unable to decode text file")
-            
+
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_extension}")
             

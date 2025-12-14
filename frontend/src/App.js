@@ -279,6 +279,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
     });
   };
 
+  const [processingStatus, setProcessingStatus] = useState('');
+
   // File upload handler
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
@@ -286,16 +288,21 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
     setUploadedFiles(acceptedFiles);
     setIsProcessing(true);
     setError('');
+    setProcessingStatus('Connecting to server...');
 
     try {
       let totalWords = 0;
 
-      for (const file of acceptedFiles) {
+      for (let i = 0; i < acceptedFiles.length; i++) {
+        const file = acceptedFiles[i];
+        setProcessingStatus(`Processing ${file.name} (${i + 1}/${acceptedFiles.length})...`);
+
         const formDataUpload = new FormData();
         formDataUpload.append('file', file);
 
         const response = await axios.post(`${API}/upload-document`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 120000 // 2 minute timeout for OCR processing
         });
 
         if (response.data?.word_count) {
@@ -304,11 +311,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       }
 
       setWordCount(totalWords);
+      setProcessingStatus('');
     } catch (err) {
-      setError('Error processing document. Please try again.');
+      if (err.code === 'ECONNABORTED') {
+        setError('Processing timed out. The file might be too large or complex. Please try a smaller file.');
+      } else {
+        setError('Error processing document. Please try again.');
+      }
       console.error('Upload error:', err);
     } finally {
       setIsProcessing(false);
+      setProcessingStatus('');
     }
   }, []);
 
@@ -517,7 +530,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800">Processing document...</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || 'Processing document...'}</div>
+                  <div className="text-xs text-blue-600 mt-1">This may take a moment for large or image-based files</div>
                 </div>
               )}
 
