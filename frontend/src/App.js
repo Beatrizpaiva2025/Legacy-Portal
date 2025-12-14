@@ -233,8 +233,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
     client_name: '',
     client_email: '',
     service_type: 'professional',
-    translate_from: 'english',
-    translate_to: 'spanish',
+    translate_from: 'portuguese',
+    translate_to: 'english',
     urgency: 'no',
     reference: '',
     notes: ''
@@ -259,9 +259,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
     const pages = Math.max(1, Math.ceil(wordCount / 250));
 
     if (formData.service_type === 'standard') {
-      basePrice = pages * 24.99;
+      basePrice = pages * 24.99;  // Certified Translation
     } else {
-      basePrice = wordCount * 0.075;
+      basePrice = pages * 19.50;  // Professional Translation
     }
 
     let urgencyFee = 0;
@@ -475,7 +475,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
                     <div className="font-medium">Professional Translation</div>
                     <div className="text-sm text-gray-500">Business, marketing, general content</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$0.08/word</div>
+                  <div className="font-semibold text-teal-600">$19.50/page</div>
                 </label>
               </div>
             </div>
@@ -538,9 +538,26 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
               {uploadedFiles.length > 0 && !isProcessing && (
                 <div className="mt-4 space-y-2">
                   {uploadedFiles.map((file, i) => (
-                    <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between">
-                      <span>{file.name}</span>
-                      <span className="text-green-600">✓</span>
+                    <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
+                      <div className="flex items-center">
+                        <span className="text-green-600 mr-2">✓</span>
+                        <span>{file.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFiles = uploadedFiles.filter((_, index) => index !== i);
+                          setUploadedFiles(newFiles);
+                          if (newFiles.length === 0) {
+                            setWordCount(0);
+                            setQuote(null);
+                          }
+                        }}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Remove file"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   ))}
                   <div className="text-lg font-semibold text-teal-600">
