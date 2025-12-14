@@ -483,25 +483,49 @@ def count_words(text: str) -> int:
     """Count words in text with improved accuracy"""
     if not text or not text.strip():
         return 0
-    
+
     # Clean the text: remove extra whitespace, normalize line breaks
     cleaned_text = re.sub(r'\s+', ' ', text.strip())
-    
-    # Split by whitespace and filter out empty strings and very short strings
-    words = [word.strip() for word in cleaned_text.split() if word.strip() and len(word.strip()) > 1]
-    
-    # Filter out common PDF artifacts and noise
+
+    # Split by whitespace and filter out empty strings
+    words = [word.strip() for word in cleaned_text.split() if word.strip()]
+
+    # Common short words in English and Portuguese (2 chars or less)
+    common_short_words = {
+        # English
+        'a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'is', 'as',
+        'or', 'if', 'it', 'be', 'we', 'he', 'me', 'my', 'no', 'so', 'up', 'do', 'go',
+        'i', 'am', 'us', 'vs',
+        # Portuguese
+        'de', 'da', 'do', 'em', 'um', 'se', 'ao', 'os', 'as', 'no', 'na', 'ou',
+        'eu', 'tu', 'me', 'te', 'lhe', 'nos', 'vos', 'ja', 'e', 'o', 'a', 'que',
+        'por', 'para', 'com', 'sem', 'sob', 'mais', 'menos', 'mas', 'nem',
+        # Spanish
+        'el', 'la', 'en', 'un', 'una', 'es', 'de', 'del', 'al', 'lo', 'los', 'las',
+        'y', 'que', 'su', 'sus', 'mi', 'tu', 'se', 'si', 'por', 'para', 'con', 'sin'
+    }
+
+    # Filter out PDF artifacts and noise
     filtered_words = []
     for word in words:
-        # Skip common PDF extraction artifacts
-        if not re.match(r'^[^\w\s]*$', word):  # Skip words that are only punctuation
-            # Skip very short words that are likely artifacts (but keep common short words)
-            if len(word) > 2 or word.lower() in ['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'by', 'for', 'is', 'as', 'or', 'if', 'it', 'be', 'we', 'he', 'me', 'my', 'no', 'so', 'up', 'do', 'go']:
-                filtered_words.append(word)
-    
+        # Remove leading/trailing punctuation for checking
+        cleaned_word = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+
+        # Skip empty after cleaning or words that are only punctuation/numbers
+        if not cleaned_word:
+            continue
+
+        # Skip if it's just numbers (like page numbers, dates, etc.)
+        if cleaned_word.isdigit() and len(cleaned_word) < 4:
+            continue
+
+        # Keep the word if it's longer than 2 chars OR it's a common short word
+        if len(cleaned_word) > 2 or cleaned_word.lower() in common_short_words:
+            filtered_words.append(word)
+
     word_count = len(filtered_words)
-    logger.info(f"Word count: {word_count} (original: {len(words)}, filtered: {len(filtered_words)})")
-    
+    logger.info(f"Word count: {word_count} (original split: {len(words)}, after filter: {len(filtered_words)})")
+
     return word_count
 
 def calculate_price(word_count: int, service_type: str, urgency: str) -> tuple[float, float, float]:
