@@ -307,7 +307,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
         if (response.data?.word_count) {
           newWords += response.data.word_count;
-          newFiles.push({ file, wordCount: response.data.word_count });
+          newFiles.push({ fileName: file.name, wordCount: response.data.word_count });
         }
       }
 
@@ -359,7 +359,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       const orderData = {
         ...formData,
         word_count: wordCount,
-        document_filename: uploadedFiles[0]?.file?.name || null
+        document_filename: uploadedFiles[0]?.fileName || null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
@@ -370,9 +370,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       setFormData({
         client_name: '',
         client_email: '',
-        service_type: 'professional',
-        translate_from: 'english',
-        translate_to: 'spanish',
+        service_type: 'standard',
+        translate_from: 'portuguese',
+        translate_to: 'english',
         urgency: 'no',
         reference: '',
         notes: ''
@@ -544,7 +544,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
                     <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
                       <div className="flex items-center">
                         <span className="text-green-600 mr-2">✓</span>
-                        <span>{item.file.name}</span>
+                        <span>{item.fileName}</span>
                         <span className="text-gray-400 text-sm ml-2">({item.wordCount} words)</span>
                       </div>
                       <button
