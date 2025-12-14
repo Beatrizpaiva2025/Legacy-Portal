@@ -640,8 +640,9 @@ def extract_text_with_textract(content: bytes, file_extension: str) -> str:
 
                     text += '\n'  # Page separator
 
+                num_pages = pdf_document.page_count
                 pdf_document.close()
-                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({pdf_document.page_count} pages)")
+                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages)")
                 return text
 
             except Exception as e:
