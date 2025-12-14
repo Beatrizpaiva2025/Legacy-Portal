@@ -467,6 +467,73 @@ class TranslationOrderUpdate(BaseModel):
     delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
 
+# ==================== ADMIN & TRANSLATOR MODELS ====================
+
+class AdminUser(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    password_hash: str
+    name: str
+    role: str = "admin"  # admin, manager
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class AdminLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    token: str
+
+class Translator(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    languages: List[str] = []  # List of language codes they can translate
+    specializations: List[str] = []  # certified, professional, legal, medical, etc.
+    rate_per_word: float = 0.05
+    is_active: bool = True
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    orders_completed: int = 0
+    rating: float = 5.0
+
+class TranslatorCreate(BaseModel):
+    name: str
+    email: EmailStr
+    phone: Optional[str] = None
+    languages: List[str] = []
+    specializations: List[str] = []
+    rate_per_word: float = 0.05
+    notes: Optional[str] = None
+
+class TranslatorUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    languages: Optional[List[str]] = None
+    specializations: Optional[List[str]] = None
+    rate_per_word: Optional[float] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+class OrderAssignment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    translator_id: str
+    translator_name: str
+    assigned_by: str  # admin id
+    assigned_at: datetime = Field(default_factory=datetime.utcnow)
+    deadline: Optional[datetime] = None
+    status: str = "assigned"  # assigned, in_progress, completed, cancelled
+    translator_notes: Optional[str] = None
+    completed_at: Optional[datetime] = None
+
 # Helper functions for authentication
 def hash_password(password: str) -> str:
     """Hash password with salt"""
@@ -1819,6 +1886,323 @@ async def admin_deliver_order(order_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Failed to send delivery emails: {str(e)}")
         return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
+
+# ==================== ADMIN API ROUTES ====================
+
+# Admin token storage
+async def store_admin_token(token: str, admin_id: str):
+    """Store admin token in database"""
+    await db.admin_sessions.update_one(
+        {"token": token},
+        {"$set": {"token": token, "admin_id": admin_id, "created_at": datetime.utcnow()}},
+        upsert=True
+    )
+
+async def get_current_admin(token: str) -> Optional[dict]:
+    """Get current admin from token"""
+    if not token:
+        return None
+    session = await db.admin_sessions.find_one({"token": token})
+    if not session:
+        return None
+    admin = await db.admins.find_one({"id": session["admin_id"]})
+    return admin
+
+@api_router.post("/admin/login")
+async def admin_login(login_data: AdminLogin):
+    """Admin login"""
+    try:
+        admin = await db.admins.find_one({"email": login_data.email})
+        if not admin:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        if not verify_password(login_data.password, admin["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        if not admin.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account deactivated")
+
+        token = generate_token()
+        await store_admin_token(token, admin["id"])
+
+        return AdminResponse(
+            id=admin["id"],
+            email=admin["email"],
+            name=admin["name"],
+            role=admin["role"],
+            token=token
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Admin login error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+@api_router.post("/admin/create-first")
+async def create_first_admin(admin_data: dict):
+    """Create the first admin user (only works if no admins exist)"""
+    try:
+        # Check if any admin exists
+        existing = await db.admins.find_one({})
+        if existing:
+            raise HTTPException(status_code=400, detail="Admin already exists. Use admin login.")
+
+        # Create first admin
+        admin = AdminUser(
+            email=admin_data.get("email"),
+            password_hash=hash_password(admin_data.get("password")),
+            name=admin_data.get("name", "Administrator"),
+            role="admin"
+        )
+
+        await db.admins.insert_one(admin.dict())
+
+        token = generate_token()
+        await store_admin_token(token, admin.id)
+
+        return AdminResponse(
+            id=admin.id,
+            email=admin.email,
+            name=admin.name,
+            role=admin.role,
+            token=token
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create admin error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create admin")
+
+@api_router.get("/admin/dashboard")
+async def admin_dashboard(token: str):
+    """Get admin dashboard stats"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        # Get stats
+        total_orders = await db.translation_orders.count_documents({})
+        pending_orders = await db.translation_orders.count_documents({"translation_status": "received"})
+        in_progress = await db.translation_orders.count_documents({"translation_status": {"$in": ["in_translation", "review"]}})
+        completed = await db.translation_orders.count_documents({"translation_status": "delivered"})
+        total_translators = await db.translators.count_documents({"is_active": True})
+        total_partners = await db.partners.count_documents({"is_active": True})
+
+        # Revenue stats
+        pipeline = [
+            {"$match": {"payment_status": "paid"}},
+            {"$group": {"_id": None, "total": {"$sum": "$total_price"}}}
+        ]
+        revenue_result = await db.translation_orders.aggregate(pipeline).to_list(1)
+        total_revenue = revenue_result[0]["total"] if revenue_result else 0
+
+        # Pending payments
+        pipeline = [
+            {"$match": {"payment_status": "pending"}},
+            {"$group": {"_id": None, "total": {"$sum": "$total_price"}}}
+        ]
+        pending_result = await db.translation_orders.aggregate(pipeline).to_list(1)
+        pending_revenue = pending_result[0]["total"] if pending_result else 0
+
+        # Recent orders
+        recent_orders = await db.translation_orders.find({}).sort("created_at", -1).limit(10).to_list(10)
+
+        return {
+            "stats": {
+                "total_orders": total_orders,
+                "pending_orders": pending_orders,
+                "in_progress": in_progress,
+                "completed": completed,
+                "total_translators": total_translators,
+                "total_partners": total_partners,
+                "total_revenue": total_revenue,
+                "pending_revenue": pending_revenue
+            },
+            "recent_orders": recent_orders
+        }
+    except Exception as e:
+        logger.error(f"Dashboard error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load dashboard")
+
+@api_router.get("/admin/orders")
+async def admin_get_orders(token: str, status: Optional[str] = None, limit: int = 50, skip: int = 0):
+    """Get all orders for admin"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        query = {}
+        if status:
+            query["translation_status"] = status
+
+        orders = await db.translation_orders.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+        total = await db.translation_orders.count_documents(query)
+
+        return {"orders": orders, "total": total}
+    except Exception as e:
+        logger.error(f"Get orders error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get orders")
+
+@api_router.put("/admin/orders/{order_id}")
+async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, token: str):
+    """Update order status"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+
+        if update_dict:
+            await db.translation_orders.update_one(
+                {"id": order_id},
+                {"$set": update_dict}
+            )
+
+        order = await db.translation_orders.find_one({"id": order_id})
+        return {"status": "success", "order": order}
+    except Exception as e:
+        logger.error(f"Update order error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update order")
+
+# ==================== TRANSLATOR MANAGEMENT ====================
+
+@api_router.get("/admin/translators")
+async def get_translators(token: str):
+    """Get all translators"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        translators = await db.translators.find({}).sort("name", 1).to_list(100)
+        return {"translators": translators}
+    except Exception as e:
+        logger.error(f"Get translators error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get translators")
+
+@api_router.post("/admin/translators")
+async def create_translator(translator_data: TranslatorCreate, token: str):
+    """Create a new translator"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        # Check if email exists
+        existing = await db.translators.find_one({"email": translator_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Translator with this email already exists")
+
+        translator = Translator(**translator_data.dict())
+        await db.translators.insert_one(translator.dict())
+
+        return {"status": "success", "translator": translator.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create translator error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create translator")
+
+@api_router.put("/admin/translators/{translator_id}")
+async def update_translator(translator_id: str, update_data: TranslatorUpdate, token: str):
+    """Update translator"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        update_dict = {k: v for k, v in update_data.dict().items() if v is not None}
+
+        if update_dict:
+            await db.translators.update_one(
+                {"id": translator_id},
+                {"$set": update_dict}
+            )
+
+        translator = await db.translators.find_one({"id": translator_id})
+        return {"status": "success", "translator": translator}
+    except Exception as e:
+        logger.error(f"Update translator error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update translator")
+
+@api_router.delete("/admin/translators/{translator_id}")
+async def delete_translator(translator_id: str, token: str):
+    """Delete (deactivate) translator"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        await db.translators.update_one(
+            {"id": translator_id},
+            {"$set": {"is_active": False}}
+        )
+        return {"status": "success", "message": "Translator deactivated"}
+    except Exception as e:
+        logger.error(f"Delete translator error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete translator")
+
+# ==================== ORDER ASSIGNMENT ====================
+
+@api_router.post("/admin/orders/{order_id}/assign")
+async def assign_order(order_id: str, translator_id: str, deadline: Optional[str] = None, token: str = None):
+    """Assign order to translator"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        # Get translator
+        translator = await db.translators.find_one({"id": translator_id})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+
+        # Create assignment
+        assignment = OrderAssignment(
+            order_id=order_id,
+            translator_id=translator_id,
+            translator_name=translator["name"],
+            assigned_by=admin["id"],
+            deadline=datetime.fromisoformat(deadline) if deadline else None
+        )
+
+        await db.assignments.insert_one(assignment.dict())
+
+        # Update order status
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {"translation_status": "in_translation", "assigned_translator_id": translator_id}}
+        )
+
+        # TODO: Send email to translator
+
+        return {"status": "success", "assignment": assignment.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Assign order error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to assign order")
+
+@api_router.get("/admin/assignments")
+async def get_assignments(token: str, status: Optional[str] = None):
+    """Get all assignments"""
+    admin = await get_current_admin(token)
+    if not admin:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+
+        assignments = await db.assignments.find(query).sort("assigned_at", -1).to_list(100)
+        return {"assignments": assignments}
+    except Exception as e:
+        logger.error(f"Get assignments error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get assignments")
 
 # Include the router in the main app
 app.include_router(api_router)
