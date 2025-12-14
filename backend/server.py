@@ -618,15 +618,33 @@ def extract_text_with_textract(content: bytes, file_extension: str) -> str:
         # For PDFs, convert pages to images first
         elif file_extension == 'pdf':
             text = ""
+            TEXTRACT_MAX_SIZE = 5 * 1024 * 1024  # 5MB max for Textract
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
 
                 for page_num in range(min(pdf_document.page_count, 15)):  # Limit to 15 pages
                     page = pdf_document[page_num]
 
-                    # Convert PDF page to PNG image
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
-                    img_data = pix.tobytes("png")
+                    # Try different zoom levels to stay under 5MB limit
+                    img_data = None
+                    for zoom in [2.0, 1.5, 1.0, 0.75]:
+                        pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                        img_data = pix.tobytes("png")
+
+                        # If PNG is too large, try JPEG (much smaller)
+                        if len(img_data) > TEXTRACT_MAX_SIZE:
+                            # Convert to JPEG using PIL
+                            img = Image.open(io.BytesIO(img_data))
+                            jpeg_buffer = io.BytesIO()
+                            img.convert('RGB').save(jpeg_buffer, format='JPEG', quality=85)
+                            img_data = jpeg_buffer.getvalue()
+
+                        if len(img_data) <= TEXTRACT_MAX_SIZE:
+                            break
+
+                    if len(img_data) > TEXTRACT_MAX_SIZE:
+                        logger.warning(f"Page {page_num + 1} image too large ({len(img_data)} bytes), skipping")
+                        continue
 
                     # Send to Textract
                     response = textract_client.detect_document_text(
