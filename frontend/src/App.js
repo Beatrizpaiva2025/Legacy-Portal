@@ -232,7 +232,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
-    service_type: 'professional',
+    service_type: 'standard',
     translate_from: 'portuguese',
     translate_to: 'english',
     urgency: 'no',
@@ -281,17 +281,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
   const [processingStatus, setProcessingStatus] = useState('');
 
-  // File upload handler
+  // File upload handler - accumulates files and word counts
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
 
-    setUploadedFiles(acceptedFiles);
     setIsProcessing(true);
     setError('');
     setProcessingStatus('Connecting to server...');
 
     try {
-      let totalWords = 0;
+      let newWords = 0;
+      const newFiles = [];
 
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i];
@@ -306,11 +306,14 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
         });
 
         if (response.data?.word_count) {
-          totalWords += response.data.word_count;
+          newWords += response.data.word_count;
+          newFiles.push({ fileName: file.name, wordCount: response.data.word_count });
         }
       }
 
-      setWordCount(totalWords);
+      // Add new files to existing files (accumulate) - store with word counts
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      setWordCount(prev => prev + newWords);
       setProcessingStatus('');
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
@@ -356,7 +359,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       const orderData = {
         ...formData,
         word_count: wordCount,
-        document_filename: uploadedFiles[0]?.name || null
+        document_filename: uploadedFiles[0]?.fileName || null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
@@ -367,9 +370,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       setFormData({
         client_name: '',
         client_email: '',
-        service_type: 'professional',
-        translate_from: 'english',
-        translate_to: 'spanish',
+        service_type: 'standard',
+        translate_from: 'portuguese',
+        translate_to: 'english',
         urgency: 'no',
         reference: '',
         notes: ''
@@ -537,31 +540,36 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
               {uploadedFiles.length > 0 && !isProcessing && (
                 <div className="mt-4 space-y-2">
-                  {uploadedFiles.map((file, i) => (
-                    <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
-                      <div className="flex items-center">
-                        <span className="text-green-600 mr-2">✓</span>
-                        <span>{file.name}</span>
+                  {uploadedFiles.map((item, i) => {
+                    const pages = Math.max(1, Math.ceil(item.wordCount / 250));
+                    return (
+                      <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
+                        <div className="flex items-center">
+                          <span className="text-green-600 mr-2">✓</span>
+                          <span>{item.fileName}</span>
+                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const removedWordCount = item.wordCount;
+                            const newFiles = uploadedFiles.filter((_, index) => index !== i);
+                            setUploadedFiles(newFiles);
+                            setWordCount(prev => Math.max(0, prev - removedWordCount));
+                            if (newFiles.length === 0) {
+                              setQuote(null);
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-700 p-1"
+                          title="Remove file"
+                        >
+                          🗑️
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newFiles = uploadedFiles.filter((_, index) => index !== i);
-                          setUploadedFiles(newFiles);
-                          if (newFiles.length === 0) {
-                            setWordCount(0);
-                            setQuote(null);
-                          }
-                        }}
-                        className="text-red-500 hover:text-red-700 p-1"
-                        title="Remove file"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div className="text-lg font-semibold text-teal-600">
-                    Word Count: {wordCount} words ({Math.ceil(wordCount / 250)} pages)
+                    Total: {Math.max(1, Math.ceil(wordCount / 250))} {Math.ceil(wordCount / 250) === 1 ? 'page' : 'pages'}
                   </div>
                 </div>
               )}
@@ -636,10 +644,6 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
               <span className="font-medium">
                 {formData.service_type === 'standard' ? 'Certified' : 'Professional'}
               </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Words</span>
-              <span className="font-medium">{wordCount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Pages</span>
