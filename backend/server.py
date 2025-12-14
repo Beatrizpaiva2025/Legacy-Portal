@@ -487,14 +487,33 @@ def generate_token() -> str:
     """Generate a simple session token"""
     return secrets.token_urlsafe(32)
 
-# In-memory token storage (in production, use Redis or database)
-active_tokens: Dict[str, str] = {}  # token -> partner_id
+# Token storage in MongoDB for persistence across restarts
+async def store_token(token: str, partner_id: str):
+    """Store token in database"""
+    await db.sessions.update_one(
+        {"token": token},
+        {"$set": {"token": token, "partner_id": partner_id, "created_at": datetime.utcnow()}},
+        upsert=True
+    )
+
+async def delete_token(token: str):
+    """Delete token from database"""
+    await db.sessions.delete_one({"token": token})
+
+async def get_partner_id_from_token(token: str) -> Optional[str]:
+    """Get partner_id from token in database"""
+    session = await db.sessions.find_one({"token": token})
+    if session:
+        return session.get("partner_id")
+    return None
 
 async def get_current_partner(token: str = None) -> Optional[dict]:
     """Get current partner from token"""
-    if not token or token not in active_tokens:
+    if not token:
         return None
-    partner_id = active_tokens[token]
+    partner_id = await get_partner_id_from_token(token)
+    if not partner_id:
+        return None
     partner = await db.partners.find_one({"id": partner_id})
     return partner
 
@@ -1301,9 +1320,9 @@ async def register_partner(partner_data: PartnerCreate):
 
         await db.partners.insert_one(partner.dict())
 
-        # Generate token
+        # Generate token and store in database
         token = generate_token()
-        active_tokens[token] = partner.id
+        await store_token(token, partner.id)
 
         return PartnerResponse(
             id=partner.id,
@@ -1337,9 +1356,9 @@ async def login_partner(login_data: PartnerLogin):
         if not partner.get("is_active", True):
             raise HTTPException(status_code=401, detail="Account is deactivated")
 
-        # Generate token
+        # Generate token and store in database
         token = generate_token()
-        active_tokens[token] = partner["id"]
+        await store_token(token, partner["id"])
 
         return PartnerResponse(
             id=partner["id"],
@@ -1359,8 +1378,7 @@ async def login_partner(login_data: PartnerLogin):
 @api_router.post("/auth/logout")
 async def logout_partner(token: str):
     """Logout partner"""
-    if token in active_tokens:
-        del active_tokens[token]
+    await delete_token(token)
     return {"status": "success", "message": "Logged out successfully"}
 
 @api_router.get("/auth/me")
