@@ -232,7 +232,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
-    service_type: 'professional',
+    service_type: 'standard',
     translate_from: 'portuguese',
     translate_to: 'english',
     urgency: 'no',
@@ -281,17 +281,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
   const [processingStatus, setProcessingStatus] = useState('');
 
-  // File upload handler
+  // File upload handler - accumulates files and word counts
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
 
-    setUploadedFiles(acceptedFiles);
     setIsProcessing(true);
     setError('');
     setProcessingStatus('Connecting to server...');
 
     try {
-      let totalWords = 0;
+      let newWords = 0;
+      const newFiles = [];
 
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i];
@@ -306,11 +306,14 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
         });
 
         if (response.data?.word_count) {
-          totalWords += response.data.word_count;
+          newWords += response.data.word_count;
+          newFiles.push({ file, wordCount: response.data.word_count });
         }
       }
 
-      setWordCount(totalWords);
+      // Add new files to existing files (accumulate)
+      setUploadedFiles(prev => [...prev, ...acceptedFiles]);
+      setWordCount(prev => prev + newWords);
       setProcessingStatus('');
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
