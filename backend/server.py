@@ -32,10 +32,11 @@ import secrets
 # Set Tesseract path
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-# SendGrid imports
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+# SendGrid imports (keeping for backwards compatibility)
+# from sendgrid import SendGridAPIClient
+# from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
 import base64
+import resend
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -67,49 +68,54 @@ class EmailDeliveryError(Exception):
 
 class EmailService:
     def __init__(self):
-        self.api_key = os.environ.get('SENDGRID_API_KEY')
-        self.sender_email = os.environ.get('SENDER_EMAIL')
-        
-    async def send_email(self, to: str, subject: str, content: str, content_type: str = "html"):
-        """Send email via SendGrid"""
-        message = Mail(
-            from_email=self.sender_email,
-            to_emails=to,
-            subject=subject,
-            html_content=content if content_type == "html" else None,
-            plain_text_content=content if content_type == "plain" else None
-        )
+        self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+        # Initialize Resend
+        resend.api_key = self.api_key
 
+    async def send_email(self, to: str, subject: str, content: str, content_type: str = "html"):
+        """Send email via Resend"""
         try:
-            sg = SendGridAPIClient(self.api_key)
-            response = sg.send(message)
-            return response.status_code == 202
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+            }
+            if content_type == "html":
+                params["html"] = content
+            else:
+                params["text"] = content
+
+            response = resend.Emails.send(params)
+            logger.info(f"Email sent successfully: {response}")
+            return True
         except Exception as e:
             logger.error(f"Failed to send email: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email: {str(e)}")
-    
+
     async def send_email_with_attachment(self, to: str, subject: str, content: str,
                                           file_content: str, filename: str, file_type: str = "application/pdf"):
-        """Send email with file attachment via SendGrid"""
-        message = Mail(
-            from_email=self.sender_email,
-            to_emails=to,
-            subject=subject,
-            html_content=content
-        )
-
-        # Add attachment
-        attachment = Attachment()
-        attachment.file_content = FileContent(file_content)  # Already base64 encoded
-        attachment.file_name = FileName(filename)
-        attachment.file_type = FileType(file_type)
-        attachment.disposition = Disposition("attachment")
-        message.attachment = attachment
-
+        """Send email with file attachment via Resend"""
         try:
-            sg = SendGridAPIClient(self.api_key)
-            response = sg.send(message)
-            return response.status_code == 202
+            # Decode base64 content for attachment
+            file_bytes = base64.b64decode(file_content)
+
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+                "html": content,
+                "attachments": [
+                    {
+                        "filename": filename,
+                        "content": list(file_bytes),  # Resend expects list of bytes
+                    }
+                ]
+            }
+
+            response = resend.Emails.send(params)
+            logger.info(f"Email with attachment sent successfully: {response}")
+            return True
         except Exception as e:
             logger.error(f"Failed to send email with attachment: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")

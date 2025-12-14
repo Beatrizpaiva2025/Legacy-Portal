@@ -31,6 +31,7 @@ pymupdf>=1.23.0
 python-docx>=0.8.11
 aiofiles>=23.1.0
 sendgrid
+resend
 stripe
 httpx
 pydantic[email]
