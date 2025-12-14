@@ -36,22 +36,6 @@ pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 import boto3
 from botocore.exceptions import ClientError
 
-# Initialize AWS Textract client (if credentials are available)
-textract_client = None
-try:
-    if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY'):
-        textract_client = boto3.client(
-            'textract',
-            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
-            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
-        )
-        logger.info("AWS Textract initialized successfully")
-    else:
-        logger.info("AWS credentials not found, using Tesseract OCR as fallback")
-except Exception as e:
-    logger.warning(f"Failed to initialize AWS Textract: {e}, using Tesseract as fallback")
-
 # SendGrid imports (keeping for backwards compatibility)
 # from sendgrid import SendGridAPIClient
 # from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
@@ -81,6 +65,22 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Initialize AWS Textract client (if credentials are available)
+textract_client = None
+try:
+    if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY'):
+        textract_client = boto3.client(
+            'textract',
+            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
+            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+        )
+        logger.info("AWS Textract initialized successfully")
+    else:
+        logger.info("AWS credentials not found, using Tesseract OCR as fallback")
+except Exception as e:
+    logger.warning(f"Failed to initialize AWS Textract: {e}, using Tesseract as fallback")
 
 # Email Service Class
 class EmailDeliveryError(Exception):
