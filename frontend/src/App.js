@@ -311,8 +311,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
         }
       }
 
-      // Add new files to existing files (accumulate)
-      setUploadedFiles(prev => [...prev, ...acceptedFiles]);
+      // Add new files to existing files (accumulate) - store with word counts
+      setUploadedFiles(prev => [...prev, ...newFiles]);
       setWordCount(prev => prev + newWords);
       setProcessingStatus('');
     } catch (err) {
@@ -359,7 +359,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       const orderData = {
         ...formData,
         word_count: wordCount,
-        document_filename: uploadedFiles[0]?.name || null
+        document_filename: uploadedFiles[0]?.file?.name || null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
@@ -540,19 +540,21 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
               {uploadedFiles.length > 0 && !isProcessing && (
                 <div className="mt-4 space-y-2">
-                  {uploadedFiles.map((file, i) => (
+                  {uploadedFiles.map((item, i) => (
                     <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
                       <div className="flex items-center">
                         <span className="text-green-600 mr-2">✓</span>
-                        <span>{file.name}</span>
+                        <span>{item.file.name}</span>
+                        <span className="text-gray-400 text-sm ml-2">({item.wordCount} words)</span>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
+                          const removedWordCount = item.wordCount;
                           const newFiles = uploadedFiles.filter((_, index) => index !== i);
                           setUploadedFiles(newFiles);
+                          setWordCount(prev => Math.max(0, prev - removedWordCount));
                           if (newFiles.length === 0) {
-                            setWordCount(0);
                             setQuote(null);
                           }
                         }}
