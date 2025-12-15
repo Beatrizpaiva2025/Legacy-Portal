@@ -1796,11 +1796,83 @@ async def admin_deliver_order(order_id: str, admin_key: str):
                 """
             )
 
+        # Create internal message for partner
+        if partner:
+            message = {
+                "id": str(uuid.uuid4()),
+                "partner_id": partner["id"],
+                "order_id": order_id,
+                "order_number": order["order_number"],
+                "type": "delivery",
+                "title": f"Translation Delivered - #{order['order_number']}",
+                "content": f"Your translation for client {order['client_name']} ({order['client_email']}) has been completed and delivered.",
+                "read": False,
+                "created_at": datetime.utcnow()
+            }
+            await db.messages.insert_one(message)
+
         return {"status": "success", "message": "Order delivered and emails sent", "attachment_sent": has_attachment}
 
     except Exception as e:
         logger.error(f"Failed to send delivery emails: {str(e)}")
         return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
+
+
+# ==================== MESSAGES ENDPOINTS ====================
+
+@api_router.get("/messages")
+async def get_partner_messages(token: str):
+    """Get all messages for the logged-in partner"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get messages for this partner
+    messages = await db.messages.find(
+        {"partner_id": partner["id"]}
+    ).sort("created_at", -1).to_list(100)
+
+    # Convert datetime to string for JSON serialization
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
+@api_router.put("/messages/{message_id}/read")
+async def mark_message_read(message_id: str, token: str):
+    """Mark a message as read"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Update message
+    result = await db.messages.update_one(
+        {"id": message_id, "partner_id": partner["id"]},
+        {"$set": {"read": True}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
+@api_router.get("/messages/unread-count")
+async def get_unread_count(token: str):
+    """Get count of unread messages"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    count = await db.messages.count_documents({"partner_id": partner["id"], "read": False})
+    return {"unread_count": count}
+
 
 # Include the router in the main app
 app.include_router(api_router)
