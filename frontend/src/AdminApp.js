@@ -215,15 +215,32 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
+  // Logo states (base64)
+  const [logoLeft, setLogoLeft] = useState('');
+  const [logoRight, setLogoRight] = useState('');
+  const [logoStamp, setLogoStamp] = useState('');
+
   // Refs
   const fileInputRef = useRef(null);
+  const logoLeftInputRef = useRef(null);
+  const logoRightInputRef = useRef(null);
+  const logoStampInputRef = useRef(null);
   const originalTextRef = useRef(null);
   const translatedTextRef = useRef(null);
 
-  // Load saved API key and resources
+  // Load saved API key, logos and resources
   useEffect(() => {
     const savedKey = localStorage.getItem('claude_api_key');
     if (savedKey) setClaudeApiKey(savedKey);
+
+    // Load saved logos
+    const savedLogoLeft = localStorage.getItem('logo_left');
+    const savedLogoRight = localStorage.getItem('logo_right');
+    const savedLogoStamp = localStorage.getItem('logo_stamp');
+    if (savedLogoLeft) setLogoLeft(savedLogoLeft);
+    if (savedLogoRight) setLogoRight(savedLogoRight);
+    if (savedLogoStamp) setLogoStamp(savedLogoStamp);
+
     fetchResources();
   }, []);
 
@@ -245,6 +262,44 @@ const TranslationWorkspace = ({ adminKey }) => {
   const saveApiKey = () => {
     localStorage.setItem('claude_api_key', claudeApiKey);
     setProcessingStatus('✅ API Key saved!');
+  };
+
+  // Handle logo upload
+  const handleLogoUpload = (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target.result;
+      if (type === 'left') {
+        setLogoLeft(base64);
+        localStorage.setItem('logo_left', base64);
+      } else if (type === 'right') {
+        setLogoRight(base64);
+        localStorage.setItem('logo_right', base64);
+      } else if (type === 'stamp') {
+        setLogoStamp(base64);
+        localStorage.setItem('logo_stamp', base64);
+      }
+      setProcessingStatus(`✅ ${type === 'left' ? 'Left logo' : type === 'right' ? 'ATA logo' : 'Stamp logo'} uploaded!`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Remove logo
+  const removeLogo = (type) => {
+    if (type === 'left') {
+      setLogoLeft('');
+      localStorage.removeItem('logo_left');
+    } else if (type === 'right') {
+      setLogoRight('');
+      localStorage.removeItem('logo_right');
+    } else if (type === 'stamp') {
+      setLogoStamp('');
+      localStorage.removeItem('logo_stamp');
+    }
+    setProcessingStatus(`Logo removed`);
   };
 
   // Translation Instructions CRUD
@@ -763,12 +818,13 @@ const TranslationWorkspace = ({ adminKey }) => {
 <body>
     <!-- HEADER WITH LOGOS -->
     <div class="header">
-        <!-- Left Logo (Editable - can be replaced with partner logo) -->
+        <!-- Left Logo (Partner Logo) -->
         <div class="logo-left">
-            <!-- Replace src with your logo URL or base64 -->
-            <div class="logo-placeholder" contenteditable="true" title="Click to add logo">
+            ${logoLeft
+              ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+              : `<div class="logo-placeholder" contenteditable="true" title="Click to add logo">
                 <span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span>
-            </div>
+            </div>`}
         </div>
 
         <!-- Center - Company Info -->
@@ -780,12 +836,13 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
         </div>
 
-        <!-- Right Logo (ATA Member - Editable) -->
+        <!-- Right Logo (ATA Member) -->
         <div class="logo-right">
-            <!-- Replace with your ATA logo image or edit text -->
-            <div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
+            ${logoRight
+              ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+              : `<div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
                 <span>ata<br/>Member #275993</span>
-            </div>
+            </div>`}
         </div>
     </div>
 
@@ -834,13 +891,15 @@ const TranslationWorkspace = ({ adminKey }) => {
 
         <!-- Circular Stamp -->
         <div class="stamp-container">
-            <div class="stamp">
+            ${logoStamp
+              ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
+              : `<div class="stamp">
                 <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
                 <div class="stamp-center">
                     <div class="stamp-company">LEGACY TRANSLATIONS</div>
                     <div class="stamp-ata">ATA # 275993</div>
                 </div>
-            </div>
+            </div>`}
         </div>
     </div>
 
@@ -1364,6 +1423,119 @@ const TranslationWorkspace = ({ adminKey }) => {
                 onChange={(e) => setTranslationDate(e.target.value)}
                 className="w-full px-2 py-1.5 text-xs border rounded"
               />
+            </div>
+          </div>
+
+          {/* Certificate Logos Section */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+            <h3 className="text-sm font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
+            <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
+
+            <div className="grid grid-cols-3 gap-4">
+              {/* Left Logo (Legacy/Partner) */}
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoLeft ? (
+                    <img src={logoLeft} alt="Left Logo" className="max-h-16 max-w-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No logo</span>
+                  )}
+                </div>
+                <input
+                  ref={logoLeftInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoUpload(e, 'left')}
+                  className="hidden"
+                />
+                <div className="flex justify-center space-x-1 mt-2">
+                  <button
+                    onClick={() => logoLeftInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoLeft && (
+                    <button
+                      onClick={() => removeLogo('left')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Logo (ATA) */}
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Right Logo (ATA)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoRight ? (
+                    <img src={logoRight} alt="Right Logo" className="max-h-16 max-w-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No logo</span>
+                  )}
+                </div>
+                <input
+                  ref={logoRightInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoUpload(e, 'right')}
+                  className="hidden"
+                />
+                <div className="flex justify-center space-x-1 mt-2">
+                  <button
+                    onClick={() => logoRightInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoRight && (
+                    <button
+                      onClick={() => removeLogo('right')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Stamp Logo */}
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Stamp Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp Logo" className="max-h-16 max-w-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No logo</span>
+                  )}
+                </div>
+                <input
+                  ref={logoStampInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoUpload(e, 'stamp')}
+                  className="hidden"
+                />
+                <div className="flex justify-center space-x-1 mt-2">
+                  <button
+                    onClick={() => logoStampInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoStamp && (
+                    <button
+                      onClick={() => removeLogo('stamp')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
