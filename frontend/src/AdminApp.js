@@ -1,37 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
+// Translation Program URL (external)
+const TRANSLATION_PROGRAM_URL = 'https://translation-program-c0dnb4idq-beatriz-paivas-projects.vercel.app';
+
 // ==================== CONSTANTS ====================
-const TRANSLATION_STAGES = {
-  'received': { id: 1, name: 'Received', icon: '📥', color: 'bg-gray-100 text-gray-800' },
-  'in_translation': { id: 2, name: 'In Translation', icon: '✍️', color: 'bg-blue-100 text-blue-800' },
-  'review': { id: 3, name: 'Review', icon: '🔍', color: 'bg-yellow-100 text-yellow-800' },
-  'ready': { id: 4, name: 'Ready', icon: '📦', color: 'bg-green-100 text-green-800' },
-  'delivered': { id: 5, name: 'Delivered', icon: '🎉', color: 'bg-purple-100 text-purple-800' }
+const STATUS_COLORS = {
+  'Quote': 'bg-gray-100 text-gray-700',
+  'Confirmed': 'bg-blue-100 text-blue-700',
+  'In progress': 'bg-yellow-100 text-yellow-700',
+  'Completed': 'bg-green-100 text-green-700',
+  'Client Review': 'bg-purple-100 text-purple-700',
+  'Delivered': 'bg-teal-100 text-teal-700',
+  'received': 'bg-gray-100 text-gray-700',
+  'in_translation': 'bg-yellow-100 text-yellow-700',
+  'review': 'bg-purple-100 text-purple-700',
+  'ready': 'bg-green-100 text-green-700',
+  'delivered': 'bg-teal-100 text-teal-700'
 };
 
-const PAYMENT_STATUS = {
-  'pending': { color: 'bg-yellow-100 text-yellow-800', label: 'Pending' },
-  'paid': { color: 'bg-green-100 text-green-800', label: 'Paid' },
-  'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
+const PAYMENT_COLORS = {
+  'pending': 'bg-yellow-100 text-yellow-700',
+  'paid': 'bg-green-100 text-green-700',
+  'overdue': 'bg-red-100 text-red-700'
 };
 
-const LANGUAGES = {
-  'english': { name: 'English', flag: '🇺🇸' },
-  'spanish': { name: 'Spanish', flag: '🇪🇸' },
-  'french': { name: 'French', flag: '🇫🇷' },
-  'german': { name: 'German', flag: '🇩🇪' },
-  'portuguese': { name: 'Portuguese', flag: '🇧🇷' },
-  'italian': { name: 'Italian', flag: '🇮🇹' },
-  'chinese': { name: 'Chinese', flag: '🇨🇳' },
-  'japanese': { name: 'Japanese', flag: '🇯🇵' },
-  'korean': { name: 'Korean', flag: '🇰🇷' },
-  'arabic': { name: 'Arabic', flag: '🇸🇦' },
-  'russian': { name: 'Russian', flag: '🇷🇺' },
-  'dutch': { name: 'Dutch', flag: '🇳🇱' }
+const FLAGS = {
+  'english': '🇺🇸', 'spanish': '🇪🇸', 'french': '🇫🇷', 'german': '🇩🇪',
+  'portuguese': '🇧🇷', 'italian': '🇮🇹', 'chinese': '🇨🇳', 'japanese': '🇯🇵',
+  'korean': '🇰🇷', 'arabic': '🇸🇦', 'russian': '🇷🇺', 'dutch': '🇳🇱',
+  'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
+  'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
 };
 
 // ==================== ADMIN LOGIN ====================
@@ -46,7 +48,6 @@ const AdminLogin = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      // Verify admin key by fetching orders
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
       if (response.data) {
         onLogin(adminKey);
@@ -59,29 +60,29 @@ const AdminLogin = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl text-white">🔐</span>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl text-white">🔐</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Admin Panel</h1>
-          <p className="text-gray-600">Legacy Translations Management</p>
+          <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+          <p className="text-xs text-gray-500">Legacy Translations</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">
+          <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Admin Key</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
             <input
               type="password"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               value={adminKey}
               onChange={(e) => setAdminKey(e.target.value)}
               placeholder="Enter admin key..."
@@ -91,328 +92,110 @@ const AdminLogin = ({ onLogin }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 font-semibold transition-colors"
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
           >
-            {loading ? 'Verifying...' : 'Access Admin Panel'}
+            {loading ? 'Verifying...' : 'Access'}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-          <a href="/" className="text-teal-600 hover:underline text-sm">
-            ← Back to Partner Portal
-          </a>
+        <div className="mt-4 text-center">
+          <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
         </div>
       </div>
     </div>
   );
 };
 
-// ==================== ADMIN SIDEBAR ====================
-const AdminSidebar = ({ activeTab, setActiveTab, onLogout }) => {
+// ==================== COMPACT SIDEBAR ====================
+const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'orders', label: 'Orders', icon: '📋' },
+    { id: 'projects', label: 'Projects', icon: '📋' },
     { id: 'translators', label: 'Translators', icon: '👥' },
-    { id: 'translator-workspace', label: 'Translation', icon: '✍️' },
-    { id: 'glossaries', label: 'Glossaries', icon: '📚' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 
   return (
-    <div className="w-64 bg-slate-900 text-white min-h-screen flex flex-col">
-      <div className="p-6 border-b border-slate-700">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center">
-            <span className="text-xl">🌐</span>
-          </div>
+    <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
+      <div className="p-3 border-b border-slate-700">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
           <div>
-            <div className="font-bold">Legacy Admin</div>
-            <div className="text-xs text-slate-400">Management System</div>
+            <div className="font-bold text-sm">Legacy Admin</div>
+            <div className="text-[10px] text-slate-400">Management</div>
           </div>
         </div>
       </div>
 
-      <nav className="flex-1 py-4">
+      <nav className="flex-1 py-2">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center px-6 py-3 text-left transition-colors ${
+            className={`w-full flex items-center px-3 py-2 text-left transition-colors ${
               activeTab === item.id
-                ? 'bg-teal-600 text-white border-r-4 border-teal-400'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                ? 'bg-teal-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <span className="mr-3 text-lg">{item.icon}</span>
-            <span className="font-medium">{item.label}</span>
+            <span className="mr-2">{item.icon}</span>
+            <span>{item.label}</span>
           </button>
         ))}
+
+        <a
+          href={TRANSLATION_PROGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center px-3 py-2 text-left text-slate-300 hover:bg-slate-700 mt-2 border-t border-slate-700 pt-2"
+        >
+          <span className="mr-2">✍️</span>
+          <span>Translation Tool</span>
+          <span className="ml-1 text-[10px]">↗</span>
+        </a>
       </nav>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-2 border-t border-slate-700">
         <button
           onClick={onLogout}
-          className="w-full py-2 text-red-400 hover:bg-red-900/30 rounded-md transition-colors"
+          className="w-full py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
         >
-          🚪 Logout
+          Logout
         </button>
       </div>
     </div>
   );
 };
 
-// ==================== DASHBOARD ====================
-const Dashboard = ({ adminKey }) => {
-  const [stats, setStats] = useState({
-    total_orders: 0,
-    pending_orders: 0,
-    in_progress: 0,
-    completed: 0,
-    total_revenue: 0,
-    pending_payment: 0
-  });
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [readReceipts, setReadReceipts] = useState([]);
-  const [loading, setLoading] = useState(true);
+// ==================== SEARCH BAR ====================
+const SearchBar = ({ value, onChange, placeholder }) => (
+  <div className="relative">
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder || "Search by name or email..."}
+      className="w-64 px-3 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 pl-8"
+    />
+    <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">🔍</span>
+  </div>
+);
 
-  useEffect(() => {
-    fetchDashboardData();
-    fetchReadReceipts();
-  }, []);
-
-  const fetchReadReceipts = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/read-receipts?admin_key=${adminKey}&limit=10`);
-      setReadReceipts(response.data.receipts || []);
-    } catch (err) {
-      console.error('Failed to fetch read receipts:', err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      const orders = response.data.orders || [];
-
-      // Calculate stats
-      const total = orders.length;
-      const pending = orders.filter(o => o.translation_status === 'received').length;
-      const inProgress = orders.filter(o => ['in_translation', 'review'].includes(o.translation_status)).length;
-      const completed = orders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).length;
-      const revenue = orders.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (o.total_price || 0), 0);
-      const pendingPayment = orders.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + (o.total_price || 0), 0);
-
-      setStats({
-        total_orders: total,
-        pending_orders: pending,
-        in_progress: inProgress,
-        completed: completed,
-        total_revenue: revenue,
-        pending_payment: pendingPayment
-      });
-
-      setRecentOrders(orders.slice(0, 5));
-    } catch (err) {
-      console.error('Failed to fetch dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500 font-medium">Total Orders</div>
-              <div className="text-3xl font-bold text-gray-800">{stats.total_orders}</div>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">📋</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-yellow-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500 font-medium">Pending</div>
-              <div className="text-3xl font-bold text-gray-800">{stats.pending_orders}</div>
-            </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">⏳</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-teal-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500 font-medium">In Progress</div>
-              <div className="text-3xl font-bold text-gray-800">{stats.in_progress}</div>
-            </div>
-            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">✍️</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-gray-500 font-medium">Completed</div>
-              <div className="text-3xl font-bold text-gray-800">{stats.completed}</div>
-            </div>
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-              <span className="text-2xl">✅</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Revenue Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm opacity-80 font-medium">Total Revenue</div>
-              <div className="text-3xl font-bold">${stats.total_revenue.toFixed(2)}</div>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-2xl">💰</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm opacity-80 font-medium">Pending Payment</div>
-              <div className="text-3xl font-bold">${stats.pending_payment.toFixed(2)}</div>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <span className="text-2xl">📄</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold text-gray-800">Recent Orders</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <span className="font-semibold text-teal-600">#{order.order_number}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900">{order.client_name}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${TRANSLATION_STAGES[order.translation_status]?.color}`}>
-                        {TRANSLATION_STAGES[order.translation_status]?.icon} {TRANSLATION_STAGES[order.translation_status]?.name}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-semibold">${order.total_price?.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Read Receipts - Partner confirmations */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-bold text-gray-800">📬 Message Read Confirmations</h2>
-            <p className="text-sm text-gray-500 mt-1">Partners who read delivery notifications</p>
-          </div>
-          <div className="p-4 max-h-80 overflow-y-auto">
-            {readReceipts.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-3xl mb-2">📭</div>
-                <p>No read confirmations yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {readReceipts.map((receipt) => (
-                  <div key={receipt.id} className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
-                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white mr-3">
-                      ✓
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-800">{receipt.partner_name}</div>
-                      <div className="text-sm text-gray-600">Read: {receipt.message_title}</div>
-                      <div className="text-xs text-gray-400">
-                        {new Date(receipt.read_at).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ==================== ORDERS MANAGEMENT ====================
-const OrdersManagement = ({ adminKey, onOpenTranslation }) => {
+// ==================== PROJECTS PAGE (Protemos Style with Legacy Data) ====================
+const ProjectsPage = ({ adminKey }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [translators, setTranslators] = useState([]);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchOrders();
-    fetchTranslators();
-  }, [filter]);
+  }, []);
 
   const fetchOrders = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      let filteredOrders = response.data.orders || [];
-
-      if (filter !== 'all') {
-        filteredOrders = filteredOrders.filter(o => o.translation_status === filter);
-      }
-
-      setOrders(filteredOrders);
+      setOrders(response.data.orders || []);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -420,37 +203,23 @@ const OrdersManagement = ({ adminKey, onOpenTranslation }) => {
     }
   };
 
-  const fetchTranslators = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/translators?admin_key=${adminKey}`);
-      setTranslators(response.data.translators || []);
-    } catch (err) {
-      // Translators endpoint might not exist yet
-      setTranslators([
-        { id: '1', name: 'Maria Silva', languages: ['portuguese', 'english'], status: 'available' },
-        { id: '2', name: 'John Smith', languages: ['spanish', 'english'], status: 'available' },
-        { id: '3', name: 'Sophie Dubois', languages: ['french', 'english'], status: 'busy' }
-      ]);
-    }
-  };
-
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateStatus = async (orderId, newStatus) => {
     try {
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
         translation_status: newStatus
       });
       fetchOrders();
     } catch (err) {
-      console.error('Failed to update order:', err);
+      console.error('Failed to update:', err);
     }
   };
 
-  const markAsPaid = async (orderId) => {
+  const markPaid = async (orderId) => {
     try {
       await axios.post(`${API}/admin/orders/${orderId}/mark-paid?admin_key=${adminKey}`);
       fetchOrders();
     } catch (err) {
-      console.error('Failed to mark as paid:', err);
+      console.error('Failed to mark paid:', err);
     }
   };
 
@@ -459,381 +228,403 @@ const OrdersManagement = ({ adminKey, onOpenTranslation }) => {
       await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
       fetchOrders();
     } catch (err) {
-      console.error('Failed to deliver order:', err);
+      console.error('Failed to deliver:', err);
     }
+  };
+
+  // Filter orders
+  const filtered = orders.filter(o => {
+    const matchSearch =
+      o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
+      o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
+      o.order_number?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  // Calculate totals
+  const totalReceive = filtered.reduce((sum, o) => sum + (o.total_price || 0), 0);
+  const totalPaid = filtered.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (o.total_price || 0), 0);
+  const totalPending = filtered.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + (o.total_price || 0), 0);
+
+  // Status to Protemos-style
+  const getStatusLabel = (status) => {
+    const labels = {
+      'received': 'Quote',
+      'in_translation': 'In progress',
+      'review': 'Client Review',
+      'ready': 'Completed',
+      'delivered': 'Delivered'
+    };
+    return labels[status] || status;
   };
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      <div className="p-4 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Orders Management</h1>
-        <div className="flex gap-2">
-          {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === f
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {f === 'all' ? 'All' : TRANSLATION_STAGES[f]?.name || f}
-            </button>
-          ))}
+    <div className="p-4">
+      {/* Financial Stats */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="bg-white rounded shadow p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
+              <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+            </div>
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <span>📋</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
+          <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
+          <div className="text-xl font-bold">${totalReceive.toFixed(2)}</div>
+        </div>
+        <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded shadow p-3 text-white">
+          <div className="text-[10px] uppercase opacity-80">Paid</div>
+          <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
+        </div>
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
+          <div className="text-[10px] uppercase opacity-80">Pending Payment</div>
+          <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
         </div>
       </div>
 
-      {orders.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <div className="text-5xl mb-4">📭</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No orders found</h2>
-          <p className="text-gray-600">Orders will appear here when partners submit them</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <span className="text-xl font-bold text-teal-600">#{order.order_number}</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${TRANSLATION_STAGES[order.translation_status]?.color}`}>
-                        {TRANSLATION_STAGES[order.translation_status]?.icon} {TRANSLATION_STAGES[order.translation_status]?.name}
-                      </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${PAYMENT_STATUS[order.payment_status]?.color}`}>
-                        {PAYMENT_STATUS[order.payment_status]?.label}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-gray-500">Client</div>
-                        <div className="font-medium">{order.client_name}</div>
-                        <div className="text-gray-400 text-xs">{order.client_email}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Languages</div>
-                        <div className="font-medium">
-                          {LANGUAGES[order.translate_from]?.flag} {LANGUAGES[order.translate_from]?.name} → {LANGUAGES[order.translate_to]?.flag} {LANGUAGES[order.translate_to]?.name}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Words/Pages</div>
-                        <div className="font-medium">{order.word_count} words ({order.page_count || Math.ceil(order.word_count / 250)} pages)</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-500">Total</div>
-                        <div className="font-bold text-lg text-teal-600">${order.total_price?.toFixed(2)}</div>
-                      </div>
-                    </div>
-
-                    {order.assigned_translator && (
-                      <div className="mt-3 p-2 bg-blue-50 rounded-lg inline-flex items-center">
-                        <span className="text-blue-600 mr-2">👤</span>
-                        <span className="text-sm font-medium text-blue-800">Assigned: {order.assigned_translator}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2 ml-4">
-                    {order.translation_status === 'received' && (
-                      <>
-                        <button
-                          onClick={() => {
-                            setSelectedOrder(order);
-                            setShowAssignModal(true);
-                          }}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                        >
-                          👤 Assign
-                        </button>
-                        <button
-                          onClick={() => updateOrderStatus(order.id, 'in_translation')}
-                          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm font-medium"
-                        >
-                          ▶️ Start
-                        </button>
-                      </>
-                    )}
-
-                    {order.translation_status === 'in_translation' && (
-                      <button
-                        onClick={() => onOpenTranslation(order)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
-                      >
-                        ✍️ Translate
-                      </button>
-                    )}
-
-                    {order.translation_status === 'review' && (
-                      <button
-                        onClick={() => updateOrderStatus(order.id, 'ready')}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-                      >
-                        ✅ Approve
-                      </button>
-                    )}
-
-                    {order.translation_status === 'ready' && (
-                      <button
-                        onClick={() => deliverOrder(order.id)}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
-                      >
-                        📤 Deliver
-                      </button>
-                    )}
-
-                    {order.payment_status === 'pending' && (
-                      <button
-                        onClick={() => markAsPaid(order.id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-                      >
-                        💳 Mark Paid
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Assign Modal */}
-      {showAssignModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4">Assign Translator</h2>
-            <p className="text-gray-600 mb-4">Order #{selectedOrder.order_number}</p>
-
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {translators.map((translator) => (
-                <button
-                  key={translator.id}
-                  onClick={async () => {
-                    try {
-                      await axios.put(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`, {
-                        assigned_translator: translator.name
-                      });
-                      fetchOrders();
-                      setShowAssignModal(false);
-                    } catch (err) {
-                      console.error('Failed to assign:', err);
-                    }
-                  }}
-                  className="w-full p-4 border rounded-lg hover:bg-gray-50 text-left flex items-center justify-between"
-                >
-                  <div>
-                    <div className="font-medium">{translator.name}</div>
-                    <div className="text-sm text-gray-500">
-                      {translator.languages?.map(l => LANGUAGES[l]?.flag).join(' ')}
-                    </div>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    translator.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {translator.status}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowAssignModal(false)}
-              className="w-full mt-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-            >
-              Cancel
-            </button>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center space-x-3">
+          <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
+          <div className="flex space-x-1">
+            {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {s === 'all' ? 'All' : getStatusLabel(s)}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+        <div className="flex items-center space-x-2">
+          <SearchBar value={search} onChange={setSearch} />
+          <button className="px-3 py-1.5 border text-xs rounded hover:bg-gray-50">
+            Export to Excel
+          </button>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-500 mb-2">
+        Showing 1-{filtered.length} of {filtered.length} items.
+      </p>
+
+      {/* Protemos-style Table */}
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-2 py-2 text-left font-medium text-blue-600 cursor-pointer hover:bg-gray-100">Code ↕</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Name</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Client</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Start at</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Deadline at</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Status</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Assigned</th>
+              <th className="px-2 py-2 text-left font-medium text-gray-600">Tags</th>
+              <th className="px-2 py-2 text-right font-medium text-gray-600">Total, USD</th>
+              <th className="px-2 py-2 text-right font-medium text-gray-600">Payment</th>
+              <th className="px-2 py-2 text-center font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {filtered.map((order) => {
+              const createdDate = new Date(order.created_at);
+              const now = new Date();
+              const daysAgo = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
+              // Estimate deadline as 5 days after creation
+              const deadline = new Date(createdDate);
+              deadline.setDate(deadline.getDate() + 5);
+              const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+
+              return (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-2 py-2">
+                    <a href="#" className="text-blue-600 hover:underline font-medium">{order.order_number}</a>
+                  </td>
+                  <td className="px-2 py-2 font-medium max-w-[150px] truncate" title={order.client_name}>
+                    {order.client_name}
+                  </td>
+                  <td className="px-2 py-2">
+                    <a href="#" className="text-blue-600 hover:underline">{order.client_name}</a>
+                    <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
+                  </td>
+                  <td className="px-2 py-2 text-gray-500">
+                    {createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <span className="text-gray-400 text-[10px] block">{daysAgo}d ago</span>
+                  </td>
+                  <td className="px-2 py-2">
+                    {deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {daysUntil > 0 && order.translation_status !== 'delivered' && (
+                      <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>
+                        in {daysUntil}d
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                      {getStatusLabel(order.translation_status)}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2">
+                    {order.assigned_translator || (
+                      <span className="text-gray-400 text-[10px]">Unassigned</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2">
+                    <span className="inline-block px-1 py-0.5 bg-gray-100 border rounded text-[10px]">
+                      {order.translation_type === 'certified' ? 'CERT' : 'PROF'}
+                    </span>
+                    <span className="ml-1 text-[10px]">{FLAGS[order.translate_to] || '🌐'}</span>
+                  </td>
+                  <td className="px-2 py-2 text-right font-medium">{order.total_price?.toFixed(2)}</td>
+                  <td className="px-2 py-2 text-right">
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>
+                      {order.payment_status}
+                    </span>
+                  </td>
+                  <td className="px-2 py-1 text-center">
+                    <div className="flex items-center justify-center space-x-1">
+                      {order.translation_status === 'received' && (
+                        <button
+                          onClick={() => updateStatus(order.id, 'in_translation')}
+                          className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px] hover:bg-yellow-600"
+                          title="Start"
+                        >
+                          ▶
+                        </button>
+                      )}
+                      {order.translation_status === 'in_translation' && (
+                        <button
+                          onClick={() => updateStatus(order.id, 'review')}
+                          className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600"
+                          title="Review"
+                        >
+                          👁
+                        </button>
+                      )}
+                      {order.translation_status === 'review' && (
+                        <button
+                          onClick={() => updateStatus(order.id, 'ready')}
+                          className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
+                          title="Complete"
+                        >
+                          ✓
+                        </button>
+                      )}
+                      {order.translation_status === 'ready' && (
+                        <button
+                          onClick={() => deliverOrder(order.id)}
+                          className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px] hover:bg-teal-600"
+                          title="Deliver"
+                        >
+                          📤
+                        </button>
+                      )}
+                      {order.payment_status === 'pending' && (
+                        <button
+                          onClick={() => markPaid(order.id)}
+                          className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
+                          title="Mark Paid"
+                        >
+                          $
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-gray-50 border-t font-medium">
+            <tr>
+              <td colSpan="8" className="px-2 py-2 text-right text-gray-600">Totals:</td>
+              <td className="px-2 py-2 text-right font-bold">{totalReceive.toFixed(2)}</td>
+              <td colSpan="2" className="px-2 py-2 text-right text-green-600">
+                Paid: ${totalPaid.toFixed(2)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {filtered.length === 0 && (
+          <div className="p-8 text-center text-gray-500 text-sm">
+            No projects found
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-// ==================== TRANSLATORS MANAGEMENT ====================
-const TranslatorsManagement = ({ adminKey }) => {
+// ==================== TRANSLATORS PAGE (Compact) ====================
+const TranslatorsPage = ({ adminKey }) => {
   const [translators, setTranslators] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newTranslator, setNewTranslator] = useState({
-    name: '',
-    email: '',
-    languages: [],
-    specializations: []
-  });
+  const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTranslator, setNewTranslator] = useState({ name: '', email: '', languages: '', specialization: '' });
 
   useEffect(() => {
-    fetchTranslators();
+    // Mock translators - in real app, fetch from API
+    setTranslators([
+      { id: '1', name: 'Yasmin Costa', email: 'yasmin@legacy.com', languages: 'PT-BR, EN, ES', specialization: 'Legal, Certificates', status: 'available', orders: 89 },
+      { id: '2', name: 'Noemi Santos', email: 'noemi@legacy.com', languages: 'PT-BR, EN', specialization: 'Certificates', status: 'busy', orders: 67 },
+      { id: '3', name: 'Ana Clara', email: 'anaclara@legacy.com', languages: 'PT-BR, EN, FR', specialization: 'Legal, Technical', status: 'available', orders: 45 },
+      { id: '4', name: 'Maria Silva', email: 'maria@legacy.com', languages: 'PT-BR, EN', specialization: 'Medical', status: 'available', orders: 32 },
+    ]);
   }, []);
 
-  const fetchTranslators = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/translators?admin_key=${adminKey}`);
-      setTranslators(response.data.translators || []);
-    } catch (err) {
-      // Mock data if endpoint doesn't exist
-      setTranslators([
-        { id: '1', name: 'Maria Silva', email: 'maria@legacy.com', languages: ['portuguese', 'english'], specializations: ['legal', 'medical'], status: 'available', completed_orders: 45 },
-        { id: '2', name: 'John Smith', email: 'john@legacy.com', languages: ['spanish', 'english'], specializations: ['business', 'technical'], status: 'available', completed_orders: 32 },
-        { id: '3', name: 'Sophie Dubois', email: 'sophie@legacy.com', languages: ['french', 'english'], specializations: ['legal', 'financial'], status: 'busy', completed_orders: 28 }
-      ]);
-    }
-  };
+  const filtered = translators.filter(t =>
+    t.name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.email?.toLowerCase().includes(search.toLowerCase())
+  );
 
-  const addTranslator = async () => {
-    try {
-      await axios.post(`${API}/admin/translators?admin_key=${adminKey}`, newTranslator);
-      fetchTranslators();
-      setShowAddModal(false);
-      setNewTranslator({ name: '', email: '', languages: [], specializations: [] });
-    } catch (err) {
-      // If endpoint doesn't exist, add locally
-      setTranslators([...translators, { ...newTranslator, id: Date.now().toString(), status: 'available', completed_orders: 0 }]);
-      setShowAddModal(false);
-    }
+  const addTranslator = () => {
+    setTranslators([...translators, { ...newTranslator, id: Date.now().toString(), status: 'available', orders: 0 }]);
+    setShowAdd(false);
+    setNewTranslator({ name: '', email: '', languages: '', specialization: '' });
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Translators</h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
-        >
-          + Add Translator
-        </button>
+    <div className="p-4">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-lg font-bold text-blue-600">TRANSLATORS</h1>
+        <div className="flex items-center space-x-2">
+          <SearchBar value={search} onChange={setSearch} />
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+          >
+            + Add Translator
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {translators.map((translator) => (
-          <div key={translator.id} className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  {translator.name?.charAt(0)}
-                </div>
-                <div className="ml-3">
-                  <div className="font-semibold text-gray-800">{translator.name}</div>
-                  <div className="text-sm text-gray-500">{translator.email}</div>
-                </div>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                translator.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {translator.status}
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-gray-500 uppercase mb-1">Languages</div>
-                <div className="flex flex-wrap gap-1">
-                  {translator.languages?.map((lang) => (
-                    <span key={lang} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                      {LANGUAGES[lang]?.flag} {LANGUAGES[lang]?.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs text-gray-500 uppercase mb-1">Specializations</div>
-                <div className="flex flex-wrap gap-1">
-                  {translator.specializations?.map((spec) => (
-                    <span key={spec} className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs capitalize">
-                      {spec}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-3 border-t flex justify-between items-center">
-                <div className="text-sm text-gray-500">
-                  <span className="font-semibold text-gray-800">{translator.completed_orders}</span> orders completed
-                </div>
-                <button className="text-teal-600 hover:text-teal-800 text-sm font-medium">
-                  View Details
-                </button>
-              </div>
-            </div>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="bg-white rounded shadow p-3 flex items-center">
+          <div className="w-2 h-10 bg-blue-500 rounded mr-3"></div>
+          <div>
+            <div className="text-xl font-bold">{translators.length}</div>
+            <div className="text-[10px] text-gray-500 uppercase">Total</div>
           </div>
-        ))}
+        </div>
+        <div className="bg-white rounded shadow p-3 flex items-center">
+          <div className="w-2 h-10 bg-green-500 rounded mr-3"></div>
+          <div>
+            <div className="text-xl font-bold">{translators.filter(t => t.status === 'available').length}</div>
+            <div className="text-[10px] text-gray-500 uppercase">Available</div>
+          </div>
+        </div>
+        <div className="bg-white rounded shadow p-3 flex items-center">
+          <div className="w-2 h-10 bg-yellow-500 rounded mr-3"></div>
+          <div>
+            <div className="text-xl font-bold">{translators.filter(t => t.status === 'busy').length}</div>
+            <div className="text-[10px] text-gray-500 uppercase">Busy</div>
+          </div>
+        </div>
       </div>
 
-      {/* Add Translator Modal */}
-      {showAddModal && (
+      {/* Table */}
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Name</th>
+              <th className="px-3 py-2 text-left font-medium">Email</th>
+              <th className="px-3 py-2 text-left font-medium">Languages</th>
+              <th className="px-3 py-2 text-left font-medium">Specialization</th>
+              <th className="px-3 py-2 text-center font-medium">Status</th>
+              <th className="px-3 py-2 text-right font-medium">Orders</th>
+              <th className="px-3 py-2 text-center font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filtered.map((t) => (
+              <tr key={t.id} className="hover:bg-gray-50">
+                <td className="px-3 py-2 font-medium">{t.name}</td>
+                <td className="px-3 py-2 text-gray-500">{t.email}</td>
+                <td className="px-3 py-2">{t.languages}</td>
+                <td className="px-3 py-2">{t.specialization}</td>
+                <td className="px-3 py-2 text-center">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {t.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-right">{t.orders}</td>
+                <td className="px-3 py-2 text-center">
+                  <button className="text-blue-600 hover:underline text-[10px] mr-2">Edit</button>
+                  <button className="text-red-600 hover:underline text-[10px]">Remove</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add Modal */}
+      {showAdd && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4">Add New Translator</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  value={newTranslator.name}
-                  onChange={(e) => setNewTranslator({...newTranslator, name: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  value={newTranslator.email}
-                  onChange={(e) => setNewTranslator({...newTranslator, email: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Languages</label>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(LANGUAGES).map(([code, lang]) => (
-                    <button
-                      key={code}
-                      type="button"
-                      onClick={() => {
-                        const langs = newTranslator.languages.includes(code)
-                          ? newTranslator.languages.filter(l => l !== code)
-                          : [...newTranslator.languages, code];
-                        setNewTranslator({...newTranslator, languages: langs});
-                      }}
-                      className={`px-2 py-1 rounded text-xs ${
-                        newTranslator.languages.includes(code)
-                          ? 'bg-teal-600 text-white'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {lang.flag} {lang.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div className="bg-white rounded shadow-xl w-full max-w-sm p-4">
+            <h2 className="text-sm font-bold mb-3">Add New Translator</h2>
+            <div className="space-y-2">
+              <input
+                type="text"
+                placeholder="Name"
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                value={newTranslator.name}
+                onChange={(e) => setNewTranslator({...newTranslator, name: e.target.value})}
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                value={newTranslator.email}
+                onChange={(e) => setNewTranslator({...newTranslator, email: e.target.value})}
+              />
+              <input
+                type="text"
+                placeholder="Languages (e.g., PT-BR, EN)"
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                value={newTranslator.languages}
+                onChange={(e) => setNewTranslator({...newTranslator, languages: e.target.value})}
+              />
+              <input
+                type="text"
+                placeholder="Specialization"
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                value={newTranslator.specialization}
+                onChange={(e) => setNewTranslator({...newTranslator, specialization: e.target.value})}
+              />
             </div>
-
-            <div className="flex gap-2 mt-6">
+            <div className="flex space-x-2 mt-4">
               <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                onClick={() => setShowAdd(false)}
+                className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded text-xs"
               >
                 Cancel
               </button>
               <button
                 onClick={addTranslator}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs"
               >
-                Add Translator
+                Add
               </button>
             </div>
           </div>
@@ -843,752 +634,99 @@ const TranslatorsManagement = ({ adminKey }) => {
   );
 };
 
-// ==================== TRANSLATOR WORKSPACE (TRANSLATION PROGRAM) ====================
-const TranslatorWorkspace = ({ adminKey, order, onBack }) => {
-  const [activeStep, setActiveStep] = useState('ocr');
-  const [sourceText, setSourceText] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
-  const [segments, setSegments] = useState([]);
-  const [glossary, setGlossary] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showGlossary, setShowGlossary] = useState(false);
-  const [showAI, setShowAI] = useState(false);
-  const [aiSuggestion, setAiSuggestion] = useState('');
-  const [selectedSegment, setSelectedSegment] = useState(null);
-
-  const steps = [
-    { id: 'ocr', name: 'OCR', icon: '📄' },
-    { id: 'review', name: 'Review', icon: '🔍' },
-    { id: 'translate', name: 'Translate', icon: '✍️' },
-    { id: 'approval', name: 'Approval', icon: '✅' },
-    { id: 'export', name: 'Export', icon: '📤' }
-  ];
-
-  useEffect(() => {
-    if (order?.extracted_text) {
-      setSourceText(order.extracted_text);
-      splitIntoSegments(order.extracted_text);
-    }
-    loadGlossary();
-  }, [order]);
-
-  const splitIntoSegments = (text) => {
-    const sentences = text.split(/(?<=[.!?])\s+/);
-    setSegments(sentences.map((sentence, index) => ({
-      id: index,
-      source: sentence.trim(),
-      translation: '',
-      status: 'pending',
-      locked: false
-    })));
-  };
-
-  const loadGlossary = async () => {
-    try {
-      const response = await axios.get(`${API}/admin/glossary?admin_key=${adminKey}&from=${order?.translate_from}&to=${order?.translate_to}`);
-      setGlossary(response.data.terms || []);
-    } catch (err) {
-      // Mock glossary
-      setGlossary([
-        { source: 'birth certificate', target: 'certidão de nascimento', notes: 'Official document' },
-        { source: 'notarized', target: 'autenticado', notes: 'Legal term' },
-        { source: 'sworn translation', target: 'tradução juramentada', notes: 'Certified translation' }
-      ]);
-    }
-  };
-
-  const runOCR = async () => {
-    setIsProcessing(true);
-    try {
-      // Simulate OCR processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const sampleText = `BIRTH CERTIFICATE
-
-This is to certify that John Doe was born on January 15, 1990, in New York City, New York, United States of America.
-
-Parents:
-Father: Robert Doe
-Mother: Mary Jane Doe (née Smith)
-
-This document is a true copy of the original record on file.
-
-Issued by the Department of Health
-Date: March 1, 2024
-
-[Official Seal]
-Registrar's Signature`;
-
-      setSourceText(sampleText);
-      splitIntoSegments(sampleText);
-      setActiveStep('review');
-    } catch (err) {
-      console.error('OCR failed:', err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const translateWithAI = async (segment) => {
-    setIsProcessing(true);
-    setSelectedSegment(segment.id);
-    setShowAI(true);
-
-    try {
-      // Simulate AI translation
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Mock AI response based on source language
-      const translations = {
-        'BIRTH CERTIFICATE': 'CERTIDÃO DE NASCIMENTO',
-        'This is to certify': 'Certificamos que',
-        'was born on': 'nasceu em',
-        'Parents:': 'Filiação:',
-        'Father:': 'Pai:',
-        'Mother:': 'Mãe:',
-        'This document is a true copy': 'Este documento é uma cópia fiel',
-        'Issued by': 'Emitido por',
-        'Department of Health': 'Departamento de Saúde',
-        'Official Seal': 'Selo Oficial',
-        "Registrar's Signature": 'Assinatura do Registrador'
-      };
-
-      let suggestion = segment.source;
-      Object.entries(translations).forEach(([eng, port]) => {
-        suggestion = suggestion.replace(eng, port);
-      });
-
-      setAiSuggestion(suggestion);
-    } catch (err) {
-      console.error('AI translation failed:', err);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const applyAISuggestion = () => {
-    if (selectedSegment !== null) {
-      const updatedSegments = segments.map(seg =>
-        seg.id === selectedSegment
-          ? { ...seg, translation: aiSuggestion, status: 'translated' }
-          : seg
-      );
-      setSegments(updatedSegments);
-      setShowAI(false);
-      setAiSuggestion('');
-      setSelectedSegment(null);
-    }
-  };
-
-  const updateSegmentTranslation = (segmentId, translation) => {
-    const updatedSegments = segments.map(seg =>
-      seg.id === segmentId
-        ? { ...seg, translation, status: translation ? 'translated' : 'pending' }
-        : seg
-    );
-    setSegments(updatedSegments);
-  };
-
-  const approveAllSegments = () => {
-    const updatedSegments = segments.map(seg => ({ ...seg, status: 'approved', locked: true }));
-    setSegments(updatedSegments);
-    setActiveStep('export');
-  };
-
-  const exportTranslation = async () => {
-    const finalTranslation = segments.map(s => s.translation).join('\n\n');
-    setTranslatedText(finalTranslation);
-
-    try {
-      // Upload translation to order
-      await axios.post(`${API}/admin/orders/${order.id}/upload-translation?admin_key=${adminKey}`, {
-        translated_text: finalTranslation,
-        filename: `translation_${order.order_number}.txt`
-      });
-
-      // Update order status to review
-      await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
-        translation_status: 'review'
-      });
-
-      alert('Translation exported and order updated to Review status!');
-    } catch (err) {
-      console.error('Export failed:', err);
-      // Still show the translation even if API fails
-    }
-  };
-
-  const progress = Math.round((segments.filter(s => s.status !== 'pending').length / Math.max(segments.length, 1)) * 100);
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              ← Back
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">Translation Workspace</h1>
-              <p className="text-sm text-gray-500">Order #{order?.order_number} | {LANGUAGES[order?.translate_from]?.flag} → {LANGUAGES[order?.translate_to]?.flag}</p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-sm">
-              <span className="text-gray-500">Progress:</span>
-              <span className="ml-2 font-bold text-teal-600">{progress}%</span>
-            </div>
-            <div className="w-32 bg-gray-200 rounded-full h-2">
-              <div className="bg-teal-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Steps */}
-        <div className="px-6 py-3 flex items-center space-x-2 border-t bg-gray-50">
-          {steps.map((step, index) => (
-            <React.Fragment key={step.id}>
-              <button
-                onClick={() => setActiveStep(step.id)}
-                className={`flex items-center px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeStep === step.id
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <span className="mr-2">{step.icon}</span>
-                {step.name}
-              </button>
-              {index < steps.length - 1 && (
-                <span className="text-gray-300">→</span>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="p-6">
-        {/* OCR Step */}
-        {activeStep === 'ocr' && (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <div className="text-6xl mb-4">📄</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Document OCR</h2>
-            <p className="text-gray-600 mb-6">Extract text from the uploaded document using OCR technology</p>
-
-            {order?.document_filename && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg inline-block">
-                <span className="text-gray-500">Document:</span>
-                <span className="ml-2 font-medium">{order.document_filename}</span>
-              </div>
-            )}
-
-            <button
-              onClick={runOCR}
-              disabled={isProcessing}
-              className="px-8 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
-            >
-              {isProcessing ? (
-                <span className="flex items-center">
-                  <span className="animate-spin mr-2">⏳</span>
-                  Processing OCR...
-                </span>
-              ) : (
-                '🔍 Run OCR'
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Review Step */}
-        {activeStep === 'review' && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Review Source Text</h2>
-              <button
-                onClick={() => setActiveStep('translate')}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-              >
-                Continue to Translation →
-              </button>
-            </div>
-
-            <div className="border rounded-lg p-4 bg-gray-50">
-              <pre className="whitespace-pre-wrap font-sans text-gray-800">{sourceText}</pre>
-            </div>
-
-            <div className="mt-4 text-sm text-gray-500">
-              {segments.length} segments detected
-            </div>
-          </div>
-        )}
-
-        {/* Translate Step */}
-        {activeStep === 'translate' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Source Panel */}
-            <div className="bg-white rounded-xl shadow-sm">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h2 className="font-bold text-gray-800">
-                  {LANGUAGES[order?.translate_from]?.flag} Source ({LANGUAGES[order?.translate_from]?.name})
-                </h2>
-                <button
-                  onClick={() => setShowGlossary(!showGlossary)}
-                  className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm hover:bg-purple-200"
-                >
-                  📚 Glossary
-                </button>
-              </div>
-              <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-                {segments.map((segment) => (
-                  <div
-                    key={segment.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedSegment === segment.id
-                        ? 'border-teal-500 bg-teal-50'
-                        : segment.status === 'approved'
-                        ? 'border-green-300 bg-green-50'
-                        : segment.status === 'translated'
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedSegment(segment.id)}
-                  >
-                    <div className="text-sm text-gray-800">{segment.source}</div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        segment.status === 'approved' ? 'bg-green-100 text-green-700' :
-                        segment.status === 'translated' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-500'
-                      }`}>
-                        {segment.status}
-                      </span>
-                      {!segment.locked && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            translateWithAI(segment);
-                          }}
-                          className="text-xs text-purple-600 hover:text-purple-800"
-                        >
-                          🤖 AI Translate
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Translation Panel */}
-            <div className="bg-white rounded-xl shadow-sm">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h2 className="font-bold text-gray-800">
-                  {LANGUAGES[order?.translate_to]?.flag} Translation ({LANGUAGES[order?.translate_to]?.name})
-                </h2>
-                <button
-                  onClick={() => setActiveStep('approval')}
-                  className="px-3 py-1 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700"
-                >
-                  Review All →
-                </button>
-              </div>
-              <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
-                {segments.map((segment) => (
-                  <div
-                    key={segment.id}
-                    className={`p-3 rounded-lg border ${
-                      selectedSegment === segment.id ? 'border-teal-500' : 'border-gray-200'
-                    }`}
-                  >
-                    <textarea
-                      value={segment.translation}
-                      onChange={(e) => updateSegmentTranslation(segment.id, e.target.value)}
-                      disabled={segment.locked}
-                      placeholder="Enter translation..."
-                      className="w-full min-h-[60px] text-sm border-0 focus:ring-0 resize-none bg-transparent"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Approval Step */}
-        {activeStep === 'approval' && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">Review & Approve Translation</h2>
-              <button
-                onClick={approveAllSegments}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                ✅ Approve All
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {segments.map((segment) => (
-                <div key={segment.id} className="grid grid-cols-2 gap-4 p-4 border rounded-lg">
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Source</div>
-                    <div className="text-sm">{segment.source}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500 mb-1">Translation</div>
-                    <div className="text-sm">{segment.translation || <span className="text-red-500">Missing translation</span>}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Export Step */}
-        {activeStep === 'export' && (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <div className="text-6xl mb-4">📤</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Export Translation</h2>
-            <p className="text-gray-600 mb-6">Your translation is ready to be exported and delivered</p>
-
-            <div className="max-w-2xl mx-auto mb-6 p-4 bg-gray-50 rounded-lg text-left">
-              <div className="text-sm font-medium text-gray-500 mb-2">Preview:</div>
-              <pre className="whitespace-pre-wrap text-sm text-gray-800 max-h-64 overflow-y-auto">
-                {segments.map(s => s.translation).join('\n\n')}
-              </pre>
-            </div>
-
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={exportTranslation}
-                className="px-8 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-semibold"
-              >
-                📤 Export & Send to Review
-              </button>
-              <button
-                onClick={() => {
-                  const blob = new Blob([segments.map(s => s.translation).join('\n\n')], { type: 'text/plain' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `translation_${order?.order_number || 'export'}.txt`;
-                  a.click();
-                }}
-                className="px-8 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
-              >
-                💾 Download File
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Glossary Sidebar */}
-      {showGlossary && (
-        <div className="fixed right-0 top-0 h-full w-80 bg-white shadow-xl z-50">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-bold">📚 Glossary</h3>
-            <button onClick={() => setShowGlossary(false)} className="text-gray-500 hover:text-gray-700">✕</button>
-          </div>
-          <div className="p-4 space-y-3 overflow-y-auto h-[calc(100%-60px)]">
-            {glossary.map((term, index) => (
-              <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                <div className="font-medium text-sm">{term.source}</div>
-                <div className="text-teal-600 text-sm">→ {term.target}</div>
-                {term.notes && <div className="text-xs text-gray-500 mt-1">{term.notes}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* AI Suggestion Modal */}
-      {showAI && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
-            <div className="flex items-center mb-4">
-              <span className="text-2xl mr-2">🤖</span>
-              <h2 className="text-xl font-bold">AI Translation Suggestion</h2>
-            </div>
-
-            {isProcessing ? (
-              <div className="text-center py-8">
-                <div className="animate-spin text-4xl mb-4">⏳</div>
-                <p className="text-gray-600">Generating translation...</p>
-              </div>
-            ) : (
-              <>
-                <div className="p-4 bg-purple-50 rounded-lg mb-4">
-                  <div className="text-sm text-purple-600 mb-1">Suggested translation:</div>
-                  <div className="text-gray-800">{aiSuggestion}</div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowAI(false)}
-                    className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={applyAISuggestion}
-                    className="flex-1 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-                  >
-                    Apply Suggestion
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== GLOSSARY MANAGEMENT ====================
-const GlossaryManagement = ({ adminKey }) => {
-  const [glossaries, setGlossaries] = useState([]);
-  const [selectedGlossary, setSelectedGlossary] = useState(null);
-  const [terms, setTerms] = useState([]);
-  const [showAddTerm, setShowAddTerm] = useState(false);
-  const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
-
-  useEffect(() => {
-    // Mock glossaries
-    setGlossaries([
-      { id: '1', name: 'Legal Terms', from: 'english', to: 'portuguese', terms_count: 150 },
-      { id: '2', name: 'Medical Terms', from: 'english', to: 'spanish', terms_count: 200 },
-      { id: '3', name: 'Business Terms', from: 'english', to: 'french', terms_count: 100 }
-    ]);
-  }, []);
-
-  const selectGlossary = (glossary) => {
-    setSelectedGlossary(glossary);
-    // Mock terms
-    setTerms([
-      { id: '1', source: 'affidavit', target: 'declaração juramentada', notes: 'Legal document' },
-      { id: '2', source: 'notary public', target: 'tabelião', notes: 'Official who can certify documents' },
-      { id: '3', source: 'power of attorney', target: 'procuração', notes: 'Legal authorization' }
-    ]);
-  };
-
-  const addTerm = () => {
-    setTerms([...terms, { ...newTerm, id: Date.now().toString() }]);
-    setNewTerm({ source: '', target: '', notes: '' });
-    setShowAddTerm(false);
-  };
-
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Glossary Management</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Glossary List */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 border-b">
-            <h2 className="font-bold text-gray-800">Glossaries</h2>
-          </div>
-          <div className="p-4 space-y-2">
-            {glossaries.map((glossary) => (
-              <button
-                key={glossary.id}
-                onClick={() => selectGlossary(glossary)}
-                className={`w-full p-4 rounded-lg text-left transition-colors ${
-                  selectedGlossary?.id === glossary.id
-                    ? 'bg-teal-50 border-2 border-teal-500'
-                    : 'bg-gray-50 hover:bg-gray-100 border-2 border-transparent'
-                }`}
-              >
-                <div className="font-medium">{glossary.name}</div>
-                <div className="text-sm text-gray-500">
-                  {LANGUAGES[glossary.from]?.flag} → {LANGUAGES[glossary.to]?.flag} | {glossary.terms_count} terms
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Terms List */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm">
-          <div className="p-4 border-b flex justify-between items-center">
-            <h2 className="font-bold text-gray-800">
-              {selectedGlossary ? selectedGlossary.name : 'Select a Glossary'}
-            </h2>
-            {selectedGlossary && (
-              <button
-                onClick={() => setShowAddTerm(true)}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 text-sm"
-              >
-                + Add Term
-              </button>
-            )}
-          </div>
-
-          {selectedGlossary ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Target</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Notes</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {terms.map((term) => (
-                    <tr key={term.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium">{term.source}</td>
-                      <td className="px-6 py-4 text-teal-600">{term.target}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{term.notes}</td>
-                      <td className="px-6 py-4">
-                        <button className="text-red-600 hover:text-red-800 text-sm">Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-12 text-center text-gray-500">
-              <div className="text-4xl mb-4">📚</div>
-              <p>Select a glossary to view and manage terms</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Add Term Modal */}
-      {showAddTerm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4">Add New Term</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Source Term</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  value={newTerm.source}
-                  onChange={(e) => setNewTerm({...newTerm, source: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Target Translation</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  value={newTerm.target}
-                  onChange={(e) => setNewTerm({...newTerm, target: e.target.value})}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border rounded-lg"
-                  value={newTerm.notes}
-                  onChange={(e) => setNewTerm({...newTerm, notes: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={() => setShowAddTerm(false)}
-                className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addTerm}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-              >
-                Add Term
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== SETTINGS ====================
+// ==================== SETTINGS PAGE (Compact) ====================
 const SettingsPage = ({ adminKey }) => {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8">Settings</h1>
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">API Configuration</h2>
-          <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">API Configuration</h2>
+          <div className="space-y-2 text-xs">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Backend URL</label>
-              <input
-                type="text"
-                className="w-full px-4 py-2 border rounded-lg bg-gray-50"
-                value={BACKEND_URL}
-                readOnly
-              />
+              <label className="block text-gray-500 mb-1">Backend URL</label>
+              <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Admin Key</label>
-              <input
-                type="password"
-                className="w-full px-4 py-2 border rounded-lg bg-gray-50"
-                value={adminKey}
-                readOnly
-              />
+              <label className="block text-gray-500 mb-1">Admin Key</label>
+              <input type="password" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={adminKey} readOnly />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Pricing Configuration</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">Pricing</h2>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Certified Translation</span>
               <span className="font-bold text-teal-600">$24.99/page</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Professional Translation</span>
               <span className="font-bold text-teal-600">$19.50/page</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Priority Fee</span>
               <span className="font-bold text-orange-600">+25%</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Urgent Fee</span>
               <span className="font-bold text-red-600">+100%</span>
             </div>
           </div>
         </div>
+
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">Integrations</h2>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center">
+                <span className="mr-2">💳</span>
+                <span>Stripe</span>
+              </div>
+              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Connected</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center">
+                <span className="mr-2">📧</span>
+                <span>SendGrid</span>
+              </div>
+              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Connected</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">External Tools</h2>
+          <div className="space-y-2 text-xs">
+            <a
+              href={TRANSLATION_PROGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-2 bg-blue-50 rounded hover:bg-blue-100"
+            >
+              <div className="flex items-center">
+                <span className="mr-2">✍️</span>
+                <span>Translation Program</span>
+              </div>
+              <span className="text-blue-600">Open ↗</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-// ==================== MAIN ADMIN APP ====================
+// ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [activeTab, setActiveTab] = useState('projects');
 
-  // Check for saved session
   useEffect(() => {
-    const savedAdminKey = localStorage.getItem('admin_key');
-    if (savedAdminKey) {
-      setAdminKey(savedAdminKey);
-    }
+    const savedKey = localStorage.getItem('admin_key');
+    if (savedKey) setAdminKey(savedKey);
   }, []);
 
   const handleLogin = (key) => {
@@ -1601,53 +739,16 @@ function AdminApp() {
     localStorage.removeItem('admin_key');
   };
 
-  const openTranslationWorkspace = (order) => {
-    setSelectedOrder(order);
-    setActiveTab('translator-workspace');
-  };
-
   const renderContent = () => {
-    // If in translator workspace with selected order, show that
-    if (activeTab === 'translator-workspace' && selectedOrder) {
-      return (
-        <TranslatorWorkspace
-          adminKey={adminKey}
-          order={selectedOrder}
-          onBack={() => {
-            setSelectedOrder(null);
-            setActiveTab('orders');
-          }}
-        />
-      );
-    }
-
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard adminKey={adminKey} />;
-      case 'orders':
-        return <OrdersManagement adminKey={adminKey} onOpenTranslation={openTranslationWorkspace} />;
+      case 'projects':
+        return <ProjectsPage adminKey={adminKey} />;
       case 'translators':
-        return <TranslatorsManagement adminKey={adminKey} />;
-      case 'translator-workspace':
-        return (
-          <div className="p-8 text-center">
-            <div className="text-5xl mb-4">✍️</div>
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Translation Workspace</h2>
-            <p className="text-gray-600 mb-4">Select an order from the Orders tab to start translating</p>
-            <button
-              onClick={() => setActiveTab('orders')}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-            >
-              Go to Orders
-            </button>
-          </div>
-        );
-      case 'glossaries':
-        return <GlossaryManagement adminKey={adminKey} />;
+        return <TranslatorsPage adminKey={adminKey} />;
       case 'settings':
         return <SettingsPage adminKey={adminKey} />;
       default:
-        return <Dashboard adminKey={adminKey} />;
+        return <ProjectsPage adminKey={adminKey} />;
     }
   };
 
@@ -1655,23 +756,9 @@ function AdminApp() {
     return <AdminLogin onLogin={handleLogin} />;
   }
 
-  // Full screen for translator workspace
-  if (activeTab === 'translator-workspace' && selectedOrder) {
-    return renderContent();
-  }
-
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      <AdminSidebar
-        activeTab={activeTab}
-        setActiveTab={(tab) => {
-          if (tab !== 'translator-workspace') {
-            setSelectedOrder(null);
-          }
-          setActiveTab(tab);
-        }}
-        onLogout={handleLogout}
-      />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
       <div className="flex-1 overflow-auto">
         {renderContent()}
       </div>
