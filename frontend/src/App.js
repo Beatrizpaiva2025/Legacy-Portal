@@ -828,15 +828,113 @@ const OrdersPage = ({ token }) => {
 };
 
 // ==================== MESSAGES PAGE ====================
-const MessagesPage = () => {
+const MessagesPage = ({ token }) => {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const response = await axios.get(`${API}/messages?token=${token}`);
+      setMessages(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAsRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/messages/${messageId}/read?token=${token}`);
+      setMessages(messages.map(msg =>
+        msg.id === messageId ? { ...msg, read: true } : msg
+      ));
+    } catch (err) {
+      console.error('Failed to mark message as read:', err);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getMessageIcon = (type) => {
+    switch (type) {
+      case 'delivery': return '🎉';
+      case 'status': return '📋';
+      case 'payment': return '💳';
+      default: return '✉️';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
+        <p className="mt-4 text-gray-600">Loading messages...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
-      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-        <div className="text-4xl mb-4">✉️</div>
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">No messages</h2>
-        <p className="text-gray-600">Messages from Legacy Translations will appear here</p>
-      </div>
+
+      {messages.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="text-4xl mb-4">✉️</div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">No messages</h2>
+          <p className="text-gray-600">Messages from Legacy Translations will appear here</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
+                message.read ? 'border-gray-300' : 'border-teal-500'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start space-x-4">
+                  <div className="text-2xl">{getMessageIcon(message.type)}</div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className={`font-semibold ${message.read ? 'text-gray-600' : 'text-gray-800'}`}>
+                        {message.title}
+                      </h3>
+                      {!message.read && (
+                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 mt-1">{message.content}</p>
+                    <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
+                  </div>
+                </div>
+                {!message.read && (
+                  <button
+                    onClick={() => markAsRead(message.id)}
+                    className="text-sm text-teal-600 hover:text-teal-800"
+                  >
+                    Mark as read
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -883,7 +981,7 @@ function App() {
       case 'orders':
         return <OrdersPage token={token} />;
       case 'messages':
-        return <MessagesPage />;
+        return <MessagesPage token={token} />;
       default:
         return <NewOrderPage partner={partner} token={token} />;
     }

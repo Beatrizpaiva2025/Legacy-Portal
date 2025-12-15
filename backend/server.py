@@ -1796,11 +1796,120 @@ async def admin_deliver_order(order_id: str, admin_key: str):
                 """
             )
 
+        # Create internal message for partner
+        if partner:
+            message = {
+                "id": str(uuid.uuid4()),
+                "partner_id": partner["id"],
+                "order_id": order_id,
+                "order_number": order["order_number"],
+                "type": "delivery",
+                "title": f"Translation Delivered - #{order['order_number']}",
+                "content": f"Your translation for client {order['client_name']} ({order['client_email']}) has been completed and delivered.",
+                "read": False,
+                "created_at": datetime.utcnow()
+            }
+            await db.messages.insert_one(message)
+
         return {"status": "success", "message": "Order delivered and emails sent", "attachment_sent": has_attachment}
 
     except Exception as e:
         logger.error(f"Failed to send delivery emails: {str(e)}")
         return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
+
+
+# ==================== MESSAGES ENDPOINTS ====================
+
+@api_router.get("/messages")
+async def get_partner_messages(token: str):
+    """Get all messages for the logged-in partner"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get messages for this partner
+    messages = await db.messages.find(
+        {"partner_id": partner["id"]}
+    ).sort("created_at", -1).to_list(100)
+
+    # Convert datetime to string for JSON serialization
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
+@api_router.put("/messages/{message_id}/read")
+async def mark_message_read(message_id: str, token: str):
+    """Mark a message as read and notify admin"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Get the message first
+    message = await db.messages.find_one({"id": message_id, "partner_id": partner["id"]})
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Update message with read timestamp
+    read_at = datetime.utcnow()
+    result = await db.messages.update_one(
+        {"id": message_id, "partner_id": partner["id"]},
+        {"$set": {"read": True, "read_at": read_at}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Create read receipt for admin
+    read_receipt = {
+        "id": str(uuid.uuid4()),
+        "message_id": message_id,
+        "order_number": message.get("order_number", ""),
+        "partner_id": partner["id"],
+        "partner_name": partner.get("company_name", partner.get("contact_name", "Partner")),
+        "message_title": message.get("title", ""),
+        "read_at": read_at,
+        "created_at": read_at
+    }
+    await db.read_receipts.insert_one(read_receipt)
+
+    return {"status": "success", "read_at": read_at.isoformat()}
+
+
+@api_router.get("/admin/read-receipts")
+async def get_read_receipts(admin_key: str, limit: int = 50):
+    """Get read receipts for admin - shows when partners read messages"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    receipts = await db.read_receipts.find().sort("read_at", -1).limit(limit).to_list(limit)
+
+    for receipt in receipts:
+        receipt["_id"] = str(receipt["_id"])
+        if receipt.get("read_at"):
+            receipt["read_at"] = receipt["read_at"].isoformat()
+        if receipt.get("created_at"):
+            receipt["created_at"] = receipt["created_at"].isoformat()
+
+    return {"receipts": receipts}
+
+
+@api_router.get("/messages/unread-count")
+async def get_unread_count(token: str):
+    """Get count of unread messages"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    count = await db.messages.count_documents({"partner_id": partner["id"], "read": False})
+    return {"unread_count": count}
+
 
 # Include the router in the main app
 app.include_router(api_router)
