@@ -2065,6 +2065,243 @@ async def admin_download_document(document_id: str, admin_key: str):
     }
 
 
+# ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
+
+class OCRRequest(BaseModel):
+    file_base64: str
+    file_type: str
+    filename: str
+
+class TranslateRequest(BaseModel):
+    text: str
+    source_language: str
+    target_language: str
+    document_type: str
+    claude_api_key: str
+    action: str  # 'translate' or correction commands
+    current_translation: Optional[str] = None
+
+@api_router.post("/admin/ocr")
+async def admin_ocr(request: OCRRequest, admin_key: str):
+    """Perform OCR on uploaded document (admin translation workspace)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Decode base64 file
+        file_content = base64.b64decode(request.file_base64)
+        file_extension = request.filename.split('.')[-1].lower() if '.' in request.filename else ''
+
+        logger.info(f"OCR request for file: {request.filename}, type: {request.file_type}, size: {len(file_content)} bytes")
+
+        # Determine file type
+        is_image = request.file_type.startswith('image/') or file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'webp']
+        is_pdf = request.file_type == 'application/pdf' or file_extension == 'pdf'
+
+        text = ""
+
+        if is_image:
+            # Try AWS Textract first for images
+            if textract_client:
+                logger.info("Using AWS Textract for image OCR...")
+                text = extract_text_with_textract(file_content, file_extension)
+                if text and len(text.strip()) > 10:
+                    logger.info(f"Textract extracted {len(text)} characters")
+                else:
+                    text = ""
+
+            # Fallback to Tesseract if Textract didn't work
+            if not text:
+                logger.info("Using Tesseract for image OCR...")
+                try:
+                    image = Image.open(io.BytesIO(file_content))
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+
+                    # Enhance image for better OCR
+                    from PIL import ImageEnhance, ImageFilter
+                    enhancer = ImageEnhance.Contrast(image)
+                    image = enhancer.enhance(2.0)
+                    image = image.filter(ImageFilter.SHARPEN)
+
+                    # Resize if too small
+                    width, height = image.size
+                    if width < 1000 or height < 1000:
+                        scale_factor = max(1000/width, 1000/height)
+                        new_width = int(width * scale_factor)
+                        new_height = int(height * scale_factor)
+                        image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                    text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                    logger.info(f"Tesseract extracted {len(text)} characters")
+                except Exception as e:
+                    logger.error(f"Tesseract OCR failed: {str(e)}")
+                    raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
+
+        elif is_pdf:
+            # Try text extraction first
+            try:
+                with pdfplumber.open(io.BytesIO(file_content)) as pdf:
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            text += page_text + "\n"
+
+                if text.strip() and len(text.strip()) > 50:
+                    logger.info(f"pdfplumber extracted {len(text)} characters (text-based PDF)")
+            except Exception as e:
+                logger.warning(f"pdfplumber failed: {str(e)}")
+
+            # If text extraction failed, use OCR
+            if not text or len(text.strip()) < 50:
+                logger.info("PDF appears to be image-based, using OCR...")
+
+                # Try Textract first
+                if textract_client:
+                    logger.info("Using AWS Textract for PDF OCR...")
+                    text = extract_text_with_textract(file_content, 'pdf')
+                    if text and len(text.strip()) > 10:
+                        logger.info(f"Textract extracted {len(text)} characters from PDF")
+
+                # Fallback to Tesseract
+                if not text or len(text.strip()) < 10:
+                    logger.info("Using Tesseract for PDF OCR...")
+                    try:
+                        pdf_document = fitz.open(stream=file_content, filetype="pdf")
+                        text = ""
+
+                        for page_num in range(min(pdf_document.page_count, 15)):
+                            page = pdf_document[page_num]
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                            img_data = pix.tobytes("png")
+
+                            image = Image.open(io.BytesIO(img_data))
+                            page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+
+                            if page_text.strip():
+                                text += page_text + "\n"
+
+                        pdf_document.close()
+                        logger.info(f"Tesseract extracted {len(text)} characters from PDF")
+                    except Exception as e:
+                        logger.error(f"PDF OCR failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {request.file_type}")
+
+        if not text or not text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from document")
+
+        # Count words
+        word_count = count_words(text)
+
+        return {
+            "status": "success",
+            "text": text.strip(),
+            "word_count": word_count,
+            "filename": request.filename
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OCR error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
+
+
+@api_router.post("/admin/translate")
+async def admin_translate(request: TranslateRequest, admin_key: str):
+    """Translate text using Claude API (admin translation workspace)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    if not request.claude_api_key:
+        raise HTTPException(status_code=400, detail="Claude API key is required")
+
+    try:
+        # Build the prompt based on action
+        if request.action == 'translate':
+            system_prompt = f"""You are a professional translator specializing in {request.document_type} documents.
+Translate the following text from {request.source_language} to {request.target_language}.
+
+IMPORTANT INSTRUCTIONS:
+1. Maintain the exact formatting, line breaks, and structure of the original document
+2. For {request.document_type} documents, use appropriate formal/legal terminology
+3. Preserve any dates, numbers, names, and proper nouns accurately
+4. If there are any stamps, seals, or signatures mentioned, indicate them in brackets
+5. Do NOT add any explanations or notes - only provide the translation
+6. Maintain paragraph structure and spacing as in the original"""
+
+            user_message = f"Please translate the following {request.document_type} document:\n\n{request.text}"
+
+        elif request.action == 'improve_formality':
+            system_prompt = f"""You are a professional translator. The user has a translation that needs to be more formal.
+Rewrite the translation to use more formal, professional language appropriate for {request.document_type} documents.
+Maintain the same meaning but use more sophisticated vocabulary and formal sentence structures."""
+            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nPlease make this translation more formal and professional."
+
+        elif request.action == 'simplify':
+            system_prompt = f"""You are a professional translator. The user has a translation that needs to be simplified.
+Rewrite the translation to use clearer, simpler language while maintaining accuracy.
+Make it easier to understand without losing the essential meaning."""
+            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nPlease simplify this translation while keeping it accurate."
+
+        elif request.action == 'check_accuracy':
+            system_prompt = f"""You are a professional translation reviewer. Compare the original text with its translation and identify any errors or inaccuracies.
+Provide a corrected version of the translation if needed, and briefly note what was corrected."""
+            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nTranslation ({request.target_language}):\n{request.current_translation}\n\nPlease check for accuracy and provide corrections if needed."
+
+        else:
+            # Custom command
+            system_prompt = f"""You are a professional translator working with {request.document_type} documents.
+Follow the user's instructions to modify or improve the translation."""
+            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}"
+
+        # Call Claude API
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": request.claude_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 8192,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_message}
+                    ]
+                }
+            )
+
+            if response.status_code != 200:
+                error_detail = response.text
+                logger.error(f"Claude API error: {response.status_code} - {error_detail}")
+                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+
+            result = response.json()
+            translation = result.get("content", [{}])[0].get("text", "")
+
+            if not translation:
+                raise HTTPException(status_code=500, detail="No translation returned from Claude")
+
+            return {
+                "status": "success",
+                "translation": translation,
+                "action": request.action,
+                "model": "claude-sonnet-4-20250514"
+            }
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Translation request timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Translation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

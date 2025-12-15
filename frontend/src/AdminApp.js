@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
-
-// Translation Program URL (external)
-const TRANSLATION_PROGRAM_URL = 'https://translation-program-c0dnb4idq-beatriz-paivas-projects.vercel.app';
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -35,6 +32,18 @@ const FLAGS = {
   'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
   'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
 };
+
+const LANGUAGES = [
+  "English", "Spanish", "Portuguese", "Portuguese (Brazil)", "French", "German",
+  "Italian", "Chinese", "Japanese", "Korean", "Arabic", "Russian", "Dutch"
+];
+
+const TRANSLATORS = [
+  { name: "Beatriz Paiva", title: "Managing Director" },
+  { name: "Ana Clara", title: "Project Manager" },
+  { name: "Yasmin Costa", title: "Certified Translator" },
+  { name: "Noemi Santos", title: "Senior Translator" }
+];
 
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
@@ -110,6 +119,7 @@ const AdminLogin = ({ onLogin }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
     { id: 'projects', label: 'Projects', icon: '📋' },
+    { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
@@ -141,17 +151,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <span>{item.label}</span>
           </button>
         ))}
-
-        <a
-          href={TRANSLATION_PROGRAM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center px-3 py-2 text-left text-slate-300 hover:bg-slate-700 mt-2 border-t border-slate-700 pt-2"
-        >
-          <span className="mr-2">✍️</span>
-          <span>Translation Tool</span>
-          <span className="ml-1 text-[10px]">↗</span>
-        </a>
       </nav>
 
       <div className="p-2 border-t border-slate-700">
@@ -180,7 +179,616 @@ const SearchBar = ({ value, onChange, placeholder }) => (
   </div>
 );
 
-// ==================== PROJECTS PAGE (Protemos Style with Legacy Data) ====================
+// ==================== TRANSLATION WORKSPACE ====================
+const TranslationWorkspace = ({ adminKey }) => {
+  // State
+  const [activeSubTab, setActiveSubTab] = useState('upload');
+  const [files, setFiles] = useState([]);
+  const [ocrResults, setOcrResults] = useState([]);
+  const [translationResults, setTranslationResults] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+
+  // Config state
+  const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
+  const [targetLanguage, setTargetLanguage] = useState('English');
+  const [documentType, setDocumentType] = useState('Birth Certificate');
+  const [orderNumber, setOrderNumber] = useState('');
+  const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
+  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
+  const [claudeApiKey, setClaudeApiKey] = useState('');
+
+  // Correction state
+  const [correctionCommand, setCorrectionCommand] = useState('');
+  const [applyingCorrection, setApplyingCorrection] = useState(false);
+
+  // Refs
+  const fileInputRef = useRef(null);
+  const originalTextRef = useRef(null);
+  const translatedTextRef = useRef(null);
+
+  // Load saved API key
+  useEffect(() => {
+    const savedKey = localStorage.getItem('claude_api_key');
+    if (savedKey) setClaudeApiKey(savedKey);
+  }, []);
+
+  // Save API key
+  const saveApiKey = () => {
+    localStorage.setItem('claude_api_key', claudeApiKey);
+    setProcessingStatus('✅ API Key saved!');
+  };
+
+  // Synchronized scrolling
+  const handleScroll = (source) => {
+    if (source === 'original' && translatedTextRef.current && originalTextRef.current) {
+      translatedTextRef.current.scrollTop = originalTextRef.current.scrollTop;
+    } else if (source === 'translated' && originalTextRef.current && translatedTextRef.current) {
+      originalTextRef.current.scrollTop = translatedTextRef.current.scrollTop;
+    }
+  };
+
+  // File handling
+  const handleFileSelect = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    setFiles(selectedFiles);
+    setOcrResults([]);
+    setTranslationResults([]);
+    setProcessingStatus('');
+  };
+
+  // Convert file to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // OCR with backend
+  const handleOCR = async () => {
+    if (files.length === 0) {
+      alert('Please select files first');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus('Performing OCR...');
+    setOcrResults([]);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setProcessingStatus(`Processing ${file.name} (${i + 1}/${files.length})...`);
+
+        const fileBase64 = await fileToBase64(file);
+
+        const response = await axios.post(`${API}/admin/ocr?admin_key=${adminKey}`, {
+          file_base64: fileBase64,
+          file_type: file.type,
+          filename: file.name
+        });
+
+        if (response.data.success) {
+          setOcrResults(prev => [...prev, {
+            filename: file.name,
+            text: response.data.text
+          }]);
+        } else {
+          throw new Error(response.data.error || 'OCR failed');
+        }
+      }
+      setProcessingStatus('✅ OCR completed!');
+    } catch (error) {
+      console.error('OCR error:', error);
+      setProcessingStatus(`❌ OCR failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Translation with Claude
+  const handleTranslate = async () => {
+    if (ocrResults.length === 0) {
+      alert('Please perform OCR first');
+      return;
+    }
+
+    if (!claudeApiKey) {
+      alert('Please configure your Claude API Key in the Config tab');
+      setActiveSubTab('config');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus('Translating with Claude AI...');
+    setTranslationResults([]);
+
+    try {
+      for (let i = 0; i < ocrResults.length; i++) {
+        const ocrResult = ocrResults[i];
+        setProcessingStatus(`Translating ${ocrResult.filename} (${i + 1}/${ocrResults.length})...`);
+
+        const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+          text: ocrResult.text,
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          document_type: documentType,
+          claude_api_key: claudeApiKey,
+          action: 'translate'
+        });
+
+        if (response.data.success) {
+          setTranslationResults(prev => [...prev, {
+            filename: ocrResult.filename,
+            originalText: ocrResult.text,
+            translatedText: response.data.translation
+          }]);
+        } else {
+          throw new Error(response.data.error || 'Translation failed');
+        }
+      }
+      setProcessingStatus('✅ Translation completed!');
+      setActiveSubTab('results');
+    } catch (error) {
+      console.error('Translation error:', error);
+      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Apply correction
+  const handleApplyCorrection = async () => {
+    if (!correctionCommand.trim() || translationResults.length === 0) return;
+
+    setApplyingCorrection(true);
+
+    try {
+      const currentResult = translationResults[selectedResultIndex];
+
+      const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+        text: currentResult.translatedText,
+        corrections: correctionCommand,
+        claude_api_key: claudeApiKey,
+        action: 'correct'
+      });
+
+      if (response.data.success) {
+        const updatedResults = [...translationResults];
+        updatedResults[selectedResultIndex] = {
+          ...currentResult,
+          translatedText: response.data.translation
+        };
+        setTranslationResults(updatedResults);
+        setCorrectionCommand('');
+        setProcessingStatus('✅ Correction applied!');
+      } else {
+        throw new Error(response.data.error || 'Correction failed');
+      }
+    } catch (error) {
+      console.error('Correction error:', error);
+      alert('Error applying correction: ' + error.message);
+    } finally {
+      setApplyingCorrection(false);
+    }
+  };
+
+  // Update translation text manually
+  const handleTranslationEdit = (newText) => {
+    const updatedResults = [...translationResults];
+    updatedResults[selectedResultIndex] = {
+      ...updatedResults[selectedResultIndex],
+      translatedText: newText
+    };
+    setTranslationResults(updatedResults);
+  };
+
+  // Download certificate
+  const handleDownload = () => {
+    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Certification of Translation Accuracy</title>
+    <style>
+        @page { size: Letter; margin: 0.75in 1in; }
+        body { font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6; color: #333; }
+        .header { display: flex; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0; margin-bottom: 30px; }
+        .header-center { flex: 1; text-align: center; }
+        .company-name { font-size: 18px; font-weight: bold; }
+        .company-address { font-size: 11px; line-height: 1.4; }
+        .order-number { text-align: right; margin-bottom: 30px; }
+        .main-title { text-align: center; font-size: 28px; margin-bottom: 40px; }
+        .subtitle { text-align: center; font-size: 16px; margin-bottom: 40px; line-height: 1.8; }
+        .body-text { text-align: justify; margin-bottom: 20px; line-height: 1.8; }
+        .footer-section { margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .translation-page { page-break-before: always; margin-top: 30px; }
+        .translation-content { white-space: pre-wrap; line-height: 1.8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div style="width: 150px;"></div>
+        <div class="header-center">
+            <div class="company-name">Legacy Translations</div>
+            <div class="company-address">
+                867 Boylston Street 5th Floor #2073 Boston, MA 02116<br>
+                (857) 316-7770 | contact@legacytranslations.com<br>
+                ATA Member # 275993
+            </div>
+        </div>
+        <div style="width: 100px;"></div>
+    </div>
+
+    <div class="order-number">Order # <strong>${orderNumber || 'N/A'}</strong></div>
+
+    <h1 class="main-title">Certification of Translation Accuracy</h1>
+
+    <div class="subtitle">
+        Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to <strong>${targetLanguage}</strong>
+    </div>
+
+    <p class="body-text">
+        We, Legacy Translations, a professional translation services company and ATA Member (#275993),
+        having no relation to the client, hereby certify that the annexed <strong>${targetLanguage}</strong>
+        translation of the <strong>${sourceLanguage}</strong> document, executed by us, is to the best
+        of our knowledge and belief, a true and accurate translation of the original document, likewise
+        annexed hereunto.
+    </p>
+
+    <p class="body-text">
+        This is to certify the correctness of the translation only. We do not guarantee that the original
+        is a genuine document, or that the statements contained in the original document are true.
+    </p>
+
+    <p class="body-text">A copy of the translation is attached to this certification.</p>
+
+    <div class="footer-section">
+        <div>
+            <div style="font-weight: bold;">${translator?.name || 'Beatriz Paiva'}</div>
+            <div style="font-weight: bold;">${translator?.title || 'Managing Director'}</div>
+            <div>Dated: ${translationDate}</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 12px; color: #666;">[ Official Seal ]</div>
+        </div>
+    </div>
+
+    ${translationResults.map((result, index) => `
+    <div class="translation-page">
+        <h2 style="font-size: 18px; margin-bottom: 20px;">Translation - ${result.filename}</h2>
+        <div class="translation-content">${result.translatedText}</div>
+    </div>
+    `).join('')}
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certification_${orderNumber || 'translation'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATION WORKSPACE</h1>
+
+      {/* Sub-tabs */}
+      <div className="flex space-x-1 mb-4 border-b">
+        {[
+          { id: 'upload', label: '1. Upload', icon: '📤' },
+          { id: 'config', label: '2. Config', icon: '⚙️' },
+          { id: 'results', label: '3. Results', icon: '📊' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-4 py-2 text-xs font-medium rounded-t ${
+              activeSubTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* UPLOAD TAB */}
+      {activeSubTab === 'upload' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">Upload Documents</h2>
+          <p className="text-xs text-gray-500 mb-4">Select documents for OCR and translation</p>
+
+          <div
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div className="text-4xl mb-2">📤</div>
+            <button className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+              Choose Files
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+              {files.length > 0 ? `${files.length} file(s) selected` : 'Click to select files (images or PDF)'}
+            </p>
+          </div>
+
+          {files.length > 0 && (
+            <div className="mt-4">
+              <label className="text-xs font-medium text-gray-700">Selected Files:</label>
+              <div className="mt-1 space-y-1">
+                {files.map((file, idx) => (
+                  <div key={idx} className="flex items-center text-xs p-2 bg-gray-50 rounded">
+                    <span className="mr-2">📄</span>
+                    <span>{file.name}</span>
+                    <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex space-x-2 mt-4">
+            <button
+              onClick={handleOCR}
+              disabled={files.length === 0 || isProcessing}
+              className="flex-1 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? '⏳ Processing...' : '🔍 OCR (Extract Text)'}
+            </button>
+
+            <button
+              onClick={handleTranslate}
+              disabled={ocrResults.length === 0 || isProcessing}
+              className="flex-1 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? '⏳ Processing...' : '🌐 Translate (Claude)'}
+            </button>
+          </div>
+
+          {processingStatus && (
+            <div className={`mt-4 p-3 rounded text-xs ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {processingStatus}
+            </div>
+          )}
+
+          {/* OCR Results Preview */}
+          {ocrResults.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-xs font-bold mb-2">📝 OCR Results (editable)</h3>
+              {ocrResults.map((result, idx) => (
+                <div key={idx} className="mb-3">
+                  <label className="text-xs text-gray-600">{result.filename}</label>
+                  <textarea
+                    value={result.text}
+                    onChange={(e) => {
+                      const updated = [...ocrResults];
+                      updated[idx].text = e.target.value;
+                      setOcrResults(updated);
+                    }}
+                    className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CONFIG TAB */}
+      {activeSubTab === 'config' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">Translation Configuration</h2>
+
+          {/* Claude API Key */}
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <label className="block text-xs font-medium text-gray-700 mb-1">🔑 Claude API Key</label>
+            <div className="flex space-x-2">
+              <input
+                type="password"
+                value={claudeApiKey}
+                onChange={(e) => setClaudeApiKey(e.target.value)}
+                placeholder="sk-ant-api03-..."
+                className="flex-1 px-2 py-1.5 text-xs border rounded"
+              />
+              <button
+                onClick={saveApiKey}
+                className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-1">Required for translation. Get yours at console.anthropic.com</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
+              <select
+                value={sourceLanguage}
+                onChange={(e) => setSourceLanguage(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+              >
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
+              <select
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+              >
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
+            <input
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value)}
+              className="w-full px-2 py-1.5 text-xs border rounded"
+              placeholder="e.g., Birth Certificate, Diploma, Contract"
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
+            <input
+              value={orderNumber}
+              onChange={(e) => setOrderNumber(e.target.value)}
+              className="w-full px-2 py-1.5 text-xs border rounded"
+              placeholder="e.g., P6312"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
+              <select
+                value={selectedTranslator}
+                onChange={(e) => setSelectedTranslator(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+              >
+                {TRANSLATORS.map(t => (
+                  <option key={t.name} value={t.name}>{t.name} - {t.title}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+              <input
+                value={translationDate}
+                onChange={(e) => setTranslationDate(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RESULTS TAB */}
+      {activeSubTab === 'results' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">Translation Results</h2>
+
+          {translationResults.length > 0 ? (
+            <>
+              {/* Document selector */}
+              {translationResults.length > 1 && (
+                <div className="mb-3">
+                  <label className="text-xs text-gray-600 mr-2">Document:</label>
+                  <select
+                    value={selectedResultIndex}
+                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
+                    className="px-2 py-1 text-xs border rounded"
+                  >
+                    {translationResults.map((r, idx) => (
+                      <option key={idx} value={idx}>{r.filename}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Side by side view */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    📄 Original ({sourceLanguage})
+                  </label>
+                  <textarea
+                    ref={originalTextRef}
+                    value={translationResults[selectedResultIndex]?.originalText || ''}
+                    readOnly
+                    onScroll={() => handleScroll('original')}
+                    className="w-full h-64 p-2 text-xs font-mono border rounded bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    🌐 Translation ({targetLanguage}) - Editable
+                  </label>
+                  <textarea
+                    ref={translatedTextRef}
+                    value={translationResults[selectedResultIndex]?.translatedText || ''}
+                    onChange={(e) => handleTranslationEdit(e.target.value)}
+                    onScroll={() => handleScroll('translated')}
+                    className="w-full h-64 p-2 text-xs font-mono border rounded"
+                  />
+                </div>
+              </div>
+
+              {/* Correction Command */}
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  📝 Send Correction Command to Claude
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={correctionCommand}
+                    onChange={(e) => setCorrectionCommand(e.target.value)}
+                    placeholder='e.g., "Change certificate to diploma" or "Fix formatting"'
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  />
+                  <button
+                    onClick={handleApplyCorrection}
+                    disabled={!correctionCommand.trim() || applyingCorrection}
+                    className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
+                  >
+                    {applyingCorrection ? '⏳' : '✨ Apply'}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleDownload}
+                className="w-full py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                📥 Download Certificate (HTML)
+              </button>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📄</div>
+              <p className="text-xs">No translations yet. Upload and translate documents first.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== PROJECTS PAGE ====================
 const ProjectsPage = ({ adminKey }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -205,9 +813,7 @@ const ProjectsPage = ({ adminKey }) => {
 
   const updateStatus = async (orderId, newStatus) => {
     try {
-      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
-        translation_status: newStatus
-      });
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, { translation_status: newStatus });
       fetchOrders();
     } catch (err) {
       console.error('Failed to update:', err);
@@ -232,7 +838,6 @@ const ProjectsPage = ({ adminKey }) => {
     }
   };
 
-  // Filter orders
   const filtered = orders.filter(o => {
     const matchSearch =
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -242,45 +847,25 @@ const ProjectsPage = ({ adminKey }) => {
     return matchSearch && matchStatus;
   });
 
-  // Calculate totals
   const totalReceive = filtered.reduce((sum, o) => sum + (o.total_price || 0), 0);
   const totalPaid = filtered.filter(o => o.payment_status === 'paid').reduce((sum, o) => sum + (o.total_price || 0), 0);
   const totalPending = filtered.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + (o.total_price || 0), 0);
 
-  // Status to Protemos-style
   const getStatusLabel = (status) => {
-    const labels = {
-      'received': 'Quote',
-      'in_translation': 'In progress',
-      'review': 'Client Review',
-      'ready': 'Completed',
-      'delivered': 'Delivered'
-    };
+    const labels = { 'received': 'Quote', 'in_translation': 'In progress', 'review': 'Client Review', 'ready': 'Completed', 'delivered': 'Delivered' };
     return labels[status] || status;
   };
 
   if (loading) {
-    return (
-      <div className="p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-      </div>
-    );
+    return <div className="p-4 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div></div>;
   }
 
   return (
     <div className="p-4">
-      {/* Financial Stats */}
       <div className="grid grid-cols-4 gap-3 mb-4">
         <div className="bg-white rounded shadow p-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
-              <div className="text-xl font-bold text-gray-800">{orders.length}</div>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <span>📋</span>
-            </div>
-          </div>
+          <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
+          <div className="text-xl font-bold text-gray-800">{orders.length}</div>
         </div>
         <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
           <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
@@ -291,257 +876,112 @@ const ProjectsPage = ({ adminKey }) => {
           <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
         </div>
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
-          <div className="text-[10px] uppercase opacity-80">Pending Payment</div>
+          <div className="text-[10px] uppercase opacity-80">Pending</div>
           <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
         </div>
       </div>
 
-      {/* Header */}
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
           <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
           <div className="flex space-x-1">
             {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
               </button>
             ))}
           </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <SearchBar value={search} onChange={setSearch} />
-          <button className="px-3 py-1.5 border text-xs rounded hover:bg-gray-50">
-            Export to Excel
-          </button>
-        </div>
+        <SearchBar value={search} onChange={setSearch} />
       </div>
 
-      <p className="text-xs text-gray-500 mb-2">
-        Showing 1-{filtered.length} of {filtered.length} items.
-      </p>
-
-      {/* Protemos-style Table */}
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-2 py-2 text-left font-medium text-blue-600 cursor-pointer hover:bg-gray-100">Code ↕</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Name</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Client</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Start at</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Deadline at</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Status</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Assigned</th>
-              <th className="px-2 py-2 text-left font-medium text-gray-600">Tags</th>
-              <th className="px-2 py-2 text-right font-medium text-gray-600">Total, USD</th>
-              <th className="px-2 py-2 text-right font-medium text-gray-600">Payment</th>
-              <th className="px-2 py-2 text-center font-medium text-gray-600">Actions</th>
+              <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
+              <th className="px-2 py-2 text-left font-medium">Client</th>
+              <th className="px-2 py-2 text-left font-medium">Start</th>
+              <th className="px-2 py-2 text-left font-medium">Deadline</th>
+              <th className="px-2 py-2 text-left font-medium">Status</th>
+              <th className="px-2 py-2 text-left font-medium">Tags</th>
+              <th className="px-2 py-2 text-right font-medium">Total</th>
+              <th className="px-2 py-2 text-center font-medium">Payment</th>
+              <th className="px-2 py-2 text-center font-medium">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y">
             {filtered.map((order) => {
-              const createdDate = new Date(order.created_at);
-              const now = new Date();
-              const daysAgo = Math.ceil((now - createdDate) / (1000 * 60 * 60 * 24));
-              // Estimate deadline as 5 days after creation
-              const deadline = new Date(createdDate);
-              deadline.setDate(deadline.getDate() + 5);
-              const daysUntil = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-
+              const created = new Date(order.created_at);
+              const deadline = new Date(created); deadline.setDate(deadline.getDate() + 5);
+              const daysUntil = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
               return (
                 <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-2">
-                    <a href="#" className="text-blue-600 hover:underline font-medium">{order.order_number}</a>
+                  <td className="px-2 py-2 font-medium text-blue-600">{order.order_number}</td>
+                  <td className="px-2 py-2">{order.client_name}<span className="text-gray-400 text-[10px] block">{order.client_email}</span></td>
+                  <td className="px-2 py-2 text-gray-500">{created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                  <td className="px-2 py-2">{deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {daysUntil > 0 && order.translation_status !== 'delivered' && <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>in {daysUntil}d</span>}
                   </td>
-                  <td className="px-2 py-2 font-medium max-w-[150px] truncate" title={order.client_name}>
-                    {order.client_name}
-                  </td>
-                  <td className="px-2 py-2">
-                    <a href="#" className="text-blue-600 hover:underline">{order.client_name}</a>
-                    <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
-                  </td>
-                  <td className="px-2 py-2 text-gray-500">
-                    {createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    <span className="text-gray-400 text-[10px] block">{daysAgo}d ago</span>
-                  </td>
-                  <td className="px-2 py-2">
-                    {deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {daysUntil > 0 && order.translation_status !== 'delivered' && (
-                      <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>
-                        in {daysUntil}d
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
-                      {getStatusLabel(order.translation_status)}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2">
-                    {order.assigned_translator || (
-                      <span className="text-gray-400 text-[10px]">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-2 py-2">
-                    <span className="inline-block px-1 py-0.5 bg-gray-100 border rounded text-[10px]">
-                      {order.translation_type === 'certified' ? 'CERT' : 'PROF'}
-                    </span>
-                    <span className="ml-1 text-[10px]">{FLAGS[order.translate_to] || '🌐'}</span>
-                  </td>
-                  <td className="px-2 py-2 text-right font-medium">{order.total_price?.toFixed(2)}</td>
-                  <td className="px-2 py-2 text-right">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>
-                      {order.payment_status}
-                    </span>
-                  </td>
+                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  <td className="px-2 py-2"><span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span><span className="ml-1">{FLAGS[order.translate_to] || '🌐'}</span></td>
+                  <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>
+                  <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>
                   <td className="px-2 py-1 text-center">
                     <div className="flex items-center justify-center space-x-1">
-                      {order.translation_status === 'received' && (
-                        <button
-                          onClick={() => updateStatus(order.id, 'in_translation')}
-                          className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px] hover:bg-yellow-600"
-                          title="Start"
-                        >
-                          ▶
-                        </button>
-                      )}
-                      {order.translation_status === 'in_translation' && (
-                        <button
-                          onClick={() => updateStatus(order.id, 'review')}
-                          className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px] hover:bg-purple-600"
-                          title="Review"
-                        >
-                          👁
-                        </button>
-                      )}
-                      {order.translation_status === 'review' && (
-                        <button
-                          onClick={() => updateStatus(order.id, 'ready')}
-                          className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
-                          title="Complete"
-                        >
-                          ✓
-                        </button>
-                      )}
-                      {order.translation_status === 'ready' && (
-                        <button
-                          onClick={() => deliverOrder(order.id)}
-                          className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px] hover:bg-teal-600"
-                          title="Deliver"
-                        >
-                          📤
-                        </button>
-                      )}
-                      {order.payment_status === 'pending' && (
-                        <button
-                          onClick={() => markPaid(order.id)}
-                          className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
-                          title="Mark Paid"
-                        >
-                          $
-                        </button>
-                      )}
+                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]">▶</button>}
+                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]">👁</button>}
+                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>}
+                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]">📤</button>}
+                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]">$</button>}
                     </div>
                   </td>
                 </tr>
               );
             })}
           </tbody>
-          <tfoot className="bg-gray-50 border-t font-medium">
-            <tr>
-              <td colSpan="8" className="px-2 py-2 text-right text-gray-600">Totals:</td>
-              <td className="px-2 py-2 text-right font-bold">{totalReceive.toFixed(2)}</td>
-              <td colSpan="2" className="px-2 py-2 text-right text-green-600">
-                Paid: ${totalPaid.toFixed(2)}
-              </td>
-            </tr>
-          </tfoot>
         </table>
-
-        {filtered.length === 0 && (
-          <div className="p-8 text-center text-gray-500 text-sm">
-            No projects found
-          </div>
-        )}
+        {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
       </div>
     </div>
   );
 };
 
-// ==================== TRANSLATORS PAGE (Compact) ====================
+// ==================== TRANSLATORS PAGE ====================
 const TranslatorsPage = ({ adminKey }) => {
-  const [translators, setTranslators] = useState([]);
+  const [translators, setTranslators] = useState([
+    { id: '1', name: 'Yasmin Costa', email: 'yasmin@legacy.com', languages: 'PT-BR, EN, ES', specialization: 'Legal, Certificates', status: 'available', orders: 89 },
+    { id: '2', name: 'Noemi Santos', email: 'noemi@legacy.com', languages: 'PT-BR, EN', specialization: 'Certificates', status: 'busy', orders: 67 },
+    { id: '3', name: 'Ana Clara', email: 'anaclara@legacy.com', languages: 'PT-BR, EN, FR', specialization: 'Legal, Technical', status: 'available', orders: 45 },
+    { id: '4', name: 'Maria Silva', email: 'maria@legacy.com', languages: 'PT-BR, EN', specialization: 'Medical', status: 'available', orders: 32 },
+  ]);
   const [search, setSearch] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
-  const [newTranslator, setNewTranslator] = useState({ name: '', email: '', languages: '', specialization: '' });
 
-  useEffect(() => {
-    // Mock translators - in real app, fetch from API
-    setTranslators([
-      { id: '1', name: 'Yasmin Costa', email: 'yasmin@legacy.com', languages: 'PT-BR, EN, ES', specialization: 'Legal, Certificates', status: 'available', orders: 89 },
-      { id: '2', name: 'Noemi Santos', email: 'noemi@legacy.com', languages: 'PT-BR, EN', specialization: 'Certificates', status: 'busy', orders: 67 },
-      { id: '3', name: 'Ana Clara', email: 'anaclara@legacy.com', languages: 'PT-BR, EN, FR', specialization: 'Legal, Technical', status: 'available', orders: 45 },
-      { id: '4', name: 'Maria Silva', email: 'maria@legacy.com', languages: 'PT-BR, EN', specialization: 'Medical', status: 'available', orders: 32 },
-    ]);
-  }, []);
-
-  const filtered = translators.filter(t =>
-    t.name?.toLowerCase().includes(search.toLowerCase()) ||
-    t.email?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const addTranslator = () => {
-    setTranslators([...translators, { ...newTranslator, id: Date.now().toString(), status: 'available', orders: 0 }]);
-    setShowAdd(false);
-    setNewTranslator({ name: '', email: '', languages: '', specialization: '' });
-  };
+  const filtered = translators.filter(t => t.name?.toLowerCase().includes(search.toLowerCase()) || t.email?.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="p-4">
-      {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-lg font-bold text-blue-600">TRANSLATORS</h1>
-        <div className="flex items-center space-x-2">
-          <SearchBar value={search} onChange={setSearch} />
-          <button
-            onClick={() => setShowAdd(true)}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-          >
-            + Add Translator
-          </button>
-        </div>
+        <SearchBar value={search} onChange={setSearch} />
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         <div className="bg-white rounded shadow p-3 flex items-center">
           <div className="w-2 h-10 bg-blue-500 rounded mr-3"></div>
-          <div>
-            <div className="text-xl font-bold">{translators.length}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Total</div>
-          </div>
+          <div><div className="text-xl font-bold">{translators.length}</div><div className="text-[10px] text-gray-500 uppercase">Total</div></div>
         </div>
         <div className="bg-white rounded shadow p-3 flex items-center">
           <div className="w-2 h-10 bg-green-500 rounded mr-3"></div>
-          <div>
-            <div className="text-xl font-bold">{translators.filter(t => t.status === 'available').length}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Available</div>
-          </div>
+          <div><div className="text-xl font-bold">{translators.filter(t => t.status === 'available').length}</div><div className="text-[10px] text-gray-500 uppercase">Available</div></div>
         </div>
         <div className="bg-white rounded shadow p-3 flex items-center">
           <div className="w-2 h-10 bg-yellow-500 rounded mr-3"></div>
-          <div>
-            <div className="text-xl font-bold">{translators.filter(t => t.status === 'busy').length}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Busy</div>
-          </div>
+          <div><div className="text-xl font-bold">{translators.filter(t => t.status === 'busy').length}</div><div className="text-[10px] text-gray-500 uppercase">Busy</div></div>
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b">
@@ -552,7 +992,6 @@ const TranslatorsPage = ({ adminKey }) => {
               <th className="px-3 py-2 text-left font-medium">Specialization</th>
               <th className="px-3 py-2 text-center font-medium">Status</th>
               <th className="px-3 py-2 text-right font-medium">Orders</th>
-              <th className="px-3 py-2 text-center font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -563,155 +1002,36 @@ const TranslatorsPage = ({ adminKey }) => {
                 <td className="px-3 py-2">{t.languages}</td>
                 <td className="px-3 py-2">{t.specialization}</td>
                 <td className="px-3 py-2 text-center">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {t.status}
-                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{t.status}</span>
                 </td>
                 <td className="px-3 py-2 text-right">{t.orders}</td>
-                <td className="px-3 py-2 text-center">
-                  <button className="text-blue-600 hover:underline text-[10px] mr-2">Edit</button>
-                  <button className="text-red-600 hover:underline text-[10px]">Remove</button>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* Add Modal */}
-      {showAdd && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-xl w-full max-w-sm p-4">
-            <h2 className="text-sm font-bold mb-3">Add New Translator</h2>
-            <div className="space-y-2">
-              <input
-                type="text"
-                placeholder="Name"
-                className="w-full px-2 py-1.5 text-xs border rounded"
-                value={newTranslator.name}
-                onChange={(e) => setNewTranslator({...newTranslator, name: e.target.value})}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                className="w-full px-2 py-1.5 text-xs border rounded"
-                value={newTranslator.email}
-                onChange={(e) => setNewTranslator({...newTranslator, email: e.target.value})}
-              />
-              <input
-                type="text"
-                placeholder="Languages (e.g., PT-BR, EN)"
-                className="w-full px-2 py-1.5 text-xs border rounded"
-                value={newTranslator.languages}
-                onChange={(e) => setNewTranslator({...newTranslator, languages: e.target.value})}
-              />
-              <input
-                type="text"
-                placeholder="Specialization"
-                className="w-full px-2 py-1.5 text-xs border rounded"
-                value={newTranslator.specialization}
-                onChange={(e) => setNewTranslator({...newTranslator, specialization: e.target.value})}
-              />
-            </div>
-            <div className="flex space-x-2 mt-4">
-              <button
-                onClick={() => setShowAdd(false)}
-                className="flex-1 py-1.5 bg-gray-100 text-gray-700 rounded text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addTranslator}
-                className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-// ==================== SETTINGS PAGE (Compact) ====================
+// ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
   return (
     <div className="p-4">
       <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold text-gray-800 mb-3">API Configuration</h2>
           <div className="space-y-2 text-xs">
-            <div>
-              <label className="block text-gray-500 mb-1">Backend URL</label>
-              <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly />
-            </div>
-            <div>
-              <label className="block text-gray-500 mb-1">Admin Key</label>
-              <input type="password" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={adminKey} readOnly />
-            </div>
+            <div><label className="block text-gray-500 mb-1">Backend URL</label><input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly /></div>
+            <div><label className="block text-gray-500 mb-1">Admin Key</label><input type="password" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={adminKey} readOnly /></div>
           </div>
         </div>
-
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold text-gray-800 mb-3">Pricing</h2>
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
-              <span>Certified Translation</span>
-              <span className="font-bold text-teal-600">$24.99/page</span>
-            </div>
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
-              <span>Professional Translation</span>
-              <span className="font-bold text-teal-600">$19.50/page</span>
-            </div>
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
-              <span>Priority Fee</span>
-              <span className="font-bold text-orange-600">+25%</span>
-            </div>
-            <div className="flex justify-between p-2 bg-gray-50 rounded">
-              <span>Urgent Fee</span>
-              <span className="font-bold text-red-600">+100%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">Integrations</h2>
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-              <div className="flex items-center">
-                <span className="mr-2">💳</span>
-                <span>Stripe</span>
-              </div>
-              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Connected</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-              <div className="flex items-center">
-                <span className="mr-2">📧</span>
-                <span>SendGrid</span>
-              </div>
-              <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Connected</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">External Tools</h2>
-          <div className="space-y-2 text-xs">
-            <a
-              href={TRANSLATION_PROGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-2 bg-blue-50 rounded hover:bg-blue-100"
-            >
-              <div className="flex items-center">
-                <span className="mr-2">✍️</span>
-                <span>Translation Program</span>
-              </div>
-              <span className="text-blue-600">Open ↗</span>
-            </a>
+            <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Certified Translation</span><span className="font-bold text-teal-600">$24.99/page</span></div>
+            <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Professional Translation</span><span className="font-bold text-teal-600">$19.50/page</span></div>
           </div>
         </div>
       </div>
@@ -741,27 +1061,20 @@ function AdminApp() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'projects':
-        return <ProjectsPage adminKey={adminKey} />;
-      case 'translators':
-        return <TranslatorsPage adminKey={adminKey} />;
-      case 'settings':
-        return <SettingsPage adminKey={adminKey} />;
-      default:
-        return <ProjectsPage adminKey={adminKey} />;
+      case 'projects': return <ProjectsPage adminKey={adminKey} />;
+      case 'translation': return <TranslationWorkspace adminKey={adminKey} />;
+      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
+      case 'settings': return <SettingsPage adminKey={adminKey} />;
+      default: return <ProjectsPage adminKey={adminKey} />;
     }
   };
 
-  if (!adminKey) {
-    return <AdminLogin onLogin={handleLogin} />;
-  }
+  if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
-      <div className="flex-1 overflow-auto">
-        {renderContent()}
-      </div>
+      <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );
 }
