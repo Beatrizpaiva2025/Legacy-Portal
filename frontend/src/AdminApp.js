@@ -683,10 +683,9 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
     </div>`;
 
-    // Translation pages HTML (with "Translation" header)
+    // Translation pages HTML (starts directly with translated text)
     const translationPagesHTML = translationResults.map((result) => `
     <div class="translation-page">
-        <div class="page-header">Translation</div>
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
