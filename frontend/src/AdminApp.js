@@ -208,6 +208,11 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [correctionCommand, setCorrectionCommand] = useState('');
   const [applyingCorrection, setApplyingCorrection] = useState(false);
 
+  // Send to Projects state
+  const [availableOrders, setAvailableOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [sendingToProjects, setSendingToProjects] = useState(false);
+
   // Resources state
   const [instructions, setInstructions] = useState([]);
   const [glossaries, setGlossaries] = useState([]);
@@ -257,6 +262,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     if (savedTranslationType) setTranslationType(savedTranslationType);
 
     fetchResources();
+    fetchAvailableOrders();
   }, []);
 
   // Fetch resources from backend
@@ -270,6 +276,76 @@ const TranslationWorkspace = ({ adminKey }) => {
       setGlossaries(glossRes.data.glossaries || []);
     } catch (err) {
       console.error('Failed to fetch resources:', err);
+    }
+  };
+
+  // Fetch available orders for sending translation
+  const fetchAvailableOrders = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      // Filter orders that are in translation or review status
+      const orders = response.data.orders || [];
+      const available = orders.filter(o =>
+        ['received', 'in_translation', 'review'].includes(o.translation_status)
+      );
+      setAvailableOrders(available);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    }
+  };
+
+  // Send translation to Projects
+  const sendToProjects = async () => {
+    if (!selectedOrderId) {
+      alert('Please select an order to link this translation');
+      return;
+    }
+
+    if (translationResults.length === 0) {
+      alert('No translation to send');
+      return;
+    }
+
+    setSendingToProjects(true);
+    try {
+      // Generate the HTML content
+      const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+      const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+
+      // Build translation HTML (simplified for storage)
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+
+      // Send to backend
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+        translation_html: translationHTML,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
+        translator_name: translator?.name || selectedTranslator,
+        translation_date: translationDate,
+        include_cover: includeCover,
+        page_format: pageFormat,
+        translation_type: translationType,
+        original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
+        logo_left: logoLeft,
+        logo_right: logoRight,
+        logo_stamp: logoStamp
+      });
+
+      if (response.data.success) {
+        setProcessingStatus('✅ Translation sent to Projects! Ready for review.');
+        setSelectedOrderId('');
+        // Refresh orders list
+        fetchAvailableOrders();
+      } else {
+        throw new Error(response.data.error || 'Failed to send');
+      }
+    } catch (error) {
+      console.error('Error sending to projects:', error);
+      setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setSendingToProjects(false);
     }
   };
 
@@ -1580,6 +1656,36 @@ const TranslationWorkspace = ({ adminKey }) => {
                 <p className="text-[10px] text-gray-500 mt-2">
                   Order: {includeCover ? 'Cover Letter → ' : ''}Translation → Original Document(s)
                 </p>
+              </div>
+
+              {/* Send to Projects */}
+              <div className="p-3 bg-green-50 border border-green-200 rounded">
+                <h3 className="text-xs font-bold text-green-700 mb-2">📤 Send to Projects</h3>
+                <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
+                <div className="flex space-x-2">
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => setSelectedOrderId(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option value="">-- Select Order --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_number} - {order.client_name} ({order.translation_status})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={sendToProjects}
+                    disabled={!selectedOrderId || sendingToProjects}
+                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                  </button>
+                </div>
+                {availableOrders.length === 0 && (
+                  <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
+                )}
               </div>
             </>
           ) : (
