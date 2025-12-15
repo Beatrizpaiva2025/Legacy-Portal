@@ -512,75 +512,375 @@ const TranslationWorkspace = ({ adminKey }) => {
     <meta charset="UTF-8">
     <title>Certification of Translation Accuracy</title>
     <style>
-        @page { size: Letter; margin: 0.75in 1in; }
-        body { font-family: 'Times New Roman', serif; font-size: 14px; line-height: 1.6; color: #333; }
-        .header { display: flex; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0; margin-bottom: 30px; }
-        .header-center { flex: 1; text-align: center; }
-        .company-name { font-size: 18px; font-weight: bold; }
-        .company-address { font-size: 11px; line-height: 1.4; }
-        .order-number { text-align: right; margin-bottom: 30px; }
-        .main-title { text-align: center; font-size: 28px; margin-bottom: 40px; }
-        .subtitle { text-align: center; font-size: 16px; margin-bottom: 40px; line-height: 1.8; }
-        .body-text { text-align: justify; margin-bottom: 20px; line-height: 1.8; }
-        .footer-section { margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .translation-page { page-break-before: always; margin-top: 30px; }
-        .translation-content { white-space: pre-wrap; line-height: 1.8; }
+        @page { size: Letter; margin: 0.6in 0.75in; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            padding: 40px 50px;
+        }
+
+        /* Header with logos */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+
+        .logo-left {
+            width: 120px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-left img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Placeholder for editable logo */
+        .logo-placeholder {
+            width: 120px;
+            height: 50px;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+            background: #fafafa;
+        }
+
+        .header-center {
+            text-align: center;
+            flex: 1;
+            padding: 0 20px;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 2px;
+        }
+
+        .company-address {
+            font-size: 10px;
+            line-height: 1.4;
+            color: #333;
+        }
+
+        .logo-right {
+            width: 70px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .logo-right img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .ata-placeholder {
+            text-align: right;
+            font-size: 9px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .ata-placeholder .ata-logo {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            font-size: 14px;
+            color: #1a365d;
+        }
+
+        .ata-member {
+            font-size: 9px;
+            color: #666;
+        }
+
+        /* Order number */
+        .order-number {
+            text-align: right;
+            margin-bottom: 30px;
+            font-size: 13px;
+        }
+
+        /* Main title */
+        .main-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: normal;
+            margin-bottom: 25px;
+            color: #1a365d;
+        }
+
+        /* Subtitle */
+        .subtitle {
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 35px;
+            line-height: 1.6;
+        }
+
+        /* Body text */
+        .body-text {
+            text-align: justify;
+            margin-bottom: 18px;
+            line-height: 1.7;
+            font-size: 13px;
+        }
+
+        .body-text:last-of-type {
+            margin-bottom: 50px;
+        }
+
+        /* Footer with signature and stamp */
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 40px;
+        }
+
+        .signature-block {
+            line-height: 1.4;
+        }
+
+        .signature-name {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .signature-title {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .signature-date {
+            font-size: 13px;
+        }
+
+        /* Circular stamp */
+        .stamp-container {
+            width: 140px;
+            height: 140px;
+            position: relative;
+        }
+
+        .stamp {
+            width: 140px;
+            height: 140px;
+            border: 3px solid #2563eb;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+        }
+
+        .stamp::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            bottom: 8px;
+            border: 1px solid #2563eb;
+            border-radius: 50%;
+        }
+
+        .stamp-text-top {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            font-weight: bold;
+            color: #2563eb;
+            letter-spacing: 2px;
+        }
+
+        .stamp-center {
+            text-align: center;
+            padding: 0 15px;
+        }
+
+        .stamp-company {
+            font-size: 11px;
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 2px;
+        }
+
+        .stamp-ata {
+            font-size: 9px;
+            color: #2563eb;
+        }
+
+        .stamp-text-bottom {
+            position: absolute;
+            bottom: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            color: #2563eb;
+            letter-spacing: 1px;
+        }
+
+        /* Decorative dots around stamp */
+        .stamp-dots {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .stamp-dot {
+            width: 4px;
+            height: 4px;
+            background: #2563eb;
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        /* Translation pages */
+        .translation-page {
+            page-break-before: always;
+            margin-top: 30px;
+        }
+
+        .translation-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .translation-content {
+            white-space: pre-wrap;
+            line-height: 1.8;
+            font-size: 12px;
+        }
+
+        /* Print styles */
+        @media print {
+            body { padding: 0; }
+            .logo-placeholder { border: 1px dashed #ccc; }
+        }
     </style>
 </head>
 <body>
+    <!-- HEADER WITH LOGOS -->
     <div class="header">
-        <div style="width: 150px;"></div>
+        <!-- Left Logo (Editable - can be replaced with partner logo) -->
+        <div class="logo-left">
+            <!-- Replace src with your logo URL or base64 -->
+            <div class="logo-placeholder" contenteditable="true" title="Click to add logo">
+                <span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span>
+            </div>
+        </div>
+
+        <!-- Center - Company Info -->
         <div class="header-center">
             <div class="company-name">Legacy Translations</div>
             <div class="company-address">
-                867 Boylston Street 5th Floor #2073 Boston, MA 02116<br>
-                (857) 316-7770 | contact@legacytranslations.com<br>
-                ATA Member # 275993
+                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                (857) 316-7770 · contact@legacytranslations.com
             </div>
         </div>
-        <div style="width: 100px;"></div>
+
+        <!-- Right Logo (ATA Member) -->
+        <div class="logo-right">
+            <div class="ata-placeholder">
+                <div class="ata-logo">ata</div>
+                <div class="ata-member">Member # 275993</div>
+            </div>
+        </div>
     </div>
 
-    <div class="order-number">Order # <strong>${orderNumber || 'N/A'}</strong></div>
+    <!-- ORDER NUMBER -->
+    <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
 
+    <!-- MAIN TITLE -->
     <h1 class="main-title">Certification of Translation Accuracy</h1>
 
+    <!-- SUBTITLE -->
     <div class="subtitle">
-        Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to <strong>${targetLanguage}</strong>
+        Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+        <strong>${targetLanguage}</strong>
     </div>
 
+    <!-- BODY TEXT -->
     <p class="body-text">
-        We, Legacy Translations, a professional translation services company and ATA Member (#275993),
-        having no relation to the client, hereby certify that the annexed <strong>${targetLanguage}</strong>
-        translation of the <strong>${sourceLanguage}</strong> document, executed by us, is to the best
-        of our knowledge and belief, a true and accurate translation of the original document, likewise
-        annexed hereunto.
+        We, Legacy Translations, a professional translation services company and ATA
+        Member (#275993), having no relation to the client, hereby certify that the
+        annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
+        executed by us, is to the best of our knowledge and belief, a true and accurate
+        translation of the original document, likewise annexed hereunto.
     </p>
 
     <p class="body-text">
-        This is to certify the correctness of the translation only. We do not guarantee that the original
-        is a genuine document, or that the statements contained in the original document are true.
+        This is to certify the correctness of the translation only. We do not guarantee
+        that the original is a genuine document, or that the statements contained in the
+        original document are true. Further, Legacy Translations assumes no liability for
+        the way in which the translation is used by the customer or any third party,
+        including end-users of the translation.
     </p>
 
-    <p class="body-text">A copy of the translation is attached to this certification.</p>
+    <p class="body-text">
+        A copy of the translation, and original files presented, are attached to this
+        certification.
+    </p>
 
+    <!-- FOOTER WITH SIGNATURE AND STAMP -->
     <div class="footer-section">
-        <div>
-            <div style="font-weight: bold;">${translator?.name || 'Beatriz Paiva'}</div>
-            <div style="font-weight: bold;">${translator?.title || 'Managing Director'}</div>
-            <div>Dated: ${translationDate}</div>
+        <!-- Signature Block -->
+        <div class="signature-block">
+            <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
+            <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+            <div class="signature-date">Dated: ${translationDate}</div>
         </div>
-        <div style="text-align: center;">
-            <div style="font-size: 12px; color: #666;">[ Official Seal ]</div>
+
+        <!-- Circular Stamp -->
+        <div class="stamp-container">
+            <div class="stamp">
+                <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+                <div class="stamp-center">
+                    <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                    <div class="stamp-ata">ATA # 275993</div>
+                </div>
+            </div>
+            <!-- Decorative dots -->
+            <svg class="stamp-dots" viewBox="0 0 140 140">
+                ${Array.from({length: 24}, (_, i) => {
+                  const angle = (i * 15) * Math.PI / 180;
+                  const x = 70 + 62 * Math.cos(angle);
+                  const y = 70 + 62 * Math.sin(angle);
+                  return \`<circle cx="\${x}" cy="\${y}" r="2" fill="#2563eb" opacity="0.6"/>\`;
+                }).join('')}
+            </svg>
         </div>
     </div>
 
-    ${translationResults.map((result, index) => `
+    <!-- TRANSLATION PAGES -->
+    ${translationResults.map((result, index) => \`
     <div class="translation-page">
-        <h2 style="font-size: 18px; margin-bottom: 20px;">Translation - ${result.filename}</h2>
-        <div class="translation-content">${result.translatedText}</div>
+        <div class="translation-header">Translation - \${result.filename}</div>
+        <div class="translation-content">\${result.translatedText}</div>
     </div>
-    `).join('')}
+    \`).join('')}
 </body>
 </html>`;
 
