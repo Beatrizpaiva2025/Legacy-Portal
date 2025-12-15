@@ -1751,6 +1751,58 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
 
     return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
 
+class TranslationData(BaseModel):
+    translation_html: str
+    source_language: str
+    target_language: str
+    document_type: str
+    translator_name: str
+    translation_date: str
+    include_cover: bool = True
+    page_format: str = "letter"
+    translation_type: str = "certified"
+    original_images: List[dict] = []
+    logo_left: Optional[str] = None
+    logo_right: Optional[str] = None
+    logo_stamp: Optional[str] = None
+
+@api_router.post("/admin/orders/{order_id}/translation")
+async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
+    """Save translation from workspace to an order (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find the order
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Update order with translation data
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "translation_html": data.translation_html,
+            "translation_source_language": data.source_language,
+            "translation_target_language": data.target_language,
+            "translation_document_type": data.document_type,
+            "translation_translator_name": data.translator_name,
+            "translation_date": data.translation_date,
+            "translation_include_cover": data.include_cover,
+            "translation_page_format": data.page_format,
+            "translation_type_setting": data.translation_type,
+            "translation_original_images": data.original_images,
+            "translation_logo_left": data.logo_left,
+            "translation_logo_right": data.logo_right,
+            "translation_logo_stamp": data.logo_stamp,
+            "translation_status": "review",  # Move to review status
+            "translation_ready": True,
+            "translation_ready_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    logger.info(f"Translation saved for order {order_id}, moved to review status")
+    return {"success": True, "message": "Translation saved and sent to review"}
+
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str):
     """Mark order as delivered and send translation to client (admin only)"""
@@ -2080,6 +2132,8 @@ class TranslateRequest(BaseModel):
     claude_api_key: str
     action: str  # 'translate' or correction commands
     current_translation: Optional[str] = None
+    general_instructions: Optional[str] = None  # Additional user instructions
+    preserve_layout: Optional[bool] = True  # Maintain original document layout
 
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
@@ -2220,6 +2274,19 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     try:
         # Build the prompt based on action
         if request.action == 'translate':
+            # Build additional instructions
+            additional_instructions = ""
+            if request.general_instructions:
+                additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
+
+            layout_instruction = ""
+            if request.preserve_layout:
+                layout_instruction = """
+7. CRITICAL: Preserve the EXACT layout and formatting of the original document
+8. Maintain all spacing, indentation, line breaks, and visual structure
+9. Keep tables, columns, and aligned text in the same format
+10. Reproduce the document structure exactly as it appears in the original"""
+
             system_prompt = f"""You are a professional translator specializing in {request.document_type} documents.
 Translate the following text from {request.source_language} to {request.target_language}.
 
@@ -2229,7 +2296,7 @@ IMPORTANT INSTRUCTIONS:
 3. Preserve any dates, numbers, names, and proper nouns accurately
 4. If there are any stamps, seals, or signatures mentioned, indicate them in brackets
 5. Do NOT add any explanations or notes - only provide the translation
-6. Maintain paragraph structure and spacing as in the original"""
+6. Maintain paragraph structure and spacing as in the original{layout_instruction}{additional_instructions}"""
 
             user_message = f"Please translate the following {request.document_type} document:\n\n{request.text}"
 

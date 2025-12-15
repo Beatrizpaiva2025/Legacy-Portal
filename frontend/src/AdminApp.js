@@ -198,10 +198,20 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
   const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
   const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
+  const [translationType, setTranslationType] = useState('certified'); // 'certified' or 'sworn'
+  const [generalInstructions, setGeneralInstructions] = useState('');
+  const [includeCover, setIncludeCover] = useState(true);
+  const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
   // Correction state
   const [correctionCommand, setCorrectionCommand] = useState('');
   const [applyingCorrection, setApplyingCorrection] = useState(false);
+
+  // Send to Projects state
+  const [availableOrders, setAvailableOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [sendingToProjects, setSendingToProjects] = useState(false);
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -228,7 +238,7 @@ const TranslationWorkspace = ({ adminKey }) => {
   const originalTextRef = useRef(null);
   const translatedTextRef = useRef(null);
 
-  // Load saved API key, logos and resources
+  // Load saved API key, logos, instructions and resources
   useEffect(() => {
     const savedKey = localStorage.getItem('claude_api_key');
     if (savedKey) setClaudeApiKey(savedKey);
@@ -241,7 +251,18 @@ const TranslationWorkspace = ({ adminKey }) => {
     if (savedLogoRight) setLogoRight(savedLogoRight);
     if (savedLogoStamp) setLogoStamp(savedLogoStamp);
 
+    // Load saved general instructions
+    const savedInstructions = localStorage.getItem('general_instructions');
+    if (savedInstructions) setGeneralInstructions(savedInstructions);
+
+    // Load saved page format and translation type
+    const savedPageFormat = localStorage.getItem('page_format');
+    const savedTranslationType = localStorage.getItem('translation_type');
+    if (savedPageFormat) setPageFormat(savedPageFormat);
+    if (savedTranslationType) setTranslationType(savedTranslationType);
+
     fetchResources();
+    fetchAvailableOrders();
   }, []);
 
   // Fetch resources from backend
@@ -258,10 +279,98 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
   };
 
+  // Fetch available orders for sending translation
+  const fetchAvailableOrders = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      // Filter orders that are in translation or review status
+      const orders = response.data.orders || [];
+      const available = orders.filter(o =>
+        ['received', 'in_translation', 'review'].includes(o.translation_status)
+      );
+      setAvailableOrders(available);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    }
+  };
+
+  // Send translation to Projects
+  const sendToProjects = async () => {
+    if (!selectedOrderId) {
+      alert('Please select an order to link this translation');
+      return;
+    }
+
+    if (translationResults.length === 0) {
+      alert('No translation to send');
+      return;
+    }
+
+    setSendingToProjects(true);
+    try {
+      // Generate the HTML content
+      const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+      const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+
+      // Build translation HTML (simplified for storage)
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+
+      // Send to backend
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+        translation_html: translationHTML,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
+        translator_name: translator?.name || selectedTranslator,
+        translation_date: translationDate,
+        include_cover: includeCover,
+        page_format: pageFormat,
+        translation_type: translationType,
+        original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
+        logo_left: logoLeft,
+        logo_right: logoRight,
+        logo_stamp: logoStamp
+      });
+
+      if (response.data.success) {
+        setProcessingStatus('✅ Translation sent to Projects! Ready for review.');
+        setSelectedOrderId('');
+        // Refresh orders list
+        fetchAvailableOrders();
+      } else {
+        throw new Error(response.data.error || 'Failed to send');
+      }
+    } catch (error) {
+      console.error('Error sending to projects:', error);
+      setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setSendingToProjects(false);
+    }
+  };
+
   // Save API key
   const saveApiKey = () => {
     localStorage.setItem('claude_api_key', claudeApiKey);
     setProcessingStatus('✅ API Key saved!');
+  };
+
+  // Save general instructions
+  const saveGeneralInstructions = () => {
+    localStorage.setItem('general_instructions', generalInstructions);
+    setProcessingStatus('✅ General instructions saved!');
+  };
+
+  // Save page format
+  const savePageFormat = (format) => {
+    setPageFormat(format);
+    localStorage.setItem('page_format', format);
+  };
+
+  // Save translation type
+  const saveTranslationType = (type) => {
+    setTranslationType(type);
+    localStorage.setItem('translation_type', type);
   };
 
   // Handle logo upload
@@ -403,6 +512,16 @@ const TranslationWorkspace = ({ adminKey }) => {
     setOcrResults([]);
     setTranslationResults([]);
     setProcessingStatus('');
+
+    // Save original images as base64 for later use in certificate
+    const imagePromises = selectedFiles.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ filename: file.name, data: reader.result });
+        reader.readAsDataURL(file);
+      });
+    });
+    Promise.all(imagePromises).then(images => setOriginalImages(images));
   };
 
   // Convert file to base64
@@ -488,7 +607,9 @@ const TranslationWorkspace = ({ adminKey }) => {
           target_language: targetLanguage,
           document_type: documentType,
           claude_api_key: claudeApiKey,
-          action: 'translate'
+          action: 'translate',
+          general_instructions: generalInstructions,
+          preserve_layout: true
         });
 
         if (response.data.success) {
@@ -558,16 +679,113 @@ const TranslationWorkspace = ({ adminKey }) => {
   };
 
   // Download certificate
-  const handleDownload = () => {
+  const handleDownload = (format = 'html') => {
     const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+
+    // Cover Letter HTML
+    const coverLetterHTML = `
+    <!-- COVER LETTER PAGE -->
+    <div class="cover-page">
+        <!-- HEADER WITH LOGOS -->
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder" contenteditable="true" title="Click to add logo">
+                    <span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span>
+                </div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
+                    <span>ata<br/>Member #275993</span>
+                </div>`}
+            </div>
+        </div>
+
+        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        <h1 class="main-title">${certTitle}</h1>
+        <div class="subtitle">
+            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+            <strong>${targetLanguage}</strong>
+        </div>
+
+        <p class="body-text">
+            We, Legacy Translations, a professional translation services company and ATA
+            Member (#275993), having no relation to the client, hereby certify that the
+            annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
+            executed by us, is to the best of our knowledge and belief, a true and accurate
+            translation of the original document, likewise annexed hereunto.
+        </p>
+        <p class="body-text">
+            This is to certify the correctness of the translation only. We do not guarantee
+            that the original is a genuine document, or that the statements contained in the
+            original document are true. Further, Legacy Translations assumes no liability for
+            the way in which the translation is used by the customer or any third party,
+            including end-users of the translation.
+        </p>
+        <p class="body-text">
+            A copy of the translation, and original files presented, are attached to this
+            certification.
+        </p>
+
+        <div class="footer-section">
+            <div class="signature-block">
+                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-date">Dated: ${translationDate}</div>
+            </div>
+            <div class="stamp-container">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
+                  : `<div class="stamp">
+                    <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+                    <div class="stamp-center">
+                        <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                        <div class="stamp-ata">ATA # 275993</div>
+                    </div>
+                </div>`}
+            </div>
+        </div>
+    </div>`;
+
+    // Translation pages HTML (starts directly with translated text)
+    const translationPagesHTML = translationResults.map((result) => `
+    <div class="translation-page">
+        <div class="translation-content">${result.translatedText}</div>
+    </div>
+    `).join('');
+
+    // Original documents pages HTML (last page with header and image below)
+    const originalPagesHTML = originalImages.length > 0 ? `
+    <div class="original-documents-page">
+        <div class="page-header">Original Document</div>
+        <div class="original-images-wrapper">
+            ${originalImages.map(img => `
+            <div class="original-image-container">
+                <img src="${img.data}" alt="${img.filename}" class="original-image" />
+            </div>
+            `).join('')}
+        </div>
+    </div>` : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Certification of Translation Accuracy</title>
+    <title>${certTitle}</title>
     <style>
-        @page { size: Letter; margin: 0.6in 0.75in; }
+        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Times New Roman', Georgia, serif;
@@ -576,8 +794,6 @@ const TranslationWorkspace = ({ adminKey }) => {
             color: #333;
             padding: 40px 50px;
         }
-
-        /* Header with logos */
         .header {
             display: flex;
             justify-content: space-between;
@@ -585,343 +801,86 @@ const TranslationWorkspace = ({ adminKey }) => {
             margin-bottom: 20px;
             padding-bottom: 10px;
         }
-
-        .logo-left {
-            width: 120px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-        }
-
-        .logo-left img {
-            max-width: 100%;
-            max-height: 100%;
-        }
-
-        /* Placeholder for editable logo */
+        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left img { max-width: 100%; max-height: 100%; }
         .logo-placeholder {
-            width: 120px;
-            height: 50px;
-            border: 1px dashed #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            color: #999;
-            background: #fafafa;
+            width: 120px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #999; background: #fafafa;
         }
-
-        .header-center {
-            text-align: center;
-            flex: 1;
-            padding: 0 20px;
-        }
-
-        .company-name {
-            font-size: 16px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 2px;
-        }
-
-        .company-address {
-            font-size: 10px;
-            line-height: 1.4;
-            color: #333;
-        }
-
-        .logo-right {
-            width: 80px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-        }
-
-        .logo-right img {
-            max-width: 100%;
-            max-height: 100%;
-        }
-
-        /* Editable placeholder for ATA logo */
+        .header-center { text-align: center; flex: 1; padding: 0 20px; }
+        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
+        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .logo-right img { max-width: 100%; max-height: 100%; }
         .logo-placeholder-right {
-            width: 80px;
-            height: 50px;
-            border: 1px dashed #ccc;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 9px;
-            color: #1a365d;
-            background: #fafafa;
-            text-align: center;
-            font-style: italic;
+            width: 80px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
         }
-
-        /* Order number */
-        .order-number {
-            text-align: right;
-            margin-bottom: 30px;
-            font-size: 13px;
-        }
-
-        /* Main title */
-        .main-title {
-            text-align: center;
-            font-size: 28px;
-            font-weight: normal;
-            margin-bottom: 25px;
-            color: #1a365d;
-        }
-
-        /* Subtitle */
-        .subtitle {
-            text-align: center;
-            font-size: 14px;
-            margin-bottom: 35px;
-            line-height: 1.6;
-        }
-
-        /* Body text */
-        .body-text {
-            text-align: justify;
-            margin-bottom: 18px;
-            line-height: 1.7;
-            font-size: 13px;
-        }
-
-        .body-text:last-of-type {
-            margin-bottom: 50px;
-        }
-
-        /* Footer with signature and stamp */
-        .footer-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 40px;
-        }
-
-        .signature-block {
-            line-height: 1.4;
-        }
-
-        .signature-name {
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        .signature-title {
-            font-weight: bold;
-            font-size: 13px;
-        }
-
-        .signature-date {
-            font-size: 13px;
-        }
-
-        /* Circular stamp */
-        .stamp-container {
-            width: 140px;
-            height: 140px;
-            position: relative;
-        }
-
+        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
+        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
+        .body-text:last-of-type { margin-bottom: 50px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+        .signature-block { line-height: 1.4; }
+        .signature-name { font-weight: bold; font-size: 14px; }
+        .signature-title { font-weight: bold; font-size: 13px; }
+        .signature-date { font-size: 13px; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
         .stamp {
-            width: 140px;
-            height: 140px;
-            border: 3px solid #2563eb;
-            border-radius: 50%;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
-
         .stamp::before {
-            content: '';
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            right: 8px;
-            bottom: 8px;
-            border: 1px solid #2563eb;
-            border-radius: 50%;
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
         }
-
         .stamp-text-top {
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 9px;
-            font-weight: bold;
-            color: #2563eb;
-            letter-spacing: 2px;
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
         }
-
-        .stamp-center {
-            text-align: center;
-            padding: 0 15px;
-        }
-
-        .stamp-company {
-            font-size: 11px;
-            font-weight: bold;
-            color: #2563eb;
-            margin-bottom: 2px;
-        }
-
-        .stamp-ata {
-            font-size: 9px;
-            color: #2563eb;
-        }
-
-        .stamp-text-bottom {
-            position: absolute;
-            bottom: 18px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 8px;
-            color: #2563eb;
-            letter-spacing: 1px;
-        }
-
-        /* Translation pages */
-        .translation-page {
-            page-break-before: always;
-            margin-top: 30px;
-        }
-
-        .translation-header {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .translation-content {
-            white-space: pre-wrap;
-            line-height: 1.8;
-            font-size: 12px;
-        }
-
-        /* Print styles */
-        @media print {
-            body { padding: 0; }
-            .logo-placeholder { border: 1px dashed #ccc; }
-        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
+        .translation-page { page-break-before: always; padding-top: 20px; }
+        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .translation-content { white-space: pre-wrap; line-height: 1.8; font-size: 12px; }
+        .original-documents-page { page-break-before: always; padding-top: 20px; }
+        .original-images-wrapper { margin-top: 20px; }
+        .original-image-container { text-align: center; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
+        @media print { body { padding: 0; } .logo-placeholder { border: 1px dashed #ccc; } }
     </style>
 </head>
 <body>
-    <!-- HEADER WITH LOGOS -->
-    <div class="header">
-        <!-- Left Logo (Partner Logo) -->
-        <div class="logo-left">
-            ${logoLeft
-              ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
-              : `<div class="logo-placeholder" contenteditable="true" title="Click to add logo">
-                <span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span>
-            </div>`}
-        </div>
-
-        <!-- Center - Company Info -->
-        <div class="header-center">
-            <div class="company-name">Legacy Translations</div>
-            <div class="company-address">
-                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                (857) 316-7770 · contact@legacytranslations.com
-            </div>
-        </div>
-
-        <!-- Right Logo (ATA Member) -->
-        <div class="logo-right">
-            ${logoRight
-              ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
-              : `<div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
-                <span>ata<br/>Member #275993</span>
-            </div>`}
-        </div>
-    </div>
-
-    <!-- ORDER NUMBER -->
-    <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
-
-    <!-- MAIN TITLE -->
-    <h1 class="main-title">Certification of Translation Accuracy</h1>
-
-    <!-- SUBTITLE -->
-    <div class="subtitle">
-        Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
-        <strong>${targetLanguage}</strong>
-    </div>
-
-    <!-- BODY TEXT -->
-    <p class="body-text">
-        We, Legacy Translations, a professional translation services company and ATA
-        Member (#275993), having no relation to the client, hereby certify that the
-        annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
-        executed by us, is to the best of our knowledge and belief, a true and accurate
-        translation of the original document, likewise annexed hereunto.
-    </p>
-
-    <p class="body-text">
-        This is to certify the correctness of the translation only. We do not guarantee
-        that the original is a genuine document, or that the statements contained in the
-        original document are true. Further, Legacy Translations assumes no liability for
-        the way in which the translation is used by the customer or any third party,
-        including end-users of the translation.
-    </p>
-
-    <p class="body-text">
-        A copy of the translation, and original files presented, are attached to this
-        certification.
-    </p>
-
-    <!-- FOOTER WITH SIGNATURE AND STAMP -->
-    <div class="footer-section">
-        <!-- Signature Block -->
-        <div class="signature-block">
-            <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-            <div class="signature-title">${translator?.title || 'Managing Director'}</div>
-            <div class="signature-date">Dated: ${translationDate}</div>
-        </div>
-
-        <!-- Circular Stamp -->
-        <div class="stamp-container">
-            ${logoStamp
-              ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
-              : `<div class="stamp">
-                <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
-                <div class="stamp-center">
-                    <div class="stamp-company">LEGACY TRANSLATIONS</div>
-                    <div class="stamp-ata">ATA # 275993</div>
-                </div>
-            </div>`}
-        </div>
-    </div>
-
-    <!-- TRANSLATION PAGES -->
-    ${translationResults.map((result, index) => \`
-    <div class="translation-page">
-        <div class="translation-header">Translation - \${result.filename}</div>
-        <div class="translation-content">\${result.translatedText}</div>
-    </div>
-    \`).join('')}
+    ${includeCover ? coverLetterHTML : ''}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
 </body>
 </html>`;
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `certification_${orderNumber || 'translation'}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (format === 'pdf') {
+      // Open in new window for PDF printing
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } else {
+      // Download as HTML
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${translationType === 'sworn' ? 'sworn' : 'certified'}_translation_${orderNumber || 'document'}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
@@ -1426,6 +1385,58 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
           </div>
 
+          {/* Translation Type and Page Format */}
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+            <h3 className="text-xs font-bold text-green-700 mb-3">📄 Page Format</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
+                <select
+                  value={translationType}
+                  onChange={(e) => saveTranslationType(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="certified">Certified Translation</option>
+                  <option value="sworn">Sworn Translation</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
+                <select
+                  value={pageFormat}
+                  onChange={(e) => savePageFormat(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
+                  <option value="a4">A4 (210mm x 297mm) - International</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">
+              {translationType === 'sworn' ? 'Sworn Translation (Tradução Juramentada) - A4 format' : 'Certified Translation - Letter format'}
+            </p>
+          </div>
+
+          {/* General Instructions */}
+          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
+            <label className="block text-xs font-bold text-purple-700 mb-2">📝 General Translation Instructions</label>
+            <textarea
+              value={generalInstructions}
+              onChange={(e) => setGeneralInstructions(e.target.value)}
+              placeholder="Enter general instructions for the translator (e.g., maintain formal tone, preserve formatting, specific terminology to use...)"
+              className="w-full h-24 px-2 py-1.5 text-xs border rounded resize-none"
+            />
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-[10px] text-gray-500">These instructions will be used in all translations.</p>
+              <button
+                onClick={saveGeneralInstructions}
+                className="px-3 py-1 bg-purple-500 text-white text-[10px] rounded hover:bg-purple-600"
+              >
+                Save Instructions
+              </button>
+            </div>
+          </div>
+
           {/* Certificate Logos Section */}
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
             <h3 className="text-sm font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
@@ -1544,7 +1555,7 @@ const TranslationWorkspace = ({ adminKey }) => {
       {/* RESULTS TAB */}
       {activeSubTab === 'results' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">Translation Results</h2>
+          <h2 className="text-sm font-bold mb-2">Translation Review & Approval</h2>
 
           {translationResults.length > 0 ? (
             <>
@@ -1564,31 +1575,30 @@ const TranslationWorkspace = ({ adminKey }) => {
                 </div>
               )}
 
-              {/* Side by side view */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    📄 Original ({sourceLanguage})
-                  </label>
-                  <textarea
-                    ref={originalTextRef}
-                    value={translationResults[selectedResultIndex]?.originalText || ''}
-                    readOnly
-                    onScroll={() => handleScroll('original')}
-                    className="w-full h-64 p-2 text-xs font-mono border rounded bg-gray-50"
-                  />
+              {/* Side by side view with synchronized scroll */}
+              <div className="border rounded mb-4">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r">
+                    <span className="text-xs font-bold text-gray-700">📄 Original ({sourceLanguage})</span>
+                  </div>
+                  <div className="px-3 py-2">
+                    <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage}) - Editable</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    🌐 Translation ({targetLanguage}) - Editable
-                  </label>
-                  <textarea
-                    ref={translatedTextRef}
-                    value={translationResults[selectedResultIndex]?.translatedText || ''}
-                    onChange={(e) => handleTranslationEdit(e.target.value)}
-                    onScroll={() => handleScroll('translated')}
-                    className="w-full h-64 p-2 text-xs font-mono border rounded"
-                  />
+                <div className="grid grid-cols-2 gap-0 h-80 overflow-hidden">
+                  <div className="border-r overflow-auto" ref={originalTextRef} onScroll={() => handleScroll('original')}>
+                    <pre className="p-3 text-xs font-mono whitespace-pre-wrap bg-gray-50 min-h-full" style={{fontWeight: 'bold'}}>
+                      {translationResults[selectedResultIndex]?.originalText || ''}
+                    </pre>
+                  </div>
+                  <div className="overflow-auto" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                    <textarea
+                      value={translationResults[selectedResultIndex]?.translatedText || ''}
+                      onChange={(e) => handleTranslationEdit(e.target.value)}
+                      className="w-full min-h-full p-3 text-xs font-mono border-0 resize-none focus:outline-none focus:ring-0"
+                      style={{minHeight: '320px'}}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1615,12 +1625,68 @@ const TranslationWorkspace = ({ adminKey }) => {
                 </div>
               </div>
 
-              <button
-                onClick={handleDownload}
-                className="w-full py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-              >
-                📥 Download Certificate (HTML)
-              </button>
+              {/* Download Options */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-xs font-bold text-blue-700 mb-2">📥 Download Options</h3>
+                <div className="flex items-center space-x-4 mb-3">
+                  <label className="flex items-center text-xs">
+                    <input
+                      type="checkbox"
+                      checked={includeCover}
+                      onChange={(e) => setIncludeCover(e.target.checked)}
+                      className="mr-2"
+                    />
+                    Include Cover Letter
+                  </label>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleDownload('html')}
+                    className="flex-1 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    📄 Download HTML
+                  </button>
+                  <button
+                    onClick={() => handleDownload('pdf')}
+                    className="flex-1 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                  >
+                    📑 Download PDF
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  Order: {includeCover ? 'Cover Letter → ' : ''}Translation → Original Document(s)
+                </p>
+              </div>
+
+              {/* Send to Projects */}
+              <div className="p-3 bg-green-50 border border-green-200 rounded">
+                <h3 className="text-xs font-bold text-green-700 mb-2">📤 Send to Projects</h3>
+                <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
+                <div className="flex space-x-2">
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => setSelectedOrderId(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option value="">-- Select Order --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_number} - {order.client_name} ({order.translation_status})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={sendToProjects}
+                    disabled={!selectedOrderId || sendingToProjects}
+                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                  </button>
+                </div>
+                {availableOrders.length === 0 && (
+                  <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
+                )}
+              </div>
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">
