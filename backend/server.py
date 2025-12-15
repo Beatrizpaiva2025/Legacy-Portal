@@ -2080,6 +2080,8 @@ class TranslateRequest(BaseModel):
     claude_api_key: str
     action: str  # 'translate' or correction commands
     current_translation: Optional[str] = None
+    general_instructions: Optional[str] = None  # Additional user instructions
+    preserve_layout: Optional[bool] = True  # Maintain original document layout
 
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
@@ -2220,6 +2222,19 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     try:
         # Build the prompt based on action
         if request.action == 'translate':
+            # Build additional instructions
+            additional_instructions = ""
+            if request.general_instructions:
+                additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
+
+            layout_instruction = ""
+            if request.preserve_layout:
+                layout_instruction = """
+7. CRITICAL: Preserve the EXACT layout and formatting of the original document
+8. Maintain all spacing, indentation, line breaks, and visual structure
+9. Keep tables, columns, and aligned text in the same format
+10. Reproduce the document structure exactly as it appears in the original"""
+
             system_prompt = f"""You are a professional translator specializing in {request.document_type} documents.
 Translate the following text from {request.source_language} to {request.target_language}.
 
@@ -2229,7 +2244,7 @@ IMPORTANT INSTRUCTIONS:
 3. Preserve any dates, numbers, names, and proper nouns accurately
 4. If there are any stamps, seals, or signatures mentioned, indicate them in brackets
 5. Do NOT add any explanations or notes - only provide the translation
-6. Maintain paragraph structure and spacing as in the original"""
+6. Maintain paragraph structure and spacing as in the original{layout_instruction}{additional_instructions}"""
 
             user_message = f"Please translate the following {request.document_type} document:\n\n{request.text}"
 
