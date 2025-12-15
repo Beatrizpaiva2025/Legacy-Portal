@@ -2302,6 +2302,172 @@ Follow the user's instructions to modify or improve the translation."""
         raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
 
 
+# ==================== TRANSLATION RESOURCES ENDPOINTS ====================
+
+class TranslationInstructionCreate(BaseModel):
+    sourceLang: str
+    targetLang: str
+    title: str
+    content: str
+
+class GlossaryTerm(BaseModel):
+    id: Optional[int] = None
+    source: str
+    target: str
+    notes: Optional[str] = ""
+
+class GlossaryCreate(BaseModel):
+    name: str
+    language: str
+    field: str
+    terms: List[GlossaryTerm] = []
+
+# Translation Instructions CRUD
+@api_router.get("/admin/translation-instructions")
+async def get_translation_instructions(admin_key: str):
+    """Get all translation instructions"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    instructions = await db.translation_instructions.find().sort("created_at", -1).to_list(100)
+    for instr in instructions:
+        if '_id' in instr:
+            del instr['_id']
+        if instr.get("created_at"):
+            instr["created_at"] = instr["created_at"].isoformat()
+
+    return {"instructions": instructions}
+
+
+@api_router.post("/admin/translation-instructions")
+async def create_translation_instruction(data: TranslationInstructionCreate, admin_key: str):
+    """Create a new translation instruction"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    instruction = {
+        "id": str(uuid.uuid4()),
+        "sourceLang": data.sourceLang,
+        "targetLang": data.targetLang,
+        "title": data.title,
+        "content": data.content,
+        "created_at": datetime.utcnow()
+    }
+
+    await db.translation_instructions.insert_one(instruction)
+
+    return {"status": "success", "instruction": instruction}
+
+
+@api_router.put("/admin/translation-instructions/{instruction_id}")
+async def update_translation_instruction(instruction_id: str, data: TranslationInstructionCreate, admin_key: str):
+    """Update a translation instruction"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translation_instructions.update_one(
+        {"id": instruction_id},
+        {"$set": {
+            "sourceLang": data.sourceLang,
+            "targetLang": data.targetLang,
+            "title": data.title,
+            "content": data.content
+        }}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Instruction not found")
+
+    return {"status": "success"}
+
+
+@api_router.delete("/admin/translation-instructions/{instruction_id}")
+async def delete_translation_instruction(instruction_id: str, admin_key: str):
+    """Delete a translation instruction"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translation_instructions.delete_one({"id": instruction_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Instruction not found")
+
+    return {"status": "success"}
+
+
+# Glossaries CRUD
+@api_router.get("/admin/glossaries")
+async def get_glossaries(admin_key: str):
+    """Get all glossaries"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    glossaries = await db.glossaries.find().sort("created_at", -1).to_list(100)
+    for gloss in glossaries:
+        if '_id' in gloss:
+            del gloss['_id']
+        if gloss.get("created_at"):
+            gloss["created_at"] = gloss["created_at"].isoformat()
+
+    return {"glossaries": glossaries}
+
+
+@api_router.post("/admin/glossaries")
+async def create_glossary(data: GlossaryCreate, admin_key: str):
+    """Create a new glossary"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    glossary = {
+        "id": str(uuid.uuid4()),
+        "name": data.name,
+        "language": data.language,
+        "field": data.field,
+        "terms": [t.dict() for t in data.terms],
+        "created_at": datetime.utcnow()
+    }
+
+    await db.glossaries.insert_one(glossary)
+
+    return {"status": "success", "glossary": glossary}
+
+
+@api_router.put("/admin/glossaries/{glossary_id}")
+async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str):
+    """Update a glossary"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.glossaries.update_one(
+        {"id": glossary_id},
+        {"$set": {
+            "name": data.name,
+            "language": data.language,
+            "field": data.field,
+            "terms": [t.dict() for t in data.terms]
+        }}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Glossary not found")
+
+    return {"status": "success"}
+
+
+@api_router.delete("/admin/glossaries/{glossary_id}")
+async def delete_glossary(glossary_id: str, admin_key: str):
+    """Delete a glossary"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.glossaries.delete_one({"id": glossary_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Glossary not found")
+
+    return {"status": "success"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
