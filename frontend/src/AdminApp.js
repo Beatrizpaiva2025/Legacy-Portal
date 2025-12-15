@@ -119,7 +119,6 @@ const AdminLogin = ({ onLogin }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
     { id: 'projects', label: 'Projects', icon: '📋' },
-    { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
@@ -151,6 +150,18 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <span>{item.label}</span>
           </button>
         ))}
+
+        {/* Translation Tool - External Link */}
+        <a
+          href="/admin/translation-tool"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700"
+        >
+          <span className="mr-2">✍️</span>
+          <span>Translation Tool</span>
+          <span className="ml-auto text-[10px]">↗</span>
+        </a>
       </nav>
 
       <div className="p-2 border-t border-slate-700">
@@ -1932,21 +1943,108 @@ const SettingsPage = ({ adminKey }) => {
     <div className="p-4">
       <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
       <div className="grid grid-cols-2 gap-4">
+        {/* API Configuration */}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold text-gray-800 mb-3">API Configuration</h2>
           <div className="space-y-2 text-xs">
-            <div><label className="block text-gray-500 mb-1">Backend URL</label><input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly /></div>
-            <div><label className="block text-gray-500 mb-1">Admin Key</label><input type="password" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={adminKey} readOnly /></div>
+            <div>
+              <label className="block text-gray-500 mb-1">Backend URL</label>
+              <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly />
+            </div>
+            <div>
+              <label className="block text-gray-500 mb-1">Admin Key</label>
+              <input type="password" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={adminKey} readOnly />
+            </div>
           </div>
         </div>
+
+        {/* Pricing */}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold text-gray-800 mb-3">Pricing</h2>
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Certified Translation</span><span className="font-bold text-teal-600">$24.99/page</span></div>
-            <div className="flex justify-between p-2 bg-gray-50 rounded"><span>Professional Translation</span><span className="font-bold text-teal-600">$19.50/page</span></div>
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
+              <span>Certified Translation</span>
+              <span className="font-bold text-teal-600">$24.99/page</span>
+            </div>
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
+              <span>Professional Translation</span>
+              <span className="font-bold text-teal-600">$19.50/page</span>
+            </div>
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
+              <span>Priority Fee</span>
+              <span className="font-bold text-teal-600">+25%</span>
+            </div>
+            <div className="flex justify-between p-2 bg-gray-50 rounded">
+              <span>Urgent Fee</span>
+              <span className="font-bold text-red-500">+100%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Integrations */}
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">Integrations</h2>
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center">
+                <span className="mr-2">💳</span>
+                <span>Stripe</span>
+              </div>
+              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center">
+                <span className="mr-2">📧</span>
+                <span>SendGrid</span>
+              </div>
+              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+            </div>
+          </div>
+        </div>
+
+        {/* External Tools */}
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">External Tools</h2>
+          <div className="space-y-2 text-xs">
+            <a
+              href="/admin/translation-tool"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center">
+                <span className="mr-2">✍️</span>
+                <span>Translation Program</span>
+              </div>
+              <span className="text-orange-500 text-[10px] font-medium">Open ↗</span>
+            </a>
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ==================== TRANSLATION TOOL PAGE (Standalone) ====================
+const TranslationToolPage = ({ adminKey, onLogout }) => {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">✍️</div>
+          <div>
+            <div className="font-bold text-sm">Translation Tool</div>
+            <div className="text-[10px] text-slate-400">Legacy Translations</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-3">
+          <a href="/admin" className="text-xs text-slate-300 hover:text-white">← Back to Admin</a>
+          <button onClick={onLogout} className="text-xs text-red-400 hover:text-red-300">Logout</button>
+        </div>
+      </div>
+      {/* Translation Workspace */}
+      <TranslationWorkspace adminKey={adminKey} />
     </div>
   );
 };
@@ -1955,6 +2053,9 @@ const SettingsPage = ({ adminKey }) => {
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
   const [activeTab, setActiveTab] = useState('projects');
+
+  // Get current path
+  const isTranslationTool = window.location.pathname.includes('/admin/translation-tool');
 
   useEffect(() => {
     const savedKey = localStorage.getItem('admin_key');
@@ -1969,12 +2070,12 @@ function AdminApp() {
   const handleLogout = () => {
     setAdminKey(null);
     localStorage.removeItem('admin_key');
+    window.location.href = '/admin';
   };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'projects': return <ProjectsPage adminKey={adminKey} />;
-      case 'translation': return <TranslationWorkspace adminKey={adminKey} />;
       case 'translators': return <TranslatorsPage adminKey={adminKey} />;
       case 'settings': return <SettingsPage adminKey={adminKey} />;
       default: return <ProjectsPage adminKey={adminKey} />;
@@ -1982,6 +2083,11 @@ function AdminApp() {
   };
 
   if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
+
+  // If translation-tool route, render standalone page
+  if (isTranslationTool) {
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
