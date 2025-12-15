@@ -13,6 +13,8 @@ services:
         sync: false
       - key: DB_NAME
         value: legacy_translations
+      - key: ADMIN_KEY
+        value: legacy_admin_2024
       - key: CORS_ORIGINS
         value: "*"
       - key: SENDGRID_API_KEY
