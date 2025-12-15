@@ -576,7 +576,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         }
 
         .logo-right {
-            width: 70px;
+            width: 80px;
             height: 50px;
             display: flex;
             align-items: center;
@@ -588,23 +588,19 @@ const TranslationWorkspace = ({ adminKey }) => {
             max-height: 100%;
         }
 
-        .ata-placeholder {
-            text-align: right;
+        /* Editable placeholder for ATA logo */
+        .logo-placeholder-right {
+            width: 80px;
+            height: 50px;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 9px;
-            color: #666;
-            font-style: italic;
-        }
-
-        .ata-placeholder .ata-logo {
-            font-family: 'Times New Roman', serif;
-            font-style: italic;
-            font-size: 14px;
             color: #1a365d;
-        }
-
-        .ata-member {
-            font-size: 9px;
-            color: #666;
+            background: #fafafa;
+            text-align: center;
+            font-style: italic;
         }
 
         /* Order number */
@@ -784,11 +780,11 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
         </div>
 
-        <!-- Right Logo (ATA Member) -->
+        <!-- Right Logo (ATA Member - Editable) -->
         <div class="logo-right">
-            <div class="ata-placeholder">
-                <div class="ata-logo">ata</div>
-                <div class="ata-member">Member # 275993</div>
+            <!-- Replace with your ATA logo image or edit text -->
+            <div class="logo-placeholder-right" contenteditable="true" title="Click to add ATA logo">
+                <span>ata<br/>Member #275993</span>
             </div>
         </div>
     </div>
