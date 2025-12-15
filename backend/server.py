@@ -356,6 +356,7 @@ class DocumentUploadResponse(BaseModel):
     word_count: int
     file_size: int
     message: str
+    document_id: Optional[str] = None
 
 # Payment Models
 class PaymentTransaction(BaseModel):
@@ -459,6 +460,7 @@ class TranslationOrderCreate(BaseModel):
     reference: Optional[str] = None
     notes: Optional[str] = None
     document_filename: Optional[str] = None
+    document_ids: Optional[List[str]] = None  # IDs of uploaded documents
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -829,34 +831,58 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 @api_router.post("/upload-document", response_model=DocumentUploadResponse)
-async def upload_document(file: UploadFile = File(...)):
-    """Upload and process document for word count extraction"""
-    
+async def upload_document(file: UploadFile = File(...), token: Optional[str] = None):
+    """Upload and process document for word count extraction - also stores the document"""
+
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
-    
+
     # Check file size (limit to 10MB)
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB.")
-    
+
     # Reset file pointer
     await file.seek(0)
-    
+
     try:
         # Extract text from file
         extracted_text = await extract_text_from_file(file)
-        
+
         # Count words
         word_count = count_words(extracted_text)
-        
+
+        # Get partner_id if token provided
+        partner_id = None
+        if token:
+            partner = await db.partners.find_one({"token": token})
+            if partner:
+                partner_id = partner["id"]
+
+        # Store document in MongoDB
+        document_id = str(uuid.uuid4())
+        document_data = {
+            "id": document_id,
+            "filename": file.filename,
+            "content_type": file.content_type or "application/octet-stream",
+            "file_data": base64.b64encode(content).decode('utf-8'),
+            "file_size": len(content),
+            "word_count": word_count,
+            "extracted_text": extracted_text[:10000] if extracted_text else "",  # Store first 10k chars
+            "partner_id": partner_id,
+            "order_id": None,  # Will be updated when order is created
+            "created_at": datetime.utcnow()
+        }
+        await db.documents.insert_one(document_data)
+
         return DocumentUploadResponse(
             filename=file.filename,
             word_count=word_count,
             file_size=len(content),
-            message=f"Successfully extracted {word_count} words from {file.filename}"
+            message=f"Successfully extracted {word_count} words from {file.filename}",
+            document_id=document_id
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1425,6 +1451,13 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
         await db.translation_orders.insert_one(order.dict())
 
+        # Associate uploaded documents with this order
+        if order_data.document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": order_data.document_ids}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
         # Send to Protemos
         try:
             protemos_data = {
@@ -1909,6 +1942,127 @@ async def get_unread_count(token: str):
 
     count = await db.messages.count_documents({"partner_id": partner["id"], "read": False})
     return {"unread_count": count}
+
+
+# ==================== DOCUMENTS ENDPOINTS ====================
+
+@api_router.get("/documents")
+async def get_partner_documents(token: str):
+    """Get all documents uploaded by the partner"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    documents = await db.documents.find(
+        {"partner_id": partner["id"]}
+    ).sort("created_at", -1).to_list(100)
+
+    # Remove file_data from response (too large)
+    for doc in documents:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("file_data", None)
+        doc.pop("extracted_text", None)
+        if doc.get("created_at"):
+            doc["created_at"] = doc["created_at"].isoformat()
+
+    return {"documents": documents}
+
+
+@api_router.get("/documents/{document_id}")
+async def get_document(document_id: str, token: str):
+    """Get a specific document (without file data)"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    document = await db.documents.find_one({"id": document_id, "partner_id": partner["id"]})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    document["_id"] = str(document["_id"])
+    document.pop("file_data", None)  # Don't send file data in this endpoint
+    if document.get("created_at"):
+        document["created_at"] = document["created_at"].isoformat()
+
+    return document
+
+
+@api_router.get("/documents/{document_id}/download")
+async def download_document(document_id: str, token: str):
+    """Download a document file"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    document = await db.documents.find_one({"id": document_id, "partner_id": partner["id"]})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "filename": document["filename"],
+        "content_type": document["content_type"],
+        "file_data": document["file_data"]  # Base64 encoded
+    }
+
+
+@api_router.get("/orders/{order_id}/documents")
+async def get_order_documents(order_id: str, token: str):
+    """Get all documents for a specific order"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Verify order belongs to partner
+    order = await db.translation_orders.find_one({"id": order_id, "partner_id": partner["id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    documents = await db.documents.find({"order_id": order_id}).to_list(50)
+
+    for doc in documents:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("file_data", None)
+        doc.pop("extracted_text", None)
+        if doc.get("created_at"):
+            doc["created_at"] = doc["created_at"].isoformat()
+
+    return {"documents": documents}
+
+
+@api_router.get("/admin/documents")
+async def admin_get_documents(admin_key: str, order_id: Optional[str] = None):
+    """Admin: Get documents, optionally filtered by order"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {"order_id": order_id} if order_id else {}
+    documents = await db.documents.find(query).sort("created_at", -1).to_list(100)
+
+    for doc in documents:
+        doc["_id"] = str(doc["_id"])
+        doc.pop("file_data", None)  # Don't send in list
+        if doc.get("created_at"):
+            doc["created_at"] = doc["created_at"].isoformat()
+
+    return {"documents": documents}
+
+
+@api_router.get("/admin/documents/{document_id}/download")
+async def admin_download_document(document_id: str, admin_key: str):
+    """Admin: Download a document file"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    document = await db.documents.find_one({"id": document_id})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "filename": document["filename"],
+        "content_type": document["content_type"],
+        "file_data": document["file_data"],
+        "extracted_text": document.get("extracted_text", "")
+    }
 
 
 # Include the router in the main app

@@ -301,18 +301,22 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
         const formDataUpload = new FormData();
         formDataUpload.append('file', file);
 
-        const response = await axios.post(`${API}/upload-document`, formDataUpload, {
+        const response = await axios.post(`${API}/upload-document?token=${token}`, formDataUpload, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 120000 // 2 minute timeout for OCR processing
         });
 
         if (response.data?.word_count) {
           newWords += response.data.word_count;
-          newFiles.push({ fileName: file.name, wordCount: response.data.word_count });
+          newFiles.push({
+            fileName: file.name,
+            wordCount: response.data.word_count,
+            documentId: response.data.document_id
+          });
         }
       }
 
-      // Add new files to existing files (accumulate) - store with word counts
+      // Add new files to existing files (accumulate) - store with word counts and document IDs
       setUploadedFiles(prev => [...prev, ...newFiles]);
       setWordCount(prev => prev + newWords);
       setProcessingStatus('');
@@ -327,7 +331,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       setIsProcessing(false);
       setProcessingStatus('');
     }
-  }, []);
+  }, [token]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -360,7 +364,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
       const orderData = {
         ...formData,
         word_count: wordCount,
-        document_filename: uploadedFiles[0]?.fileName || null
+        document_filename: uploadedFiles[0]?.fileName || null,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
