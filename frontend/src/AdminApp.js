@@ -737,23 +737,6 @@ const TranslationWorkspace = ({ adminKey }) => {
             letter-spacing: 1px;
         }
 
-        /* Decorative dots around stamp */
-        .stamp-dots {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-        }
-
-        .stamp-dot {
-            width: 4px;
-            height: 4px;
-            background: #2563eb;
-            border-radius: 50%;
-            position: absolute;
-        }
-
         /* Translation pages */
         .translation-page {
             page-break-before: always;
@@ -862,15 +845,6 @@ const TranslationWorkspace = ({ adminKey }) => {
                     <div class="stamp-ata">ATA # 275993</div>
                 </div>
             </div>
-            <!-- Decorative dots -->
-            <svg class="stamp-dots" viewBox="0 0 140 140">
-                ${Array.from({length: 24}, (_, i) => {
-                  const angle = (i * 15) * Math.PI / 180;
-                  const x = 70 + 62 * Math.cos(angle);
-                  const y = 70 + 62 * Math.sin(angle);
-                  return \`<circle cx="\${x}" cy="\${y}" r="2" fill="#2563eb" opacity="0.6"/>\`;
-                }).join('')}
-            </svg>
         </div>
     </div>
 
