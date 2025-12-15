@@ -683,23 +683,25 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
     </div>`;
 
-    // Translation pages HTML (without "Translation -" header)
+    // Translation pages HTML (with "Translation" header)
     const translationPagesHTML = translationResults.map((result) => `
     <div class="translation-page">
+        <div class="page-header">Translation</div>
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
 
-    // Original documents pages HTML
+    // Original documents pages HTML (last page with header and image below)
     const originalPagesHTML = originalImages.length > 0 ? `
     <div class="original-documents-page">
-        <div class="original-header">Original Document(s)</div>
-        ${originalImages.map(img => `
-        <div class="original-image-container">
-            <img src="${img.data}" alt="${img.filename}" class="original-image" />
-            <p class="original-filename">${img.filename}</p>
+        <div class="page-header">Original Document</div>
+        <div class="original-images-wrapper">
+            ${originalImages.map(img => `
+            <div class="original-image-container">
+                <img src="${img.data}" alt="${img.filename}" class="original-image" />
+            </div>
+            `).join('')}
         </div>
-        `).join('')}
     </div>` : '';
 
     const htmlContent = `<!DOCTYPE html>
@@ -768,12 +770,12 @@ const TranslationWorkspace = ({ adminKey }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .translation-page { page-break-before: always; padding-top: 20px; }
+        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .translation-content { white-space: pre-wrap; line-height: 1.8; font-size: 12px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
-        .original-header { font-size: 16px; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #ddd; text-align: center; }
-        .original-image-container { margin-bottom: 20px; text-align: center; page-break-inside: avoid; }
-        .original-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; }
-        .original-filename { font-size: 10px; color: #666; margin-top: 5px; }
+        .original-images-wrapper { margin-top: 20px; }
+        .original-image-container { text-align: center; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         @media print { body { padding: 0; } .logo-placeholder { border: 1px dashed #ccc; } }
     </style>
 </head>
