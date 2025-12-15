@@ -1844,22 +1844,59 @@ async def get_partner_messages(token: str):
 
 @api_router.put("/messages/{message_id}/read")
 async def mark_message_read(message_id: str, token: str):
-    """Mark a message as read"""
+    """Mark a message as read and notify admin"""
     # Verify token
     partner = await db.partners.find_one({"token": token})
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Update message
+    # Get the message first
+    message = await db.messages.find_one({"id": message_id, "partner_id": partner["id"]})
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Update message with read timestamp
+    read_at = datetime.utcnow()
     result = await db.messages.update_one(
         {"id": message_id, "partner_id": partner["id"]},
-        {"$set": {"read": True}}
+        {"$set": {"read": True, "read_at": read_at}}
     )
 
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    return {"status": "success"}
+    # Create read receipt for admin
+    read_receipt = {
+        "id": str(uuid.uuid4()),
+        "message_id": message_id,
+        "order_number": message.get("order_number", ""),
+        "partner_id": partner["id"],
+        "partner_name": partner.get("company_name", partner.get("contact_name", "Partner")),
+        "message_title": message.get("title", ""),
+        "read_at": read_at,
+        "created_at": read_at
+    }
+    await db.read_receipts.insert_one(read_receipt)
+
+    return {"status": "success", "read_at": read_at.isoformat()}
+
+
+@api_router.get("/admin/read-receipts")
+async def get_read_receipts(admin_key: str, limit: int = 50):
+    """Get read receipts for admin - shows when partners read messages"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    receipts = await db.read_receipts.find().sort("read_at", -1).limit(limit).to_list(limit)
+
+    for receipt in receipts:
+        receipt["_id"] = str(receipt["_id"])
+        if receipt.get("read_at"):
+            receipt["read_at"] = receipt["read_at"].isoformat()
+        if receipt.get("created_at"):
+            receipt["created_at"] = receipt["created_at"].isoformat()
+
+    return {"receipts": receipts}
 
 
 @api_router.get("/messages/unread-count")

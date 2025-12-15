@@ -172,11 +172,22 @@ const Dashboard = ({ adminKey }) => {
     pending_payment: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
+  const [readReceipts, setReadReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchReadReceipts();
   }, []);
+
+  const fetchReadReceipts = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/read-receipts?admin_key=${adminKey}&limit=10`);
+      setReadReceipts(response.data.receipts || []);
+    } catch (err) {
+      console.error('Failed to fetch read receipts:', err);
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -298,47 +309,80 @@ const Dashboard = ({ adminKey }) => {
         </div>
       </div>
 
-      {/* Recent Orders */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-800">Recent Orders</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Languages</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-teal-600">#{order.order_number}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">{order.client_name}</div>
-                    <div className="text-sm text-gray-500">{order.client_email}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm">
-                      {LANGUAGES[order.translate_from]?.flag} → {LANGUAGES[order.translate_to]?.flag}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${TRANSLATION_STAGES[order.translation_status]?.color}`}>
-                      {TRANSLATION_STAGES[order.translation_status]?.icon} {TRANSLATION_STAGES[order.translation_status]?.name}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-semibold">${order.total_price?.toFixed(2)}</td>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Orders */}
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="p-6 border-b">
+            <h2 className="text-xl font-bold text-gray-800">Recent Orders</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Order</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {recentOrders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-teal-600">#{order.order_number}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{order.client_name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${TRANSLATION_STAGES[order.translation_status]?.color}`}>
+                        {TRANSLATION_STAGES[order.translation_status]?.icon} {TRANSLATION_STAGES[order.translation_status]?.name}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-semibold">${order.total_price?.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Read Receipts - Partner confirmations */}
+        <div className="bg-white rounded-xl shadow-sm">
+          <div className="p-6 border-b">
+            <h2 className="text-xl font-bold text-gray-800">📬 Message Read Confirmations</h2>
+            <p className="text-sm text-gray-500 mt-1">Partners who read delivery notifications</p>
+          </div>
+          <div className="p-4 max-h-80 overflow-y-auto">
+            {readReceipts.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-3xl mb-2">📭</div>
+                <p>No read confirmations yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {readReceipts.map((receipt) => (
+                  <div key={receipt.id} className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white mr-3">
+                      ✓
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-800">{receipt.partner_name}</div>
+                      <div className="text-sm text-gray-600">Read: {receipt.message_title}</div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(receipt.read_at).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
