@@ -193,7 +193,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey }) => {
   // State
-  const [activeSubTab, setActiveSubTab] = useState('upload');
+  const [activeSubTab, setActiveSubTab] = useState('resources');
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
   const [translationResults, setTranslationResults] = useState([]);
@@ -723,8 +723,8 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your Claude API Key in the Config tab');
-      setActiveSubTab('config');
+      alert('Please configure your Claude API Key in the Setup tab');
+      setActiveSubTab('resources');
       return;
     }
 
@@ -759,7 +759,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         }
       }
       setProcessingStatus('✅ Translation completed!');
-      setActiveSubTab('results');
+      setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
       setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
