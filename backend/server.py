@@ -2138,6 +2138,7 @@ class TranslateRequest(BaseModel):
     current_translation: Optional[str] = None
     general_instructions: Optional[str] = None  # Additional user instructions
     preserve_layout: Optional[bool] = True  # Maintain original document layout
+    page_format: Optional[str] = 'letter'  # 'letter' or 'a4'
 
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
@@ -2346,26 +2347,126 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
             if request.general_instructions:
                 additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
 
-            layout_instruction = ""
-            if request.preserve_layout:
-                layout_instruction = """
-7. CRITICAL: Preserve the EXACT layout and formatting of the original document
-8. Maintain all spacing, indentation, line breaks, and visual structure
-9. Keep tables, columns, and aligned text in the same format
-10. Reproduce the document structure exactly as it appears in the original"""
+            # Determine page format
+            page_format = getattr(request, 'page_format', 'letter')
+            if page_format == 'a4':
+                page_size = "A4 (210mm × 297mm)"
+            else:
+                page_size = "Letter (8.5\" × 11\" / 215.9mm × 279.4mm)"
 
-            system_prompt = f"""You are a professional translator specializing in {request.document_type} documents.
-Translate the following text from {request.source_language} to {request.target_language}.
+            system_prompt = f"""You are a CERTIFIED PROFESSIONAL TRANSLATOR specializing in {request.document_type} documents.
+Translate from {request.source_language} to {request.target_language}.
 
-IMPORTANT INSTRUCTIONS:
-1. Maintain the exact formatting, line breaks, and structure of the original document
-2. For {request.document_type} documents, use appropriate formal/legal terminology
-3. Preserve any dates, numbers, names, and proper nouns accurately
-4. If there are any stamps, seals, or signatures mentioned, indicate them in brackets
-5. Do NOT add any explanations or notes - only provide the translation
-6. Maintain paragraph structure and spacing as in the original{layout_instruction}{additional_instructions}"""
+═══════════════════════════════════════════════════════════════════
+                    FUNDAMENTAL PRINCIPLES
+═══════════════════════════════════════════════════════════════════
 
-            user_message = f"Please translate the following {request.document_type} document:\n\n{request.text}"
+🎯 GOLDEN RULE: COMPLETENESS
+✅ TRANSLATE 100% OF THE CONTENT
+❌ ZERO OMISSIONS
+❌ ZERO UNREQUESTED ADDITIONS
+
+═══════════════════════════════════════════════════════════════════
+                    OUTPUT FORMAT - CRITICAL
+═══════════════════════════════════════════════════════════════════
+
+You MUST output ONLY clean, professional HTML ready for PDF conversion.
+
+HTML STRUCTURE REQUIREMENTS:
+1. Start with a complete HTML document structure
+2. Include embedded CSS for professional formatting
+3. Use tables with borders for structured data (birth certificates, invoices, etc.)
+4. Apply print-optimized CSS (@media print)
+5. Target page size: {page_size}
+6. OPTIMIZE TO FIT ONE PAGE
+
+CSS STYLING GUIDELINES:
+- Font: Professional serif (Georgia, Times New Roman) or sans-serif (Arial)
+- Title: 14-16pt, bold, centered
+- Body text: 10-11pt
+- Tables: 8-10pt with visible borders
+- Margins: 15-20mm
+- Line height: 1.3-1.5
+- Table borders: 1px solid black
+- Cell padding: 4-8px
+
+═══════════════════════════════════════════════════════════════════
+                    TRANSLATION RULES
+═══════════════════════════════════════════════════════════════════
+
+ELEMENTS TO TRANSLATE:
+✅ Main text and all headers
+✅ Complete tables with all cells
+✅ Numbers and codes (preserve exactly)
+✅ Marginal texts (all sides)
+✅ Footnotes and captions
+✅ Stamps text with dates
+
+STANDARD NOTATION FOR NON-TEXTUAL ELEMENTS:
+[Coat of Arms of Brazil] - for emblems
+[signature: Name or "illegible"]
+[stamp: text, dated DD/MM/YYYY]
+[seal: description]
+[QR code]
+[handwritten: text or "illegible"]
+
+REGIONAL ADAPTATIONS FOR {request.target_language}:
+- USA dates: MM/DD/YYYY or Month DD, YYYY
+- USA numbers: 8,116.50 (comma for thousands, dot for decimal)
+- Keep metric units (convert only if specifically requested)
+- Use official terminology for destination country
+
+PROPER NAMES:
+- Keep ALL proper names in original form (do not translate names of people, places)
+- Translate titles and descriptions around names
+
+═══════════════════════════════════════════════════════════════════
+                    DOCUMENT-SPECIFIC FORMATTING
+═══════════════════════════════════════════════════════════════════
+
+For BIRTH CERTIFICATES / VITAL RECORDS:
+- Create a formal document header with country name centered
+- Use bordered tables for registration data
+- Format: Registration Number, Date of Birth, Parents, etc. in labeled rows
+- Include official seal/emblem notation at top
+- Bold important names and dates
+
+For INVOICES / COMMERCIAL DOCUMENTS:
+- Preserve exact alphanumeric codes
+- Format currency with proper separators
+- Maintain table structure for line items
+- Include all tax/VAT information
+
+For DIPLOMAS / EDUCATIONAL:
+- Preserve ceremonial/formal tone
+- Apply official equivalencies when applicable
+- Maintain decorative structure
+
+═══════════════════════════════════════════════════════════════════
+                    NEVER INCLUDE
+═══════════════════════════════════════════════════════════════════
+
+❌ Translator's Certificate of Accuracy (prepared separately)
+❌ Usage instructions or explanatory text
+❌ Information about the translation process
+❌ Download buttons or interface elements
+❌ Comments about the translation
+❌ Markdown formatting (use HTML only)
+
+═══════════════════════════════════════════════════════════════════
+                    FINAL OUTPUT
+═══════════════════════════════════════════════════════════════════
+
+Output ONLY the HTML document. Start with <!DOCTYPE html> and end with </html>.
+The document must be:
+✅ Complete translation (100% content)
+✅ Professional HTML layout with CSS
+✅ Ready for print/PDF conversion
+✅ Optimized to fit ONE page
+✅ Clean with no extra elements
+{additional_instructions}"""
+
+            user_message = f"Translate this {request.document_type} document to professional HTML format:\n\n{request.text}"
 
         elif request.action == 'improve_formality':
             system_prompt = f"""You are a professional translator. The user has a translation that needs to be more formal.
@@ -2452,8 +2553,11 @@ class GlossaryTerm(BaseModel):
 
 class GlossaryCreate(BaseModel):
     name: str
-    language: str
-    field: str
+    sourceLang: Optional[str] = "Portuguese (Brazil)"
+    targetLang: Optional[str] = "English"
+    bidirectional: Optional[bool] = True
+    language: Optional[str] = None  # Legacy field, kept for compatibility
+    field: str = "All Fields"
     terms: List[GlossaryTerm] = []
 
 # Translation Instructions CRUD
@@ -2555,7 +2659,10 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
     glossary = {
         "id": str(uuid.uuid4()),
         "name": data.name,
-        "language": data.language,
+        "sourceLang": data.sourceLang,
+        "targetLang": data.targetLang,
+        "bidirectional": data.bidirectional,
+        "language": data.language or f"{data.sourceLang} <> {data.targetLang}",  # Legacy compatibility
         "field": data.field,
         "terms": [t.dict() for t in data.terms],
         "created_at": datetime.utcnow()
@@ -2576,7 +2683,10 @@ async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str
         {"id": glossary_id},
         {"$set": {
             "name": data.name,
-            "language": data.language,
+            "sourceLang": data.sourceLang,
+            "targetLang": data.targetLang,
+            "bidirectional": data.bidirectional,
+            "language": data.language or f"{data.sourceLang} <> {data.targetLang}",
             "field": data.field,
             "terms": [t.dict() for t in data.terms]
         }}
