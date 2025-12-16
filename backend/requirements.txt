@@ -35,3 +35,4 @@ resend
 stripe
 httpx
 pydantic[email]
+anthropic>=0.39.0
