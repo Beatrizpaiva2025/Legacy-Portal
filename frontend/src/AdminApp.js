@@ -2101,15 +2101,24 @@ tradução juramentada | certified translation`}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-0" style={{height: '450px'}}>
-                  {/* Left: Original Document Image */}
+                  {/* Left: Original Document */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages.map((img, idx) => (
                       <div key={idx} className="mb-2">
-                        <img
-                          src={img.data}
-                          alt={img.filename}
-                          className="max-w-full border shadow-sm"
-                        />
+                        {img.filename.toLowerCase().endsWith('.pdf') ? (
+                          <embed
+                            src={img.data}
+                            type="application/pdf"
+                            className="w-full border shadow-sm"
+                            style={{height: '430px'}}
+                          />
+                        ) : (
+                          <img
+                            src={img.data}
+                            alt={img.filename}
+                            className="max-w-full border shadow-sm"
+                          />
+                        )}
                       </div>
                     ))}
                   </div>
