@@ -248,6 +248,18 @@ const TranslationWorkspace = ({ adminKey }) => {
   const logoStampInputRef = useRef(null);
   const originalTextRef = useRef(null);
   const translatedTextRef = useRef(null);
+  const uploadOriginalRef = useRef(null);
+  const uploadOcrRef = useRef(null);
+
+  // OCR Editor state
+  const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
+  const [ocrFontSize, setOcrFontSize] = useState('12px');
+
+  // Approval checkboxes state
+  const [approvalChecks, setApprovalChecks] = useState({
+    coverLetter: false,
+    proofread: false
+  });
 
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
@@ -507,13 +519,46 @@ const TranslationWorkspace = ({ adminKey }) => {
     return matchLang && matchField;
   });
 
-  // Synchronized scrolling
+  // Synchronized scrolling for Review tab
   const handleScroll = (source) => {
     if (source === 'original' && translatedTextRef.current && originalTextRef.current) {
       translatedTextRef.current.scrollTop = originalTextRef.current.scrollTop;
     } else if (source === 'translated' && originalTextRef.current && translatedTextRef.current) {
       originalTextRef.current.scrollTop = translatedTextRef.current.scrollTop;
     }
+  };
+
+  // Synchronized scrolling for Upload tab
+  const handleUploadScroll = (source) => {
+    if (source === 'original' && uploadOcrRef.current && uploadOriginalRef.current) {
+      uploadOcrRef.current.scrollTop = uploadOriginalRef.current.scrollTop;
+    } else if (source === 'ocr' && uploadOriginalRef.current && uploadOcrRef.current) {
+      uploadOriginalRef.current.scrollTop = uploadOcrRef.current.scrollTop;
+    }
+  };
+
+  // Apply formatting to OCR text
+  const applyOcrFormatting = (format) => {
+    const textarea = document.getElementById('ocr-editor');
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+
+    if (!selectedText) return;
+
+    let formattedText = selectedText;
+    if (format === 'bold') {
+      formattedText = `**${selectedText}**`;
+    } else if (format === 'italic') {
+      formattedText = `*${selectedText}*`;
+    }
+
+    const newText = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
+    const updated = [...ocrResults];
+    updated[0].text = newText;
+    setOcrResults(updated);
   };
 
   // File handling
@@ -1241,6 +1286,71 @@ const TranslationWorkspace = ({ adminKey }) => {
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
 
+          {/* Translation Details Section - Moved from Review */}
+          <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded">
+            <h3 className="text-xs font-bold text-purple-700 mb-3">📝 Translation Details</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
+                <input
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="e.g., Birth Certificate"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
+                <input
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="e.g., P6312"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
+                <select
+                  value={selectedTranslator}
+                  onChange={(e) => setSelectedTranslator(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {TRANSLATORS.map(t => (
+                    <option key={t.name} value={t.name}>{t.name} - {t.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  value={translationDate}
+                  onChange={(e) => setTranslationDate(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Page Format Section */}
           <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
@@ -1471,11 +1581,11 @@ const TranslationWorkspace = ({ adminKey }) => {
       {activeSubTab === 'ocr' && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📤 Upload & OCR</h2>
-          <p className="text-xs text-gray-500 mb-4">Upload documents and extract text using OCR</p>
+          <p className="text-xs text-gray-500 mb-4">Upload documents, extract text with OCR, and edit side-by-side</p>
 
           {/* File Upload Section */}
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
+            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
             onClick={() => fileInputRef.current?.click()}
           >
             <input
@@ -1486,44 +1596,28 @@ const TranslationWorkspace = ({ adminKey }) => {
               onChange={handleFileSelect}
               className="hidden"
             />
-            <div className="text-3xl mb-2">📤</div>
-            <button className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
+            <div className="text-2xl mb-1">📤</div>
+            <button className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
               Choose Files
             </button>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-gray-500 mt-1">
               {files.length > 0 ? `${files.length} file(s) selected` : 'Click to select files (images or PDF)'}
             </p>
           </div>
 
-          {/* Selected Files List */}
-          {files.length > 0 && (
-            <div className="mb-4 p-3 bg-gray-50 rounded">
-              <label className="text-xs font-medium text-gray-700">Selected Files:</label>
-              <div className="mt-1 space-y-1">
-                {files.map((file, idx) => (
-                  <div key={idx} className="flex items-center text-xs p-2 bg-white rounded border">
-                    <span className="mr-2">📄</span>
-                    <span>{file.name}</span>
-                    <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* OCR Button */}
-          {files.length > 0 && (
+          {files.length > 0 && !ocrResults.length && (
             <button
               onClick={handleOCR}
               disabled={isProcessing}
-              className="w-full py-3 bg-yellow-500 text-white text-sm font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full py-2 bg-yellow-500 text-white text-sm font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed mb-4"
             >
               {isProcessing ? '⏳ Processing OCR...' : '🔍 Run OCR (Extract Text)'}
             </button>
           )}
 
           {processingStatus && (
-            <div className={`mt-4 p-3 rounded text-xs ${
+            <div className={`mb-4 p-2 rounded text-xs ${
               processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
               processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
               'bg-blue-100 text-blue-700'
@@ -1532,11 +1626,50 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
           )}
 
-          {/* OCR Results Preview */}
+          {/* Side-by-Side View: Original + OCR */}
           {ocrResults.length > 0 && (
-            <div className="mt-4">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xs font-bold">📝 OCR Results (editable)</h3>
+            <div className="mt-2">
+              {/* Toolbar */}
+              <div className="flex justify-between items-center mb-2 p-2 bg-gray-100 rounded">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold">OCR Editor:</span>
+                  <button
+                    onClick={() => applyOcrFormatting('bold')}
+                    className="px-2 py-1 bg-white border rounded text-xs font-bold hover:bg-gray-50"
+                    title="Bold"
+                  >
+                    B
+                  </button>
+                  <button
+                    onClick={() => applyOcrFormatting('italic')}
+                    className="px-2 py-1 bg-white border rounded text-xs italic hover:bg-gray-50"
+                    title="Italic"
+                  >
+                    I
+                  </button>
+                  <select
+                    value={ocrFontFamily}
+                    onChange={(e) => setOcrFontFamily(e.target.value)}
+                    className="px-2 py-1 text-xs border rounded"
+                  >
+                    <option value="monospace">Monospace</option>
+                    <option value="serif">Serif</option>
+                    <option value="sans-serif">Sans-serif</option>
+                    <option value="'Times New Roman', serif">Times New Roman</option>
+                    <option value="Arial, sans-serif">Arial</option>
+                  </select>
+                  <select
+                    value={ocrFontSize}
+                    onChange={(e) => setOcrFontSize(e.target.value)}
+                    className="px-2 py-1 text-xs border rounded"
+                  >
+                    <option value="10px">10px</option>
+                    <option value="11px">11px</option>
+                    <option value="12px">12px</option>
+                    <option value="14px">14px</option>
+                    <option value="16px">16px</option>
+                  </select>
+                </div>
                 <button
                   onClick={() => {
                     const allText = ocrResults.map(r => `=== ${r.filename} ===\n${r.text}`).join('\n\n');
@@ -1553,26 +1686,82 @@ const TranslationWorkspace = ({ adminKey }) => {
                   📥 Download OCR
                 </button>
               </div>
-              {ocrResults.map((result, idx) => (
-                <div key={idx} className="mb-3">
-                  <label className="text-xs text-gray-600">{result.filename}</label>
-                  <textarea
-                    value={result.text}
-                    onChange={(e) => {
-                      const updated = [...ocrResults];
-                      updated[idx].text = e.target.value;
-                      setOcrResults(updated);
-                    }}
-                    className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
-                  />
-                </div>
-              ))}
 
-              <div className="mt-4">
+              {/* Side-by-Side Panels */}
+              <div className="border rounded">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r">
+                    <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
+                  </div>
+                  <div className="px-3 py-2">
+                    <span className="text-xs font-bold text-gray-700">📝 OCR Text (Editable)</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-0" style={{height: '400px'}}>
+                  {/* Left: Original Document Image */}
+                  <div
+                    className="border-r overflow-auto bg-gray-50 p-2"
+                    ref={uploadOriginalRef}
+                    onScroll={() => handleUploadScroll('original')}
+                  >
+                    {originalImages.length > 0 ? (
+                      originalImages.map((img, idx) => (
+                        <div key={idx} className="mb-2">
+                          <img
+                            src={img.data}
+                            alt={img.filename}
+                            className="max-w-full border shadow-sm"
+                            style={{minHeight: '100%'}}
+                          />
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-xs">
+                        Original document preview
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: OCR Text Editor */}
+                  <div
+                    className="overflow-auto"
+                    ref={uploadOcrRef}
+                    onScroll={() => handleUploadScroll('ocr')}
+                  >
+                    <textarea
+                      id="ocr-editor"
+                      value={ocrResults[0]?.text || ''}
+                      onChange={(e) => {
+                        const updated = [...ocrResults];
+                        updated[0].text = e.target.value;
+                        setOcrResults(updated);
+                      }}
+                      className="w-full h-full p-3 border-0 resize-none focus:outline-none focus:ring-0"
+                      style={{
+                        fontFamily: ocrFontFamily,
+                        fontSize: ocrFontSize,
+                        minHeight: '400px',
+                        whiteSpace: 'pre-wrap'
+                      }}
+                      placeholder="OCR text will appear here..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-4 flex space-x-2">
+                <button
+                  onClick={handleOCR}
+                  disabled={isProcessing}
+                  className="flex-1 py-2 bg-yellow-500 text-white text-xs font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300"
+                >
+                  🔄 Re-run OCR
+                </button>
                 <button
                   onClick={handleTranslate}
                   disabled={isProcessing}
-                  className="w-full py-3 bg-green-500 text-white text-sm font-medium rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="flex-1 py-2 bg-green-500 text-white text-xs font-medium rounded hover:bg-green-600 disabled:bg-gray-300"
                 >
                   {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
                 </button>
@@ -1610,71 +1799,6 @@ const TranslationWorkspace = ({ adminKey }) => {
                   </select>
                 </div>
               )}
-
-              {/* Translation Configuration */}
-              <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
-                <h3 className="text-xs font-bold text-purple-700 mb-2">📝 Translation Details</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
-                    <select
-                      value={sourceLanguage}
-                      onChange={(e) => setSourceLanguage(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                    >
-                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
-                    <select
-                      value={targetLanguage}
-                      onChange={(e) => setTargetLanguage(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                    >
-                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
-                    <input
-                      value={documentType}
-                      onChange={(e) => setDocumentType(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                      placeholder="e.g., Birth Certificate"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
-                    <input
-                      value={orderNumber}
-                      onChange={(e) => setOrderNumber(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                      placeholder="e.g., P6312"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
-                    <select
-                      value={selectedTranslator}
-                      onChange={(e) => setSelectedTranslator(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                    >
-                      {TRANSLATORS.map(t => (
-                        <option key={t.name} value={t.name}>{t.name} - {t.title}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                    <input
-                      value={translationDate}
-                      onChange={(e) => setTranslationDate(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
 
               {/* Side by side view with synchronized scroll */}
               <div className="border rounded mb-4">
@@ -1727,7 +1851,7 @@ const TranslationWorkspace = ({ adminKey }) => {
               </div>
 
               <div className="p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-xs text-green-700">✅ Review complete? Go to <strong>6. Approval</strong> to download or send to projects.</p>
+                <p className="text-xs text-green-700">✅ Review complete? Go to <strong>5. Approval</strong> to download or send to projects.</p>
               </div>
             </>
           ) : (
@@ -1746,6 +1870,32 @@ const TranslationWorkspace = ({ adminKey }) => {
 
           {translationResults.length > 0 ? (
             <>
+              {/* Approval Checklist */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
+                <div className="space-y-3">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.coverLetter}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, coverLetter: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">1. Cover Letter</span>
+                    <span className="ml-2 text-gray-400 text-[10px]">(not mandatory)</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.proofread}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">2. Proofread</span>
+                  </label>
+                </div>
+              </div>
+
               {/* Download Options */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-blue-700 mb-3">📥 Download Options</h3>
@@ -1757,7 +1907,7 @@ const TranslationWorkspace = ({ adminKey }) => {
                       onChange={(e) => setIncludeCover(e.target.checked)}
                       className="mr-2"
                     />
-                    Include Cover Letter
+                    Include Cover Letter in Download
                   </label>
                 </div>
                 <div className="flex space-x-2">
