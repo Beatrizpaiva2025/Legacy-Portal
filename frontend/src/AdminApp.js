@@ -451,6 +451,8 @@ const TranslationWorkspace = ({ adminKey }) => {
       return;
     }
 
+    setProcessingStatus('Saving instruction...');
+
     try {
       const dataToSend = {
         sourceLang: instructionForm.sourceLang,
@@ -459,10 +461,12 @@ const TranslationWorkspace = ({ adminKey }) => {
         content: instructionForm.content.trim()
       };
 
+      const config = { timeout: 30000 }; // 30 second timeout
+
       if (editingInstruction) {
-        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend);
+        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend, config);
       } else {
-        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend);
+        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend, config);
       }
       setShowInstructionModal(false);
       setEditingInstruction(null);
@@ -471,7 +475,24 @@ const TranslationWorkspace = ({ adminKey }) => {
       setProcessingStatus('✅ Instruction saved!');
     } catch (err) {
       console.error('Failed to save instruction:', err);
-      alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
+
+      // Save locally as backup
+      const localInstructions = JSON.parse(localStorage.getItem('backup_instructions') || '[]');
+      localInstructions.push({
+        ...instructionForm,
+        id: `local_${Date.now()}`,
+        savedAt: new Date().toISOString()
+      });
+      localStorage.setItem('backup_instructions', JSON.stringify(localInstructions));
+
+      const errorMsg = err.code === 'ECONNABORTED'
+        ? 'Request timeout - server may be slow. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+          : (err.response?.data?.detail || err.message);
+
+      alert('Failed to save instruction: ' + errorMsg);
+      setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
 
