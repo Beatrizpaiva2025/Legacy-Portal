@@ -2123,6 +2123,10 @@ class OCRRequest(BaseModel):
     file_base64: str
     file_type: str
     filename: str
+    use_claude: Optional[bool] = False
+    claude_api_key: Optional[str] = None
+    special_commands: Optional[str] = None
+    preserve_layout: Optional[bool] = True
 
 class TranslateRequest(BaseModel):
     text: str
@@ -2146,13 +2150,76 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
         file_content = base64.b64decode(request.file_base64)
         file_extension = request.filename.split('.')[-1].lower() if '.' in request.filename else ''
 
-        logger.info(f"OCR request for file: {request.filename}, type: {request.file_type}, size: {len(file_content)} bytes")
+        logger.info(f"OCR request for file: {request.filename}, type: {request.file_type}, size: {len(file_content)} bytes, use_claude: {request.use_claude}")
 
         # Determine file type
         is_image = request.file_type.startswith('image/') or file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'gif', 'webp']
         is_pdf = request.file_type == 'application/pdf' or file_extension == 'pdf'
 
         text = ""
+
+        # Use Claude for OCR if requested
+        if request.use_claude and request.claude_api_key:
+            logger.info("Using Claude AI for OCR with layout preservation...")
+            try:
+                import anthropic
+                client = anthropic.Anthropic(api_key=request.claude_api_key)
+
+                # Prepare the image for Claude
+                image_data = base64.b64encode(file_content).decode('utf-8')
+                media_type = request.file_type if request.file_type.startswith('image/') else 'image/jpeg'
+
+                # Build the OCR prompt
+                ocr_prompt = """Extract ALL text from this document image.
+
+CRITICAL INSTRUCTIONS:
+1. Maintain the EXACT original layout, structure, and formatting
+2. Preserve all line breaks, spacing, and indentation
+3. Keep tables in their original format using markdown table syntax or ASCII art
+4. Preserve headers, titles, and sections exactly as they appear
+5. Include ALL text, even small print, stamps, and signatures
+6. Use ** for bold text and * for italic text where visible
+7. Maintain the visual hierarchy of the document
+
+"""
+                if request.special_commands:
+                    ocr_prompt += f"\nAdditional instructions: {request.special_commands}\n"
+
+                ocr_prompt += "\nExtract the complete text now, preserving the original layout:"
+
+                message = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=4096,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": media_type,
+                                        "data": image_data,
+                                    },
+                                },
+                                {
+                                    "type": "text",
+                                    "text": ocr_prompt
+                                }
+                            ],
+                        }
+                    ],
+                )
+
+                text = message.content[0].text
+                logger.info(f"Claude OCR extracted {len(text)} characters with layout preservation")
+
+                if text and len(text.strip()) > 10:
+                    return {"status": "success", "text": text, "method": "claude"}
+
+            except Exception as e:
+                logger.error(f"Claude OCR failed: {str(e)}, falling back to standard OCR")
+                # Fall through to standard OCR methods
 
         if is_image:
             # Try AWS Textract first for images

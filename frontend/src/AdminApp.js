@@ -451,6 +451,8 @@ const TranslationWorkspace = ({ adminKey }) => {
       return;
     }
 
+    setProcessingStatus('Saving instruction...');
+
     try {
       const dataToSend = {
         sourceLang: instructionForm.sourceLang,
@@ -459,10 +461,12 @@ const TranslationWorkspace = ({ adminKey }) => {
         content: instructionForm.content.trim()
       };
 
+      const config = { timeout: 30000 }; // 30 second timeout
+
       if (editingInstruction) {
-        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend);
+        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend, config);
       } else {
-        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend);
+        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend, config);
       }
       setShowInstructionModal(false);
       setEditingInstruction(null);
@@ -471,7 +475,24 @@ const TranslationWorkspace = ({ adminKey }) => {
       setProcessingStatus('✅ Instruction saved!');
     } catch (err) {
       console.error('Failed to save instruction:', err);
-      alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
+
+      // Save locally as backup
+      const localInstructions = JSON.parse(localStorage.getItem('backup_instructions') || '[]');
+      localInstructions.push({
+        ...instructionForm,
+        id: `local_${Date.now()}`,
+        savedAt: new Date().toISOString()
+      });
+      localStorage.setItem('backup_instructions', JSON.stringify(localInstructions));
+
+      const errorMsg = err.code === 'ECONNABORTED'
+        ? 'Request timeout - server may be slow. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+          : (err.response?.data?.detail || err.message);
+
+      alert('Failed to save instruction: ' + errorMsg);
+      setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
 
@@ -493,19 +514,46 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Glossaries CRUD
   const handleSaveGlossary = async () => {
+    if (!glossaryForm.name || !glossaryForm.name.trim()) {
+      alert('Please enter a name for the glossary');
+      return;
+    }
+
+    setProcessingStatus('Saving glossary...');
+
     try {
+      const config = { timeout: 30000 }; // 30 second timeout
+
       if (editingGlossary) {
-        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm);
+        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm, config);
       } else {
-        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm);
+        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm, config);
       }
       setShowGlossaryModal(false);
       setEditingGlossary(null);
       setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] });
       fetchResources();
+      setProcessingStatus('✅ Glossary saved!');
     } catch (err) {
       console.error('Failed to save glossary:', err);
-      alert('Failed to save glossary');
+
+      // Save locally as backup
+      const localGlossaries = JSON.parse(localStorage.getItem('backup_glossaries') || '[]');
+      localGlossaries.push({
+        ...glossaryForm,
+        id: `local_${Date.now()}`,
+        savedAt: new Date().toISOString()
+      });
+      localStorage.setItem('backup_glossaries', JSON.stringify(localGlossaries));
+
+      const errorMsg = err.code === 'ECONNABORTED'
+        ? 'Request timeout - server may be slow. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+          : (err.response?.data?.detail || err.message);
+
+      alert('Failed to save glossary: ' + errorMsg);
+      setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
 
@@ -1001,6 +1049,13 @@ const TranslationWorkspace = ({ adminKey }) => {
       {/* RESOURCES TAB */}
       {activeSubTab === 'resources' && (
         <div className="space-y-6">
+          {/* Quick Start Guide */}
+          <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <p className="text-xs text-blue-700">
+              <strong>Quick Start:</strong> 1️⃣ Add your Claude API Key → 2️⃣ Go to Details tab → 3️⃣ Upload Document → 4️⃣ Review → 5️⃣ Deliver
+            </p>
+          </div>
+
           {/* Claude API Key Section */}
           <div className="bg-white rounded shadow p-4">
             <div className="flex items-center space-x-2 mb-3">
@@ -1420,9 +1475,10 @@ CPF | individual taxpayer number | Brazilian tax ID"
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
 
-          {/* Translation Details Section - Moved from Review */}
+          {/* Translation Details Section - Auto-updates Cover Letter below */}
           <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded">
-            <h3 className="text-xs font-bold text-purple-700 mb-3">📝 Translation Details</h3>
+            <h3 className="text-xs font-bold text-purple-700 mb-2">📝 Translation Details</h3>
+            <p className="text-[10px] text-purple-600 mb-3">⚡ Changes here automatically update the Cover Letter preview below</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
@@ -1600,9 +1656,12 @@ CPF | individual taxpayer number | Brazilian tax ID"
             </div>
           </div>
 
-          {/* Certificate Preview */}
-          <div className="p-4 bg-white border-2 border-gray-300 rounded mb-4">
-            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Certificate Preview</h3>
+          {/* Certificate Preview - Live Preview */}
+          <div className="p-4 bg-white border-2 border-blue-300 rounded mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
+              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Auto-updates from fields above</span>
+            </div>
             <div className="border rounded p-6 bg-white" style={{fontFamily: 'Times New Roman, serif', fontSize: '11px', lineHeight: '1.6'}}>
               {/* Header with logos */}
               <div className="flex justify-between items-start mb-4">
