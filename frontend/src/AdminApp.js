@@ -902,7 +902,6 @@ const TranslationWorkspace = ({ adminKey }) => {
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'resources', label: 'Resources', icon: '📚' },
-          { id: 'api', label: '1. API', icon: '🔑' },
           { id: 'cover', label: '2. Cover Letter', icon: '📋' },
           { id: 'upload', label: '3. Upload', icon: '📤' },
           { id: 'ocr', label: '4. OCR', icon: '🔍' },
@@ -926,6 +925,30 @@ const TranslationWorkspace = ({ adminKey }) => {
       {/* RESOURCES TAB */}
       {activeSubTab === 'resources' && (
         <div className="space-y-6">
+          {/* Claude API Key Section */}
+          <div className="bg-white rounded shadow p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <span className="text-lg">🔑</span>
+              <h2 className="text-sm font-bold">Claude API Key</h2>
+            </div>
+            <div className="flex space-x-2">
+              <input
+                type="password"
+                value={claudeApiKey}
+                onChange={(e) => setClaudeApiKey(e.target.value)}
+                placeholder="sk-ant-api03-..."
+                className="flex-1 px-3 py-2 text-xs border rounded"
+              />
+              <button
+                onClick={saveApiKey}
+                className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+          </div>
+
           {/* Translation Instructions Section */}
           <div className="bg-white rounded shadow">
             <div className="p-4 border-b flex items-center justify-between">
@@ -1214,44 +1237,6 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
       )}
 
-      {/* API TAB */}
-      {activeSubTab === 'api' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">🔑 API Configuration</h2>
-
-          {/* Claude API Key */}
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Claude API Key</label>
-            <div className="flex space-x-2">
-              <input
-                type="password"
-                value={claudeApiKey}
-                onChange={(e) => setClaudeApiKey(e.target.value)}
-                placeholder="sk-ant-api03-..."
-                className="flex-1 px-2 py-1.5 text-xs border rounded"
-              />
-              <button
-                onClick={saveApiKey}
-                className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-1">Required for translation. Get yours at console.anthropic.com</p>
-          </div>
-
-          {processingStatus && processingStatus.includes('API') && (
-            <div className="mt-4 p-3 rounded text-xs bg-green-100 text-green-700">
-              {processingStatus}
-            </div>
-          )}
-
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-            <p className="text-xs text-green-700">✅ Cover letter configured. Go to <strong>3. Upload</strong> to add documents.</p>
-          </div>
-        </div>
-      )}
-
       {/* COVER LETTER TAB */}
       {activeSubTab === 'cover' && (
         <div className="bg-white rounded shadow p-4">
@@ -1312,22 +1297,12 @@ const TranslationWorkspace = ({ adminKey }) => {
                   onChange={(e) => handleLogoUpload(e, 'left')}
                   className="hidden"
                 />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoLeftInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoLeft && (
-                    <button
-                      onClick={() => removeLogo('left')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={() => logoLeftInputRef.current?.click()}
+                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
+                >
+                  Upload
+                </button>
               </div>
 
               {/* Right Logo (ATA) */}
@@ -1347,22 +1322,12 @@ const TranslationWorkspace = ({ adminKey }) => {
                   onChange={(e) => handleLogoUpload(e, 'right')}
                   className="hidden"
                 />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoRightInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoRight && (
-                    <button
-                      onClick={() => removeLogo('right')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={() => logoRightInputRef.current?.click()}
+                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
+                >
+                  Upload
+                </button>
               </div>
 
               {/* Stamp Logo */}
@@ -1382,20 +1347,115 @@ const TranslationWorkspace = ({ adminKey }) => {
                   onChange={(e) => handleLogoUpload(e, 'stamp')}
                   className="hidden"
                 />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoStampInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                <button
+                  onClick={() => logoStampInputRef.current?.click()}
+                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
+                >
+                  Upload
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Certificate Preview */}
+          <div className="p-4 bg-white border-2 border-gray-300 rounded mb-4">
+            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Certificate Preview</h3>
+            <div className="border rounded p-6 bg-white" style={{fontFamily: 'Times New Roman, serif', fontSize: '11px', lineHeight: '1.6'}}>
+              {/* Header with logos */}
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-24">
+                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-gray-400 border p-2">Logo</div>}
+                </div>
+                <div className="text-center flex-1 px-4">
+                  <div className="font-bold text-blue-600">Legacy Translations</div>
+                  <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                  <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                </div>
+                <div className="w-20 text-right">
+                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[9px] text-gray-500 italic">ata<br/>Member # 275993</div>}
+                </div>
+              </div>
+
+              <div className="text-right mb-6">
+                <span>Order # </span>
+                <input
+                  type="text"
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  className="font-bold border-b border-blue-400 bg-blue-50 px-1 w-20 text-center"
+                  placeholder="P6287"
+                />
+              </div>
+
+              <h1 className="text-2xl text-center mb-4" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
+
+              <p className="text-center mb-6">
+                Translation of a{' '}
+                <input
+                  type="text"
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="font-bold border-b border-blue-400 bg-blue-50 px-1 w-32"
+                  placeholder="School Transcript"
+                />
+                {' '}from{' '}
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="font-bold border-b border-blue-400 bg-blue-50 px-1"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+                {' '}to{' '}
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="font-bold border-b border-blue-400 bg-blue-50 px-1"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </p>
+
+              <p className="mb-4 text-justify">
+                We, Legacy Translations, a professional translation services company and ATA Member (#275993), having no relation to the client, hereby certify that the annexed{' '}
+                <strong>{targetLanguage}</strong> translation of the <strong>{sourceLanguage}</strong> document, executed by us, is to the best of our knowledge and belief, a true and accurate translation of the original document, likewise annexed hereunto.
+              </p>
+
+              <p className="mb-4 text-justify">
+                This is to certify the correctness of the translation only. We do not guarantee that the original is a genuine document, or that the statements contained in the original document are true. Further, Legacy Translations assumes no liability for the way in which the translation is used by the customer or any third party, including end-users of the translation.
+              </p>
+
+              <p className="mb-8 text-justify">
+                A copy of the translation, and original files presented, are attached to this certification.
+              </p>
+
+              <div className="flex justify-between items-end mt-8">
+                <div>
+                  <select
+                    value={selectedTranslator}
+                    onChange={(e) => setSelectedTranslator(e.target.value)}
+                    className="font-bold border-b border-blue-400 bg-blue-50 px-1 block"
                   >
-                    Upload
-                  </button>
-                  {logoStamp && (
-                    <button
-                      onClick={() => removeLogo('stamp')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
+                    {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                  </select>
+                  <div className="font-semibold">Managing Director</div>
+                  <div>Dated: <input
+                    type="text"
+                    value={translationDate}
+                    onChange={(e) => setTranslationDate(e.target.value)}
+                    className="border-b border-blue-400 bg-blue-50 px-1 w-24"
+                  /></div>
+                </div>
+                <div className="w-32 h-32">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp" className="max-w-full max-h-full" />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full border-4 border-gray-400 flex items-center justify-center text-center p-2">
+                      <div className="text-[8px]">
+                        <div className="font-bold">LEGACY TRANSLATIONS</div>
+                        <div>ATA # 275993</div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1496,7 +1556,24 @@ const TranslationWorkspace = ({ adminKey }) => {
               {/* OCR Results Preview */}
               {ocrResults.length > 0 && (
                 <div className="mt-4">
-                  <h3 className="text-xs font-bold mb-2">📝 OCR Results (editable)</h3>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-xs font-bold">📝 OCR Results (editable)</h3>
+                    <button
+                      onClick={() => {
+                        const allText = ocrResults.map(r => `=== ${r.filename} ===\n${r.text}`).join('\n\n');
+                        const blob = new Blob([allText], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'ocr-results.txt';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}
+                      className="px-3 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                    >
+                      📥 Download OCR
+                    </button>
+                  </div>
                   {ocrResults.map((result, idx) => (
                     <div key={idx} className="mb-3">
                       <label className="text-xs text-gray-600">{result.filename}</label>
