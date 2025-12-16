@@ -193,7 +193,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey }) => {
   // State
-  const [activeSubTab, setActiveSubTab] = useState('upload');
+  const [activeSubTab, setActiveSubTab] = useState('config');
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
   const [translationResults, setTranslationResults] = useState([]);
@@ -895,821 +895,635 @@ const TranslationWorkspace = ({ adminKey }) => {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATION WORKSPACE</h1>
-
-      {/* Sub-tabs */}
-      <div className="flex space-x-1 mb-4 border-b">
+    <div className="p-6">
+      {/* 7 Tabs Navigation */}
+      <div className="flex justify-center space-x-2 mb-6">
         {[
-          { id: 'resources', label: 'Resources', icon: '📚' },
-          { id: 'upload', label: '1. Upload', icon: '📤' },
-          { id: 'config', label: '2. Config', icon: '⚙️' },
-          { id: 'results', label: '3. Results', icon: '📊' }
+          { id: 'config', label: '1. Config' },
+          { id: 'upload', label: '2. Upload' },
+          { id: 'ocr', label: '3. Ocr' },
+          { id: 'review', label: '4. Review' },
+          { id: 'translate', label: '5. Translate' },
+          { id: 'approval', label: '6. Approval' },
+          { id: 'export', label: '7. Export' }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t ${
+            className={`px-5 py-2 text-sm font-medium rounded-md border-2 transition-all ${
               activeSubTab === tab.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-blue-500 text-white border-blue-500'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
             }`}
           >
-            {tab.icon} {tab.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* RESOURCES TAB */}
-      {activeSubTab === 'resources' && (
-        <div className="space-y-6">
-          {/* Translation Instructions Section */}
-          <div className="bg-white rounded shadow">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">📖</span>
-                <div>
-                  <h2 className="text-sm font-bold">Translation Instructions</h2>
-                  <p className="text-xs text-gray-500">Manage translation guidelines by language pair</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setEditingInstruction(null); setInstructionForm({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' }); setShowInstructionModal(true); }}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-              >
-                <span className="mr-1">+</span> Add
-              </button>
-            </div>
-            <div className="p-4">
-              {instructions.length > 0 ? (
-                <div className="space-y-2">
-                  {instructions.map((instr) => (
-                    <div key={instr.id} className="p-3 border rounded hover:bg-gray-50 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center text-xs">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded">{FLAGS[instr.sourceLang?.toLowerCase()] || '🌐'} {instr.sourceLang}</span>
-                          <span className="mx-2">→</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded">{FLAGS[instr.targetLang?.toLowerCase()] || '🌐'} {instr.targetLang}</span>
-                        </div>
-                        <span className="text-xs font-medium">{instr.title}</span>
-                      </div>
-                      <div className="flex space-x-1">
-                        <button onClick={() => handleEditInstruction(instr)} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">✏️</button>
-                        <button onClick={() => handleDeleteInstruction(instr.id)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-xs">No instructions yet. Click "Add" to create one.</p>
-                </div>
-              )}
-            </div>
-          </div>
+      {/* ==================== 1. CONFIG TAB ==================== */}
+      {activeSubTab === 'config' && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-6">Configurações</h2>
 
-          {/* Glossaries & Translation Memories Section */}
-          <div className="bg-white rounded shadow">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">🌐</span>
-                <div>
-                  <h2 className="text-sm font-bold">Glossaries & Translation Memories</h2>
-                  <p className="text-xs text-gray-500">Upload and manage terminology resources</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] }); setShowGlossaryModal(true); }}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-              >
-                <span className="mr-1">+</span> Add
-              </button>
-            </div>
-            <div className="p-4">
-              {/* Filters */}
-              <div className="flex space-x-3 mb-4">
-                <select
-                  value={resourcesFilter.language}
-                  onChange={(e) => setResourcesFilter({ ...resourcesFilter, language: e.target.value })}
-                  className="px-3 py-1.5 text-xs border rounded"
+            {/* Claude API Key */}
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <label className="block text-sm font-medium text-gray-700 mb-2">🔑 Claude API Key</label>
+              <div className="flex space-x-2">
+                <input
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  placeholder="sk-ant-api03-..."
+                  className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={saveApiKey}
+                  className="px-4 py-2 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600"
                 >
-                  <option>All Languages</option>
+                  Salvar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Necessário para tradução. Obtenha em console.anthropic.com</p>
+            </div>
+
+            {/* Languages */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Idioma de Origem</label>
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
                   {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Idioma de Destino</label>
                 <select
-                  value={resourcesFilter.field}
-                  onChange={(e) => setResourcesFilter({ ...resourcesFilter, field: e.target.value })}
-                  className="px-3 py-1.5 text-xs border rounded"
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option>All Fields</option>
-                  <option>Legal</option>
-                  <option>Medical</option>
-                  <option>Technical</option>
-                  <option>Financial</option>
-                  <option>Certificates</option>
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </div>
+            </div>
 
-              {filteredGlossaries.length > 0 ? (
-                <div className="space-y-2">
-                  {filteredGlossaries.map((gloss) => (
-                    <div key={gloss.id} className="p-3 border rounded hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-medium">{gloss.name}</span>
-                          <div className="flex space-x-2 mt-1">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{gloss.language}</span>
-                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{gloss.field}</span>
-                            <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
-                          </div>
-                        </div>
-                        <div className="flex space-x-1">
-                          <button onClick={() => handleEditGlossary(gloss)} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">✏️</button>
-                          <button onClick={() => handleDeleteGlossary(gloss.id)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️</button>
-                        </div>
-                      </div>
+            {/* Document Type & Order */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Documento</label>
+                <input
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg"
+                  placeholder="Ex: Certidão de Nascimento"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número do Pedido</label>
+                <input
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg"
+                  placeholder="Ex: P6312"
+                />
+              </div>
+            </div>
+
+            {/* Translator & Date */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tradutor</label>
+                <select
+                  value={selectedTranslator}
+                  onChange={(e) => setSelectedTranslator(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg"
+                >
+                  {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name} - {t.title}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                <input
+                  value={translationDate}
+                  onChange={(e) => setTranslationDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg"
+                />
+              </div>
+            </div>
+
+            {/* Translation Type & Page Format */}
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+              <h3 className="text-sm font-bold text-green-700 mb-3">📄 Formato da Página</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Tradução</label>
+                  <select
+                    value={translationType}
+                    onChange={(e) => saveTranslationType(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option value="certified">Certified Translation</option>
+                    <option value="sworn">Sworn Translation (Juramentada)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tamanho da Página</label>
+                  <select
+                    value={pageFormat}
+                    onChange={(e) => savePageFormat(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option value="letter">Letter (8.5" x 11")</option>
+                    <option value="a4">A4 (210mm x 297mm)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* General Instructions */}
+            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg mb-4">
+              <label className="block text-sm font-bold text-purple-700 mb-2">📝 Instruções Gerais</label>
+              <textarea
+                value={generalInstructions}
+                onChange={(e) => setGeneralInstructions(e.target.value)}
+                placeholder="Instruções gerais para o tradutor..."
+                className="w-full h-24 px-3 py-2 text-sm border rounded-lg resize-none"
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  onClick={saveGeneralInstructions}
+                  className="px-4 py-1.5 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600"
+                >
+                  Salvar Instruções
+                </button>
+              </div>
+            </div>
+
+            {/* Logos */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-sm font-bold text-blue-700 mb-3">🖼️ Logos do Certificado</h3>
+              <div className="grid grid-cols-3 gap-4">
+                {/* Left Logo */}
+                <div className="text-center">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Logo Esquerda</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white min-h-[80px] flex items-center justify-center">
+                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-16 object-contain" /> : <span className="text-xs text-gray-400">Sem logo</span>}
+                  </div>
+                  <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
+                  <div className="flex justify-center space-x-1 mt-2">
+                    <button onClick={() => logoLeftInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-xs rounded">Upload</button>
+                    {logoLeft && <button onClick={() => removeLogo('left')} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Remover</button>}
+                  </div>
+                </div>
+                {/* Right Logo */}
+                <div className="text-center">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Logo ATA</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white min-h-[80px] flex items-center justify-center">
+                    {logoRight ? <img src={logoRight} alt="Logo ATA" className="max-h-16 object-contain" /> : <span className="text-xs text-gray-400">Sem logo</span>}
+                  </div>
+                  <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
+                  <div className="flex justify-center space-x-1 mt-2">
+                    <button onClick={() => logoRightInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-xs rounded">Upload</button>
+                    {logoRight && <button onClick={() => removeLogo('right')} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Remover</button>}
+                  </div>
+                </div>
+                {/* Stamp Logo */}
+                <div className="text-center">
+                  <label className="block text-xs font-medium text-gray-700 mb-2">Carimbo</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-2 bg-white min-h-[80px] flex items-center justify-center">
+                    {logoStamp ? <img src={logoStamp} alt="Carimbo" className="max-h-16 object-contain" /> : <span className="text-xs text-gray-400">Sem logo</span>}
+                  </div>
+                  <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
+                  <div className="flex justify-center space-x-1 mt-2">
+                    <button onClick={() => logoStampInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-xs rounded">Upload</button>
+                    {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-2 py-1 bg-red-500 text-white text-xs rounded">Remover</button>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Next button */}
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setActiveSubTab('upload')}
+                className="px-8 py-3 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600"
+              >
+                Próximo → Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 2. UPLOAD TAB ==================== */}
+      {activeSubTab === 'upload' && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload de Documentos</h2>
+            <p className="text-sm text-gray-500 mb-6">Selecione os documentos para OCR e tradução</p>
+
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center cursor-pointer hover:border-blue-400 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" onChange={handleFileSelect} className="hidden" />
+              <div className="text-5xl mb-4">📤</div>
+              <button className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                Escolher Arquivos
+              </button>
+              <p className="text-sm text-gray-500 mt-3">
+                {files.length > 0 ? `${files.length} arquivo(s) selecionado(s)` : 'Clique para selecionar (imagens ou PDF)'}
+              </p>
+            </div>
+
+            {files.length > 0 && (
+              <div className="mt-6">
+                <label className="text-sm font-medium text-gray-700">Arquivos Selecionados:</label>
+                <div className="mt-2 space-y-2">
+                  {files.map((file, idx) => (
+                    <div key={idx} className="flex items-center text-sm p-3 bg-gray-50 rounded-lg">
+                      <span className="mr-2">📄</span>
+                      <span>{file.name}</span>
+                      <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-xs">No glossaries/TM yet. Click "Add" to upload one.</p>
-                </div>
-              )}
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => setActiveSubTab('config')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+              <button
+                onClick={() => setActiveSubTab('ocr')}
+                disabled={files.length === 0}
+                className="px-8 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+              >
+                Próximo → OCR
+              </button>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Instruction Modal */}
-          {showInstructionModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-                <div className="p-4 border-b">
-                  <h3 className="font-bold">{editingInstruction ? 'Edit' : 'Add'} Translation Instruction</h3>
+      {/* ==================== 3. OCR TAB ==================== */}
+      {activeSubTab === 'ocr' && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Extração de Texto (OCR)</h2>
+            <p className="text-sm text-gray-500 mb-6">Extrair texto dos documentos enviados</p>
+
+            {files.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhum arquivo selecionado. Volte para a aba Upload.</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm"><strong>Arquivos:</strong> {files.map(f => f.name).join(', ')}</p>
                 </div>
-                <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Source Language</label>
-                      <select
-                        value={instructionForm.sourceLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
+
+                <div className="text-center">
+                  <button
+                    onClick={async () => {
+                      await handleOCR();
+                      if (ocrResults.length > 0) setActiveSubTab('review');
+                    }}
+                    disabled={isProcessing}
+                    className="px-8 py-3 bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 disabled:bg-gray-300"
+                  >
+                    {isProcessing ? '⏳ Processando...' : '🔍 Executar OCR'}
+                  </button>
+                </div>
+
+                {processingStatus && (
+                  <div className={`mt-4 p-3 rounded-lg text-sm ${
+                    processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                    processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {processingStatus}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => setActiveSubTab('upload')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+              <button
+                onClick={() => setActiveSubTab('review')}
+                disabled={ocrResults.length === 0}
+                className="px-8 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+              >
+                Próximo → Review
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 4. REVIEW TAB ==================== */}
+      {activeSubTab === 'review' && (
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Revisão do OCR</h2>
+            <p className="text-sm text-gray-500 mb-6">Revise e edite o texto extraído antes de traduzir</p>
+
+            {ocrResults.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhum resultado de OCR. Execute o OCR primeiro.</p>
+              </div>
+            ) : (
+              <>
+                {ocrResults.map((result, idx) => (
+                  <div key={idx} className="mb-6">
+                    <label className="text-sm font-medium text-gray-700 mb-2 block">📄 {result.filename}</label>
+                    <textarea
+                      value={result.text}
+                      onChange={(e) => {
+                        const updated = [...ocrResults];
+                        updated[idx].text = e.target.value;
+                        setOcrResults(updated);
+                      }}
+                      className="w-full h-64 p-3 text-sm font-mono border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      style={{fontWeight: 'bold'}}
+                    />
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => setActiveSubTab('ocr')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+              <button
+                onClick={() => setActiveSubTab('translate')}
+                disabled={ocrResults.length === 0}
+                className="px-8 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+              >
+                Próximo → Translate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 5. TRANSLATE TAB ==================== */}
+      {activeSubTab === 'translate' && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Tradução</h2>
+            <p className="text-sm text-gray-500 mb-6">Traduzir o texto com Claude AI</p>
+
+            {ocrResults.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhum texto para traduzir. Execute o OCR primeiro.</p>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm"><strong>De:</strong> {sourceLanguage} → <strong>Para:</strong> {targetLanguage}</p>
+                  <p className="text-sm"><strong>Documento:</strong> {documentType}</p>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={async () => {
+                      await handleTranslate();
+                      if (translationResults.length > 0) setActiveSubTab('approval');
+                    }}
+                    disabled={isProcessing || !claudeApiKey}
+                    className="px-8 py-3 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 disabled:bg-gray-300"
+                  >
+                    {isProcessing ? '⏳ Traduzindo...' : '🌐 Traduzir com Claude'}
+                  </button>
+                  {!claudeApiKey && (
+                    <p className="text-xs text-red-500 mt-2">Configure a API Key do Claude na aba Config</p>
+                  )}
+                </div>
+
+                {processingStatus && (
+                  <div className={`mt-4 p-3 rounded-lg text-sm ${
+                    processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                    processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {processingStatus}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => setActiveSubTab('review')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+              <button
+                onClick={() => setActiveSubTab('approval')}
+                disabled={translationResults.length === 0}
+                className="px-8 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+              >
+                Próximo → Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 6. APPROVAL TAB ==================== */}
+      {activeSubTab === 'approval' && (
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Aprovação da Tradução</h2>
+
+            {translationResults.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhuma tradução para aprovar. Execute a tradução primeiro.</p>
+              </div>
+            ) : (
+              <>
+                {/* Document selector */}
+                {translationResults.length > 1 && (
+                  <div className="mb-4">
+                    <label className="text-sm text-gray-600 mr-2">Documento:</label>
+                    <select
+                      value={selectedResultIndex}
+                      onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
+                      className="px-3 py-1.5 text-sm border rounded-lg"
+                    >
+                      {translationResults.map((r, idx) => <option key={idx} value={idx}>{r.filename}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Side by side view */}
+                <div className="border rounded-lg overflow-hidden mb-6">
+                  <div className="grid grid-cols-2 bg-gray-100 border-b">
+                    <div className="px-4 py-2 border-r font-medium text-sm">📄 Original ({sourceLanguage})</div>
+                    <div className="px-4 py-2 font-medium text-sm">🌐 Tradução ({targetLanguage})</div>
+                  </div>
+                  <div className="grid grid-cols-2 h-80">
+                    <div className="border-r overflow-auto" ref={originalTextRef} onScroll={() => handleScroll('original')}>
+                      <pre className="p-4 text-sm font-mono whitespace-pre-wrap bg-gray-50 min-h-full" style={{fontWeight: 'bold'}}>
+                        {translationResults[selectedResultIndex]?.originalText || ''}
+                      </pre>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Target Language</label>
-                      <select
-                        value={instructionForm.targetLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
+                    <div className="overflow-auto" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                      <textarea
+                        value={translationResults[selectedResultIndex]?.translatedText || ''}
+                        onChange={(e) => handleTranslationEdit(e.target.value)}
+                        className="w-full min-h-full p-4 text-sm font-mono border-0 resize-none focus:outline-none"
+                        style={{minHeight: '320px'}}
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Title</label>
+                </div>
+
+                {/* Correction Command */}
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">📝 Comando de Correção</label>
+                  <div className="flex space-x-2">
                     <input
                       type="text"
-                      value={instructionForm.title}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, title: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                      placeholder="e.g., Birth Certificate Guidelines"
+                      value={correctionCommand}
+                      onChange={(e) => setCorrectionCommand(e.target.value)}
+                      placeholder='Ex: "Mude certificado para diploma"'
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Instructions</label>
-                    <textarea
-                      value={instructionForm.content}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, content: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded h-32"
-                      placeholder="Enter translation guidelines and instructions..."
-                    />
-                  </div>
-                </div>
-                <div className="p-4 border-t flex justify-end space-x-2">
-                  <button onClick={() => setShowInstructionModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSaveInstruction} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Glossary Modal */}
-          {showGlossaryModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="p-4 border-b">
-                  <h3 className="font-bold">{editingGlossary ? 'Edit' : 'Add'} Glossary / TM</h3>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={glossaryForm.name}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, name: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                        placeholder="e.g., Legal Terms PT-EN"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Language</label>
-                      <select
-                        value={glossaryForm.language}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, language: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        <option>All Languages</option>
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Field</label>
-                      <select
-                        value={glossaryForm.field}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, field: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        <option>All Fields</option>
-                        <option>Legal</option>
-                        <option>Medical</option>
-                        <option>Technical</option>
-                        <option>Financial</option>
-                        <option>Certificates</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Add Term */}
-                  <div className="border-t pt-3">
-                    <label className="block text-xs font-medium mb-2">Add Terms</label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={newTerm.source}
-                        onChange={(e) => setNewTerm({ ...newTerm, source: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Source term"
-                      />
-                      <input
-                        type="text"
-                        value={newTerm.target}
-                        onChange={(e) => setNewTerm({ ...newTerm, target: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Target term"
-                      />
-                      <input
-                        type="text"
-                        value={newTerm.notes}
-                        onChange={(e) => setNewTerm({ ...newTerm, notes: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Notes (optional)"
-                      />
-                      <button onClick={addTermToGlossary} className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">+</button>
-                    </div>
-                  </div>
-
-                  {/* Terms List */}
-                  {glossaryForm.terms.length > 0 && (
-                    <div className="border rounded max-h-48 overflow-y-auto">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left">Source</th>
-                            <th className="px-2 py-1.5 text-left">Target</th>
-                            <th className="px-2 py-1.5 text-left">Notes</th>
-                            <th className="px-2 py-1.5 w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {glossaryForm.terms.map((term) => (
-                            <tr key={term.id}>
-                              <td className="px-2 py-1.5">{term.source}</td>
-                              <td className="px-2 py-1.5">{term.target}</td>
-                              <td className="px-2 py-1.5 text-gray-500">{term.notes}</td>
-                              <td className="px-2 py-1.5">
-                                <button onClick={() => removeTermFromGlossary(term.id)} className="text-red-500 hover:text-red-700">×</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 border-t flex justify-end space-x-2">
-                  <button onClick={() => setShowGlossaryModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSaveGlossary} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* UPLOAD TAB */}
-      {activeSubTab === 'upload' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">Upload Documents</h2>
-          <p className="text-xs text-gray-500 mb-4">Select documents for OCR and translation</p>
-
-          <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <div className="text-4xl mb-2">📤</div>
-            <button className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
-              Choose Files
-            </button>
-            <p className="text-xs text-gray-500 mt-2">
-              {files.length > 0 ? `${files.length} file(s) selected` : 'Click to select files (images or PDF)'}
-            </p>
-          </div>
-
-          {files.length > 0 && (
-            <div className="mt-4">
-              <label className="text-xs font-medium text-gray-700">Selected Files:</label>
-              <div className="mt-1 space-y-1">
-                {files.map((file, idx) => (
-                  <div key={idx} className="flex items-center text-xs p-2 bg-gray-50 rounded">
-                    <span className="mr-2">📄</span>
-                    <span>{file.name}</span>
-                    <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex space-x-2 mt-4">
-            <button
-              onClick={handleOCR}
-              disabled={files.length === 0 || isProcessing}
-              className="flex-1 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? '⏳ Processing...' : '🔍 OCR (Extract Text)'}
-            </button>
-
-            <button
-              onClick={handleTranslate}
-              disabled={ocrResults.length === 0 || isProcessing}
-              className="flex-1 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? '⏳ Processing...' : '🌐 Translate (Claude)'}
-            </button>
-          </div>
-
-          {processingStatus && (
-            <div className={`mt-4 p-3 rounded text-xs ${
-              processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
-              processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
-              'bg-blue-100 text-blue-700'
-            }`}>
-              {processingStatus}
-            </div>
-          )}
-
-          {/* OCR Results Preview */}
-          {ocrResults.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-xs font-bold mb-2">📝 OCR Results (editable)</h3>
-              {ocrResults.map((result, idx) => (
-                <div key={idx} className="mb-3">
-                  <label className="text-xs text-gray-600">{result.filename}</label>
-                  <textarea
-                    value={result.text}
-                    onChange={(e) => {
-                      const updated = [...ocrResults];
-                      updated[idx].text = e.target.value;
-                      setOcrResults(updated);
-                    }}
-                    className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* CONFIG TAB */}
-      {activeSubTab === 'config' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">Translation Configuration</h2>
-
-          {/* Claude API Key */}
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-            <label className="block text-xs font-medium text-gray-700 mb-1">🔑 Claude API Key</label>
-            <div className="flex space-x-2">
-              <input
-                type="password"
-                value={claudeApiKey}
-                onChange={(e) => setClaudeApiKey(e.target.value)}
-                placeholder="sk-ant-api03-..."
-                className="flex-1 px-2 py-1.5 text-xs border rounded"
-              />
-              <button
-                onClick={saveApiKey}
-                className="px-3 py-1.5 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-1">Required for translation. Get yours at console.anthropic.com</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
-              <select
-                value={sourceLanguage}
-                onChange={(e) => setSourceLanguage(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border rounded"
-              >
-                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
-              <select
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border rounded"
-              >
-                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
-            <input
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
-              className="w-full px-2 py-1.5 text-xs border rounded"
-              placeholder="e.g., Birth Certificate, Diploma, Contract"
-            />
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
-            <input
-              value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
-              className="w-full px-2 py-1.5 text-xs border rounded"
-              placeholder="e.g., P6312"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
-              <select
-                value={selectedTranslator}
-                onChange={(e) => setSelectedTranslator(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border rounded"
-              >
-                {TRANSLATORS.map(t => (
-                  <option key={t.name} value={t.name}>{t.name} - {t.title}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-              <input
-                value={translationDate}
-                onChange={(e) => setTranslationDate(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border rounded"
-              />
-            </div>
-          </div>
-
-          {/* Translation Type and Page Format */}
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-            <h3 className="text-xs font-bold text-green-700 mb-3">📄 Page Format</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
-                <select
-                  value={translationType}
-                  onChange={(e) => saveTranslationType(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  <option value="certified">Certified Translation</option>
-                  <option value="sworn">Sworn Translation</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
-                <select
-                  value={pageFormat}
-                  onChange={(e) => savePageFormat(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
-                  <option value="a4">A4 (210mm x 297mm) - International</option>
-                </select>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-2">
-              {translationType === 'sworn' ? 'Sworn Translation (Tradução Juramentada) - A4 format' : 'Certified Translation - Letter format'}
-            </p>
-          </div>
-
-          {/* General Instructions */}
-          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
-            <label className="block text-xs font-bold text-purple-700 mb-2">📝 General Translation Instructions</label>
-            <textarea
-              value={generalInstructions}
-              onChange={(e) => setGeneralInstructions(e.target.value)}
-              placeholder="Enter general instructions for the translator (e.g., maintain formal tone, preserve formatting, specific terminology to use...)"
-              className="w-full h-24 px-2 py-1.5 text-xs border rounded resize-none"
-            />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-[10px] text-gray-500">These instructions will be used in all translations.</p>
-              <button
-                onClick={saveGeneralInstructions}
-                className="px-3 py-1 bg-purple-500 text-white text-[10px] rounded hover:bg-purple-600"
-              >
-                Save Instructions
-              </button>
-            </div>
-          </div>
-
-          {/* Certificate Logos Section */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
-            <h3 className="text-sm font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
-            <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
-
-            <div className="grid grid-cols-3 gap-4">
-              {/* Left Logo (Legacy/Partner) */}
-              <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
-                  {logoLeft ? (
-                    <img src={logoLeft} alt="Left Logo" className="max-h-16 max-w-full object-contain" />
-                  ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
-                  )}
-                </div>
-                <input
-                  ref={logoLeftInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'left')}
-                  className="hidden"
-                />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoLeftInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoLeft && (
                     <button
-                      onClick={() => removeLogo('left')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      onClick={handleApplyCorrection}
+                      disabled={!correctionCommand.trim() || applyingCorrection}
+                      className="px-4 py-2 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600 disabled:bg-gray-300"
                     >
-                      Remove
+                      {applyingCorrection ? '⏳' : '✨ Aplicar'}
                     </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Right Logo (ATA) */}
-              <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Right Logo (ATA)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
-                  {logoRight ? (
-                    <img src={logoRight} alt="Right Logo" className="max-h-16 max-w-full object-contain" />
-                  ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
-                  )}
-                </div>
-                <input
-                  ref={logoRightInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'right')}
-                  className="hidden"
-                />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoRightInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoRight && (
-                    <button
-                      onClick={() => removeLogo('right')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Stamp Logo */}
-              <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Stamp Logo</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
-                  {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp Logo" className="max-h-16 max-w-full object-contain" />
-                  ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
-                  )}
-                </div>
-                <input
-                  ref={logoStampInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'stamp')}
-                  className="hidden"
-                />
-                <div className="flex justify-center space-x-1 mt-2">
-                  <button
-                    onClick={() => logoStampInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoStamp && (
-                    <button
-                      onClick={() => removeLogo('stamp')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* RESULTS TAB */}
-      {activeSubTab === 'results' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">Translation Review & Approval</h2>
-
-          {translationResults.length > 0 ? (
-            <>
-              {/* Document selector */}
-              {translationResults.length > 1 && (
-                <div className="mb-3">
-                  <label className="text-xs text-gray-600 mr-2">Document:</label>
-                  <select
-                    value={selectedResultIndex}
-                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
-                    className="px-2 py-1 text-xs border rounded"
-                  >
-                    {translationResults.map((r, idx) => (
-                      <option key={idx} value={idx}>{r.filename}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Side by side view with synchronized scroll */}
-              <div className="border rounded mb-4">
-                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
-                  <div className="px-3 py-2 border-r">
-                    <span className="text-xs font-bold text-gray-700">📄 Original ({sourceLanguage})</span>
-                  </div>
-                  <div className="px-3 py-2">
-                    <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage}) - Editable</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0 h-80 overflow-hidden">
-                  <div className="border-r overflow-auto" ref={originalTextRef} onScroll={() => handleScroll('original')}>
-                    <pre className="p-3 text-xs font-mono whitespace-pre-wrap bg-gray-50 min-h-full" style={{fontWeight: 'bold'}}>
-                      {translationResults[selectedResultIndex]?.originalText || ''}
-                    </pre>
-                  </div>
-                  <div className="overflow-auto" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
-                    <textarea
-                      value={translationResults[selectedResultIndex]?.translatedText || ''}
-                      onChange={(e) => handleTranslationEdit(e.target.value)}
-                      className="w-full min-h-full p-3 text-xs font-mono border-0 resize-none focus:outline-none focus:ring-0"
-                      style={{minHeight: '320px'}}
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Correction Command */}
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  📝 Send Correction Command to Claude
-                </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={correctionCommand}
-                    onChange={(e) => setCorrectionCommand(e.target.value)}
-                    placeholder='e.g., "Change certificate to diploma" or "Fix formatting"'
-                    className="flex-1 px-2 py-1.5 text-xs border rounded"
-                  />
-                  <button
-                    onClick={handleApplyCorrection}
-                    disabled={!correctionCommand.trim() || applyingCorrection}
-                    className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
-                  >
-                    {applyingCorrection ? '⏳' : '✨ Apply'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Download Options */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-xs font-bold text-blue-700 mb-2">📥 Download Options</h3>
-                <div className="flex items-center space-x-4 mb-3">
-                  <label className="flex items-center text-xs">
+                {/* Include Cover option */}
+                <div className="mb-4">
+                  <label className="flex items-center text-sm">
                     <input
                       type="checkbox"
                       checked={includeCover}
                       onChange={(e) => setIncludeCover(e.target.checked)}
                       className="mr-2"
                     />
-                    Include Cover Letter
+                    Incluir Carta de Apresentação (Cover Letter)
                   </label>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleDownload('html')}
-                    className="flex-1 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                  >
-                    📄 Download HTML
-                  </button>
-                  <button
-                    onClick={() => handleDownload('pdf')}
-                    className="flex-1 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                  >
-                    📑 Download PDF
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2">
-                  Order: {includeCover ? 'Cover Letter → ' : ''}Translation → Original Document(s)
-                </p>
-              </div>
+              </>
+            )}
 
-              {/* Send to Projects */}
-              <div className="p-3 bg-green-50 border border-green-200 rounded">
-                <h3 className="text-xs font-bold text-green-700 mb-2">📤 Send to Projects</h3>
-                <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
-                <div className="flex space-x-2">
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-xs border rounded"
-                  >
-                    <option value="">-- Select Order --</option>
-                    {availableOrders.map(order => (
-                      <option key={order.id} value={order.id}>
-                        {order.order_number} - {order.client_name} ({order.translation_status})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={sendToProjects}
-                    disabled={!selectedOrderId || sendingToProjects}
-                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                  </button>
-                </div>
-                {availableOrders.length === 0 && (
-                  <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">📄</div>
-              <p className="text-xs">No translations yet. Upload and translate documents first.</p>
+            {/* Navigation */}
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => setActiveSubTab('translate')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+              <button
+                onClick={() => setActiveSubTab('export')}
+                disabled={translationResults.length === 0}
+                className="px-8 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300"
+              >
+                Próximo → Export
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
+
+      {/* ==================== 7. EXPORT TAB ==================== */}
+      {activeSubTab === 'export' && (
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-lg shadow-md p-8">
+            {translationResults.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Nenhuma tradução para exportar. Complete as etapas anteriores.</p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <div className="text-6xl mb-4">🎉</div>
+                <h2 className="text-xl font-semibold text-gray-800 mb-6">Concluído!</h2>
+
+                <button
+                  onClick={() => handleDownload('html')}
+                  className="w-full py-4 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 mb-4 flex items-center justify-center"
+                >
+                  <span className="mr-2">📥</span> Download HTML
+                </button>
+
+                <p className="text-sm text-gray-500 mb-6">
+                  Abra o HTML e use Ctrl+P para salvar como PDF
+                </p>
+
+                <button
+                  onClick={() => {
+                    setFiles([]);
+                    setOcrResults([]);
+                    setTranslationResults([]);
+                    setProcessingStatus('');
+                    setActiveSubTab('config');
+                  }}
+                  className="w-full py-3 border-2 border-blue-500 text-blue-500 font-medium rounded-lg hover:bg-blue-50 flex items-center justify-center"
+                >
+                  <span className="mr-2">🔄</span> Novo
+                </button>
+
+                {/* Send to Projects */}
+                <div className="mt-8 p-4 bg-gray-50 border rounded-lg text-left">
+                  <h3 className="text-sm font-bold text-gray-700 mb-2">📤 Enviar para Projetos</h3>
+                  <div className="flex space-x-2">
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm border rounded-lg"
+                    >
+                      <option value="">-- Selecione o Pedido --</option>
+                      {availableOrders.map(order => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number} - {order.client_name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={sendToProjects}
+                      disabled={!selectedOrderId || sendingToProjects}
+                      className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-gray-300"
+                    >
+                      {sendingToProjects ? '⏳' : '📤 Enviar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="mt-6">
+              <button onClick={() => setActiveSubTab('approval')} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                ← Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
 
 // ==================== PROJECTS PAGE ====================
 const ProjectsPage = ({ adminKey }) => {
@@ -2028,19 +1842,21 @@ const SettingsPage = ({ adminKey }) => {
 // ==================== TRANSLATION TOOL PAGE (Standalone) ====================
 const TranslationToolPage = ({ adminKey, onLogout }) => {
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">✍️</div>
-          <div>
-            <div className="font-bold text-sm">Translation Tool</div>
-            <div className="text-[10px] text-slate-400">Legacy Translations</div>
-          </div>
+    <div className="min-h-screen bg-slate-100">
+      {/* Header - Legacy Translations style */}
+      <div className="bg-slate-700 text-white px-6 py-3 flex items-center justify-between shadow-md">
+        <div className="flex items-center space-x-2">
+          <span className="text-xl">🌐</span>
+          <span className="font-semibold text-lg">Legacy Translations</span>
         </div>
-        <div className="flex items-center space-x-3">
-          <a href="/admin" className="text-xs text-slate-300 hover:text-white">← Back to Admin</a>
-          <button onClick={onLogout} className="text-xs text-red-400 hover:text-red-300">Logout</button>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm">Beatriz Paiva</span>
+          <button
+            onClick={onLogout}
+            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+          >
+            Logout
+          </button>
         </div>
       </div>
       {/* Translation Workspace */}
