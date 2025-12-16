@@ -232,7 +232,14 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [editingInstruction, setEditingInstruction] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(null);
   const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
-  const [glossaryForm, setGlossaryForm] = useState({ name: '', language: 'All Languages', field: 'All Fields', terms: [] });
+  const [glossaryForm, setGlossaryForm] = useState({
+    name: '',
+    sourceLang: 'Portuguese (Brazil)',
+    targetLang: 'English',
+    bidirectional: true,  // Create entries for both directions
+    field: 'All Fields',
+    terms: []
+  });
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
@@ -534,7 +541,14 @@ const TranslationWorkspace = ({ adminKey }) => {
       }
       setShowGlossaryModal(false);
       setEditingGlossary(null);
-      setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] });
+      setGlossaryForm({
+        name: '',
+        sourceLang: 'Portuguese (Brazil)',
+        targetLang: 'English',
+        bidirectional: true,
+        field: 'All Fields',
+        terms: []
+      });
       fetchResources();
       setProcessingStatus('✅ Glossary saved!');
     } catch (err) {
@@ -572,7 +586,14 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   const handleEditGlossary = (gloss) => {
     setEditingGlossary(gloss);
-    setGlossaryForm({ name: gloss.name, language: gloss.language, field: gloss.field, terms: gloss.terms || [] });
+    setGlossaryForm({
+      name: gloss.name,
+      sourceLang: gloss.sourceLang || 'Portuguese (Brazil)',
+      targetLang: gloss.targetLang || 'English',
+      bidirectional: gloss.bidirectional !== undefined ? gloss.bidirectional : true,
+      field: gloss.field || 'All Fields',
+      terms: gloss.terms || []
+    });
     setShowGlossaryModal(true);
   };
 
@@ -1178,10 +1199,15 @@ const TranslationWorkspace = ({ adminKey }) => {
                       <div className="flex items-center justify-between">
                         <div>
                           <span className="text-xs font-medium">{gloss.name}</span>
-                          <div className="flex space-x-2 mt-1">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{gloss.language}</span>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                              {gloss.sourceLang || 'PT'} {gloss.bidirectional ? '↔' : '→'} {gloss.targetLang || 'EN'}
+                            </span>
                             <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{gloss.field}</span>
                             <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
+                            {gloss.bidirectional && (
+                              <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-[10px]">↔ Bidirectional</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex space-x-1">
@@ -1266,7 +1292,8 @@ const TranslationWorkspace = ({ adminKey }) => {
                   <h3 className="font-bold">{editingGlossary ? 'Edit' : 'Add'} Glossary / TM</h3>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
+                  {/* Name and Field */}
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium mb-1">Name</label>
                       <input
@@ -1276,17 +1303,6 @@ const TranslationWorkspace = ({ adminKey }) => {
                         className="w-full px-2 py-1.5 text-xs border rounded"
                         placeholder="e.g., Legal Terms PT-EN"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Language</label>
-                      <select
-                        value={glossaryForm.language}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, language: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        <option>All Languages</option>
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-medium mb-1">Field</label>
@@ -1303,6 +1319,41 @@ const TranslationWorkspace = ({ adminKey }) => {
                         <option>Certificates</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Language Pair */}
+                  <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                    <label className="block text-xs font-bold mb-2">🌐 Language Pair</label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={glossaryForm.sourceLang}
+                        onChange={(e) => setGlossaryForm({ ...glossaryForm, sourceLang: e.target.value })}
+                        className="flex-1 px-2 py-1.5 text-xs border rounded"
+                      >
+                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                      </select>
+                      <span className="text-lg font-bold text-blue-600">
+                        {glossaryForm.bidirectional ? '↔' : '→'}
+                      </span>
+                      <select
+                        value={glossaryForm.targetLang}
+                        onChange={(e) => setGlossaryForm({ ...glossaryForm, targetLang: e.target.value })}
+                        className="flex-1 px-2 py-1.5 text-xs border rounded"
+                      >
+                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                      </select>
+                    </div>
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={glossaryForm.bidirectional}
+                        onChange={(e) => setGlossaryForm({ ...glossaryForm, bidirectional: e.target.checked })}
+                        className="rounded text-blue-600"
+                      />
+                      <span className="text-xs text-blue-700">
+                        <strong>Bidirectional:</strong> Terms work both ways (PT → EN and EN → PT)
+                      </span>
+                    </label>
                   </div>
 
                   {/* Add Single Term */}
@@ -1336,66 +1387,99 @@ const TranslationWorkspace = ({ adminKey }) => {
 
                   {/* Bulk Upload Terms */}
                   <div className="border-t pt-3">
-                    <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms</label>
-                    <p className="text-[10px] text-gray-500 mb-2">
-                      Paste multiple terms (one per line). Format: <code className="bg-gray-100 px-1">source | target | notes</code>
-                    </p>
+                    <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms (Paste Entire Glossary)</label>
+                    <div className="bg-green-50 border border-green-200 rounded p-2 mb-2">
+                      <p className="text-[10px] text-green-700">
+                        <strong>Format:</strong> One term per line: <code className="bg-green-100 px-1">{glossaryForm.sourceLang} | {glossaryForm.targetLang} | notes (optional)</code>
+                      </p>
+                      {glossaryForm.bidirectional && (
+                        <p className="text-[10px] text-green-600 mt-1">
+                          ↔ <strong>Bidirectional enabled:</strong> Terms will work in both translation directions automatically!
+                        </p>
+                      )}
+                    </div>
                     <textarea
                       value={bulkTermsText}
                       onChange={(e) => setBulkTermsText(e.target.value)}
-                      placeholder="certidão de nascimento | birth certificate | legal document
-carteira de identidade | identity card
-CPF | individual taxpayer number | Brazilian tax ID"
-                      className="w-full px-2 py-1.5 text-xs border rounded h-24 font-mono resize-none"
+                      placeholder={`certidão de nascimento | birth certificate | legal document
+carteira de identidade | identity card | ID document
+CPF | individual taxpayer number | Brazilian tax ID
+registro civil | civil registry
+cartório | notary office | public registry
+certidão de casamento | marriage certificate
+certidão de óbito | death certificate
+reconhecimento de firma | notarized signature
+autenticação | authentication
+tradução juramentada | certified translation`}
+                      className="w-full px-2 py-1.5 text-xs border rounded h-40 font-mono resize-y"
                     />
-                    <div className="flex space-x-2 mt-2">
-                      <button
-                        onClick={() => {
-                          const lines = bulkTermsText.trim().split('\n').filter(l => l.trim());
-                          const newTerms = lines.map(line => {
-                            const parts = line.split('|').map(p => p.trim());
-                            return {
-                              id: Date.now() + Math.random(),
-                              source: parts[0] || '',
-                              target: parts[1] || '',
-                              notes: parts[2] || ''
-                            };
-                          }).filter(t => t.source && t.target);
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-xs text-gray-500">
+                        {bulkTermsText.trim() ? `${bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} valid terms detected` : 'Paste your glossary above'}
+                      </span>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setBulkTermsText('')}
+                          className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={() => {
+                            const lines = bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|'));
+                            const newTerms = lines.map(line => {
+                              const parts = line.split('|').map(p => p.trim());
+                              return {
+                                id: Date.now() + Math.random(),
+                                source: parts[0] || '',
+                                target: parts[1] || '',
+                                notes: parts[2] || ''
+                              };
+                            }).filter(t => t.source && t.target);
 
-                          if (newTerms.length > 0) {
-                            setGlossaryForm({
-                              ...glossaryForm,
-                              terms: [...glossaryForm.terms, ...newTerms]
-                            });
-                            setBulkTermsText('');
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                      >
-                        📥 Add All Terms ({bulkTermsText.trim().split('\n').filter(l => l.trim()).length})
-                      </button>
-                      <button
-                        onClick={() => setBulkTermsText('')}
-                        className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                      >
-                        Clear
-                      </button>
+                            if (newTerms.length > 0) {
+                              setGlossaryForm({
+                                ...glossaryForm,
+                                terms: [...glossaryForm.terms, ...newTerms]
+                              });
+                              setBulkTermsText('');
+                              alert(`✅ Added ${newTerms.length} terms to glossary!`);
+                            } else {
+                              alert('No valid terms found. Use format: source | target | notes');
+                            }
+                          }}
+                          disabled={!bulkTermsText.trim()}
+                          className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          📥 Import {bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} Terms
+                        </button>
+                      </div>
                     </div>
                   </div>
 
                   {/* Terms List */}
                   {glossaryForm.terms.length > 0 && (
-                    <div className="border rounded max-h-48 overflow-y-auto">
+                    <div className="border rounded max-h-64 overflow-y-auto">
                       <div className="flex justify-between items-center px-2 py-1 bg-gray-100 border-b">
-                        <span className="text-xs font-medium">{glossaryForm.terms.length} terms</span>
+                        <span className="text-xs font-medium">{glossaryForm.terms.length} terms loaded</span>
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Clear all terms?')) {
+                              setGlossaryForm({...glossaryForm, terms: []});
+                            }
+                          }}
+                          className="text-[10px] text-red-600 hover:underline"
+                        >
+                          Clear All
+                        </button>
                       </div>
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 sticky top-0">
                           <tr>
-                            <th className="px-2 py-1.5 text-left">Source</th>
-                            <th className="px-2 py-1.5 text-left">Target</th>
+                            <th className="px-2 py-1.5 text-left">{glossaryForm.sourceLang}</th>
+                            <th className="px-2 py-1.5 text-left">{glossaryForm.targetLang}</th>
                             <th className="px-2 py-1.5 text-left">Notes</th>
-                            <th className="px-2 py-1.5 w-16 text-center">Actions</th>
+                            <th className="px-2 py-1.5 w-16 text-center">🗑️</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">

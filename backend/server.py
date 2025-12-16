@@ -2553,8 +2553,11 @@ class GlossaryTerm(BaseModel):
 
 class GlossaryCreate(BaseModel):
     name: str
-    language: str
-    field: str
+    sourceLang: Optional[str] = "Portuguese (Brazil)"
+    targetLang: Optional[str] = "English"
+    bidirectional: Optional[bool] = True
+    language: Optional[str] = None  # Legacy field, kept for compatibility
+    field: str = "All Fields"
     terms: List[GlossaryTerm] = []
 
 # Translation Instructions CRUD
@@ -2656,7 +2659,10 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
     glossary = {
         "id": str(uuid.uuid4()),
         "name": data.name,
-        "language": data.language,
+        "sourceLang": data.sourceLang,
+        "targetLang": data.targetLang,
+        "bidirectional": data.bidirectional,
+        "language": data.language or f"{data.sourceLang} <> {data.targetLang}",  # Legacy compatibility
         "field": data.field,
         "terms": [t.dict() for t in data.terms],
         "created_at": datetime.utcnow()
@@ -2677,7 +2683,10 @@ async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str
         {"id": glossary_id},
         {"$set": {
             "name": data.name,
-            "language": data.language,
+            "sourceLang": data.sourceLang,
+            "targetLang": data.targetLang,
+            "bidirectional": data.bidirectional,
+            "language": data.language or f"{data.sourceLang} <> {data.targetLang}",
             "field": data.field,
             "terms": [t.dict() for t in data.terms]
         }}
