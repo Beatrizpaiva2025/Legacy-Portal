@@ -254,12 +254,17 @@ const TranslationWorkspace = ({ adminKey }) => {
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
+  const [useClaudeOcr, setUseClaudeOcr] = useState(false);
+  const [ocrSpecialCommands, setOcrSpecialCommands] = useState('');
 
   // Approval checkboxes state
   const [approvalChecks, setApprovalChecks] = useState({
     coverLetter: false,
     proofread: false
   });
+
+  // Bulk upload state for glossary
+  const [bulkTermsText, setBulkTermsText] = useState('');
 
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
@@ -593,28 +598,37 @@ const TranslationWorkspace = ({ adminKey }) => {
     });
   };
 
-  // OCR with backend
+  // OCR with backend (supports regular OCR or Claude OCR)
   const handleOCR = async () => {
     if (files.length === 0) {
       alert('Please select files first');
       return;
     }
 
+    if (useClaudeOcr && !claudeApiKey) {
+      alert('Claude API Key is required for Claude OCR. Please add it in Resources tab.');
+      return;
+    }
+
     setIsProcessing(true);
-    setProcessingStatus('Performing OCR...');
+    setProcessingStatus(useClaudeOcr ? 'Performing OCR with Claude AI...' : 'Performing OCR...');
     setOcrResults([]);
 
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        setProcessingStatus(`Processing ${file.name} (${i + 1}/${files.length})...`);
+        setProcessingStatus(`Processing ${file.name} (${i + 1}/${files.length})${useClaudeOcr ? ' with Claude AI' : ''}...`);
 
         const fileBase64 = await fileToBase64(file);
 
         const response = await axios.post(`${API}/admin/ocr?admin_key=${adminKey}`, {
           file_base64: fileBase64,
           file_type: file.type,
-          filename: file.name
+          filename: file.name,
+          use_claude: useClaudeOcr,
+          claude_api_key: useClaudeOcr ? claudeApiKey : null,
+          special_commands: ocrSpecialCommands || null,
+          preserve_layout: true
         });
 
         if (response.data.status === 'success' || response.data.text) {
@@ -1214,9 +1228,9 @@ const TranslationWorkspace = ({ adminKey }) => {
                     </div>
                   </div>
 
-                  {/* Add Term */}
+                  {/* Add Single Term */}
                   <div className="border-t pt-3">
-                    <label className="block text-xs font-medium mb-2">Add Terms</label>
+                    <label className="block text-xs font-medium mb-2">Add Single Term</label>
                     <div className="flex space-x-2">
                       <input
                         type="text"
@@ -1243,26 +1257,118 @@ const TranslationWorkspace = ({ adminKey }) => {
                     </div>
                   </div>
 
+                  {/* Bulk Upload Terms */}
+                  <div className="border-t pt-3">
+                    <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms</label>
+                    <p className="text-[10px] text-gray-500 mb-2">
+                      Paste multiple terms (one per line). Format: <code className="bg-gray-100 px-1">source | target | notes</code>
+                    </p>
+                    <textarea
+                      value={bulkTermsText}
+                      onChange={(e) => setBulkTermsText(e.target.value)}
+                      placeholder="certidão de nascimento | birth certificate | legal document
+carteira de identidade | identity card
+CPF | individual taxpayer number | Brazilian tax ID"
+                      className="w-full px-2 py-1.5 text-xs border rounded h-24 font-mono resize-none"
+                    />
+                    <div className="flex space-x-2 mt-2">
+                      <button
+                        onClick={() => {
+                          const lines = bulkTermsText.trim().split('\n').filter(l => l.trim());
+                          const newTerms = lines.map(line => {
+                            const parts = line.split('|').map(p => p.trim());
+                            return {
+                              id: Date.now() + Math.random(),
+                              source: parts[0] || '',
+                              target: parts[1] || '',
+                              notes: parts[2] || ''
+                            };
+                          }).filter(t => t.source && t.target);
+
+                          if (newTerms.length > 0) {
+                            setGlossaryForm({
+                              ...glossaryForm,
+                              terms: [...glossaryForm.terms, ...newTerms]
+                            });
+                            setBulkTermsText('');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                      >
+                        📥 Add All Terms ({bulkTermsText.trim().split('\n').filter(l => l.trim()).length})
+                      </button>
+                      <button
+                        onClick={() => setBulkTermsText('')}
+                        className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Terms List */}
                   {glossaryForm.terms.length > 0 && (
                     <div className="border rounded max-h-48 overflow-y-auto">
+                      <div className="flex justify-between items-center px-2 py-1 bg-gray-100 border-b">
+                        <span className="text-xs font-medium">{glossaryForm.terms.length} terms</span>
+                      </div>
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 sticky top-0">
                           <tr>
                             <th className="px-2 py-1.5 text-left">Source</th>
                             <th className="px-2 py-1.5 text-left">Target</th>
                             <th className="px-2 py-1.5 text-left">Notes</th>
-                            <th className="px-2 py-1.5 w-8"></th>
+                            <th className="px-2 py-1.5 w-16 text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {glossaryForm.terms.map((term) => (
-                            <tr key={term.id}>
-                              <td className="px-2 py-1.5">{term.source}</td>
-                              <td className="px-2 py-1.5">{term.target}</td>
-                              <td className="px-2 py-1.5 text-gray-500">{term.notes}</td>
+                          {glossaryForm.terms.map((term, idx) => (
+                            <tr key={term.id} className="hover:bg-gray-50">
                               <td className="px-2 py-1.5">
-                                <button onClick={() => removeTermFromGlossary(term.id)} className="text-red-500 hover:text-red-700">×</button>
+                                <input
+                                  type="text"
+                                  value={term.source}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[idx].source = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.target}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[idx].target = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.notes || ''}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[idx].notes = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-1 py-0.5 text-xs text-gray-500 border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
+                                  placeholder="notes..."
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                <button
+                                  onClick={() => removeTermFromGlossary(term.id)}
+                                  className="text-red-500 hover:text-red-700 px-1"
+                                  title="Delete term"
+                                >
+                                  🗑️
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1605,15 +1711,66 @@ const TranslationWorkspace = ({ adminKey }) => {
             </p>
           </div>
 
-          {/* OCR Button */}
+          {/* OCR Options */}
           {files.length > 0 && !ocrResults.length && (
-            <button
-              onClick={handleOCR}
-              disabled={isProcessing}
-              className="w-full py-2 bg-yellow-500 text-white text-sm font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed mb-4"
-            >
-              {isProcessing ? '⏳ Processing OCR...' : '🔍 Run OCR (Extract Text)'}
-            </button>
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <h3 className="text-xs font-bold text-yellow-700 mb-3">🔍 OCR Options</h3>
+
+              {/* OCR Type Selection */}
+              <div className="flex items-center space-x-4 mb-3">
+                <label className="flex items-center text-xs cursor-pointer">
+                  <input
+                    type="radio"
+                    name="ocrType"
+                    checked={!useClaudeOcr}
+                    onChange={() => setUseClaudeOcr(false)}
+                    className="mr-2"
+                  />
+                  <span className="font-medium">AWS Textract</span>
+                  <span className="ml-1 text-gray-400">(standard)</span>
+                </label>
+                <label className="flex items-center text-xs cursor-pointer">
+                  <input
+                    type="radio"
+                    name="ocrType"
+                    checked={useClaudeOcr}
+                    onChange={() => setUseClaudeOcr(true)}
+                    className="mr-2"
+                  />
+                  <span className="font-medium">Claude AI</span>
+                  <span className="ml-1 text-gray-400">(advanced)</span>
+                </label>
+              </div>
+
+              {/* Special Commands for Claude */}
+              {useClaudeOcr && (
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    📝 Special Commands for Claude (optional)
+                  </label>
+                  <textarea
+                    value={ocrSpecialCommands}
+                    onChange={(e) => setOcrSpecialCommands(e.target.value)}
+                    placeholder="e.g., Maintain exact layout, preserve formatting, extract tables as markdown..."
+                    className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={handleOCR}
+                disabled={isProcessing}
+                className={`w-full py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                  useClaudeOcr ? 'bg-purple-500 hover:bg-purple-600' : 'bg-yellow-500 hover:bg-yellow-600'
+                }`}
+              >
+                {isProcessing
+                  ? '⏳ Processing OCR...'
+                  : useClaudeOcr
+                    ? '🤖 Run OCR with Claude AI'
+                    : '🔍 Run OCR (AWS Textract)'}
+              </button>
+            </div>
           )}
 
           {processingStatus && (
