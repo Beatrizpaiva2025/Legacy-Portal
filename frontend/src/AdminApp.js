@@ -514,19 +514,46 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Glossaries CRUD
   const handleSaveGlossary = async () => {
+    if (!glossaryForm.name || !glossaryForm.name.trim()) {
+      alert('Please enter a name for the glossary');
+      return;
+    }
+
+    setProcessingStatus('Saving glossary...');
+
     try {
+      const config = { timeout: 30000 }; // 30 second timeout
+
       if (editingGlossary) {
-        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm);
+        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm, config);
       } else {
-        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm);
+        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm, config);
       }
       setShowGlossaryModal(false);
       setEditingGlossary(null);
       setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] });
       fetchResources();
+      setProcessingStatus('✅ Glossary saved!');
     } catch (err) {
       console.error('Failed to save glossary:', err);
-      alert('Failed to save glossary');
+
+      // Save locally as backup
+      const localGlossaries = JSON.parse(localStorage.getItem('backup_glossaries') || '[]');
+      localGlossaries.push({
+        ...glossaryForm,
+        id: `local_${Date.now()}`,
+        savedAt: new Date().toISOString()
+      });
+      localStorage.setItem('backup_glossaries', JSON.stringify(localGlossaries));
+
+      const errorMsg = err.code === 'ECONNABORTED'
+        ? 'Request timeout - server may be slow. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+          : (err.response?.data?.detail || err.message);
+
+      alert('Failed to save glossary: ' + errorMsg);
+      setProcessingStatus('❌ Save failed - backed up locally');
     }
   };
 
