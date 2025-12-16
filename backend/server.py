@@ -2496,23 +2496,55 @@ Follow the user's instructions to modify or improve the translation."""
         async with httpx.AsyncClient(timeout=120.0) as client:
             # Build message content - include image if provided for visual layout reference
             if request.original_image and request.action == 'translate':
-                # Clean base64 string (remove data:image prefix if present)
+                # Clean base64 string (remove data:image/pdf prefix if present)
                 image_data = request.original_image
+                media_type = "image/jpeg"
+
                 if ',' in image_data:
+                    # Extract media type from data URL
+                    header = image_data.split(',')[0]
                     image_data = image_data.split(',')[1]
 
-                message_content = [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": image_data,
+                    # Check if it's a PDF and convert to image
+                    if 'pdf' in header.lower():
+                        logger.info("Converting PDF to image for Claude...")
+                        try:
+                            import fitz  # PyMuPDF
+                            pdf_bytes = base64.b64decode(image_data)
+                            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                            # Convert first page to image
+                            page = doc[0]
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
+                            img_bytes = pix.tobytes("jpeg")
+                            image_data = base64.b64encode(img_bytes).decode('utf-8')
+                            media_type = "image/jpeg"
+                            doc.close()
+                            logger.info("PDF converted to image successfully")
+                        except Exception as e:
+                            logger.error(f"PDF conversion failed: {e}")
+                            # Fall back to text-only translation
+                            image_data = None
+                    elif 'png' in header.lower():
+                        media_type = "image/png"
+                    elif 'gif' in header.lower():
+                        media_type = "image/gif"
+                    elif 'webp' in header.lower():
+                        media_type = "image/webp"
+
+                if image_data:
+                    message_content = [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data,
+                            },
                         },
-                    },
-                    {
-                        "type": "text",
-                        "text": f"""Look at this document image carefully. This is the original document.
+                        {
+                            "type": "text",
+                            "text": f"""Look at this document image carefully. This is the original document.
 
 The OCR text extracted from this document is:
 ---
@@ -2525,8 +2557,10 @@ CRITICAL: Your HTML output MUST match the visual layout of the original document
 - If you see tables in the image, create HTML tables with the same structure
 - If you see bordered sections, use CSS borders
 - Replicate the exact visual appearance in HTML format"""
-                    }
-                ]
+                        }
+                    ]
+                else:
+                    message_content = user_message
             else:
                 message_content = user_message
 
