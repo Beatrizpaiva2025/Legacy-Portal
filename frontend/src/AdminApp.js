@@ -193,7 +193,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey }) => {
   // State
-  const [activeSubTab, setActiveSubTab] = useState('upload');
+  const [activeSubTab, setActiveSubTab] = useState('api');
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
   const [translationResults, setTranslationResults] = useState([]);
@@ -598,8 +598,8 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your Claude API Key in the Config tab');
-      setActiveSubTab('config');
+      alert('Please configure your Claude API Key in the API tab');
+      setActiveSubTab('api');
       return;
     }
 
@@ -634,7 +634,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         }
       }
       setProcessingStatus('✅ Translation completed!');
-      setActiveSubTab('results');
+      setActiveSubTab('review');
     } catch (error) {
       console.error('Translation error:', error);
       setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
@@ -898,18 +898,21 @@ const TranslationWorkspace = ({ adminKey }) => {
     <div className="p-4">
       <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATION WORKSPACE</h1>
 
-      {/* Sub-tabs */}
-      <div className="flex space-x-1 mb-4 border-b">
+      {/* Sub-tabs - 7 Tabs */}
+      <div className="flex flex-wrap gap-1 mb-4 border-b pb-2">
         {[
           { id: 'resources', label: 'Resources', icon: '📚' },
-          { id: 'upload', label: '1. Upload', icon: '📤' },
-          { id: 'config', label: '2. Config', icon: '⚙️' },
-          { id: 'results', label: '3. Results', icon: '📊' }
+          { id: 'api', label: '1. API', icon: '🔑' },
+          { id: 'cover', label: '2. Cover Letter', icon: '📜' },
+          { id: 'upload', label: '3. Upload', icon: '📤' },
+          { id: 'ocr', label: '4. OCR', icon: '🔍' },
+          { id: 'review', label: '5. Review', icon: '✏️' },
+          { id: 'approval', label: '6. Approval', icon: '✅' }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t ${
+            className={`px-3 py-1.5 text-xs font-medium rounded ${
               activeSubTab === tab.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1211,10 +1214,10 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
       )}
 
-      {/* UPLOAD TAB */}
+      {/* UPLOAD TAB (3) */}
       {activeSubTab === 'upload' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">Upload Documents</h2>
+          <h2 className="text-sm font-bold mb-2">📤 Upload Documents</h2>
           <p className="text-xs text-gray-500 mb-4">Select documents for OCR and translation</p>
 
           <div
@@ -1243,33 +1246,37 @@ const TranslationWorkspace = ({ adminKey }) => {
               <label className="text-xs font-medium text-gray-700">Selected Files:</label>
               <div className="mt-1 space-y-1">
                 {files.map((file, idx) => (
-                  <div key={idx} className="flex items-center text-xs p-2 bg-gray-50 rounded">
-                    <span className="mr-2">📄</span>
-                    <span>{file.name}</span>
-                    <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
+                  <div key={idx} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                    <div className="flex items-center">
+                      <span className="mr-2">📄</span>
+                      <span>{file.name}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
+                      <button
+                        onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
+              <button
+                onClick={() => setFiles([])}
+                className="mt-2 px-3 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+              >
+                Clear All
+              </button>
             </div>
           )}
 
-          <div className="flex space-x-2 mt-4">
-            <button
-              onClick={handleOCR}
-              disabled={files.length === 0 || isProcessing}
-              className="flex-1 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? '⏳ Processing...' : '🔍 OCR (Extract Text)'}
-            </button>
-
-            <button
-              onClick={handleTranslate}
-              disabled={ocrResults.length === 0 || isProcessing}
-              className="flex-1 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isProcessing ? '⏳ Processing...' : '🌐 Translate (Claude)'}
-            </button>
-          </div>
+          {files.length > 0 && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+              <p className="text-xs text-green-700">✅ {files.length} file(s) ready. Go to <strong>4. OCR</strong> tab to extract text.</p>
+            </div>
+          )}
 
           {processingStatus && (
             <div className={`mt-4 p-3 rounded text-xs ${
@@ -1280,34 +1287,89 @@ const TranslationWorkspace = ({ adminKey }) => {
               {processingStatus}
             </div>
           )}
+        </div>
+      )}
 
-          {/* OCR Results Preview */}
-          {ocrResults.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-xs font-bold mb-2">📝 OCR Results (editable)</h3>
-              {ocrResults.map((result, idx) => (
-                <div key={idx} className="mb-3">
-                  <label className="text-xs text-gray-600">{result.filename}</label>
-                  <textarea
-                    value={result.text}
-                    onChange={(e) => {
-                      const updated = [...ocrResults];
-                      updated[idx].text = e.target.value;
-                      setOcrResults(updated);
-                    }}
-                    className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
-                  />
-                </div>
-              ))}
+      {/* OCR TAB (4) */}
+      {activeSubTab === 'ocr' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">🔍 OCR - Text Extraction</h2>
+          <p className="text-xs text-gray-500 mb-4">Extract text from uploaded documents</p>
+
+          {files.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📤</div>
+              <p className="text-xs">No files uploaded. Go to <strong>3. Upload</strong> tab first.</p>
             </div>
+          ) : (
+            <>
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-xs text-blue-700">📁 {files.length} file(s) ready for OCR</p>
+              </div>
+
+              <button
+                onClick={handleOCR}
+                disabled={isProcessing}
+                className="w-full py-3 bg-yellow-500 text-white text-sm font-bold rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? '⏳ Processing OCR...' : '🔍 Run OCR (Extract Text)'}
+              </button>
+
+              {processingStatus && (
+                <div className={`mt-4 p-3 rounded text-xs ${
+                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {processingStatus}
+                </div>
+              )}
+
+              {/* OCR Results Preview (editable) */}
+              {ocrResults.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-xs font-bold mb-2">📝 OCR Results (editable - review before translation)</h3>
+                  {ocrResults.map((result, idx) => (
+                    <div key={idx} className="mb-3">
+                      <label className="text-xs text-gray-600 font-medium">{result.filename}</label>
+                      <textarea
+                        value={result.text}
+                        onChange={(e) => {
+                          const updated = [...ocrResults];
+                          updated[idx].text = e.target.value;
+                          setOcrResults(updated);
+                        }}
+                        className="w-full h-40 mt-1 p-2 text-xs font-mono border rounded"
+                      />
+                    </div>
+                  ))}
+
+                  <div className="mt-4 flex space-x-2">
+                    <button
+                      onClick={handleTranslate}
+                      disabled={isProcessing}
+                      className="flex-1 py-3 bg-green-500 text-white text-sm font-bold rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude'}
+                    </button>
+                  </div>
+
+                  {translationResults.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                      <p className="text-xs text-green-700">✅ Translation complete! Go to <strong>5. Review</strong> tab to check and edit.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
-      {/* CONFIG TAB */}
-      {activeSubTab === 'config' && (
+      {/* API TAB (1) */}
+      {activeSubTab === 'api' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">Translation Configuration</h2>
+          <h2 className="text-sm font-bold mb-4">🔑 API & Translation Settings</h2>
 
           {/* Claude API Key */}
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -1396,8 +1458,41 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
           </div>
 
+          {/* General Instructions */}
+          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
+            <label className="block text-xs font-bold text-purple-700 mb-2">📝 General Translation Instructions</label>
+            <textarea
+              value={generalInstructions}
+              onChange={(e) => setGeneralInstructions(e.target.value)}
+              placeholder="Enter general instructions for the translator (e.g., maintain formal tone, preserve formatting, specific terminology to use...)"
+              className="w-full h-24 px-2 py-1.5 text-xs border rounded resize-none"
+            />
+            <div className="flex justify-between items-center mt-2">
+              <p className="text-[10px] text-gray-500">These instructions will be used in all translations.</p>
+              <button
+                onClick={saveGeneralInstructions}
+                className="px-3 py-1 bg-purple-500 text-white text-[10px] rounded hover:bg-purple-600"
+              >
+                Save Instructions
+              </button>
+            </div>
+          </div>
+
+          {claudeApiKey && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+              <p className="text-xs text-green-700">✅ API Key configured. Go to <strong>2. Cover Letter</strong> to set up logos and format.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* COVER LETTER TAB (2) */}
+      {activeSubTab === 'cover' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">📜 Cover Letter & Certificate Setup</h2>
+
           {/* Translation Type and Page Format */}
-          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+          <div className="p-3 bg-green-50 border border-green-200 rounded mb-4">
             <h3 className="text-xs font-bold text-green-700 mb-3">📄 Page Format</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1428,28 +1523,8 @@ const TranslationWorkspace = ({ adminKey }) => {
             </p>
           </div>
 
-          {/* General Instructions */}
-          <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
-            <label className="block text-xs font-bold text-purple-700 mb-2">📝 General Translation Instructions</label>
-            <textarea
-              value={generalInstructions}
-              onChange={(e) => setGeneralInstructions(e.target.value)}
-              placeholder="Enter general instructions for the translator (e.g., maintain formal tone, preserve formatting, specific terminology to use...)"
-              className="w-full h-24 px-2 py-1.5 text-xs border rounded resize-none"
-            />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-[10px] text-gray-500">These instructions will be used in all translations.</p>
-              <button
-                onClick={saveGeneralInstructions}
-                className="px-3 py-1 bg-purple-500 text-white text-[10px] rounded hover:bg-purple-600"
-              >
-                Save Instructions
-              </button>
-            </div>
-          </div>
-
           {/* Certificate Logos Section */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded">
             <h3 className="text-sm font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
             <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
 
@@ -1560,13 +1635,17 @@ const TranslationWorkspace = ({ adminKey }) => {
               </div>
             </div>
           </div>
+
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+            <p className="text-xs text-green-700">✅ Cover letter configured. Go to <strong>3. Upload</strong> to add documents.</p>
+          </div>
         </div>
       )}
 
-      {/* RESULTS TAB */}
-      {activeSubTab === 'results' && (
+      {/* REVIEW TAB (5) */}
+      {activeSubTab === 'review' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">Translation Review & Approval</h2>
+          <h2 className="text-sm font-bold mb-2">✏️ Review Translation</h2>
 
           {translationResults.length > 0 ? (
             <>
@@ -1614,7 +1693,7 @@ const TranslationWorkspace = ({ adminKey }) => {
               </div>
 
               {/* Correction Command */}
-              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   📝 Send Correction Command to Claude
                 </label>
@@ -1633,6 +1712,39 @@ const TranslationWorkspace = ({ adminKey }) => {
                   >
                     {applyingCorrection ? '⏳' : '✨ Apply'}
                   </button>
+                </div>
+              </div>
+
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                <p className="text-xs text-green-700">✅ Review complete? Go to <strong>6. Approval</strong> to download or send to projects.</p>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📄</div>
+              <p className="text-xs">No translations yet. Complete OCR and translation in <strong>4. OCR</strong> tab first.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* APPROVAL TAB (6) */}
+      {activeSubTab === 'approval' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">✅ Approval & Download</h2>
+
+          {translationResults.length > 0 ? (
+            <>
+              {/* Summary */}
+              <div className="mb-4 p-3 bg-gray-50 border rounded">
+                <h3 className="text-xs font-bold text-gray-700 mb-2">📋 Translation Summary</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div><strong>Documents:</strong> {translationResults.length}</div>
+                  <div><strong>From:</strong> {sourceLanguage}</div>
+                  <div><strong>To:</strong> {targetLanguage}</div>
+                  <div><strong>Type:</strong> {documentType}</div>
+                  <div><strong>Order:</strong> {orderNumber || 'N/A'}</div>
+                  <div><strong>Translator:</strong> {selectedTranslator}</div>
                 </div>
               </div>
 
@@ -1698,11 +1810,21 @@ const TranslationWorkspace = ({ adminKey }) => {
                   <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
                 )}
               </div>
+
+              {processingStatus && (
+                <div className={`mt-4 p-3 rounded text-xs ${
+                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {processingStatus}
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">📄</div>
-              <p className="text-xs">No translations yet. Upload and translate documents first.</p>
+              <p className="text-xs">No translations yet. Complete OCR and translation first.</p>
             </div>
           )}
         </div>
