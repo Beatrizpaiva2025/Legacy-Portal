@@ -263,6 +263,9 @@ const TranslationWorkspace = ({ adminKey }) => {
     proofread: false
   });
 
+  // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
+  const [reviewViewMode, setReviewViewMode] = useState('preview');
+
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
 
@@ -745,7 +748,8 @@ const TranslationWorkspace = ({ adminKey }) => {
           claude_api_key: claudeApiKey,
           action: 'translate',
           general_instructions: generalInstructions,
-          preserve_layout: true
+          preserve_layout: true,
+          page_format: pageFormat
         });
 
         if (response.data.status === 'success' || response.data.translation) {
@@ -2073,29 +2077,66 @@ CPF | individual taxpayer number | Brazilian tax ID"
                 </div>
               )}
 
-              {/* Side by side view with synchronized scroll */}
+              {/* View Mode Toggle */}
+              <div className="flex justify-end mb-2">
+                <div className="inline-flex rounded-md shadow-sm" role="group">
+                  <button
+                    onClick={() => setReviewViewMode('preview')}
+                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                      reviewViewMode === 'preview'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    👁️ Preview HTML
+                  </button>
+                  <button
+                    onClick={() => setReviewViewMode('edit')}
+                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                      reviewViewMode === 'edit'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    ✏️ Edit HTML
+                  </button>
+                </div>
+              </div>
+
+              {/* Side by side view */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
                     <span className="text-xs font-bold text-gray-700">📄 Original ({sourceLanguage})</span>
                   </div>
                   <div className="px-3 py-2">
-                    <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage}) - Editable</span>
+                    <span className="text-xs font-bold text-gray-700">
+                      🌐 Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Edit Mode'}
+                    </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0 h-80 overflow-hidden">
+                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
                   <div className="border-r overflow-auto" ref={originalTextRef} onScroll={() => handleScroll('original')}>
                     <pre className="p-3 text-xs font-mono whitespace-pre-wrap bg-gray-50 min-h-full" style={{fontWeight: 'bold'}}>
                       {translationResults[selectedResultIndex]?.originalText || ''}
                     </pre>
                   </div>
-                  <div className="overflow-auto" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
-                    <textarea
-                      value={translationResults[selectedResultIndex]?.translatedText || ''}
-                      onChange={(e) => handleTranslationEdit(e.target.value)}
-                      className="w-full min-h-full p-3 text-xs font-mono border-0 resize-none focus:outline-none focus:ring-0"
-                      style={{minHeight: '320px'}}
-                    />
+                  <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                    {reviewViewMode === 'preview' ? (
+                      <iframe
+                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
+                        title="Translation Preview"
+                        className="w-full h-full border-0"
+                        style={{minHeight: '384px'}}
+                      />
+                    ) : (
+                      <textarea
+                        value={translationResults[selectedResultIndex]?.translatedText || ''}
+                        onChange={(e) => handleTranslationEdit(e.target.value)}
+                        className="w-full min-h-full p-3 text-xs font-mono border-0 resize-none focus:outline-none focus:ring-0"
+                        style={{minHeight: '384px'}}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
