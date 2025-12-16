@@ -2783,6 +2783,66 @@ async def delete_glossary(glossary_id: str, admin_key: str):
     return {"status": "success"}
 
 
+# ==================== COVER LETTER TEMPLATES ====================
+
+@api_router.get("/admin/cover-templates")
+async def get_cover_templates(admin_key: str):
+    """Get all cover letter templates"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    templates = await db.cover_templates.find().sort("created_at", -1).to_list(100)
+    for template in templates:
+        template["_id"] = str(template["_id"])
+        if "id" not in template:
+            template["id"] = template["_id"]
+
+    return {"templates": templates}
+
+
+@api_router.post("/admin/cover-templates")
+async def create_cover_template(admin_key: str, request: Request):
+    """Create a new cover letter template"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    data = await request.json()
+    template = {
+        "id": str(uuid.uuid4()),
+        "name": data.get("name", "Untitled Template"),
+        "source_language": data.get("source_language", "Portuguese (Brazil)"),
+        "target_language": data.get("target_language", "English"),
+        "document_type": data.get("document_type", "Birth Certificate"),
+        "translation_type": data.get("translation_type", "certified"),
+        "page_format": data.get("page_format", "letter"),
+        "translator_name": data.get("translator_name", "Beatriz Paiva"),
+        "created_at": datetime.utcnow()
+    }
+
+    await db.cover_templates.insert_one(template)
+
+    return {"status": "success", "template_id": template["id"]}
+
+
+@api_router.delete("/admin/cover-templates/{template_id}")
+async def delete_cover_template(template_id: str, admin_key: str):
+    """Delete a cover letter template"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.cover_templates.delete_one({"id": template_id})
+
+    if result.deleted_count == 0:
+        # Try with _id as well
+        from bson import ObjectId
+        try:
+            result = await db.cover_templates.delete_one({"_id": ObjectId(template_id)})
+        except:
+            pass
+
+    return {"status": "success"}
+
+
 # Include the router in the main app
 app.include_router(api_router)
 

@@ -276,6 +276,100 @@ const TranslationWorkspace = ({ adminKey }) => {
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
 
+  // Translation editing state
+  const [translationEditMode, setTranslationEditMode] = useState(false);
+  const translationEditRef = useRef(null);
+
+  // Cover letter templates state
+  const [coverTemplates, setCoverTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [newTemplateName, setNewTemplateName] = useState('');
+
+  // Helper function to get "a" or "an" based on first letter of word
+  const getArticle = (word) => {
+    if (!word) return 'a';
+    const firstLetter = word.trim().toLowerCase()[0];
+    const vowels = ['a', 'e', 'i', 'o', 'u'];
+    return vowels.includes(firstLetter) ? 'an' : 'a';
+  };
+
+  // Apply formatting to translation editable content
+  const applyTranslationFormat = (command, value = null) => {
+    if (translationEditRef.current) {
+      translationEditRef.current.focus();
+      document.execCommand(command, false, value);
+      // Save the updated content back to state
+      const updatedHTML = translationEditRef.current.innerHTML;
+      if (translationResults.length > 0) {
+        const newResults = [...translationResults];
+        newResults[0] = { ...newResults[0], translatedText: updatedHTML };
+        setTranslationResults(newResults);
+      }
+    }
+  };
+
+  // Fetch cover letter templates
+  const fetchCoverTemplates = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/cover-templates?admin_key=${adminKey}`);
+      setCoverTemplates(response.data.templates || []);
+    } catch (err) {
+      console.error('Failed to fetch cover templates:', err);
+    }
+  };
+
+  // Save current settings as a template
+  const saveCoverTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      alert('Please enter a template name');
+      return;
+    }
+    try {
+      const templateData = {
+        name: newTemplateName.trim(),
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
+        translation_type: translationType,
+        page_format: pageFormat,
+        translator_name: selectedTranslator
+      };
+      await axios.post(`${API}/admin/cover-templates?admin_key=${adminKey}`, templateData);
+      setNewTemplateName('');
+      fetchCoverTemplates();
+      alert('Template saved!');
+    } catch (err) {
+      console.error('Failed to save template:', err);
+      alert('Failed to save template');
+    }
+  };
+
+  // Load a template
+  const loadCoverTemplate = (templateId) => {
+    const template = coverTemplates.find(t => t._id === templateId || t.id === templateId);
+    if (template) {
+      setSourceLanguage(template.source_language || sourceLanguage);
+      setTargetLanguage(template.target_language || targetLanguage);
+      setDocumentType(template.document_type || documentType);
+      setTranslationType(template.translation_type || translationType);
+      setPageFormat(template.page_format || pageFormat);
+      setSelectedTranslator(template.translator_name || selectedTranslator);
+      setSelectedTemplate(templateId);
+    }
+  };
+
+  // Delete a template
+  const deleteCoverTemplate = async (templateId) => {
+    if (!window.confirm('Delete this template?')) return;
+    try {
+      await axios.delete(`${API}/admin/cover-templates/${templateId}?admin_key=${adminKey}`);
+      fetchCoverTemplates();
+      if (selectedTemplate === templateId) setSelectedTemplate('');
+    } catch (err) {
+      console.error('Failed to delete template:', err);
+    }
+  };
+
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
     const savedKey = localStorage.getItem('claude_api_key');
@@ -301,6 +395,7 @@ const TranslationWorkspace = ({ adminKey }) => {
 
     fetchResources();
     fetchAvailableOrders();
+    fetchCoverTemplates();
   }, []);
 
   // Fetch resources from backend
@@ -936,7 +1031,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
-            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+            Translation of ${getArticle(documentType)} <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
             <strong>${targetLanguage}</strong>
         </div>
 
@@ -1747,6 +1842,84 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
 
+          {/* Cover Letter Templates Section */}
+          <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
+            <h3 className="text-xs font-bold text-green-700 mb-3">📑 Cover Letter Templates</h3>
+            <p className="text-[10px] text-gray-600 mb-3">Save and reuse common configurations for different language pairs</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* Load Template */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Load Template</label>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => e.target.value && loadCoverTemplate(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option value="">-- Select Template --</option>
+                    {coverTemplates.map(t => (
+                      <option key={t._id || t.id} value={t._id || t.id}>
+                        {t.name} ({t.source_language} → {t.target_language})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedTemplate && (
+                    <button
+                      onClick={() => deleteCoverTemplate(selectedTemplate)}
+                      className="px-2 py-1 text-red-600 border border-red-300 rounded text-xs hover:bg-red-50"
+                      title="Delete template"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Save New Template */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Save Current as Template</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    placeholder="e.g., PT-BR to EN Birth Cert"
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  />
+                  <button
+                    onClick={saveCoverTemplate}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                  >
+                    💾 Save
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Saved Templates List */}
+            {coverTemplates.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-green-200">
+                <div className="text-[10px] text-gray-600 mb-2">Saved Templates:</div>
+                <div className="flex flex-wrap gap-2">
+                  {coverTemplates.map(t => (
+                    <button
+                      key={t._id || t.id}
+                      onClick={() => loadCoverTemplate(t._id || t.id)}
+                      className={`px-2 py-1 text-[10px] rounded border ${
+                        selectedTemplate === (t._id || t.id)
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50'
+                      }`}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Certificate Logos Section */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
             <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
@@ -1870,9 +2043,9 @@ tradução juramentada | certified translation`}
               {/* Main Title */}
               <h1 className="text-3xl text-center mb-8 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
 
-              {/* Translation of a ... */}
+              {/* Translation of a/an ... */}
               <p className="text-center mb-10 text-base">
-                Translation of a{' '}
+                Translation of {getArticle(documentType)}{' '}
                 <input
                   type="text"
                   value={documentType}
@@ -2106,12 +2279,19 @@ tradução juramentada | certified translation`}
                     {originalImages.map((img, idx) => (
                       <div key={idx} className="mb-2">
                         {img.filename.toLowerCase().endsWith('.pdf') ? (
-                          <embed
-                            src={img.data}
+                          <object
+                            data={img.data}
                             type="application/pdf"
                             className="w-full border shadow-sm"
                             style={{height: '430px'}}
-                          />
+                          >
+                            <iframe
+                              src={img.data}
+                              title={img.filename}
+                              className="w-full border shadow-sm"
+                              style={{height: '430px'}}
+                            />
+                          </object>
                         ) : (
                           <img
                             src={img.data}
@@ -2124,14 +2304,91 @@ tradução juramentada | certified translation`}
                   </div>
 
                   {/* Right: Translation Result */}
-                  <div className="overflow-auto bg-white">
+                  <div className="overflow-hidden bg-white flex flex-col">
                     {translationResults.length > 0 ? (
-                      <iframe
-                        srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
-                        title="Translation"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '450px'}}
-                      />
+                      <>
+                        {/* Edit Toggle & Toolbar */}
+                        <div className="border-b bg-gray-50 px-2 py-1">
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => setTranslationEditMode(!translationEditMode)}
+                              className={`px-2 py-1 text-xs rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                            >
+                              {translationEditMode ? '✏️ Editing' : '👁️ Preview'}
+                            </button>
+                            {translationEditMode && (
+                              <div className="flex items-center gap-1">
+                                <select
+                                  onChange={(e) => applyTranslationFormat('fontName', e.target.value)}
+                                  className="text-[10px] border rounded px-1 py-0.5"
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled>Font</option>
+                                  <option value="Arial">Arial</option>
+                                  <option value="Times New Roman">Times</option>
+                                  <option value="Georgia">Georgia</option>
+                                  <option value="Courier New">Courier</option>
+                                  <option value="Verdana">Verdana</option>
+                                </select>
+                                <select
+                                  onChange={(e) => applyTranslationFormat('fontSize', e.target.value)}
+                                  className="text-[10px] border rounded px-1 py-0.5"
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled>Size</option>
+                                  <option value="1">8pt</option>
+                                  <option value="2">10pt</option>
+                                  <option value="3">12pt</option>
+                                  <option value="4">14pt</option>
+                                  <option value="5">18pt</option>
+                                  <option value="6">24pt</option>
+                                </select>
+                                <button
+                                  onClick={() => applyTranslationFormat('bold')}
+                                  className="px-2 py-0.5 text-xs font-bold border rounded hover:bg-gray-200"
+                                  title="Bold"
+                                >B</button>
+                                <button
+                                  onClick={() => applyTranslationFormat('italic')}
+                                  className="px-2 py-0.5 text-xs italic border rounded hover:bg-gray-200"
+                                  title="Italic"
+                                >I</button>
+                                <button
+                                  onClick={() => applyTranslationFormat('underline')}
+                                  className="px-2 py-0.5 text-xs underline border rounded hover:bg-gray-200"
+                                  title="Underline"
+                                >U</button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Content */}
+                        <div className="flex-1 overflow-auto">
+                          {translationEditMode ? (
+                            <div
+                              ref={translationEditRef}
+                              contentEditable
+                              className="w-full h-full p-3 outline-none"
+                              style={{minHeight: '400px'}}
+                              dangerouslySetInnerHTML={{__html: translationResults[0]?.translatedText || ''}}
+                              onBlur={() => {
+                                if (translationEditRef.current && translationResults.length > 0) {
+                                  const newResults = [...translationResults];
+                                  newResults[0] = { ...newResults[0], translatedText: translationEditRef.current.innerHTML };
+                                  setTranslationResults(newResults);
+                                }
+                              }}
+                            />
+                          ) : (
+                            <iframe
+                              srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
+                              title="Translation"
+                              className="w-full h-full border-0"
+                              style={{minHeight: '420px'}}
+                            />
+                          )}
+                        </div>
+                      </>
                     ) : (
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
                         <div className="text-center">
