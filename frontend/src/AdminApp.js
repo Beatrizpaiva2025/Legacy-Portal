@@ -1250,7 +1250,7 @@ const TranslationWorkspace = ({ adminKey }) => {
                 </div>
 
                 <button
-                  onClick={handleOcr}
+                  onClick={handleOCR}
                   disabled={isProcessing || (useClaudeOcr && !claudeApiKey)}
                   className="w-full py-2 bg-gray-700 text-white text-xs rounded hover:bg-gray-800 disabled:bg-gray-300"
                 >
