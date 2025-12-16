@@ -903,10 +903,9 @@ const TranslationWorkspace = ({ adminKey }) => {
         {[
           { id: 'resources', label: 'Resources', icon: '📚' },
           { id: 'cover', label: '2. Cover Letter', icon: '📋' },
-          { id: 'upload', label: '3. Upload', icon: '📤' },
-          { id: 'ocr', label: '4. OCR', icon: '🔍' },
-          { id: 'review', label: '5. Review', icon: '✏️' },
-          { id: 'approval', label: '6. Approval', icon: '✅' }
+          { id: 'ocr', label: '3. Upload', icon: '📤' },
+          { id: 'review', label: '4. Review', icon: '✏️' },
+          { id: 'approval', label: '5. Approval', icon: '✅' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1468,14 +1467,15 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
       )}
 
-      {/* UPLOAD TAB */}
-      {activeSubTab === 'upload' && (
+      {/* UPLOAD & OCR TAB */}
+      {activeSubTab === 'ocr' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">📤 Upload Documents</h2>
-          <p className="text-xs text-gray-500 mb-4">Select documents for OCR and translation</p>
+          <h2 className="text-sm font-bold mb-2">📤 Upload & OCR</h2>
+          <p className="text-xs text-gray-500 mb-4">Upload documents and extract text using OCR</p>
 
+          {/* File Upload Section */}
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
+            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
             onClick={() => fileInputRef.current?.click()}
           >
             <input
@@ -1486,7 +1486,7 @@ const TranslationWorkspace = ({ adminKey }) => {
               onChange={handleFileSelect}
               className="hidden"
             />
-            <div className="text-4xl mb-2">📤</div>
+            <div className="text-3xl mb-2">📤</div>
             <button className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
               Choose Files
             </button>
@@ -1495,12 +1495,13 @@ const TranslationWorkspace = ({ adminKey }) => {
             </p>
           </div>
 
+          {/* Selected Files List */}
           {files.length > 0 && (
-            <div className="mt-4">
+            <div className="mb-4 p-3 bg-gray-50 rounded">
               <label className="text-xs font-medium text-gray-700">Selected Files:</label>
               <div className="mt-1 space-y-1">
                 {files.map((file, idx) => (
-                  <div key={idx} className="flex items-center text-xs p-2 bg-gray-50 rounded">
+                  <div key={idx} className="flex items-center text-xs p-2 bg-white rounded border">
                     <span className="mr-2">📄</span>
                     <span>{file.name}</span>
                     <span className="ml-auto text-gray-400">{(file.size / 1024).toFixed(1)} KB</span>
@@ -1510,103 +1511,79 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
           )}
 
+          {/* OCR Button */}
           {files.length > 0 && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-              <p className="text-xs text-green-700">✅ {files.length} file(s) ready. Go to <strong>4. OCR</strong> to extract text.</p>
+            <button
+              onClick={handleOCR}
+              disabled={isProcessing}
+              className="w-full py-3 bg-yellow-500 text-white text-sm font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? '⏳ Processing OCR...' : '🔍 Run OCR (Extract Text)'}
+            </button>
+          )}
+
+          {processingStatus && (
+            <div className={`mt-4 p-3 rounded text-xs ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {processingStatus}
             </div>
           )}
-        </div>
-      )}
 
-      {/* OCR TAB */}
-      {activeSubTab === 'ocr' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">🔍 OCR - Text Extraction</h2>
-          <p className="text-xs text-gray-500 mb-4">Extract text from uploaded documents using OCR</p>
+          {/* OCR Results Preview */}
+          {ocrResults.length > 0 && (
+            <div className="mt-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xs font-bold">📝 OCR Results (editable)</h3>
+                <button
+                  onClick={() => {
+                    const allText = ocrResults.map(r => `=== ${r.filename} ===\n${r.text}`).join('\n\n');
+                    const blob = new Blob([allText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ocr-results.txt';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                >
+                  📥 Download OCR
+                </button>
+              </div>
+              {ocrResults.map((result, idx) => (
+                <div key={idx} className="mb-3">
+                  <label className="text-xs text-gray-600">{result.filename}</label>
+                  <textarea
+                    value={result.text}
+                    onChange={(e) => {
+                      const updated = [...ocrResults];
+                      updated[idx].text = e.target.value;
+                      setOcrResults(updated);
+                    }}
+                    className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
+                  />
+                </div>
+              ))}
 
-          {files.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">📄</div>
-              <p className="text-xs">No files uploaded. Go to <strong>3. Upload</strong> first.</p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4 p-3 bg-gray-50 rounded">
-                <p className="text-xs text-gray-600"><strong>{files.length}</strong> file(s) ready for OCR</p>
+              <div className="mt-4">
+                <button
+                  onClick={handleTranslate}
+                  disabled={isProcessing}
+                  className="w-full py-3 bg-green-500 text-white text-sm font-medium rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
+                </button>
               </div>
 
-              <button
-                onClick={handleOCR}
-                disabled={isProcessing}
-                className="w-full py-3 bg-yellow-500 text-white text-sm font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? '⏳ Processing OCR...' : '🔍 Run OCR (Extract Text)'}
-              </button>
-
-              {processingStatus && (
-                <div className={`mt-4 p-3 rounded text-xs ${
-                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
-                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
-                  'bg-blue-100 text-blue-700'
-                }`}>
-                  {processingStatus}
+              {translationResults.length > 0 && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                  <p className="text-xs text-green-700">✅ Translation complete! Go to <strong>4. Review</strong> to review and edit.</p>
                 </div>
               )}
-
-              {/* OCR Results Preview */}
-              {ocrResults.length > 0 && (
-                <div className="mt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xs font-bold">📝 OCR Results (editable)</h3>
-                    <button
-                      onClick={() => {
-                        const allText = ocrResults.map(r => `=== ${r.filename} ===\n${r.text}`).join('\n\n');
-                        const blob = new Blob([allText], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'ocr-results.txt';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                      className="px-3 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                    >
-                      📥 Download OCR
-                    </button>
-                  </div>
-                  {ocrResults.map((result, idx) => (
-                    <div key={idx} className="mb-3">
-                      <label className="text-xs text-gray-600">{result.filename}</label>
-                      <textarea
-                        value={result.text}
-                        onChange={(e) => {
-                          const updated = [...ocrResults];
-                          updated[idx].text = e.target.value;
-                          setOcrResults(updated);
-                        }}
-                        className="w-full h-32 mt-1 p-2 text-xs font-mono border rounded"
-                      />
-                    </div>
-                  ))}
-
-                  <div className="mt-4">
-                    <button
-                      onClick={handleTranslate}
-                      disabled={isProcessing}
-                      className="w-full py-3 bg-green-500 text-white text-sm font-medium rounded hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
-                    </button>
-                  </div>
-
-                  {translationResults.length > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-                      <p className="text-xs text-green-700">✅ Translation complete! Go to <strong>5. Review</strong> to review and edit.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
       )}
