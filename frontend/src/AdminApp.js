@@ -920,17 +920,42 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
     </div>`;
 
-    // Translation pages HTML (starts directly with translated text)
-    const translationPagesHTML = translationResults.map((result) => `
+    // Letterhead for all pages
+    const letterheadHTML = `
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
+            </div>
+        </div>`;
+
+    // Translation pages HTML (with letterhead on each page)
+    const translationPagesHTML = translationResults.map((result, index) => `
     <div class="translation-page">
+        ${letterheadHTML}
+        <div class="page-title">Translation ${translationResults.length > 1 ? `(Page ${index + 1} of ${translationResults.length})` : ''}</div>
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
 
-    // Original documents pages HTML (last page with header and image below)
+    // Original documents pages HTML (last page with letterhead and image below)
     const originalPagesHTML = originalImages.length > 0 ? `
     <div class="original-documents-page">
-        <div class="page-header">Original Document</div>
+        ${letterheadHTML}
+        <div class="page-title">Original Document${originalImages.length > 1 ? 's' : ''}</div>
         <div class="original-images-wrapper">
             ${originalImages.map(img => `
             <div class="original-image-container">
@@ -1006,12 +1031,15 @@ const TranslationWorkspace = ({ adminKey }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .translation-page { page-break-before: always; padding-top: 20px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .translation-content { white-space: pre-wrap; line-height: 1.8; font-size: 12px; }
+        .translation-content { line-height: 1.6; font-size: 12px; }
+        .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
         .original-images-wrapper { margin-top: 20px; }
-        .original-image-container { text-align: center; }
-        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
+        .original-image-container { text-align: center; margin-bottom: 15px; }
+        .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
         @media print { body { padding: 0; } .logo-placeholder { border: 1px dashed #ccc; } }
     </style>
 </head>
@@ -1744,112 +1772,20 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
-          {/* Certificate Preview - Live Preview */}
-          <div className="p-4 bg-white border-2 border-blue-300 rounded mb-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
-              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Auto-updates from fields above</span>
+          {/* Summary Card */}
+          <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
+            <h3 className="text-xs font-bold text-green-700 mb-2">✅ Cover Letter Settings Summary</h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div><span className="text-gray-500">Document:</span> <strong>{documentType}</strong></div>
+              <div><span className="text-gray-500">Order:</span> <strong>{orderNumber || 'Not set'}</strong></div>
+              <div><span className="text-gray-500">From:</span> <strong>{sourceLanguage}</strong></div>
+              <div><span className="text-gray-500">To:</span> <strong>{targetLanguage}</strong></div>
+              <div><span className="text-gray-500">Translator:</span> <strong>{selectedTranslator}</strong></div>
+              <div><span className="text-gray-500">Date:</span> <strong>{translationDate}</strong></div>
             </div>
-            <div className="border rounded p-6 bg-white" style={{fontFamily: 'Times New Roman, serif', fontSize: '11px', lineHeight: '1.6'}}>
-              {/* Header with logos */}
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-24">
-                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-gray-400 border p-2">Logo</div>}
-                </div>
-                <div className="text-center flex-1 px-4">
-                  <div className="font-bold text-blue-600">Legacy Translations</div>
-                  <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                  <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
-                </div>
-                <div className="w-20 text-right">
-                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[9px] text-gray-500 italic">ata<br/>Member # 275993</div>}
-                </div>
-              </div>
-
-              <div className="text-right mb-6">
-                <span>Order # </span>
-                <input
-                  type="text"
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  className="font-bold border-b border-blue-400 bg-blue-50 px-1 w-20 text-center"
-                  placeholder="P6287"
-                />
-              </div>
-
-              <h1 className="text-2xl text-center mb-4" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
-
-              <p className="text-center mb-6">
-                Translation of a{' '}
-                <input
-                  type="text"
-                  value={documentType}
-                  onChange={(e) => setDocumentType(e.target.value)}
-                  className="font-bold border-b border-blue-400 bg-blue-50 px-1 w-32"
-                  placeholder="School Transcript"
-                />
-                {' '}from{' '}
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => setSourceLanguage(e.target.value)}
-                  className="font-bold border-b border-blue-400 bg-blue-50 px-1"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-                {' '}to{' '}
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="font-bold border-b border-blue-400 bg-blue-50 px-1"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </p>
-
-              <p className="mb-4 text-justify">
-                We, Legacy Translations, a professional translation services company and ATA Member (#275993), having no relation to the client, hereby certify that the annexed{' '}
-                <strong>{targetLanguage}</strong> translation of the <strong>{sourceLanguage}</strong> document, executed by us, is to the best of our knowledge and belief, a true and accurate translation of the original document, likewise annexed hereunto.
-              </p>
-
-              <p className="mb-4 text-justify">
-                This is to certify the correctness of the translation only. We do not guarantee that the original is a genuine document, or that the statements contained in the original document are true. Further, Legacy Translations assumes no liability for the way in which the translation is used by the customer or any third party, including end-users of the translation.
-              </p>
-
-              <p className="mb-8 text-justify">
-                A copy of the translation, and original files presented, are attached to this certification.
-              </p>
-
-              <div className="flex justify-between items-end mt-8">
-                <div>
-                  <select
-                    value={selectedTranslator}
-                    onChange={(e) => setSelectedTranslator(e.target.value)}
-                    className="font-bold border-b border-blue-400 bg-blue-50 px-1 block"
-                  >
-                    {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                  </select>
-                  <div className="font-semibold">Managing Director</div>
-                  <div>Dated: <input
-                    type="text"
-                    value={translationDate}
-                    onChange={(e) => setTranslationDate(e.target.value)}
-                    className="border-b border-blue-400 bg-blue-50 px-1 w-24"
-                  /></div>
-                </div>
-                <div className="w-32 h-32">
-                  {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp" className="max-w-full max-h-full" />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full border-4 border-gray-400 flex items-center justify-center text-center p-2">
-                      <div className="text-[8px]">
-                        <div className="font-bold">LEGACY TRANSLATIONS</div>
-                        <div>ATA # 275993</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <p className="text-[10px] text-green-600 mt-2">
+              📄 The Cover Letter will be generated with these settings in the <strong>5. Deliver</strong> tab
+            </p>
           </div>
 
           {/* Navigation */}
@@ -2314,34 +2250,55 @@ tradução juramentada | certified translation`}
 
               {/* Download Options */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-3">📥 Download Options</h3>
-                <div className="flex items-center space-x-4 mb-3">
-                  <label className="flex items-center text-xs">
-                    <input
-                      type="checkbox"
-                      checked={includeCover}
-                      onChange={(e) => setIncludeCover(e.target.checked)}
-                      className="mr-2"
-                    />
-                    Include Cover Letter in Download
-                  </label>
+                <h3 className="text-sm font-bold text-blue-700 mb-3">📥 Download Complete Package</h3>
+
+                {/* Document Order Preview */}
+                <div className="bg-white rounded border p-3 mb-3">
+                  <p className="text-xs font-medium text-gray-700 mb-2">📋 Document Order:</p>
+                  <div className="flex items-center gap-2 text-xs">
+                    {includeCover && (
+                      <>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">1. Cover Letter</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">{includeCover ? '2' : '1'}. Translation</span>
+                    <span className="text-gray-400">→</span>
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">{includeCover ? '3' : '2'}. Original</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    ✓ Letterhead appears on all pages
+                  </p>
                 </div>
-                <div className="flex space-x-2">
+
+                {/* Include Cover Letter Option */}
+                <label className="flex items-center text-xs mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeCover}
+                    onChange={(e) => setIncludeCover(e.target.checked)}
+                    className="mr-2 w-4 h-4 text-blue-600"
+                  />
+                  <span className="font-medium">Include Cover Letter (Certificate of Accuracy)</span>
+                </label>
+
+                {/* Download Buttons */}
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handleDownload('html')}
-                    className="flex-1 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    className="py-3 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center justify-center gap-2"
                   >
                     📄 Download HTML
                   </button>
                   <button
                     onClick={() => handleDownload('pdf')}
-                    className="flex-1 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                    className="py-3 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center justify-center gap-2"
                   >
-                    📑 Download PDF
+                    📑 Print / Save PDF
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2">
-                  Order: {includeCover ? 'Cover Letter → ' : ''}Translation → Original Document(s)
+                <p className="text-[10px] text-gray-500 mt-2 text-center">
+                  HTML: Edit in browser before printing | PDF: Opens print dialog
                 </p>
               </div>
 
