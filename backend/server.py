@@ -2139,6 +2139,7 @@ class TranslateRequest(BaseModel):
     general_instructions: Optional[str] = None  # Additional user instructions
     preserve_layout: Optional[bool] = True  # Maintain original document layout
     page_format: Optional[str] = 'letter'  # 'letter' or 'a4'
+    original_image: Optional[str] = None  # Base64 image for visual layout reference
 
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
@@ -2491,8 +2492,44 @@ Provide a corrected version of the translation if needed, and briefly note what 
 Follow the user's instructions to modify or improve the translation."""
             user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}"
 
-        # Call Claude API
+        # Call Claude API - with image if available for layout preservation
         async with httpx.AsyncClient(timeout=120.0) as client:
+            # Build message content - include image if provided for visual layout reference
+            if request.original_image and request.action == 'translate':
+                # Clean base64 string (remove data:image prefix if present)
+                image_data = request.original_image
+                if ',' in image_data:
+                    image_data = image_data.split(',')[1]
+
+                message_content = [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_data,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": f"""Look at this document image carefully. This is the original document.
+
+The OCR text extracted from this document is:
+---
+{request.text}
+---
+
+{user_message}
+
+CRITICAL: Your HTML output MUST match the visual layout of the original document image above.
+- If you see tables in the image, create HTML tables with the same structure
+- If you see bordered sections, use CSS borders
+- Replicate the exact visual appearance in HTML format"""
+                    }
+                ]
+            else:
+                message_content = user_message
+
             response = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -2505,7 +2542,7 @@ Follow the user's instructions to modify or improve the translation."""
                     "max_tokens": 8192,
                     "system": system_prompt,
                     "messages": [
-                        {"role": "user", "content": user_message}
+                        {"role": "user", "content": message_content}
                     ]
                 }
             )

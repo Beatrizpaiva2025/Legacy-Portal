@@ -761,6 +761,9 @@ const TranslationWorkspace = ({ adminKey }) => {
         const ocrResult = ocrResults[i];
         setProcessingStatus(`Translating ${ocrResult.filename} (${i + 1}/${ocrResults.length})...`);
 
+        // Find corresponding original image for this file
+        const originalImage = originalImages.find(img => img.filename === ocrResult.filename);
+
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
           text: ocrResult.text,
           source_language: sourceLanguage,
@@ -770,7 +773,9 @@ const TranslationWorkspace = ({ adminKey }) => {
           action: 'translate',
           general_instructions: generalInstructions,
           preserve_layout: true,
-          page_format: pageFormat
+          page_format: pageFormat,
+          // Send original image so Claude can see the visual layout
+          original_image: originalImage ? originalImage.data : null
         });
 
         if (response.data.status === 'success' || response.data.translation) {
