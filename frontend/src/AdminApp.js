@@ -254,8 +254,8 @@ const TranslationWorkspace = ({ adminKey }) => {
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
-  const [useClaudeOcr, setUseClaudeOcr] = useState(false);
-  const [ocrSpecialCommands, setOcrSpecialCommands] = useState('');
+  const [useClaudeOcr, setUseClaudeOcr] = useState(true); // Default to Claude for better formatting
+  const [ocrSpecialCommands, setOcrSpecialCommands] = useState('Maintain the EXACT original layout and formatting. Preserve all line breaks, spacing, and document structure. Extract tables with proper alignment.');
 
   // Approval checkboxes state
   const [approvalChecks, setApprovalChecks] = useState({
@@ -441,19 +441,37 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Translation Instructions CRUD
   const handleSaveInstruction = async () => {
+    // Validate required fields
+    if (!instructionForm.title || !instructionForm.title.trim()) {
+      alert('Please enter a title for the instruction');
+      return;
+    }
+    if (!instructionForm.content || !instructionForm.content.trim()) {
+      alert('Please enter instruction content');
+      return;
+    }
+
     try {
+      const dataToSend = {
+        sourceLang: instructionForm.sourceLang,
+        targetLang: instructionForm.targetLang,
+        title: instructionForm.title.trim(),
+        content: instructionForm.content.trim()
+      };
+
       if (editingInstruction) {
-        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, instructionForm);
+        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend);
       } else {
-        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, instructionForm);
+        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend);
       }
       setShowInstructionModal(false);
       setEditingInstruction(null);
       setInstructionForm({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
       fetchResources();
+      setProcessingStatus('✅ Instruction saved!');
     } catch (err) {
       console.error('Failed to save instruction:', err);
-      alert('Failed to save instruction');
+      alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -960,11 +978,11 @@ const TranslationWorkspace = ({ adminKey }) => {
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
-          { id: 'resources', label: 'Resources', icon: '📚' },
-          { id: 'cover', label: '2. Cover Letter', icon: '📋' },
-          { id: 'ocr', label: '3. Upload', icon: '📤' },
-          { id: 'review', label: '4. Review', icon: '✏️' },
-          { id: 'approval', label: '5. Approval', icon: '✅' }
+          { id: 'resources', label: '1. Setup', icon: '⚙️' },
+          { id: 'cover', label: '2. Details', icon: '📝' },
+          { id: 'ocr', label: '3. Document', icon: '📄' },
+          { id: 'review', label: '4. Review', icon: '🔍' },
+          { id: 'approval', label: '5. Deliver', icon: '✅' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1384,6 +1402,16 @@ CPF | individual taxpayer number | Brazilian tax ID"
               </div>
             </div>
           )}
+
+          {/* Navigation */}
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => setActiveSubTab('cover')}
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
+            >
+              Next: Details <span className="ml-2">→</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -1677,8 +1705,20 @@ CPF | individual taxpayer number | Brazilian tax ID"
             </div>
           </div>
 
-          <div className="p-3 bg-green-50 border border-green-200 rounded">
-            <p className="text-xs text-green-700">✅ Cover letter configured. Go to <strong>3. Upload</strong> to add documents.</p>
+          {/* Navigation */}
+          <div className="mt-4 flex justify-between items-center">
+            <button
+              onClick={() => setActiveSubTab('resources')}
+              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+            >
+              <span className="mr-2">←</span> Back: Setup
+            </button>
+            <button
+              onClick={() => setActiveSubTab('ocr')}
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
+            >
+              Next: Document <span className="ml-2">→</span>
+            </button>
           </div>
         </div>
       )}
@@ -1926,11 +1966,28 @@ CPF | individual taxpayer number | Brazilian tax ID"
 
               {translationResults.length > 0 && (
                 <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
-                  <p className="text-xs text-green-700">✅ Translation complete! Go to <strong>4. Review</strong> to review and edit.</p>
+                  <p className="text-xs text-green-700">✅ Translation complete!</p>
                 </div>
               )}
             </div>
           )}
+
+          {/* Navigation */}
+          <div className="mt-4 flex justify-between items-center">
+            <button
+              onClick={() => setActiveSubTab('cover')}
+              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+            >
+              <span className="mr-2">←</span> Back: Details
+            </button>
+            <button
+              onClick={() => setActiveSubTab('review')}
+              disabled={translationResults.length === 0}
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+            >
+              Next: Review <span className="ml-2">→</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -2007,14 +2064,32 @@ CPF | individual taxpayer number | Brazilian tax ID"
                 </div>
               </div>
 
-              <div className="p-3 bg-green-50 border border-green-200 rounded">
-                <p className="text-xs text-green-700">✅ Review complete? Go to <strong>5. Approval</strong> to download or send to projects.</p>
+              {/* Navigation */}
+              <div className="mt-4 flex justify-between items-center">
+                <button
+                  onClick={() => setActiveSubTab('ocr')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Document
+                </button>
+                <button
+                  onClick={() => setActiveSubTab('approval')}
+                  className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
+                >
+                  Next: Deliver <span className="ml-2">→</span>
+                </button>
               </div>
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">📄</div>
-              <p className="text-xs">No translations yet. Complete OCR and translation in <strong>4. OCR</strong> first.</p>
+              <p className="text-xs">No translations yet. Complete OCR and translation in <strong>3. Document</strong> first.</p>
+              <button
+                onClick={() => setActiveSubTab('ocr')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Go to Document
+              </button>
             </div>
           )}
         </div>
@@ -2125,11 +2200,27 @@ CPF | individual taxpayer number | Brazilian tax ID"
                   {processingStatus}
                 </div>
               )}
+
+              {/* Navigation */}
+              <div className="mt-6 flex justify-start">
+                <button
+                  onClick={() => setActiveSubTab('review')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Review
+                </button>
+              </div>
             </>
           ) : (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">📄</div>
               <p className="text-xs">No translations yet. Complete the translation workflow first.</p>
+              <button
+                onClick={() => setActiveSubTab('ocr')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Go to Document
+              </button>
             </div>
           )}
         </div>
