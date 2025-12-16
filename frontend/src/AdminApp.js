@@ -344,13 +344,13 @@ const TranslationWorkspace = ({ adminKey }) => {
         logo_stamp: logoStamp
       });
 
-      if (response.data.success) {
+      if (response.data.status === 'success' || response.data.success) {
         setProcessingStatus('✅ Translation sent to Projects! Ready for review.');
         setSelectedOrderId('');
         // Refresh orders list
         fetchAvailableOrders();
       } else {
-        throw new Error(response.data.error || 'Failed to send');
+        throw new Error(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
       console.error('Error sending to projects:', error);
@@ -572,13 +572,13 @@ const TranslationWorkspace = ({ adminKey }) => {
           filename: file.name
         });
 
-        if (response.data.success) {
+        if (response.data.status === 'success' || response.data.text) {
           setOcrResults(prev => [...prev, {
             filename: file.name,
             text: response.data.text
           }]);
         } else {
-          throw new Error(response.data.error || 'OCR failed');
+          throw new Error(response.data.error || response.data.detail || 'OCR failed');
         }
       }
       setProcessingStatus('✅ OCR completed!');
@@ -623,14 +623,14 @@ const TranslationWorkspace = ({ adminKey }) => {
           preserve_layout: true
         });
 
-        if (response.data.success) {
+        if (response.data.status === 'success' || response.data.translation) {
           setTranslationResults(prev => [...prev, {
             filename: ocrResult.filename,
             originalText: ocrResult.text,
             translatedText: response.data.translation
           }]);
         } else {
-          throw new Error(response.data.error || 'Translation failed');
+          throw new Error(response.data.error || response.data.detail || 'Translation failed');
         }
       }
       setProcessingStatus('✅ Translation completed!');
@@ -659,7 +659,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         action: 'correct'
       });
 
-      if (response.data.success) {
+      if (response.data.status === 'success' || response.data.translation) {
         const updatedResults = [...translationResults];
         updatedResults[selectedResultIndex] = {
           ...currentResult,
@@ -669,7 +669,7 @@ const TranslationWorkspace = ({ adminKey }) => {
         setCorrectionCommand('');
         setProcessingStatus('✅ Correction applied!');
       } else {
-        throw new Error(response.data.error || 'Correction failed');
+        throw new Error(response.data.error || response.data.detail || 'Correction failed');
       }
     } catch (error) {
       console.error('Correction error:', error);
