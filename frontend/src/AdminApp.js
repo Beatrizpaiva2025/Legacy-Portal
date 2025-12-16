@@ -798,6 +798,60 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
   };
 
+  // Direct translation - Claude sees image directly, no OCR needed
+  const handleDirectTranslate = async () => {
+    if (originalImages.length === 0) {
+      alert('Please upload a document first');
+      return;
+    }
+
+    if (!claudeApiKey) {
+      alert('Please configure your Claude API Key in the Setup tab');
+      setActiveSubTab('resources');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus('🌐 Translating with Claude AI (analyzing image directly)...');
+    setTranslationResults([]);
+
+    try {
+      for (let i = 0; i < originalImages.length; i++) {
+        const img = originalImages[i];
+        setProcessingStatus(`Translating ${img.filename} (${i + 1}/${originalImages.length})...`);
+
+        const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+          text: '[Document image attached - translate directly from image]',
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          document_type: documentType,
+          claude_api_key: claudeApiKey,
+          action: 'translate',
+          general_instructions: generalInstructions,
+          preserve_layout: true,
+          page_format: pageFormat,
+          original_image: img.data  // Claude will see and translate directly from image
+        });
+
+        if (response.data.status === 'success' || response.data.translation) {
+          setTranslationResults(prev => [...prev, {
+            filename: img.filename,
+            originalText: '[Translated directly from image]',
+            translatedText: response.data.translation
+          }]);
+        } else {
+          throw new Error(response.data.error || response.data.detail || 'Translation failed');
+        }
+      }
+      setProcessingStatus('✅ Translation completed!');
+    } catch (error) {
+      console.error('Translation error:', error);
+      setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Apply correction
   const handleApplyCorrection = async () => {
     if (!correctionCommand.trim() || translationResults.length === 0) return;
@@ -1136,6 +1190,103 @@ const TranslationWorkspace = ({ adminKey }) => {
               </button>
             </div>
             <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+          </div>
+
+          {/* OCR for CAT Tool Section */}
+          <div className="bg-white rounded shadow p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <span className="text-lg">📝</span>
+              <h2 className="text-sm font-bold">OCR for CAT Tool</h2>
+              <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Optional</span>
+            </div>
+            <p className="text-xs text-gray-600 mb-3">
+              Extract text from documents to use in external CAT tools (SDL Trados, MemoQ, etc.)
+            </p>
+
+            {/* File Upload for OCR */}
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors mb-3"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <div className="text-2xl mb-1">📤</div>
+              <button className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">
+                Upload Document for OCR
+              </button>
+              <p className="text-[10px] text-gray-500 mt-1">
+                {files.length > 0 ? `${files.length} file(s) selected` : 'Images or PDF'}
+              </p>
+            </div>
+
+            {/* OCR Options */}
+            {files.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-4 text-xs">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      checked={!useClaudeOcr}
+                      onChange={() => setUseClaudeOcr(false)}
+                      className="mr-2"
+                    />
+                    Standard OCR (Tesseract)
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      checked={useClaudeOcr}
+                      onChange={() => setUseClaudeOcr(true)}
+                      className="mr-2"
+                    />
+                    Claude AI OCR (better formatting)
+                  </label>
+                </div>
+
+                <button
+                  onClick={handleOcr}
+                  disabled={isProcessing || (useClaudeOcr && !claudeApiKey)}
+                  className="w-full py-2 bg-gray-700 text-white text-xs rounded hover:bg-gray-800 disabled:bg-gray-300"
+                >
+                  {isProcessing ? processingStatus : '🔍 Extract Text (OCR)'}
+                </button>
+
+                {/* OCR Results */}
+                {ocrResults.length > 0 && (
+                  <div className="border rounded p-3 bg-gray-50">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-medium">Extracted Text:</span>
+                      <button
+                        onClick={() => {
+                          const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                          const blob = new Blob([text], { type: 'text/plain' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = 'ocr_text_for_cat.txt';
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        📥 Download for CAT Tool
+                      </button>
+                    </div>
+                    <textarea
+                      value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
+                      readOnly
+                      className="w-full h-32 text-xs font-mono border rounded p-2 bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Translation Instructions Section */}
@@ -1850,98 +2001,67 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* UPLOAD & OCR TAB */}
+      {/* DOCUMENT TAB - Direct Translation */}
       {activeSubTab === 'ocr' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">📤 Upload & OCR</h2>
-          <p className="text-xs text-gray-500 mb-4">Upload documents, extract text with OCR, and edit side-by-side</p>
+          <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
+          <p className="text-xs text-gray-500 mb-4">Upload document and translate directly with Claude AI</p>
 
-          {/* File Upload Section */}
-          <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,.pdf"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <div className="text-2xl mb-1">📤</div>
-            <button className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
-              Choose Files
-            </button>
-            <p className="text-xs text-gray-500 mt-1">
-              {files.length > 0 ? `${files.length} file(s) selected` : 'Click to select files (images or PDF)'}
-            </p>
+          {/* Language Selection */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+            <h3 className="text-xs font-bold text-blue-700 mb-3">🌐 Translation Direction</h3>
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">From:</label>
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded font-medium"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+              <div className="pt-5 text-2xl text-blue-500">→</div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">To:</label>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded font-medium"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* OCR Options */}
-          {files.length > 0 && !ocrResults.length && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <h3 className="text-xs font-bold text-yellow-700 mb-3">🔍 OCR Options</h3>
-
-              {/* OCR Type Selection */}
-              <div className="flex items-center space-x-4 mb-3">
-                <label className="flex items-center text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="ocrType"
-                    checked={!useClaudeOcr}
-                    onChange={() => setUseClaudeOcr(false)}
-                    className="mr-2"
-                  />
-                  <span className="font-medium">AWS Textract</span>
-                  <span className="ml-1 text-gray-400">(standard)</span>
-                </label>
-                <label className="flex items-center text-xs cursor-pointer">
-                  <input
-                    type="radio"
-                    name="ocrType"
-                    checked={useClaudeOcr}
-                    onChange={() => setUseClaudeOcr(true)}
-                    className="mr-2"
-                  />
-                  <span className="font-medium">Claude AI</span>
-                  <span className="ml-1 text-gray-400">(advanced)</span>
-                </label>
-              </div>
-
-              {/* Special Commands for Claude */}
-              {useClaudeOcr && (
-                <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    📝 Special Commands for Claude (optional)
-                  </label>
-                  <textarea
-                    value={ocrSpecialCommands}
-                    onChange={(e) => setOcrSpecialCommands(e.target.value)}
-                    placeholder="e.g., Maintain exact layout, preserve formatting, extract tables as markdown..."
-                    className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
-                  />
-                </div>
-              )}
-
-              <button
-                onClick={handleOCR}
-                disabled={isProcessing}
-                className={`w-full py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                  useClaudeOcr ? 'bg-purple-500 hover:bg-purple-600' : 'bg-yellow-500 hover:bg-yellow-600'
-                }`}
-              >
-                {isProcessing
-                  ? '⏳ Processing OCR...'
-                  : useClaudeOcr
-                    ? '🤖 Run OCR with Claude AI'
-                    : '🔍 Run OCR (AWS Textract)'}
+          {/* File Upload Section */}
+          {!originalImages.length && (
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <div className="text-4xl mb-2">📤</div>
+              <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                Upload Document
               </button>
+              <p className="text-xs text-gray-500 mt-2">
+                Upload image or PDF of the document to translate
+              </p>
             </div>
           )}
 
+          {/* Processing Status */}
           {processingStatus && (
-            <div className={`mb-4 p-2 rounded text-xs ${
+            <div className={`mb-4 p-3 rounded text-xs ${
               processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
               processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
               'bg-blue-100 text-blue-700'
@@ -1950,64 +2070,23 @@ tradução juramentada | certified translation`}
             </div>
           )}
 
-          {/* Side-by-Side View: Original + OCR */}
-          {ocrResults.length > 0 && (
+          {/* Side-by-Side View: Original + Translation */}
+          {originalImages.length > 0 && (
             <div className="mt-2">
-              {/* Toolbar */}
-              <div className="flex justify-between items-center mb-2 p-2 bg-gray-100 rounded">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold">OCR Editor:</span>
-                  <button
-                    onClick={() => applyOcrFormatting('bold')}
-                    className="px-2 py-1 bg-white border rounded text-xs font-bold hover:bg-gray-50"
-                    title="Bold"
-                  >
-                    B
-                  </button>
-                  <button
-                    onClick={() => applyOcrFormatting('italic')}
-                    className="px-2 py-1 bg-white border rounded text-xs italic hover:bg-gray-50"
-                    title="Italic"
-                  >
-                    I
-                  </button>
-                  <select
-                    value={ocrFontFamily}
-                    onChange={(e) => setOcrFontFamily(e.target.value)}
-                    className="px-2 py-1 text-xs border rounded"
-                  >
-                    <option value="monospace">Monospace</option>
-                    <option value="serif">Serif</option>
-                    <option value="sans-serif">Sans-serif</option>
-                    <option value="'Times New Roman', serif">Times New Roman</option>
-                    <option value="Arial, sans-serif">Arial</option>
-                  </select>
-                  <select
-                    value={ocrFontSize}
-                    onChange={(e) => setOcrFontSize(e.target.value)}
-                    className="px-2 py-1 text-xs border rounded"
-                  >
-                    <option value="10px">10px</option>
-                    <option value="11px">11px</option>
-                    <option value="12px">12px</option>
-                    <option value="14px">14px</option>
-                    <option value="16px">16px</option>
-                  </select>
-                </div>
+              {/* Header */}
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-medium text-gray-600">
+                  {sourceLanguage} → {targetLanguage}
+                </span>
                 <button
                   onClick={() => {
-                    const allText = ocrResults.map(r => `=== ${r.filename} ===\n${r.text}`).join('\n\n');
-                    const blob = new Blob([allText], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'ocr-results.txt';
-                    a.click();
-                    URL.revokeObjectURL(url);
+                    setOriginalImages([]);
+                    setTranslationResults([]);
+                    setFiles([]);
                   }}
-                  className="px-3 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
                 >
-                  📥 Download OCR
+                  🗑️ Clear & Start Over
                 </button>
               </div>
 
@@ -2018,82 +2097,70 @@ tradução juramentada | certified translation`}
                     <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
                   </div>
                   <div className="px-3 py-2">
-                    <span className="text-xs font-bold text-gray-700">📝 OCR Text (Editable)</span>
+                    <span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage})</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0" style={{height: '400px'}}>
+                <div className="grid grid-cols-2 gap-0" style={{height: '450px'}}>
                   {/* Left: Original Document Image */}
-                  <div
-                    className="border-r overflow-auto bg-gray-50 p-2"
-                    ref={uploadOriginalRef}
-                    onScroll={() => handleUploadScroll('original')}
-                  >
-                    {originalImages.length > 0 ? (
-                      originalImages.map((img, idx) => (
-                        <div key={idx} className="mb-2">
-                          <img
-                            src={img.data}
-                            alt={img.filename}
-                            className="max-w-full border shadow-sm"
-                            style={{minHeight: '100%'}}
-                          />
-                        </div>
-                      ))
+                  <div className="border-r overflow-auto bg-gray-50 p-2">
+                    {originalImages.map((img, idx) => (
+                      <div key={idx} className="mb-2">
+                        <img
+                          src={img.data}
+                          alt={img.filename}
+                          className="max-w-full border shadow-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Right: Translation Result */}
+                  <div className="overflow-auto bg-white">
+                    {translationResults.length > 0 ? (
+                      <iframe
+                        srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
+                        title="Translation"
+                        className="w-full h-full border-0"
+                        style={{minHeight: '450px'}}
+                      />
                     ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400 text-xs">
-                        Original document preview
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">🌐</div>
+                          <p>Click "Translate" to start</p>
+                          <p className="text-xs mt-1">Claude will see the image and translate directly</p>
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* Right: OCR Text Editor */}
-                  <div
-                    className="overflow-auto"
-                    ref={uploadOcrRef}
-                    onScroll={() => handleUploadScroll('ocr')}
-                  >
-                    <textarea
-                      id="ocr-editor"
-                      value={ocrResults[0]?.text || ''}
-                      onChange={(e) => {
-                        const updated = [...ocrResults];
-                        updated[0].text = e.target.value;
-                        setOcrResults(updated);
-                      }}
-                      className="w-full h-full p-3 border-0 resize-none focus:outline-none focus:ring-0"
-                      style={{
-                        fontFamily: ocrFontFamily,
-                        fontSize: ocrFontSize,
-                        minHeight: '400px',
-                        whiteSpace: 'pre-wrap'
-                      }}
-                      placeholder="OCR text will appear here..."
-                    />
-                  </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-4 flex space-x-2">
+              {/* Translate Button */}
+              <div className="mt-4">
                 <button
-                  onClick={handleOCR}
-                  disabled={isProcessing}
-                  className="flex-1 py-2 bg-yellow-500 text-white text-xs font-medium rounded hover:bg-yellow-600 disabled:bg-gray-300"
-                >
-                  🔄 Re-run OCR
-                </button>
-                <button
-                  onClick={handleTranslate}
-                  disabled={isProcessing}
-                  className="flex-1 py-2 bg-green-500 text-white text-xs font-medium rounded hover:bg-green-600 disabled:bg-gray-300"
+                  onClick={handleDirectTranslate}
+                  disabled={isProcessing || !claudeApiKey}
+                  className="w-full py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
                 </button>
+                {!claudeApiKey && (
+                  <p className="text-[10px] text-red-500 mt-1 text-center">
+                    ⚠️ Please add your Claude API Key in the Setup tab
+                  </p>
+                )}
               </div>
 
               {translationResults.length > 0 && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded flex justify-between items-center">
                   <p className="text-xs text-green-700">✅ Translation complete!</p>
+                  <button
+                    onClick={() => setActiveSubTab('review')}
+                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                  >
+                    Go to Review →
+                  </button>
                 </div>
               )}
             </div>
