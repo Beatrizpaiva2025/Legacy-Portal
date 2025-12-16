@@ -1596,104 +1596,6 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
 
-          {/* Translation Details Section - Auto-updates Cover Letter below */}
-          <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded">
-            <h3 className="text-xs font-bold text-purple-700 mb-2">📝 Translation Details</h3>
-            <p className="text-[10px] text-purple-600 mb-3">⚡ Changes here automatically update the Cover Letter preview below</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => setSourceLanguage(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
-                <input
-                  value={documentType}
-                  onChange={(e) => setDocumentType(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                  placeholder="e.g., Birth Certificate"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
-                <input
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                  placeholder="e.g., P6312"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
-                <select
-                  value={selectedTranslator}
-                  onChange={(e) => setSelectedTranslator(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  {TRANSLATORS.map(t => (
-                    <option key={t.name} value={t.name}>{t.name} - {t.title}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                <input
-                  value={translationDate}
-                  onChange={(e) => setTranslationDate(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Page Format Section */}
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
-            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
-                <select
-                  value={translationType}
-                  onChange={(e) => saveTranslationType(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  <option value="certified">Certified Translation</option>
-                  <option value="sworn">Sworn Translation</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
-                <select
-                  value={pageFormat}
-                  onChange={(e) => savePageFormat(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
-                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
-                  <option value="a4">A4 (210mm x 297mm) - International</option>
-                </select>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-2">
-              {translationType === 'sworn' ? 'Sworn Translation (Tradução Juramentada) - A4 format' : 'Certified Translation - Letter format'}
-            </p>
-          </div>
-
           {/* Certificate Logos Section */}
           <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
             <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
@@ -1725,12 +1627,12 @@ tradução juramentada | certified translation`}
                 </button>
               </div>
 
-              {/* Right Logo (ATA) */}
+              {/* Center Logo (ATA) */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Right Logo (ATA)</label>
+                <label className="block text-xs font-medium text-gray-700 mb-2">Center Logo (ATA)</label>
                 <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
                   {logoRight ? (
-                    <img src={logoRight} alt="Right Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoRight} alt="ATA Logo" className="max-h-16 max-w-full object-contain" />
                   ) : (
                     <span className="text-xs text-gray-400">No logo</span>
                   )}
@@ -1777,20 +1679,157 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
-          {/* Summary Card */}
-          <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
-            <h3 className="text-xs font-bold text-green-700 mb-2">✅ Cover Letter Settings Summary</h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div><span className="text-gray-500">Document:</span> <strong>{documentType}</strong></div>
-              <div><span className="text-gray-500">Order:</span> <strong>{orderNumber || 'Not set'}</strong></div>
-              <div><span className="text-gray-500">From:</span> <strong>{sourceLanguage}</strong></div>
-              <div><span className="text-gray-500">To:</span> <strong>{targetLanguage}</strong></div>
-              <div><span className="text-gray-500">Translator:</span> <strong>{selectedTranslator}</strong></div>
-              <div><span className="text-gray-500">Date:</span> <strong>{translationDate}</strong></div>
+          {/* Certificate Preview - LIVE with Editable Fields */}
+          <div className="p-4 bg-white border-2 border-blue-300 rounded mb-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
+              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit bold fields directly below</span>
             </div>
-            <p className="text-[10px] text-green-600 mt-2">
-              📄 The Cover Letter will be generated with these settings in the <strong>5. Deliver</strong> tab
-            </p>
+
+            {/* The Certificate Document */}
+            <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.7', maxWidth: '800px', margin: '0 auto'}}>
+
+              {/* Header with logos */}
+              <div className="flex justify-between items-center mb-6 pb-4 border-b">
+                <div className="w-32">
+                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-14" /> : <div className="text-[10px] text-gray-400 border border-dashed p-3 text-center">LEGACY<br/>TRANSLATIONS</div>}
+                </div>
+                <div className="text-center flex-1 px-6">
+                  <div className="font-bold text-blue-600 text-lg italic">Legacy Translations</div>
+                  <div className="text-[10px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                  <div className="text-[10px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                </div>
+                <div className="w-28 text-right">
+                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[10px] text-gray-500 italic text-right">ata<br/>Member # 275993</div>}
+                </div>
+              </div>
+
+              {/* Order Number */}
+              <div className="text-right mb-8">
+                <span>Order # </span>
+                <input
+                  type="text"
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-24 text-center focus:outline-none focus:border-blue-600"
+                  placeholder="P6287"
+                />
+              </div>
+
+              {/* Main Title */}
+              <h1 className="text-3xl text-center mb-8 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
+
+              {/* Translation of a ... */}
+              <p className="text-center mb-10 text-base">
+                Translation of a{' '}
+                <input
+                  type="text"
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-40 text-center focus:outline-none focus:border-blue-600"
+                  placeholder="School Transcript"
+                />
+                {' '}from{' '}
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+                {' '}to<br/>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 mt-1 focus:outline-none focus:border-blue-600"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </p>
+
+              {/* Body paragraphs */}
+              <p className="mb-5 text-justify leading-relaxed">
+                We, Legacy Translations, a professional translation services company and ATA Member (#275993), having no relation to the client, hereby certify that the annexed{' '}
+                <strong>{targetLanguage}</strong> translation of the <strong>{sourceLanguage}</strong> document, executed by us, is to the best of our knowledge and belief, a true and accurate translation of the original document, likewise annexed hereunto.
+              </p>
+
+              <p className="mb-5 text-justify leading-relaxed">
+                This is to certify the correctness of the translation only. We do not guarantee that the original is a genuine document, or that the statements contained in the original document are true. Further, Legacy Translations assumes no liability for the way in which the translation is used by the customer or any third party, including end-users of the translation.
+              </p>
+
+              <p className="mb-10 text-justify leading-relaxed">
+                A copy of the translation, and original files presented, are attached to this certification.
+              </p>
+
+              {/* Signature Section */}
+              <div className="flex justify-between items-end mt-12">
+                <div className="leading-relaxed">
+                  <div className="mb-1 italic text-lg" style={{fontFamily: 'cursive'}}>Beatriz Paiva</div>
+                  <div>
+                    <select
+                      value={selectedTranslator}
+                      onChange={(e) => setSelectedTranslator(e.target.value)}
+                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
+                    >
+                      {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>Authorized Representative</div>
+                  <div>Legacy Translations Inc.</div>
+                  <div className="mt-1">
+                    Dated:{' '}
+                    <input
+                      type="text"
+                      value={translationDate}
+                      onChange={(e) => setTranslationDate(e.target.value)}
+                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+                <div className="w-36 h-36">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp" className="max-w-full max-h-full" />
+                  ) : (
+                    <div className="w-32 h-32 rounded-full border-4 border-blue-600 flex items-center justify-center text-center p-2 relative">
+                      <div className="absolute top-3 text-[8px] font-bold text-blue-600 tracking-wider">CERTIFIED TRANSLATOR</div>
+                      <div>
+                        <div className="text-[10px] font-bold text-blue-600">LEGACY TRANSLATIONS</div>
+                        <div className="text-[8px] text-blue-600">ATA # 275993</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Page Format Section */}
+          <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
+            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
+                <select
+                  value={translationType}
+                  onChange={(e) => saveTranslationType(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="certified">Certified Translation</option>
+                  <option value="sworn">Sworn Translation</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
+                <select
+                  value={pageFormat}
+                  onChange={(e) => savePageFormat(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
+                  <option value="a4">A4 (210mm x 297mm) - International</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Navigation */}
