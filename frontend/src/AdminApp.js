@@ -902,12 +902,33 @@ const TranslationWorkspace = ({ adminKey }) => {
     setTranslationResults(updatedResults);
   };
 
+  // Save and restore selection for formatting commands
+  const savedSelection = useRef(null);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0) {
+      savedSelection.current = sel.getRangeAt(0);
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedSelection.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelection.current);
+    }
+  };
+
   // Execute formatting command and maintain focus on contentEditable
   const execFormatCommand = (command, value = null) => {
+    restoreSelection();
     document.execCommand(command, false, value);
     if (editableRef.current) {
       editableRef.current.focus();
     }
+    // Save selection after command for next operation
+    setTimeout(saveSelection, 0);
   };
 
   // Download certificate
@@ -2237,11 +2258,11 @@ tradução juramentada | certified translation`}
                 {/* Edit Toolbar - Only visible in edit mode */}
                 {reviewViewMode === 'edit' && (
                   <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
-                    <button onClick={() => execFormatCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
-                    <button onClick={() => execFormatCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
-                    <button onClick={() => execFormatCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onChange={(e) => execFormatCommand('fontSize', e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
                       <option value="1">8pt</option>
                       <option value="2">10pt</option>
                       <option value="3">12pt</option>
@@ -2250,9 +2271,9 @@ tradução juramentada | certified translation`}
                       <option value="6">24pt</option>
                     </select>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onClick={() => execFormatCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                    <button onClick={() => execFormatCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                    <button onClick={() => execFormatCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                   </div>
                 )}
               </div>
@@ -2299,8 +2320,10 @@ tradução juramentada | certified translation`}
                         contentEditable
                         dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        className="w-full min-h-full p-3 text-xs focus:outline-none"
-                        style={{minHeight: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
