@@ -864,9 +864,12 @@ const TranslationWorkspace = ({ adminKey }) => {
 
       const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
         text: currentResult.translatedText,
-        corrections: correctionCommand,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
         claude_api_key: claudeApiKey,
-        action: 'correct'
+        action: correctionCommand,
+        current_translation: currentResult.translatedText
       });
 
       if (response.data.status === 'success' || response.data.translation) {
