@@ -817,34 +817,42 @@ const TranslationWorkspace = ({ adminKey }) => {
     setTranslationResults([]);
 
     try {
+      const totalPages = originalImages.length;
+
       for (let i = 0; i < originalImages.length; i++) {
         const img = originalImages[i];
-        setProcessingStatus(`Translating ${img.filename} (${i + 1}/${originalImages.length})...`);
+        const pageNumber = i + 1;
+        setProcessingStatus(`Translating page ${pageNumber} of ${totalPages}: ${img.filename}...`);
+
+        // Add page context to help Claude understand this is part of a multi-page document
+        const pageContext = totalPages > 1
+          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated separately.`
+          : '';
 
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
-          text: '[Document image attached - translate directly from image]',
+          text: `[Document image attached - translate directly from image] ${pageContext}`,
           source_language: sourceLanguage,
           target_language: targetLanguage,
           document_type: documentType,
           claude_api_key: claudeApiKey,
           action: 'translate',
-          general_instructions: generalInstructions,
+          general_instructions: `${generalInstructions}\n\n${pageContext}`.trim(),
           preserve_layout: true,
           page_format: pageFormat,
-          original_image: img.data  // Claude will see and translate directly from image
+          original_image: img.data
         });
 
         if (response.data.status === 'success' || response.data.translation) {
           setTranslationResults(prev => [...prev, {
             filename: img.filename,
-            originalText: '[Translated directly from image]',
+            originalText: `[Page ${pageNumber} of ${totalPages}]`,
             translatedText: response.data.translation
           }]);
         } else {
           throw new Error(response.data.error || response.data.detail || 'Translation failed');
         }
       }
-      setProcessingStatus('✅ Translation completed!');
+      setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
       setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
@@ -2158,6 +2166,22 @@ tradução juramentada | certified translation`}
                 </div>
               </div>
 
+              {/* Special Instructions for Claude */}
+              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                <label className="block text-xs font-medium text-purple-700 mb-1">
+                  📝 Special Instructions for Claude (Optional)
+                </label>
+                <textarea
+                  value={generalInstructions}
+                  onChange={(e) => setGeneralInstructions(e.target.value)}
+                  placeholder='e.g., "Describe what is written in Arabic between brackets" or "Keep original formatting with tables"'
+                  className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
+                />
+                <p className="text-[10px] text-purple-600 mt-1">
+                  These instructions will be sent to Claude along with each page. Max recommended: 5-10 pages at once.
+                </p>
+              </div>
+
               {/* Translate Button */}
               <div className="mt-4">
                 <button
@@ -2165,7 +2189,7 @@ tradução juramentada | certified translation`}
                   disabled={isProcessing || !claudeApiKey}
                   className="w-full py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
+                  {isProcessing ? '⏳ Translating...' : `🌐 Translate ${originalImages.length > 0 ? `(${originalImages.length} page${originalImages.length > 1 ? 's' : ''})` : ''} with Claude AI`}
                 </button>
                 {!claudeApiKey && (
                   <p className="text-[10px] text-red-500 mt-1 text-center">
