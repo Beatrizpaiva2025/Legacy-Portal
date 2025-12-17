@@ -45,8 +45,8 @@ const TRANSLATORS = [
   { name: "Noemi Santos", title: "Senior Translator" }
 ];
 
-// Beatriz Paiva Signature Image
-const SIGNATURE_IMAGE = '/signature-beatriz.png';
+// Beatriz Paiva Signature Image (SVG embedded as data URL)
+const SIGNATURE_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' width='200' height='80'%3E%3Cpath d='M15 45 Q20 20 35 35 Q45 45 40 55 Q35 65 25 60 Q15 55 20 45 Q25 35 35 40 M35 40 Q50 30 55 45 Q58 55 65 50 Q72 45 70 55 M75 35 Q78 55 85 45 Q88 40 85 50 M90 35 L90 55 M90 45 Q95 40 100 45 Q105 50 100 55 Q95 60 90 55 M110 55 L115 35 L120 55 M112 48 L118 48 M130 55 Q125 45 130 35 Q135 30 140 35 Q145 40 145 55 M155 40 Q165 25 175 40 L170 35 L175 40 L170 45' stroke='%23333366' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
