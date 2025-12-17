@@ -45,9 +45,6 @@ const TRANSLATORS = [
   { name: "Noemi Santos", title: "Senior Translator" }
 ];
 
-// Beatriz Paiva Signature Image (SVG embedded as data URL)
-const SIGNATURE_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' width='200' height='80'%3E%3Cpath d='M15 45 Q20 20 35 35 Q45 45 40 55 Q35 65 25 60 Q15 55 20 45 Q25 35 35 40 M35 40 Q50 30 55 45 Q58 55 65 50 Q72 45 70 55 M75 35 Q78 55 85 45 Q88 40 85 50 M90 35 L90 55 M90 45 Q95 40 100 45 Q105 50 100 55 Q95 60 90 55 M110 55 L115 35 L120 55 M112 48 L118 48 M130 55 Q125 45 130 35 Q135 30 140 35 Q145 40 145 55 M155 40 Q165 25 175 40 L170 35 L175 40 L170 45' stroke='%23333366' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
-
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [adminKey, setAdminKey] = useState('');
@@ -252,12 +249,14 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [logoLeft, setLogoLeft] = useState('');
   const [logoRight, setLogoRight] = useState('');
   const [logoStamp, setLogoStamp] = useState('');
+  const [signatureImage, setSignatureImage] = useState('');
 
   // Refs
   const fileInputRef = useRef(null);
   const logoLeftInputRef = useRef(null);
   const logoRightInputRef = useRef(null);
   const logoStampInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
   const originalTextRef = useRef(null);
   const translatedTextRef = useRef(null);
   const uploadOriginalRef = useRef(null);
@@ -292,9 +291,11 @@ const TranslationWorkspace = ({ adminKey }) => {
     const savedLogoLeft = localStorage.getItem('logo_left');
     const savedLogoRight = localStorage.getItem('logo_right');
     const savedLogoStamp = localStorage.getItem('logo_stamp');
+    const savedSignature = localStorage.getItem('signature_image');
     if (savedLogoLeft) setLogoLeft(savedLogoLeft);
     if (savedLogoRight) setLogoRight(savedLogoRight);
     if (savedLogoStamp) setLogoStamp(savedLogoStamp);
+    if (savedSignature) setSignatureImage(savedSignature);
 
     // Load saved general instructions
     const savedInstructions = localStorage.getItem('general_instructions');
@@ -435,8 +436,12 @@ const TranslationWorkspace = ({ adminKey }) => {
       } else if (type === 'stamp') {
         setLogoStamp(base64);
         localStorage.setItem('logo_stamp', base64);
+      } else if (type === 'signature') {
+        setSignatureImage(base64);
+        localStorage.setItem('signature_image', base64);
       }
-      setProcessingStatus(`✅ ${type === 'left' ? 'Left logo' : type === 'right' ? 'ATA logo' : 'Stamp logo'} uploaded!`);
+      const typeLabels = { left: 'Left logo', right: 'ATA logo', stamp: 'Stamp logo', signature: 'Signature' };
+      setProcessingStatus(`✅ ${typeLabels[type] || type} uploaded!`);
     };
     reader.readAsDataURL(file);
   };
@@ -452,8 +457,11 @@ const TranslationWorkspace = ({ adminKey }) => {
     } else if (type === 'stamp') {
       setLogoStamp('');
       localStorage.removeItem('logo_stamp');
+    } else if (type === 'signature') {
+      setSignatureImage('');
+      localStorage.removeItem('signature_image');
     }
-    setProcessingStatus(`Logo removed`);
+    setProcessingStatus(`${type === 'signature' ? 'Signature' : 'Logo'} removed`);
   };
 
   // Translation Instructions CRUD
@@ -1008,6 +1016,7 @@ const TranslationWorkspace = ({ adminKey }) => {
 
         <div class="footer-section">
             <div class="signature-block">
+                ${signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 24px; max-width: 100px; object-fit: contain; margin-bottom: 2px;" />` : ''}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
@@ -1870,6 +1879,31 @@ tradução juramentada | certified translation`}
                   Upload
                 </button>
               </div>
+
+              {/* Signature Image */}
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Signature</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {signatureImage ? (
+                    <img src={signatureImage} alt="Signature" className="max-h-16 max-w-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No signature</span>
+                  )}
+                </div>
+                <input
+                  ref={signatureInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoUpload(e, 'signature')}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => signatureInputRef.current?.click()}
+                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
+                >
+                  Upload
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1960,7 +1994,11 @@ tradução juramentada | certified translation`}
 
               {/* Signature Section - FIXED */}
               <div className="mt-8">
-                <img src={SIGNATURE_IMAGE} alt="Signature" className="h-12 mb-1" style={{maxWidth: '150px'}} />
+                {signatureImage ? (
+                  <img src={signatureImage} alt="Signature" className="h-6 mb-1" style={{maxWidth: '100px'}} />
+                ) : (
+                  <div className="h-6 mb-1 text-xs text-gray-400 italic">No signature uploaded</div>
+                )}
                 <div className="text-xs">Authorized Representative</div>
                 <div className="text-xs">Legacy Translations Inc.</div>
                 <div className="text-xs mt-2">
