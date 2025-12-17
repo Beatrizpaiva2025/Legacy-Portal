@@ -45,6 +45,9 @@ const TRANSLATORS = [
   { name: "Noemi Santos", title: "Senior Translator" }
 ];
 
+// Beatriz Paiva Signature Image
+const SIGNATURE_IMAGE = '/signature-beatriz.png';
+
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [adminKey, setAdminKey] = useState('');
@@ -1910,9 +1913,9 @@ tradução juramentada | certified translation`}
               {/* Main Title */}
               <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
 
-              {/* Translation of a ... */}
+              {/* Translation of ... */}
               <p className="text-center mb-6 text-sm">
-                Translation of (a/an/no article){' '}
+                Translation of{' '}
                 <input
                   type="text"
                   value={documentType}
@@ -1957,8 +1960,7 @@ tradução juramentada | certified translation`}
 
               {/* Signature Section - FIXED */}
               <div className="mt-8">
-                <div className="mb-1 italic text-lg" style={{fontFamily: 'Brush Script MT, cursive', fontSize: '24px'}}>Beatriz Paiva</div>
-                <div className="text-sm"><strong>Beatriz Paiva</strong></div>
+                <img src={SIGNATURE_IMAGE} alt="Signature" className="h-12 mb-1" style={{maxWidth: '150px'}} />
                 <div className="text-xs">Authorized Representative</div>
                 <div className="text-xs">Legacy Translations Inc.</div>
                 <div className="text-xs mt-2">
