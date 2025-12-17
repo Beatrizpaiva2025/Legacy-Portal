@@ -213,6 +213,8 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [translationType, setTranslationType] = useState('certified'); // 'certified' or 'sworn'
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [includeCover, setIncludeCover] = useState(true);
+  const [includeLetterhead, setIncludeLetterhead] = useState(true);
+  const [includeOriginal, setIncludeOriginal] = useState(true);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
   // Correction state
@@ -267,7 +269,8 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Approval checkboxes state
   const [approvalChecks, setApprovalChecks] = useState({
-    coverLetter: false,
+    projectNumber: false,
+    languageChanged: false,
     proofread: false
   });
 
@@ -1042,18 +1045,18 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
         </div>`;
 
-    // Translation pages HTML (with letterhead on each page, NO "Translation" title)
+    // Translation pages HTML (with or without letterhead)
     const translationPagesHTML = translationResults.map((result, index) => `
     <div class="translation-page">
-        ${letterheadHTML}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
 
     // Original documents pages HTML (each image on separate page, title only on first)
-    const originalPagesHTML = originalImages.length > 0 ? originalImages.map((img, index) => `
+    const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div class="original-documents-page">
-        ${letterheadHTML}
+        ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div class="page-title">Original Document</div>' : ''}
         <div class="original-image-container">
             <img src="${img.data}" alt="${img.filename}" class="original-image" />
@@ -2414,16 +2417,24 @@ tradução juramentada | certified translation`}
               {/* Approval Checklist */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={approvalChecks.coverLetter}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, coverLetter: e.target.checked})}
+                      checked={approvalChecks.projectNumber}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">1. Cover Letter</span>
-                    <span className="ml-2 text-gray-400 text-[10px]">(not mandatory)</span>
+                    <span className="font-medium">Você colocou o número do projeto?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.languageChanged}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageChanged: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Mudou o idioma?</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -2432,7 +2443,42 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">2. Proofread</span>
+                    <span className="font-medium">Fez o proofreading do documento?</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Non-Certified Translation Options */}
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-orange-700 mb-2">📄 Para traduções não certificadas</h3>
+                <p className="text-[10px] text-orange-600 mb-3">Marque para EXCLUIR do documento final:</p>
+                <div className="space-y-2">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeCover}
+                      onChange={(e) => setIncludeCover(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Certificate of Accuracy</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeLetterhead}
+                      onChange={(e) => setIncludeLetterhead(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Letterhead</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeOriginal}
+                      onChange={(e) => setIncludeOriginal(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Original Document</span>
                   </label>
                 </div>
               </div>
@@ -2444,32 +2490,25 @@ tradução juramentada | certified translation`}
                 {/* Document Order Preview */}
                 <div className="bg-white rounded border p-3 mb-3">
                   <p className="text-xs font-medium text-gray-700 mb-2">📋 Document Order:</p>
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
                     {includeCover && (
                       <>
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">1. Cover Letter</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Certificate</span>
                         <span className="text-gray-400">→</span>
                       </>
                     )}
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">{includeCover ? '2' : '1'}. Translation</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">{includeCover ? '3' : '2'}. Original</span>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Translation</span>
+                    {includeOriginal && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Original</span>
+                      </>
+                    )}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-2">
-                    ✓ Letterhead appears on all pages
+                    {includeLetterhead ? '✓ Letterhead em todas as páginas' : '✗ Sem letterhead'}
                   </p>
                 </div>
-
-                {/* Include Cover Letter Option */}
-                <label className="flex items-center text-xs mb-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeCover}
-                    onChange={(e) => setIncludeCover(e.target.checked)}
-                    className="mr-2 w-4 h-4 text-blue-600"
-                  />
-                  <span className="font-medium">Include Cover Letter (Certificate of Accuracy)</span>
-                </label>
 
                 {/* Download Buttons */}
                 <div className="grid grid-cols-2 gap-2">
