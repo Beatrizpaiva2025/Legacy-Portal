@@ -760,7 +760,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     if (externalTranslationText) {
       setTranslationResults([{
         original: 'Original document uploaded as image',
-        translated: externalTranslationText,
+        translatedText: externalTranslationText,
         filename: externalOriginalImages[0]?.filename || 'document'
       }]);
     }
@@ -1885,7 +1885,7 @@ tradução juramentada | certified translation`}
             <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
             <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
                 <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
@@ -1903,12 +1903,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'left')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoLeftInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoLeftInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoLeft && (
+                    <button
+                      onClick={() => removeLogo('left')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Center Logo (ATA) */}
@@ -1928,12 +1939,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'right')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoRightInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoRightInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoRight && (
+                    <button
+                      onClick={() => removeLogo('right')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Stamp Logo */}
@@ -1953,12 +1975,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'stamp')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoStampInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoStampInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoStamp && (
+                    <button
+                      onClick={() => removeLogo('stamp')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Signature Image */}
@@ -1978,12 +2011,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'signature')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => signatureInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => signatureInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {signatureImage && (
+                    <button
+                      onClick={() => removeLogo('signature')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove signature"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2073,23 +2117,38 @@ tradução juramentada | certified translation`}
                 A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.
               </p>
 
-              {/* Signature Section - FIXED */}
-              <div className="mt-8">
-                {signatureImage ? (
-                  <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
-                ) : (
-                  <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
-                )}
-                <div className="text-xs">Authorized Representative</div>
-                <div className="text-xs">Legacy Translations Inc.</div>
-                <div className="text-xs mt-2">
-                  Dated:{' '}
-                  <input
-                    type="text"
-                    value={translationDate}
-                    onChange={(e) => setTranslationDate(e.target.value)}
-                    className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
-                  />
+              {/* Signature and Stamp Section */}
+              <div className="mt-8 flex justify-between items-end">
+                {/* Signature */}
+                <div>
+                  {signatureImage ? (
+                    <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
+                  ) : (
+                    <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
+                  )}
+                  <div className="text-xs">Authorized Representative</div>
+                  <div className="text-xs">Legacy Translations Inc.</div>
+                  <div className="text-xs mt-2">
+                    Dated:{' '}
+                    <input
+                      type="text"
+                      value={translationDate}
+                      onChange={(e) => setTranslationDate(e.target.value)}
+                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+                {/* Stamp */}
+                <div className="text-center">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full border-4 border-blue-600 flex flex-col items-center justify-center p-2" style={{borderStyle: 'double'}}>
+                      <div className="text-[8px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
+                      <div className="text-[10px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
+                      <div className="text-[8px] text-blue-600">ATA # 275993</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
