@@ -213,6 +213,8 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [translationType, setTranslationType] = useState('certified'); // 'certified' or 'sworn'
   const [generalInstructions, setGeneralInstructions] = useState('');
   const [includeCover, setIncludeCover] = useState(true);
+  const [includeLetterhead, setIncludeLetterhead] = useState(true);
+  const [includeOriginal, setIncludeOriginal] = useState(true);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
   // Correction state
@@ -267,7 +269,8 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Approval checkboxes state
   const [approvalChecks, setApprovalChecks] = useState({
-    coverLetter: false,
+    projectNumber: false,
+    languageChanged: false,
     proofread: false
   });
 
@@ -817,34 +820,42 @@ const TranslationWorkspace = ({ adminKey }) => {
     setTranslationResults([]);
 
     try {
+      const totalPages = originalImages.length;
+
       for (let i = 0; i < originalImages.length; i++) {
         const img = originalImages[i];
-        setProcessingStatus(`Translating ${img.filename} (${i + 1}/${originalImages.length})...`);
+        const pageNumber = i + 1;
+        setProcessingStatus(`Translating page ${pageNumber} of ${totalPages}: ${img.filename}...`);
+
+        // Add page context to help Claude understand this is part of a multi-page document
+        const pageContext = totalPages > 1
+          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated separately.`
+          : '';
 
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
-          text: '[Document image attached - translate directly from image]',
+          text: `[Document image attached - translate directly from image] ${pageContext}`,
           source_language: sourceLanguage,
           target_language: targetLanguage,
           document_type: documentType,
           claude_api_key: claudeApiKey,
           action: 'translate',
-          general_instructions: generalInstructions,
+          general_instructions: `${generalInstructions}\n\n${pageContext}`.trim(),
           preserve_layout: true,
           page_format: pageFormat,
-          original_image: img.data  // Claude will see and translate directly from image
+          original_image: img.data
         });
 
         if (response.data.status === 'success' || response.data.translation) {
           setTranslationResults(prev => [...prev, {
             filename: img.filename,
-            originalText: '[Translated directly from image]',
+            originalText: `[Page ${pageNumber} of ${totalPages}]`,
             translatedText: response.data.translation
           }]);
         } else {
           throw new Error(response.data.error || response.data.detail || 'Translation failed');
         }
       }
-      setProcessingStatus('✅ Translation completed!');
+      setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
     } catch (error) {
       console.error('Translation error:', error);
       setProcessingStatus(`❌ Translation failed: ${error.response?.data?.detail || error.message}`);
@@ -902,12 +913,33 @@ const TranslationWorkspace = ({ adminKey }) => {
     setTranslationResults(updatedResults);
   };
 
+  // Save and restore selection for formatting commands
+  const savedSelection = useRef(null);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel.rangeCount > 0) {
+      savedSelection.current = sel.getRangeAt(0);
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedSelection.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelection.current);
+    }
+  };
+
   // Execute formatting command and maintain focus on contentEditable
   const execFormatCommand = (command, value = null) => {
+    restoreSelection();
     document.execCommand(command, false, value);
     if (editableRef.current) {
       editableRef.current.focus();
     }
+    // Save selection after command for next operation
+    setTimeout(saveSelection, 0);
   };
 
   // Download certificate
@@ -1013,28 +1045,24 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
         </div>`;
 
-    // Translation pages HTML (with letterhead on each page)
+    // Translation pages HTML (with or without letterhead)
     const translationPagesHTML = translationResults.map((result, index) => `
     <div class="translation-page">
-        ${letterheadHTML}
-        <div class="page-title">Translation ${translationResults.length > 1 ? `(Page ${index + 1} of ${translationResults.length})` : ''}</div>
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
 
-    // Original documents pages HTML (last page with letterhead and image below)
-    const originalPagesHTML = originalImages.length > 0 ? `
+    // Original documents pages HTML (each image on separate page, title only on first)
+    const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div class="original-documents-page">
-        ${letterheadHTML}
-        <div class="page-title">Original Document${originalImages.length > 1 ? 's' : ''}</div>
-        <div class="original-images-wrapper">
-            ${originalImages.map(img => `
-            <div class="original-image-container">
-                <img src="${img.data}" alt="${img.filename}" class="original-image" />
-            </div>
-            `).join('')}
+        ${includeLetterhead ? letterheadHTML : ''}
+        ${index === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+            <img src="${img.data}" alt="${img.filename}" class="original-image" />
         </div>
-    </div>` : '';
+    </div>
+    `).join('') : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -2137,6 +2165,22 @@ tradução juramentada | certified translation`}
                 </div>
               </div>
 
+              {/* Special Instructions for Claude */}
+              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                <label className="block text-xs font-medium text-purple-700 mb-1">
+                  📝 Special Instructions for Claude (Optional)
+                </label>
+                <textarea
+                  value={generalInstructions}
+                  onChange={(e) => setGeneralInstructions(e.target.value)}
+                  placeholder='e.g., "Describe what is written in Arabic between brackets" or "Keep original formatting with tables"'
+                  className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
+                />
+                <p className="text-[10px] text-purple-600 mt-1">
+                  These instructions will be sent to Claude along with each page. Max recommended: 5-10 pages at once.
+                </p>
+              </div>
+
               {/* Translate Button */}
               <div className="mt-4">
                 <button
@@ -2144,7 +2188,7 @@ tradução juramentada | certified translation`}
                   disabled={isProcessing || !claudeApiKey}
                   className="w-full py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {isProcessing ? '⏳ Translating...' : '🌐 Translate with Claude AI'}
+                  {isProcessing ? '⏳ Translating...' : `🌐 Translate ${originalImages.length > 0 ? `(${originalImages.length} page${originalImages.length > 1 ? 's' : ''})` : ''} with Claude AI`}
                 </button>
                 {!claudeApiKey && (
                   <p className="text-[10px] text-red-500 mt-1 text-center">
@@ -2237,11 +2281,11 @@ tradução juramentada | certified translation`}
                 {/* Edit Toolbar - Only visible in edit mode */}
                 {reviewViewMode === 'edit' && (
                   <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
-                    <button onClick={() => execFormatCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
-                    <button onClick={() => execFormatCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
-                    <button onClick={() => execFormatCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onChange={(e) => execFormatCommand('fontSize', e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
                       <option value="1">8pt</option>
                       <option value="2">10pt</option>
                       <option value="3">12pt</option>
@@ -2250,9 +2294,9 @@ tradução juramentada | certified translation`}
                       <option value="6">24pt</option>
                     </select>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onClick={() => execFormatCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                    <button onClick={() => execFormatCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                    <button onClick={() => execFormatCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                   </div>
                 )}
               </div>
@@ -2299,8 +2343,10 @@ tradução juramentada | certified translation`}
                         contentEditable
                         dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
-                        className="w-full min-h-full p-3 text-xs focus:outline-none"
-                        style={{minHeight: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -2371,16 +2417,24 @@ tradução juramentada | certified translation`}
               {/* Approval Checklist */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={approvalChecks.coverLetter}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, coverLetter: e.target.checked})}
+                      checked={approvalChecks.projectNumber}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">1. Cover Letter</span>
-                    <span className="ml-2 text-gray-400 text-[10px]">(not mandatory)</span>
+                    <span className="font-medium">Você colocou o número do projeto?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.languageChanged}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageChanged: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Mudou o idioma?</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -2389,7 +2443,42 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">2. Proofread</span>
+                    <span className="font-medium">Fez o proofreading do documento?</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Non-Certified Translation Options */}
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-orange-700 mb-2">📄 Para traduções não certificadas</h3>
+                <p className="text-[10px] text-orange-600 mb-3">Marque para EXCLUIR do documento final:</p>
+                <div className="space-y-2">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeCover}
+                      onChange={(e) => setIncludeCover(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Certificate of Accuracy</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeLetterhead}
+                      onChange={(e) => setIncludeLetterhead(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Letterhead</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeOriginal}
+                      onChange={(e) => setIncludeOriginal(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Excluir Original Document</span>
                   </label>
                 </div>
               </div>
@@ -2401,32 +2490,25 @@ tradução juramentada | certified translation`}
                 {/* Document Order Preview */}
                 <div className="bg-white rounded border p-3 mb-3">
                   <p className="text-xs font-medium text-gray-700 mb-2">📋 Document Order:</p>
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
                     {includeCover && (
                       <>
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">1. Cover Letter</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Certificate</span>
                         <span className="text-gray-400">→</span>
                       </>
                     )}
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">{includeCover ? '2' : '1'}. Translation</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">{includeCover ? '3' : '2'}. Original</span>
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Translation</span>
+                    {includeOriginal && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Original</span>
+                      </>
+                    )}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-2">
-                    ✓ Letterhead appears on all pages
+                    {includeLetterhead ? '✓ Letterhead em todas as páginas' : '✗ Sem letterhead'}
                   </p>
                 </div>
-
-                {/* Include Cover Letter Option */}
-                <label className="flex items-center text-xs mb-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={includeCover}
-                    onChange={(e) => setIncludeCover(e.target.checked)}
-                    className="mr-2 w-4 h-4 text-blue-600"
-                  />
-                  <span className="font-medium">Include Cover Letter (Certificate of Accuracy)</span>
-                </label>
 
                 {/* Download Buttons */}
                 <div className="grid grid-cols-2 gap-2">
