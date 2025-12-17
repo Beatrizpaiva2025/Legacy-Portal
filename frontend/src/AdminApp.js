@@ -43,14 +43,22 @@ const LANGUAGES = [
   // Asian Languages
   "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean",
   "Vietnamese", "Thai", "Indonesian", "Malay", "Filipino/Tagalog", "Hindi",
+  "Bengali", "Punjabi", "Tamil", "Telugu", "Urdu", "Gujarati", "Nepali",
+  "Burmese", "Khmer", "Lao", "Mongolian",
   // Middle Eastern & African
-  "Arabic", "Arabic (Saudi Arabia)", "Hebrew", "Turkish", "Persian/Farsi", "Swahili",
+  "Arabic", "Arabic (Saudi Arabia)", "Hebrew", "Turkish", "Persian/Farsi",
+  "Swahili", "Amharic", "Somali", "Yoruba", "Igbo", "Zulu", "Afrikaans",
   // European Languages
   "Russian", "Polish", "Ukrainian", "Czech", "Slovak", "Hungarian",
   "Romanian", "Bulgarian", "Greek", "Serbian", "Croatian", "Slovenian",
   "Swedish", "Norwegian", "Danish", "Finnish", "Icelandic",
-  // Other Languages
-  "Catalan", "Basque", "Galician", "Latin"
+  "Albanian", "Armenian", "Georgian", "Azerbaijani", "Kazakh", "Uzbek",
+  "Lithuanian", "Latvian", "Estonian", "Maltese", "Belarusian",
+  "Bosnian", "Macedonian", "Luxembourgish",
+  // Celtic & Regional
+  "Welsh", "Irish", "Scottish Gaelic", "Catalan", "Basque", "Galician",
+  // Creole & Other
+  "Haitian Creole", "Cape Verdean Creole", "Papiamento", "Latin", "Esperanto"
 ];
 
 const TRANSLATORS = [
