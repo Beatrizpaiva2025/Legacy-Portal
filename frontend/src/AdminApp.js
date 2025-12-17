@@ -1042,28 +1042,24 @@ const TranslationWorkspace = ({ adminKey }) => {
             </div>
         </div>`;
 
-    // Translation pages HTML (with letterhead on each page)
+    // Translation pages HTML (with letterhead on each page, NO "Translation" title)
     const translationPagesHTML = translationResults.map((result, index) => `
     <div class="translation-page">
         ${letterheadHTML}
-        <div class="page-title">Translation ${translationResults.length > 1 ? `(Page ${index + 1} of ${translationResults.length})` : ''}</div>
         <div class="translation-content">${result.translatedText}</div>
     </div>
     `).join('');
 
-    // Original documents pages HTML (last page with letterhead and image below)
-    const originalPagesHTML = originalImages.length > 0 ? `
+    // Original documents pages HTML (each image on separate page, title only on first)
+    const originalPagesHTML = originalImages.length > 0 ? originalImages.map((img, index) => `
     <div class="original-documents-page">
         ${letterheadHTML}
-        <div class="page-title">Original Document${originalImages.length > 1 ? 's' : ''}</div>
-        <div class="original-images-wrapper">
-            ${originalImages.map(img => `
-            <div class="original-image-container">
-                <img src="${img.data}" alt="${img.filename}" class="original-image" />
-            </div>
-            `).join('')}
+        ${index === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+            <img src="${img.data}" alt="${img.filename}" class="original-image" />
         </div>
-    </div>` : '';
+    </div>
+    `).join('') : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
