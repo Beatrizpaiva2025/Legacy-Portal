@@ -1095,7 +1095,9 @@ const TranslationWorkspace = ({ adminKey }) => {
 
         <div class="footer-section">
             <div class="signature-block">
-                ${signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 24px; max-width: 100px; object-fit: contain; margin-bottom: 2px;" />` : ''}
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
@@ -2074,9 +2076,9 @@ tradução juramentada | certified translation`}
               {/* Signature Section - FIXED */}
               <div className="mt-8">
                 {signatureImage ? (
-                  <img src={signatureImage} alt="Signature" className="h-6 mb-1" style={{maxWidth: '100px'}} />
+                  <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
                 ) : (
-                  <div className="h-6 mb-1 text-xs text-gray-400 italic">No signature uploaded</div>
+                  <div className="mb-1" style={{fontFamily: 'Brush Script MT, cursive', fontSize: '24px', color: '#1a365d'}}>Beatriz Paiva</div>
                 )}
                 <div className="text-xs">Authorized Representative</div>
                 <div className="text-xs">Legacy Translations Inc.</div>
