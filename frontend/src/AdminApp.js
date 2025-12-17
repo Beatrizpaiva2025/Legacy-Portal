@@ -1885,7 +1885,7 @@ tradução juramentada | certified translation`}
             <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
             <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
                 <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
@@ -1903,12 +1903,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'left')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoLeftInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoLeftInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoLeft && (
+                    <button
+                      onClick={() => removeLogo('left')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Center Logo (ATA) */}
@@ -1928,12 +1939,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'right')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoRightInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoRightInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoRight && (
+                    <button
+                      onClick={() => removeLogo('right')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Stamp Logo */}
@@ -1953,12 +1975,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'stamp')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => logoStampInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => logoStampInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {logoStamp && (
+                    <button
+                      onClick={() => removeLogo('stamp')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove logo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Signature Image */}
@@ -1978,12 +2011,23 @@ tradução juramentada | certified translation`}
                   onChange={(e) => handleLogoUpload(e, 'signature')}
                   className="hidden"
                 />
-                <button
-                  onClick={() => signatureInputRef.current?.click()}
-                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
-                >
-                  Upload
-                </button>
+                <div className="flex justify-center gap-1 mt-2">
+                  <button
+                    onClick={() => signatureInputRef.current?.click()}
+                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                  >
+                    Upload
+                  </button>
+                  {signatureImage && (
+                    <button
+                      onClick={() => removeLogo('signature')}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                      title="Remove signature"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
