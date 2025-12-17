@@ -257,6 +257,7 @@ const TranslationWorkspace = ({ adminKey }) => {
   const translatedTextRef = useRef(null);
   const uploadOriginalRef = useRef(null);
   const uploadOcrRef = useRef(null);
+  const editableRef = useRef(null);
 
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
@@ -896,6 +897,14 @@ const TranslationWorkspace = ({ adminKey }) => {
       translatedText: newText
     };
     setTranslationResults(updatedResults);
+  };
+
+  // Execute formatting command and maintain focus on contentEditable
+  const execFormatCommand = (command, value = null) => {
+    document.execCommand(command, false, value);
+    if (editableRef.current) {
+      editableRef.current.focus();
+    }
   };
 
   // Download certificate
@@ -2245,11 +2254,11 @@ tradução juramentada | certified translation`}
                 {/* Edit Toolbar - Only visible in edit mode */}
                 {reviewViewMode === 'edit' && (
                   <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
-                    <button onClick={() => document.execCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
-                    <button onClick={() => document.execCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
-                    <button onClick={() => document.execCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <button onClick={() => execFormatCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onClick={() => execFormatCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onClick={() => execFormatCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onChange={(e) => document.execCommand('fontSize', false, e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                    <select onChange={(e) => execFormatCommand('fontSize', e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
                       <option value="1">8pt</option>
                       <option value="2">10pt</option>
                       <option value="3">12pt</option>
@@ -2258,9 +2267,9 @@ tradução juramentada | certified translation`}
                       <option value="6">24pt</option>
                     </select>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <button onClick={() => document.execCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                    <button onClick={() => document.execCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                    <button onClick={() => document.execCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    <button onClick={() => execFormatCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onClick={() => execFormatCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onClick={() => execFormatCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                   </div>
                 )}
               </div>
@@ -2303,6 +2312,7 @@ tradução juramentada | certified translation`}
                       />
                     ) : (
                       <div
+                        ref={editableRef}
                         contentEditable
                         dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
