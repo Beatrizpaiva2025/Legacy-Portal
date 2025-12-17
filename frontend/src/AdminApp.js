@@ -2117,23 +2117,38 @@ tradução juramentada | certified translation`}
                 A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.
               </p>
 
-              {/* Signature Section - FIXED */}
-              <div className="mt-8">
-                {signatureImage ? (
-                  <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
-                ) : (
-                  <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
-                )}
-                <div className="text-xs">Authorized Representative</div>
-                <div className="text-xs">Legacy Translations Inc.</div>
-                <div className="text-xs mt-2">
-                  Dated:{' '}
-                  <input
-                    type="text"
-                    value={translationDate}
-                    onChange={(e) => setTranslationDate(e.target.value)}
-                    className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
-                  />
+              {/* Signature and Stamp Section */}
+              <div className="mt-8 flex justify-between items-end">
+                {/* Signature */}
+                <div>
+                  {signatureImage ? (
+                    <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
+                  ) : (
+                    <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
+                  )}
+                  <div className="text-xs">Authorized Representative</div>
+                  <div className="text-xs">Legacy Translations Inc.</div>
+                  <div className="text-xs mt-2">
+                    Dated:{' '}
+                    <input
+                      type="text"
+                      value={translationDate}
+                      onChange={(e) => setTranslationDate(e.target.value)}
+                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                </div>
+                {/* Stamp */}
+                <div className="text-center">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full border-4 border-blue-600 flex flex-col items-center justify-center p-2" style={{borderStyle: 'double'}}>
+                      <div className="text-[8px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
+                      <div className="text-[10px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
+                      <div className="text-[8px] text-blue-600">ATA # 275993</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
