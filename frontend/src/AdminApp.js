@@ -217,6 +217,12 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
+  // External Translation Mode
+  const [workflowMode, setWorkflowMode] = useState('ai'); // 'ai' or 'external'
+  const [externalOriginalImages, setExternalOriginalImages] = useState([]); // Original document images
+  const [externalTranslationText, setExternalTranslationText] = useState(''); // External translation text
+  const [externalTranslationImages, setExternalTranslationImages] = useState([]); // External translation as images (if PDF)
+
   // Correction state
   const [correctionCommand, setCorrectionCommand] = useState('');
   const [applyingCorrection, setApplyingCorrection] = useState(false);
@@ -249,17 +255,21 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [logoLeft, setLogoLeft] = useState('');
   const [logoRight, setLogoRight] = useState('');
   const [logoStamp, setLogoStamp] = useState('');
+  const [signatureImage, setSignatureImage] = useState('');
 
   // Refs
   const fileInputRef = useRef(null);
   const logoLeftInputRef = useRef(null);
   const logoRightInputRef = useRef(null);
   const logoStampInputRef = useRef(null);
+  const signatureInputRef = useRef(null);
   const originalTextRef = useRef(null);
   const translatedTextRef = useRef(null);
   const uploadOriginalRef = useRef(null);
   const uploadOcrRef = useRef(null);
   const editableRef = useRef(null);
+  const externalOriginalInputRef = useRef(null);
+  const externalTranslationInputRef = useRef(null);
 
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
@@ -289,9 +299,11 @@ const TranslationWorkspace = ({ adminKey }) => {
     const savedLogoLeft = localStorage.getItem('logo_left');
     const savedLogoRight = localStorage.getItem('logo_right');
     const savedLogoStamp = localStorage.getItem('logo_stamp');
+    const savedSignature = localStorage.getItem('signature_image');
     if (savedLogoLeft) setLogoLeft(savedLogoLeft);
     if (savedLogoRight) setLogoRight(savedLogoRight);
     if (savedLogoStamp) setLogoStamp(savedLogoStamp);
+    if (savedSignature) setSignatureImage(savedSignature);
 
     // Load saved general instructions
     const savedInstructions = localStorage.getItem('general_instructions');
@@ -432,8 +444,12 @@ const TranslationWorkspace = ({ adminKey }) => {
       } else if (type === 'stamp') {
         setLogoStamp(base64);
         localStorage.setItem('logo_stamp', base64);
+      } else if (type === 'signature') {
+        setSignatureImage(base64);
+        localStorage.setItem('signature_image', base64);
       }
-      setProcessingStatus(`✅ ${type === 'left' ? 'Left logo' : type === 'right' ? 'ATA logo' : 'Stamp logo'} uploaded!`);
+      const typeLabels = { left: 'Left logo', right: 'ATA logo', stamp: 'Stamp logo', signature: 'Signature' };
+      setProcessingStatus(`✅ ${typeLabels[type] || type} uploaded!`);
     };
     reader.readAsDataURL(file);
   };
@@ -449,8 +465,11 @@ const TranslationWorkspace = ({ adminKey }) => {
     } else if (type === 'stamp') {
       setLogoStamp('');
       localStorage.removeItem('logo_stamp');
+    } else if (type === 'signature') {
+      setSignatureImage('');
+      localStorage.removeItem('signature_image');
     }
-    setProcessingStatus(`Logo removed`);
+    setProcessingStatus(`${type === 'signature' ? 'Signature' : 'Logo'} removed`);
   };
 
   // Translation Instructions CRUD
@@ -677,6 +696,77 @@ const TranslationWorkspace = ({ adminKey }) => {
       });
     });
     Promise.all(imagePromises).then(images => setOriginalImages(images));
+  };
+
+  // Handle external original document upload
+  const handleExternalOriginalUpload = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    const imagePromises = selectedFiles.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ filename: file.name, data: reader.result });
+        reader.readAsDataURL(file);
+      });
+    });
+    Promise.all(imagePromises).then(images => {
+      setExternalOriginalImages(images);
+      // Also set as originalImages for certificate generation
+      setOriginalImages(images);
+      setProcessingStatus(`✅ ${images.length} original document(s) uploaded`);
+    });
+  };
+
+  // Handle external translation upload (text or images)
+  const handleExternalTranslationUpload = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    const file = selectedFiles[0];
+
+    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+      // Text file - read as text
+      const reader = new FileReader();
+      reader.onload = () => {
+        setExternalTranslationText(reader.result);
+        setProcessingStatus('✅ Translation text uploaded');
+      };
+      reader.readAsText(file);
+    } else {
+      // Image/PDF - read as base64
+      const imagePromises = selectedFiles.map(f => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve({ filename: f.name, data: reader.result });
+          reader.readAsDataURL(f);
+        });
+      });
+      Promise.all(imagePromises).then(images => {
+        setExternalTranslationImages(images);
+        setProcessingStatus(`✅ ${images.length} translation document(s) uploaded`);
+      });
+    }
+  };
+
+  // Send external translation to Review
+  const handleExternalToReview = () => {
+    if (externalOriginalImages.length === 0) {
+      alert('Please upload the original document first');
+      return;
+    }
+    if (!externalTranslationText && externalTranslationImages.length === 0) {
+      alert('Please upload or paste the translation');
+      return;
+    }
+
+    // If we have translation text, create translation results for review
+    if (externalTranslationText) {
+      setTranslationResults([{
+        original: 'Original document uploaded as image',
+        translated: externalTranslationText,
+        filename: externalOriginalImages[0]?.filename || 'document'
+      }]);
+    }
+
+    setActiveSubTab('review');
+    setProcessingStatus('✅ Ready for review');
   };
 
   // Convert file to base64
@@ -1005,6 +1095,7 @@ const TranslationWorkspace = ({ adminKey }) => {
 
         <div class="footer-section">
             <div class="signature-block">
+                ${signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 24px; max-width: 100px; object-fit: contain; margin-bottom: 2px;" />` : ''}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
@@ -1276,7 +1367,7 @@ const TranslationWorkspace = ({ adminKey }) => {
                       onChange={() => setUseClaudeOcr(false)}
                       className="mr-2"
                     />
-                    Standard OCR (Tesseract)
+                    AWS Textract OCR
                   </label>
                   <label className="flex items-center">
                     <input
@@ -1867,6 +1958,31 @@ tradução juramentada | certified translation`}
                   Upload
                 </button>
               </div>
+
+              {/* Signature Image */}
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Signature</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {signatureImage ? (
+                    <img src={signatureImage} alt="Signature" className="max-h-16 max-w-full object-contain" />
+                  ) : (
+                    <span className="text-xs text-gray-400">No signature</span>
+                  )}
+                </div>
+                <input
+                  ref={signatureInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleLogoUpload(e, 'signature')}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => signatureInputRef.current?.click()}
+                  className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2"
+                >
+                  Upload
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1910,9 +2026,9 @@ tradução juramentada | certified translation`}
               {/* Main Title */}
               <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
 
-              {/* Translation of a ... */}
+              {/* Translation of ... */}
               <p className="text-center mb-6 text-sm">
-                Translation of (a/an/no article){' '}
+                Translation of{' '}
                 <input
                   type="text"
                   value={documentType}
@@ -1957,8 +2073,11 @@ tradução juramentada | certified translation`}
 
               {/* Signature Section - FIXED */}
               <div className="mt-8">
-                <div className="mb-1 italic text-lg" style={{fontFamily: 'Brush Script MT, cursive', fontSize: '24px'}}>Beatriz Paiva</div>
-                <div className="text-sm"><strong>Beatriz Paiva</strong></div>
+                {signatureImage ? (
+                  <img src={signatureImage} alt="Signature" className="h-6 mb-1" style={{maxWidth: '100px'}} />
+                ) : (
+                  <div className="h-6 mb-1 text-xs text-gray-400 italic">No signature uploaded</div>
+                )}
                 <div className="text-xs">Authorized Representative</div>
                 <div className="text-xs">Legacy Translations Inc.</div>
                 <div className="text-xs mt-2">
@@ -2025,8 +2144,43 @@ tradução juramentada | certified translation`}
       {activeSubTab === 'ocr' && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
-          <p className="text-xs text-gray-500 mb-4">Upload document and translate directly with Claude AI</p>
 
+          {/* Workflow Mode Switch */}
+          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+            <div className="flex items-center justify-center gap-4">
+              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'ai' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="workflowMode"
+                  value="ai"
+                  checked={workflowMode === 'ai'}
+                  onChange={() => setWorkflowMode('ai')}
+                  className="sr-only"
+                />
+                <span className="mr-2">🤖</span>
+                <span className="text-sm font-medium">Traduzir com AI</span>
+              </label>
+              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'external' ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="workflowMode"
+                  value="external"
+                  checked={workflowMode === 'external'}
+                  onChange={() => setWorkflowMode('external')}
+                  className="sr-only"
+                />
+                <span className="mr-2">📥</span>
+                <span className="text-sm font-medium">Tradução Externa</span>
+              </label>
+            </div>
+            <p className="text-[10px] text-gray-500 text-center mt-2">
+              {workflowMode === 'ai' ? 'Upload document and translate with Claude AI' : 'Upload original + existing translation for review'}
+            </p>
+          </div>
+
+          {/* ============ AI TRANSLATION MODE ============ */}
+          {workflowMode === 'ai' && (
+            <>
           {/* Language Selection */}
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
             <h3 className="text-xs font-bold text-blue-700 mb-3">🌐 Translation Direction</h3>
@@ -2227,6 +2381,159 @@ tradução juramentada | certified translation`}
               Next: Review <span className="ml-2">→</span>
             </button>
           </div>
+            </>
+          )}
+
+          {/* ============ EXTERNAL TRANSLATION MODE ============ */}
+          {workflowMode === 'external' && (
+            <>
+              {/* Language Selection for External */}
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded">
+                <h3 className="text-xs font-bold text-green-700 mb-3">🌐 Translation Direction</h3>
+                <div className="flex items-center justify-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-1">From:</label>
+                    <select
+                      value={sourceLanguage}
+                      onChange={(e) => setSourceLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded font-medium"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <div className="pt-5 text-2xl text-green-500">→</div>
+                  <div className="flex-1">
+                    <label className="block text-xs text-gray-600 mb-1">To:</label>
+                    <select
+                      value={targetLanguage}
+                      onChange={(e) => setTargetLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded font-medium"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Side by Side Upload */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Original Document Upload */}
+                <div className="border-2 border-dashed border-orange-300 rounded-lg p-4 bg-orange-50">
+                  <h3 className="text-sm font-bold text-orange-700 mb-2 text-center">📄 Original Document</h3>
+                  <div
+                    className="text-center cursor-pointer hover:bg-orange-100 rounded p-4 transition-colors"
+                    onClick={() => externalOriginalInputRef.current?.click()}
+                  >
+                    <input
+                      ref={externalOriginalInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf"
+                      onChange={handleExternalOriginalUpload}
+                      className="hidden"
+                    />
+                    {externalOriginalImages.length > 0 ? (
+                      <div>
+                        <div className="text-3xl mb-2">✅</div>
+                        <p className="text-xs text-orange-700 font-medium">{externalOriginalImages.length} file(s) uploaded</p>
+                        <div className="mt-2 max-h-32 overflow-auto">
+                          {externalOriginalImages.map((img, idx) => (
+                            <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                          ))}
+                        </div>
+                        <button className="mt-2 px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600">
+                          Change Files
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-3xl mb-2">📤</div>
+                        <button className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600">
+                          Upload Original
+                        </button>
+                        <p className="text-[10px] text-gray-500 mt-1">Image or PDF</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Translation Upload */}
+                <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
+                  <h3 className="text-sm font-bold text-green-700 mb-2 text-center">📝 Translation (External)</h3>
+                  <div
+                    className="text-center cursor-pointer hover:bg-green-100 rounded p-4 transition-colors"
+                    onClick={() => externalTranslationInputRef.current?.click()}
+                  >
+                    <input
+                      ref={externalTranslationInputRef}
+                      type="file"
+                      accept=".txt,.pdf,image/*"
+                      onChange={handleExternalTranslationUpload}
+                      className="hidden"
+                    />
+                    {externalTranslationText || externalTranslationImages.length > 0 ? (
+                      <div>
+                        <div className="text-3xl mb-2">✅</div>
+                        <p className="text-xs text-green-700 font-medium">
+                          {externalTranslationText ? 'Text uploaded' : `${externalTranslationImages.length} file(s) uploaded`}
+                        </p>
+                        <button className="mt-2 px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600">
+                          Change File
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-3xl mb-2">📤</div>
+                        <button className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">
+                          Upload Translation
+                        </button>
+                        <p className="text-[10px] text-gray-500 mt-1">TXT, PDF, or Image</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Or paste translation text */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Or paste translation text directly:</label>
+                <textarea
+                  value={externalTranslationText}
+                  onChange={(e) => setExternalTranslationText(e.target.value)}
+                  placeholder="Paste the translated text here..."
+                  className="w-full h-40 px-3 py-2 text-sm border rounded font-mono"
+                />
+              </div>
+
+              {/* Processing Status */}
+              {processingStatus && (
+                <div className={`mb-4 p-3 rounded text-xs ${
+                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {processingStatus}
+                </div>
+              )}
+
+              {/* Navigation for External Mode */}
+              <div className="mt-4 flex justify-between items-center">
+                <button
+                  onClick={() => setActiveSubTab('cover')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Details
+                </button>
+                <button
+                  onClick={handleExternalToReview}
+                  disabled={externalOriginalImages.length === 0 || (!externalTranslationText && externalTranslationImages.length === 0)}
+                  className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+                >
+                  Go to Review <span className="ml-2">→</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
