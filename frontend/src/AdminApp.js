@@ -719,19 +719,29 @@ const TranslationWorkspace = ({ adminKey }) => {
   // Handle external translation upload (text or images)
   const handleExternalTranslationUpload = (event) => {
     const selectedFiles = Array.from(event.target.files);
-    const file = selectedFiles[0];
 
-    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
-      // Text file - read as text
-      const reader = new FileReader();
-      reader.onload = () => {
-        setExternalTranslationText(reader.result);
-        setProcessingStatus('✅ Translation text uploaded');
-      };
-      reader.readAsText(file);
-    } else {
+    // Check if any file is a text file
+    const textFiles = selectedFiles.filter(f => f.type === 'text/plain' || f.name.endsWith('.txt'));
+    const imageFiles = selectedFiles.filter(f => !f.type.includes('text'));
+
+    if (textFiles.length > 0) {
+      // Read all text files and combine
+      const textPromises = textFiles.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsText(file);
+        });
+      });
+      Promise.all(textPromises).then(texts => {
+        setExternalTranslationText(texts.join('\n\n--- Page Break ---\n\n'));
+        setProcessingStatus(`✅ ${textFiles.length} translation text file(s) uploaded`);
+      });
+    }
+
+    if (imageFiles.length > 0) {
       // Image/PDF - read as base64
-      const imagePromises = selectedFiles.map(f => {
+      const imagePromises = imageFiles.map(f => {
         return new Promise((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve({ filename: f.name, data: reader.result });
@@ -756,13 +766,35 @@ const TranslationWorkspace = ({ adminKey }) => {
       return;
     }
 
-    // If we have translation text, create translation results for review
+    // Create translation results for review
+    const results = [];
+
     if (externalTranslationText) {
-      setTranslationResults([{
-        original: 'Original document uploaded as image',
-        translatedText: externalTranslationText,
-        filename: externalOriginalImages[0]?.filename || 'document'
-      }]);
+      // If we have text, create one result per original page
+      // Split text by page breaks if present
+      const textPages = externalTranslationText.split(/---\s*Page\s*Break\s*---/i).map(t => t.trim()).filter(t => t);
+
+      externalOriginalImages.forEach((img, idx) => {
+        results.push({
+          original: img.data,
+          translatedText: textPages[idx] || textPages[0] || externalTranslationText,
+          filename: img.filename || `page_${idx + 1}`
+        });
+      });
+    } else if (externalTranslationImages.length > 0) {
+      // If we have translation images, pair them with originals
+      externalOriginalImages.forEach((origImg, idx) => {
+        const transImg = externalTranslationImages[idx] || externalTranslationImages[0];
+        results.push({
+          original: origImg.data,
+          translatedText: `<div style="text-align:center;"><img src="${transImg.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`,
+          filename: origImg.filename || `page_${idx + 1}`
+        });
+      });
+    }
+
+    if (results.length > 0) {
+      setTranslationResults(results);
     }
 
     setActiveSubTab('review');
