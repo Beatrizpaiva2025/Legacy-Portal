@@ -1276,7 +1276,7 @@ const TranslationWorkspace = ({ adminKey }) => {
                       onChange={() => setUseClaudeOcr(false)}
                       className="mr-2"
                     />
-                    Standard OCR (Tesseract)
+                    AWS Textract OCR
                   </label>
                   <label className="flex items-center">
                     <input
