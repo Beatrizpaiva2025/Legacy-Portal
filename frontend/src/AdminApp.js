@@ -2217,8 +2217,8 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* View Mode Toggle */}
-              <div className="flex justify-end mb-2">
+              {/* View Mode Toggle + Edit Toolbar */}
+              <div className="flex justify-between items-center mb-2">
                 <div className="inline-flex rounded-md shadow-sm" role="group">
                   <button
                     onClick={() => setReviewViewMode('preview')}
@@ -2228,7 +2228,7 @@ tradução juramentada | certified translation`}
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    👁️ Preview HTML
+                    👁️ Preview
                   </button>
                   <button
                     onClick={() => setReviewViewMode('edit')}
@@ -2238,29 +2238,61 @@ tradução juramentada | certified translation`}
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    ✏️ Edit HTML
+                    ✏️ Edit
                   </button>
                 </div>
+
+                {/* Edit Toolbar - Only visible in edit mode */}
+                {reviewViewMode === 'edit' && (
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
+                    <button onClick={() => document.execCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onClick={() => document.execCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onClick={() => document.execCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <select onChange={(e) => document.execCommand('fontSize', false, e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                      <option value="1">8pt</option>
+                      <option value="2">10pt</option>
+                      <option value="3">12pt</option>
+                      <option value="4">14pt</option>
+                      <option value="5">18pt</option>
+                      <option value="6">24pt</option>
+                    </select>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onClick={() => document.execCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onClick={() => document.execCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onClick={() => document.execCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                  </div>
+                )}
               </div>
 
               {/* Side by side view */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r">
-                    <span className="text-xs font-bold text-gray-700">📄 Original ({sourceLanguage})</span>
+                    <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
                   </div>
                   <div className="px-3 py-2">
                     <span className="text-xs font-bold text-gray-700">
-                      🌐 Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Edit Mode'}
+                      🌐 Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : '✏️ Editing'}
                     </span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
-                  <div className="border-r overflow-auto" ref={originalTextRef} onScroll={() => handleScroll('original')}>
-                    <pre className="p-3 text-xs font-mono whitespace-pre-wrap bg-gray-50 min-h-full" style={{fontWeight: 'bold'}}>
-                      {translationResults[selectedResultIndex]?.originalText || ''}
-                    </pre>
+                  {/* Left: Original Document Image or Text */}
+                  <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : (
+                      <pre className="p-3 text-xs font-mono whitespace-pre-wrap min-h-full" style={{fontWeight: 'bold'}}>
+                        {translationResults[selectedResultIndex]?.originalText || ''}
+                      </pre>
+                    )}
                   </div>
+                  {/* Right: Translation - Preview or Editable */}
                   <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
                     {reviewViewMode === 'preview' ? (
                       <iframe
@@ -2270,11 +2302,12 @@ tradução juramentada | certified translation`}
                         style={{minHeight: '384px'}}
                       />
                     ) : (
-                      <textarea
-                        value={translationResults[selectedResultIndex]?.translatedText || ''}
-                        onChange={(e) => handleTranslationEdit(e.target.value)}
-                        className="w-full min-h-full p-3 text-xs font-mono border-0 resize-none focus:outline-none focus:ring-0"
-                        style={{minHeight: '384px'}}
+                      <div
+                        contentEditable
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        className="w-full min-h-full p-3 text-xs focus:outline-none"
+                        style={{minHeight: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
