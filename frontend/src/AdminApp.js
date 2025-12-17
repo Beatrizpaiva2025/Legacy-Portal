@@ -864,9 +864,12 @@ const TranslationWorkspace = ({ adminKey }) => {
 
       const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
         text: currentResult.translatedText,
-        corrections: correctionCommand,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
         claude_api_key: claudeApiKey,
-        action: 'correct'
+        action: correctionCommand,
+        current_translation: currentResult.translatedText
       });
 
       if (response.data.status === 'success' || response.data.translation) {
@@ -1843,121 +1846,101 @@ tradução juramentada | certified translation`}
           <div className="p-4 bg-white border-2 border-blue-300 rounded mb-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
-              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit bold fields directly below</span>
+              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
             </div>
 
             {/* The Certificate Document */}
-            <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.7', maxWidth: '800px', margin: '0 auto'}}>
+            <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
 
               {/* Header with logos */}
-              <div className="flex justify-between items-center mb-6 pb-4 border-b">
+              <div className="flex justify-between items-center mb-4 pb-2">
                 <div className="w-32">
-                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-14" /> : <div className="text-[10px] text-gray-400 border border-dashed p-3 text-center">LEGACY<br/>TRANSLATIONS</div>}
+                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
                 </div>
-                <div className="text-center flex-1 px-6">
-                  <div className="font-bold text-blue-600 text-lg italic">Legacy Translations</div>
-                  <div className="text-[10px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                  <div className="text-[10px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                <div className="text-center flex-1 px-4">
+                  <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
+                  <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                  <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
                 </div>
-                <div className="w-28 text-right">
-                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-12 ml-auto" /> : <div className="text-[10px] text-gray-500 italic text-right">ata<br/>Member # 275993</div>}
+                <div className="w-20 text-right">
+                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
                 </div>
               </div>
 
               {/* Order Number */}
-              <div className="text-right mb-8">
+              <div className="text-right mb-6 text-sm">
                 <span>Order # </span>
                 <input
                   type="text"
                   value={orderNumber}
                   onChange={(e) => setOrderNumber(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-24 text-center focus:outline-none focus:border-blue-600"
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600"
                   placeholder="P6287"
                 />
               </div>
 
               {/* Main Title */}
-              <h1 className="text-3xl text-center mb-8 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
+              <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
 
               {/* Translation of a ... */}
-              <p className="text-center mb-10 text-base">
-                Translation of a{' '}
+              <p className="text-center mb-6 text-sm">
+                Translation of (a/an/no article){' '}
                 <input
                   type="text"
                   value={documentType}
                   onChange={(e) => setDocumentType(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-40 text-center focus:outline-none focus:border-blue-600"
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600"
                   placeholder="School Transcript"
                 />
-                {' '}from{' '}
+                {' '}from<br/>
                 <select
                   value={sourceLanguage}
                   onChange={(e) => setSourceLanguage(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1"
                 >
                   {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
-                {' '}to<br/>
+                {' '}to{' '}
                 <select
                   value={targetLanguage}
                   onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 mt-1 focus:outline-none focus:border-blue-600"
+                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
                 >
                   {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </p>
 
               {/* Body paragraphs */}
-              <p className="mb-5 text-justify leading-relaxed">
-                We, Legacy Translations, a professional translation services company and ATA Member (#275993), having no relation to the client, hereby certify that the annexed{' '}
-                <strong>{targetLanguage}</strong> translation of the <strong>{sourceLanguage}</strong> document, executed by us, is to the best of our knowledge and belief, a true and accurate translation of the original document, likewise annexed hereunto.
+              <p className="mb-4 text-justify text-xs leading-relaxed">
+                We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {targetLanguage} (United States) translation of the {sourceLanguage} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.
               </p>
 
-              <p className="mb-5 text-justify leading-relaxed">
-                This is to certify the correctness of the translation only. We do not guarantee that the original is a genuine document, or that the statements contained in the original document are true. Further, Legacy Translations assumes no liability for the way in which the translation is used by the customer or any third party, including end-users of the translation.
+              <p className="mb-4 text-justify text-xs leading-relaxed">
+                This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.
               </p>
 
-              <p className="mb-10 text-justify leading-relaxed">
-                A copy of the translation, and original files presented, are attached to this certification.
+              <p className="mb-4 text-justify text-xs leading-relaxed">
+                I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.
               </p>
 
-              {/* Signature Section */}
-              <div className="flex justify-between items-end mt-12">
-                <div className="leading-relaxed">
-                  <div className="mb-1 italic text-lg" style={{fontFamily: 'cursive'}}>Beatriz Paiva</div>
-                  <div>
-                    <select
-                      value={selectedTranslator}
-                      onChange={(e) => setSelectedTranslator(e.target.value)}
-                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
-                    >
-                      {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>Authorized Representative</div>
-                  <div>Legacy Translations Inc.</div>
-                  <div className="mt-1">
-                    Dated:{' '}
-                    <input
-                      type="text"
-                      value={translationDate}
-                      onChange={(e) => setTranslationDate(e.target.value)}
-                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
-                </div>
-                <div className="w-36 h-36">
-                  {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp" className="max-w-full max-h-full" />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full border-4 border-blue-600 flex items-center justify-center text-center p-2 relative">
-                      <div className="absolute top-3 text-[8px] font-bold text-blue-600 tracking-wider">CERTIFIED TRANSLATOR</div>
-                      <div>
-                        <div className="text-[10px] font-bold text-blue-600">LEGACY TRANSLATIONS</div>
-                        <div className="text-[8px] text-blue-600">ATA # 275993</div>
-                      </div>
-                    </div>
-                  )}
+              <p className="mb-6 text-justify text-xs leading-relaxed">
+                A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.
+              </p>
+
+              {/* Signature Section - FIXED */}
+              <div className="mt-8">
+                <div className="mb-1 italic text-lg" style={{fontFamily: 'Brush Script MT, cursive', fontSize: '24px'}}>Beatriz Paiva</div>
+                <div className="text-sm"><strong>Beatriz Paiva</strong></div>
+                <div className="text-xs">Authorized Representative</div>
+                <div className="text-xs">Legacy Translations Inc.</div>
+                <div className="text-xs mt-2">
+                  Dated:{' '}
+                  <input
+                    type="text"
+                    value={translationDate}
+                    onChange={(e) => setTranslationDate(e.target.value)}
+                    className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
+                  />
                 </div>
               </div>
             </div>
