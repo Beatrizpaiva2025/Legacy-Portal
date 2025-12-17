@@ -1,0 +1,1690 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const API = `${BACKEND_URL}/api`;
+
+// ==================== CONSTANTS ====================
+const STATUS_COLORS = {
+  'Quote': 'bg-gray-100 text-gray-700',
+  'Confirmed': 'bg-blue-100 text-blue-700',
+  'In progress': 'bg-yellow-100 text-yellow-700',
+  'Completed': 'bg-green-100 text-green-700',
+  'Client Review': 'bg-purple-100 text-purple-700',
+  'Delivered': 'bg-teal-100 text-teal-700',
+  'received': 'bg-gray-100 text-gray-700',
+  'in_translation': 'bg-yellow-100 text-yellow-700',
+  'review': 'bg-purple-100 text-purple-700',
+  'ready': 'bg-green-100 text-green-700',
+  'delivered': 'bg-teal-100 text-teal-700'
+};
+
+const PAYMENT_COLORS = {
+  'pending': 'bg-yellow-100 text-yellow-700',
+  'paid': 'bg-green-100 text-green-700',
+  'overdue': 'bg-red-100 text-red-700'
+};
+
+const FLAGS = {
+  'english': '🇺🇸', 'spanish': '🇪🇸', 'french': '🇫🇷', 'german': '🇩🇪',
+  'portuguese': '🇧🇷', 'italian': '🇮🇹', 'chinese': '🇨🇳', 'japanese': '🇯🇵',
+  'korean': '🇰🇷', 'arabic': '🇸🇦', 'russian': '🇷🇺', 'dutch': '🇳🇱',
+  'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
+  'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
+};
+
+const LANGUAGES = [
+  "English", "Spanish", "Portuguese", "Portuguese (Brazil)", "French", "German",
+  "Italian", "Chinese", "Japanese", "Korean", "Arabic", "Russian", "Dutch"
+];
+
+const TRANSLATORS = [
+  { name: "Beatriz Paiva", title: "Managing Director" },
+  { name: "Ana Clara", title: "Project Manager" },
+  { name: "Yasmin Costa", title: "Certified Translator" },
+  { name: "Noemi Santos", title: "Senior Translator" }
+];
+
+// ==================== ADMIN LOGIN ====================
+const AdminLogin = ({ onLogin }) => {
+  const [adminKey, setAdminKey] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      if (response.data) {
+        onLogin(adminKey);
+      }
+    } catch (err) {
+      setError('Invalid admin key');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl text-white">🔐</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+          <p className="text-xs text-gray-500">Legacy Translations</p>
+        </div>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
+            <input
+              type="password"
+              required
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              value={adminKey}
+              onChange={(e) => setAdminKey(e.target.value)}
+              placeholder="Enter admin key..."
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+          >
+            {loading ? 'Verifying...' : 'Access'}
+          </button>
+        </form>
+
+        <div className="mt-4 text-center">
+          <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== COMPACT SIDEBAR ====================
+const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
+  const menuItems = [
+    { id: 'projects', label: 'Projects', icon: '📋' },
+    { id: 'translators', label: 'Translators', icon: '👥' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' }
+  ];
+
+  return (
+    <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
+      <div className="p-3 border-b border-slate-700">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
+          <div>
+            <div className="font-bold text-sm">Legacy Admin</div>
+            <div className="text-[10px] text-slate-400">Management</div>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 py-2">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center px-3 py-2 text-left transition-colors ${
+              activeTab === item.id
+                ? 'bg-teal-600 text-white'
+                : 'text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span className="mr-2">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+
+        <a
+          href="/admin/translation-tool"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700"
+        >
+          <span className="mr-2">✍️</span>
+          <span>Translation Tool</span>
+          <span className="ml-auto text-[10px]">↗</span>
+        </a>
+      </nav>
+
+      <div className="p-2 border-t border-slate-700">
+        <button
+          onClick={onLogout}
+          className="w-full py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SEARCH BAR ====================
+const SearchBar = ({ value, onChange, placeholder }) => (
+  <div className="relative">
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder || "Search by name or email..."}
+      className="w-64 px-3 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 pl-8"
+    />
+    <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">🔍</span>
+  </div>
+);
+
+// ==================== TRANSLATION WORKSPACE ====================
+const TranslationWorkspace = ({ adminKey }) => {
+  // State
+  const [activeSubTab, setActiveSubTab] = useState('resources');
+  const [files, setFiles] = useState([]);
+  const [ocrResults, setOcrResults] = useState([]);
+  const [translationResults, setTranslationResults] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState('');
+  const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+
+  // Config state
+  const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
+  const [targetLanguage, setTargetLanguage] = useState('English');
+  const [documentType, setDocumentType] = useState('Birth Certificate');
+  const [orderNumber, setOrderNumber] = useState('');
+  const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
+  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
+  const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [pageFormat, setPageFormat] = useState('letter');
+  const [translationType, setTranslationType] = useState('certified');
+  const [generalInstructions, setGeneralInstructions] = useState('');
+  const [includeCover, setIncludeCover] = useState(true);
+  const [originalImages, setOriginalImages] = useState([]);
+
+  // Correction state
+  const [correctionCommand, setCorrectionCommand] = useState('');
+  const [applyingCorrection, setApplyingCorrection] = useState(false);
+
+  // Send to Projects state
+  const [availableOrders, setAvailableOrders] = useState([]);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [sendingToProjects, setSendingToProjects] = useState(false);
+
+  // Resources state
+  const [instructions, setInstructions] = useState([]);
+  const [glossaries, setGlossaries] = useState([]);
+  const [showInstructionModal, setShowInstructionModal] = useState(false);
+  const [showGlossaryModal, setShowGlossaryModal] = useState(false);
+  const [editingInstruction, setEditingInstruction] = useState(null);
+  const [editingGlossary, setEditingGlossary] = useState(null);
+  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
+  const [glossaryForm, setGlossaryForm] = useState({
+    name: '',
+    sourceLang: 'Portuguese (Brazil)',
+    targetLang: 'English',
+    bidirectional: true,
+    field: 'All Fields',
+    terms: []
+  });
+  const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
+  const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
+
+  // Logo states
+  const [logoLeft, setLogoLeft] = useState('');
+  const [logoRight, setLogoRight] = useState('');
+  const [logoStamp, setLogoStamp] = useState('');
+
+  // Refs
+  const fileInputRef = useRef(null);
+  const logoLeftInputRef = useRef(null);
+  const logoRightInputRef = useRef(null);
+  const logoStampInputRef = useRef(null);
+  const originalTextRef = useRef(null);
+  const translatedTextRef = useRef(null);
+  const editableRef = useRef(null);
+
+  // OCR Editor state
+  const [useClaudeOcr, setUseClaudeOcr] = useState(true);
+  const [ocrSpecialCommands, setOcrSpecialCommands] = useState('Maintain the EXACT original layout and formatting.');
+
+  // Approval checkboxes state
+  const [approvalChecks, setApprovalChecks] = useState({
+    coverLetter: false,
+    proofread: false
+  });
+
+  // Review view mode
+  const [reviewViewMode, setReviewViewMode] = useState('preview');
+
+  // Bulk upload state for glossary
+  const [bulkTermsText, setBulkTermsText] = useState('');
+
+  // Load saved data on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('claude_api_key');
+    if (savedKey) setClaudeApiKey(savedKey);
+
+    const savedLogoLeft = localStorage.getItem('logo_left');
+    const savedLogoRight = localStorage.getItem('logo_right');
+    const savedLogoStamp = localStorage.getItem('logo_stamp');
+    if (savedLogoLeft) setLogoLeft(savedLogoLeft);
+    if (savedLogoRight) setLogoRight(savedLogoRight);
+    if (savedLogoStamp) setLogoStamp(savedLogoStamp);
+
+    const savedInstructions = localStorage.getItem('general_instructions');
+    if (savedInstructions) setGeneralInstructions(savedInstructions);
+
+    const savedPageFormat = localStorage.getItem('page_format');
+    const savedTranslationType = localStorage.getItem('translation_type');
+    if (savedPageFormat) setPageFormat(savedPageFormat);
+    if (savedTranslationType) setTranslationType(savedTranslationType);
+
+    fetchResources();
+    fetchAvailableOrders();
+  }, []);
+
+  const fetchResources = async () => {
+    try {
+      const [instrRes, glossRes] = await Promise.all([
+        axios.get(`${API}/admin/translation-instructions?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`)
+      ]);
+      setInstructions(instrRes.data.instructions || []);
+      setGlossaries(glossRes.data.glossaries || []);
+    } catch (err) {
+      console.error('Failed to fetch resources:', err);
+    }
+  };
+
+  const fetchAvailableOrders = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const orders = response.data.orders || [];
+      const available = orders.filter(o =>
+        ['received', 'in_translation', 'review'].includes(o.translation_status)
+      );
+      setAvailableOrders(available);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    }
+  };
+
+  const sendToProjects = async () => {
+    if (!selectedOrderId) {
+      alert('Please select an order to link this translation');
+      return;
+    }
+
+    if (translationResults.length === 0) {
+      alert('No translation to send');
+      return;
+    }
+
+    setSendingToProjects(true);
+    try {
+      const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+
+      const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+        translation_html: translationHTML,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
+        translator_name: translator?.name || selectedTranslator,
+        translation_date: translationDate,
+        include_cover: includeCover,
+        page_format: pageFormat,
+        translation_type: translationType,
+        original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
+        logo_left: logoLeft,
+        logo_right: logoRight,
+        logo_stamp: logoStamp
+      });
+
+      if (response.data.status === 'success' || response.data.success) {
+        setProcessingStatus('✅ Translation sent to Projects!');
+        setSelectedOrderId('');
+        fetchAvailableOrders();
+      } else {
+        throw new Error(response.data.error || 'Failed to send');
+      }
+    } catch (error) {
+      console.error('Error sending to projects:', error);
+      setProcessingStatus(`❌ Failed to send: ${error.message}`);
+    } finally {
+      setSendingToProjects(false);
+    }
+  };
+
+  const saveApiKey = () => {
+    localStorage.setItem('claude_api_key', claudeApiKey);
+    setProcessingStatus('✅ API Key saved!');
+  };
+
+  const saveGeneralInstructions = () => {
+    localStorage.setItem('general_instructions', generalInstructions);
+    setProcessingStatus('✅ General instructions saved!');
+  };
+
+  const savePageFormat = (format) => {
+    setPageFormat(format);
+    localStorage.setItem('page_format', format);
+  };
+
+  const saveTranslationType = (type) => {
+    setTranslationType(type);
+    localStorage.setItem('translation_type', type);
+  };
+
+  const handleLogoUpload = (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target.result;
+      if (type === 'left') {
+        setLogoLeft(base64);
+        localStorage.setItem('logo_left', base64);
+      } else if (type === 'right') {
+        setLogoRight(base64);
+        localStorage.setItem('logo_right', base64);
+      } else if (type === 'stamp') {
+        setLogoStamp(base64);
+        localStorage.setItem('logo_stamp', base64);
+      }
+      setProcessingStatus(`✅ Logo uploaded!`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = (type) => {
+    if (type === 'left') {
+      setLogoLeft('');
+      localStorage.removeItem('logo_left');
+    } else if (type === 'right') {
+      setLogoRight('');
+      localStorage.removeItem('logo_right');
+    } else if (type === 'stamp') {
+      setLogoStamp('');
+      localStorage.removeItem('logo_stamp');
+    }
+    setProcessingStatus(`Logo removed`);
+  };
+
+  // Translation Instructions CRUD
+  const handleSaveInstruction = async () => {
+    if (!instructionForm.title || !instructionForm.title.trim()) {
+      alert('Please enter a title for the instruction');
+      return;
+    }
+    if (!instructionForm.content || !instructionForm.content.trim()) {
+      alert('Please enter instruction content');
+      return;
+    }
+
+    setProcessingStatus('Saving instruction...');
+
+    try {
+      const dataToSend = {
+        sourceLang: instructionForm.sourceLang,
+        targetLang: instructionForm.targetLang,
+        title: instructionForm.title.trim(),
+        content: instructionForm.content.trim()
+      };
+
+      if (editingInstruction) {
+        await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, dataToSend);
+      } else {
+        await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, dataToSend);
+      }
+      setShowInstructionModal(false);
+      setEditingInstruction(null);
+      setInstructionForm({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
+      fetchResources();
+      setProcessingStatus('✅ Instruction saved!');
+    } catch (err) {
+      console.error('Failed to save instruction:', err);
+      alert('Failed to save instruction');
+    }
+  };
+
+  const handleDeleteInstruction = async (id) => {
+    if (!window.confirm('Delete this instruction?')) return;
+    try {
+      await axios.delete(`${API}/admin/translation-instructions/${id}?admin_key=${adminKey}`);
+      fetchResources();
+    } catch (err) {
+      console.error('Failed to delete instruction:', err);
+    }
+  };
+
+  const handleEditInstruction = (instr) => {
+    setEditingInstruction(instr);
+    setInstructionForm({ sourceLang: instr.sourceLang, targetLang: instr.targetLang, title: instr.title, content: instr.content });
+    setShowInstructionModal(true);
+  };
+
+  // Glossaries CRUD
+  const handleSaveGlossary = async () => {
+    if (!glossaryForm.name || !glossaryForm.name.trim()) {
+      alert('Please enter a name for the glossary');
+      return;
+    }
+
+    setProcessingStatus('Saving glossary...');
+
+    try {
+      if (editingGlossary) {
+        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm);
+      } else {
+        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm);
+      }
+      setShowGlossaryModal(false);
+      setEditingGlossary(null);
+      setGlossaryForm({
+        name: '',
+        sourceLang: 'Portuguese (Brazil)',
+        targetLang: 'English',
+        bidirectional: true,
+        field: 'All Fields',
+        terms: []
+      });
+      fetchResources();
+      setProcessingStatus('✅ Glossary saved!');
+    } catch (err) {
+      console.error('Failed to save glossary:', err);
+      alert('Failed to save glossary');
+    }
+  };
+
+  const handleDeleteGlossary = async (id) => {
+    if (!window.confirm('Delete this glossary?')) return;
+    try {
+      await axios.delete(`${API}/admin/glossaries/${id}?admin_key=${adminKey}`);
+      fetchResources();
+    } catch (err) {
+      console.error('Failed to delete glossary:', err);
+    }
+  };
+
+  const handleEditGlossary = (gloss) => {
+    setEditingGlossary(gloss);
+    setGlossaryForm({
+      name: gloss.name,
+      sourceLang: gloss.sourceLang || 'Portuguese (Brazil)',
+      targetLang: gloss.targetLang || 'English',
+      bidirectional: gloss.bidirectional !== undefined ? gloss.bidirectional : true,
+      field: gloss.field || 'All Fields',
+      terms: gloss.terms || []
+    });
+    setShowGlossaryModal(true);
+  };
+
+  const addTermToGlossary = () => {
+    if (newTerm.source && newTerm.target) {
+      setGlossaryForm({ ...glossaryForm, terms: [...glossaryForm.terms, { ...newTerm, id: Date.now() }] });
+      setNewTerm({ source: '', target: '', notes: '' });
+    }
+  };
+
+  const removeTermFromGlossary = (termId) => {
+    setGlossaryForm({ ...glossaryForm, terms: glossaryForm.terms.filter(t => t.id !== termId) });
+  };
+
+  const filteredGlossaries = glossaries.filter(g => {
+    const matchLang = resourcesFilter.language === 'All Languages' || g.language === resourcesFilter.language;
+    const matchField = resourcesFilter.field === 'All Fields' || g.field === resourcesFilter.field;
+    return matchLang && matchField;
+  });
+
+  // Synchronized scrolling
+  const handleScroll = (source) => {
+    if (source === 'original' && translatedTextRef.current && originalTextRef.current) {
+      translatedTextRef.current.scrollTop = originalTextRef.current.scrollTop;
+    } else if (source === 'translated' && originalTextRef.current && translatedTextRef.current) {
+      originalTextRef.current.scrollTop = translatedTextRef.current.scrollTop;
+    }
+  };
+
+  // File handling
+  const handleFileSelect = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    setFiles(selectedFiles);
+    setOcrResults([]);
+    setTranslationResults([]);
+    setProcessingStatus('');
+    setSelectedResultIndex(0);
+
+    const imagePromises = selectedFiles.map(file => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ filename: file.name, data: reader.result });
+        reader.readAsDataURL(file);
+      });
+    });
+    Promise.all(imagePromises).then(images => setOriginalImages(images));
+  };
+
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // OCR
+  const handleOCR = async () => {
+    if (files.length === 0) {
+      alert('Please select files first');
+      return;
+    }
+
+    if (useClaudeOcr && !claudeApiKey) {
+      alert('Claude API Key is required for Claude OCR.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus('Performing OCR...');
+    setOcrResults([]);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setProcessingStatus(`Processing ${file.name} (${i + 1}/${files.length})...`);
+
+        const fileBase64 = await fileToBase64(file);
+
+        const response = await axios.post(`${API}/admin/ocr?admin_key=${adminKey}`, {
+          file_base64: fileBase64,
+          file_type: file.type,
+          filename: file.name,
+          use_claude: useClaudeOcr,
+          claude_api_key: useClaudeOcr ? claudeApiKey : null,
+          special_commands: ocrSpecialCommands || null,
+          preserve_layout: true
+        });
+
+        if (response.data.status === 'success' || response.data.text) {
+          setOcrResults(prev => [...prev, {
+            filename: file.name,
+            text: response.data.text
+          }]);
+        } else {
+          throw new Error(response.data.error || 'OCR failed');
+        }
+      }
+      setProcessingStatus('✅ OCR completed!');
+    } catch (error) {
+      console.error('OCR error:', error);
+      setProcessingStatus(`❌ OCR failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Direct translation
+  const handleDirectTranslate = async () => {
+    if (originalImages.length === 0) {
+      alert('Please upload a document first');
+      return;
+    }
+
+    if (!claudeApiKey) {
+      alert('Please configure your Claude API Key in the Setup tab');
+      setActiveSubTab('resources');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStatus('🌐 Translating with Claude AI...');
+    setTranslationResults([]);
+
+    try {
+      for (let i = 0; i < originalImages.length; i++) {
+        const img = originalImages[i];
+        setProcessingStatus(`Translating ${img.filename} (${i + 1}/${originalImages.length})...`);
+
+        const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+          text: '[Document image attached]',
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          document_type: documentType,
+          claude_api_key: claudeApiKey,
+          action: 'translate',
+          general_instructions: generalInstructions,
+          preserve_layout: true,
+          page_format: pageFormat,
+          original_image: img.data
+        });
+
+        if (response.data.status === 'success' || response.data.translation) {
+          setTranslationResults(prev => [...prev, {
+            filename: img.filename,
+            originalText: '[Translated directly from image]',
+            translatedText: response.data.translation
+          }]);
+        } else {
+          throw new Error(response.data.error || 'Translation failed');
+        }
+      }
+      setProcessingStatus('✅ Translation completed!');
+    } catch (error) {
+      console.error('Translation error:', error);
+      setProcessingStatus(`❌ Translation failed: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Apply correction
+  const handleApplyCorrection = async () => {
+    if (!correctionCommand.trim() || translationResults.length === 0) return;
+
+    setApplyingCorrection(true);
+
+    try {
+      const currentResult = translationResults[selectedResultIndex];
+
+      const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
+        text: currentResult.translatedText,
+        corrections: correctionCommand,
+        claude_api_key: claudeApiKey,
+        action: 'correct'
+      });
+
+      if (response.data.status === 'success' || response.data.translation) {
+        const updatedResults = [...translationResults];
+        updatedResults[selectedResultIndex] = {
+          ...currentResult,
+          translatedText: response.data.translation
+        };
+        setTranslationResults(updatedResults);
+        setCorrectionCommand('');
+        setProcessingStatus('✅ Correction applied!');
+      } else {
+        throw new Error(response.data.error || 'Correction failed');
+      }
+    } catch (error) {
+      console.error('Correction error:', error);
+      alert('Error applying correction: ' + error.message);
+    } finally {
+      setApplyingCorrection(false);
+    }
+  };
+
+  // Update translation text
+  const handleTranslationEdit = (newText) => {
+    const updatedResults = [...translationResults];
+    updatedResults[selectedResultIndex] = {
+      ...updatedResults[selectedResultIndex],
+      translatedText: newText
+    };
+    setTranslationResults(updatedResults);
+  };
+
+  // Save individual translation
+  const handleSaveIndividual = (index) => {
+    const result = translationResults[index];
+    const blob = new Blob([result.translatedText], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translation_${result.filename.replace(/\.[^/.]+$/, '')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setProcessingStatus(`✅ Saved: ${result.filename}`);
+  };
+
+  // Download all as ZIP
+  const handleDownloadAllZip = async () => {
+    // Simple approach: create a combined HTML file
+    const combinedHTML = translationResults.map((r, i) =>
+      `<!-- Document ${i + 1}: ${r.filename} -->\n${r.translatedText}\n\n<hr style="page-break-after: always;" />\n\n`
+    ).join('');
+
+    const blob = new Blob([combinedHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all_translations_${orderNumber || 'batch'}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setProcessingStatus('✅ All translations downloaded!');
+  };
+
+  // Navigate documents
+  const goToPrevDocument = () => {
+    if (selectedResultIndex > 0) {
+      setSelectedResultIndex(selectedResultIndex - 1);
+    }
+  };
+
+  const goToNextDocument = () => {
+    if (selectedResultIndex < translationResults.length - 1) {
+      setSelectedResultIndex(selectedResultIndex + 1);
+    }
+  };
+
+  // Download certificate
+  const handleDownload = (format = 'html') => {
+    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+
+    const coverLetterHTML = `
+    <div class="cover-page">
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px;" />` : `<div class="logo-placeholder">LEGACY<br/>TRANSLATIONS</div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+            <div class="logo-right">
+                ${logoRight ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px;" />` : `<div class="logo-placeholder-right">ata<br/>Member #275993</div>`}
+            </div>
+        </div>
+        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        <h1 class="main-title">${certTitle}</h1>
+        <div class="subtitle">Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br><strong>${targetLanguage}</strong></div>
+        <p class="body-text">We, Legacy Translations, a professional translation services company and ATA Member (#275993), having no relation to the client, hereby certify that the annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document, executed by us, is to the best of our knowledge and belief, a true and accurate translation of the original document, likewise annexed hereunto.</p>
+        <p class="body-text">This is to certify the correctness of the translation only. We do not guarantee that the original is a genuine document, or that the statements contained in the original document are true.</p>
+        <p class="body-text">A copy of the translation, and original files presented, are attached to this certification.</p>
+        <div class="footer-section">
+            <div class="signature-block">
+                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-date">Dated: ${translationDate}</div>
+            </div>
+            <div class="stamp-container">
+                ${logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px;" />` : `<div class="stamp"><div class="stamp-text-top">CERTIFIED TRANSLATOR</div><div class="stamp-center"><div class="stamp-company">LEGACY TRANSLATIONS</div><div class="stamp-ata">ATA # 275993</div></div></div>`}
+            </div>
+        </div>
+    </div>`;
+
+    const translationPagesHTML = translationResults.map((result, index) => `
+    <div class="translation-page">
+        <div class="page-title">Translation ${translationResults.length > 1 ? `(Page ${index + 1} of ${translationResults.length})` : ''}</div>
+        <div class="translation-content">${result.translatedText}</div>
+    </div>
+    `).join('');
+
+    const originalPagesHTML = originalImages.length > 0 ? `
+    <div class="original-documents-page">
+        <div class="page-title">Original Document${originalImages.length > 1 ? 's' : ''}</div>
+        ${originalImages.map(img => `<div class="original-image-container"><img src="${img.data}" alt="${img.filename}" class="original-image" /></div>`).join('')}
+    </div>` : '';
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${certTitle}</title>
+    <style>
+        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Times New Roman', Georgia, serif; font-size: 13px; line-height: 1.5; color: #333; padding: 40px 50px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; }
+        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-placeholder { width: 120px; height: 50px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #999; }
+        .header-center { text-align: center; flex: 1; padding: 0 20px; }
+        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
+        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .logo-placeholder-right { width: 80px; height: 50px; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #1a365d; text-align: center; font-style: italic; }
+        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
+        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+        .signature-block { line-height: 1.4; }
+        .signature-name { font-weight: bold; font-size: 14px; }
+        .signature-title { font-weight: bold; font-size: 13px; }
+        .signature-date { font-size: 13px; }
+        .stamp-container { width: 140px; height: 140px; }
+        .stamp { width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; }
+        .stamp-text-top { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: bold; color: #2563eb; }
+        .stamp-center { text-align: center; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
+        .translation-page { page-break-before: always; padding-top: 20px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; }
+        .translation-content { line-height: 1.6; font-size: 12px; }
+        .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
+        .original-documents-page { page-break-before: always; padding-top: 20px; }
+        .original-image-container { text-align: center; margin-bottom: 15px; }
+        .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; }
+        @media print { body { padding: 0; } }
+    </style>
+</head>
+<body>
+    ${includeCover ? coverLetterHTML : ''}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
+</body>
+</html>`;
+
+    if (format === 'pdf') {
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } else {
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${translationType}_translation_${orderNumber || 'document'}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATION WORKSPACE</h1>
+
+      {/* Sub-tabs */}
+      <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
+        {[
+          { id: 'resources', label: '1. Setup', icon: '⚙️' },
+          { id: 'cover', label: '2. Details', icon: '📝' },
+          { id: 'ocr', label: '3. Document', icon: '📄' },
+          { id: 'review', label: '4. Review', icon: '🔍' },
+          { id: 'approval', label: '5. Deliver', icon: '✅' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-4 py-2 text-xs font-medium rounded-t ${
+              activeSubTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* RESOURCES TAB */}
+      {activeSubTab === 'resources' && (
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <p className="text-xs text-blue-700">
+              <strong>Quick Start:</strong> 1️⃣ Add your Claude API Key → 2️⃣ Go to Details tab → 3️⃣ Upload Document → 4️⃣ Review → 5️⃣ Deliver
+            </p>
+          </div>
+
+          <div className="bg-white rounded shadow p-4">
+            <div className="flex items-center space-x-2 mb-3">
+              <span className="text-lg">🔑</span>
+              <h2 className="text-sm font-bold">Claude API Key</h2>
+            </div>
+            <div className="flex space-x-2">
+              <input
+                type="password"
+                value={claudeApiKey}
+                onChange={(e) => setClaudeApiKey(e.target.value)}
+                placeholder="sk-ant-api03-..."
+                className="flex-1 px-3 py-2 text-xs border rounded"
+              />
+              <button
+                onClick={saveApiKey}
+                className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => setActiveSubTab('cover')}
+              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
+            >
+              Next: Details <span className="ml-2">→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* COVER LETTER TAB */}
+      {activeSubTab === 'cover' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+            <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoLeft ? <img src={logoLeft} alt="Left Logo" className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-gray-400">No logo</span>}
+                </div>
+                <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
+                <button onClick={() => logoLeftInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2">Upload</button>
+              </div>
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Center Logo (ATA)</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoRight ? <img src={logoRight} alt="ATA Logo" className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-gray-400">No logo</span>}
+                </div>
+                <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
+                <button onClick={() => logoRightInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2">Upload</button>
+              </div>
+              <div className="text-center">
+                <label className="block text-xs font-medium text-gray-700 mb-2">Stamp Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                  {logoStamp ? <img src={logoStamp} alt="Stamp Logo" className="max-h-16 max-w-full object-contain" /> : <span className="text-xs text-gray-400">No logo</span>}
+                </div>
+                <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
+                <button onClick={() => logoStampInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600 mt-2">Upload</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Order Number</label>
+              <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded" placeholder="P6287" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Document Type</label>
+              <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded" placeholder="Birth Certificate" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Source Language</label>
+              <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Target Language</label>
+              <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Translator</label>
+              <select value={selectedTranslator} onChange={(e) => setSelectedTranslator(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
+                {TRANSLATORS.map(t => <option key={t.name} value={t.name}>{t.name} - {t.title}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Translation Date</label>
+              <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded" />
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-between items-center">
+            <button onClick={() => setActiveSubTab('resources')} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center">
+              <span className="mr-2">←</span> Back: Setup
+            </button>
+            <button onClick={() => setActiveSubTab('ocr')} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center">
+              Next: Document <span className="ml-2">→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* DOCUMENT TAB */}
+      {activeSubTab === 'ocr' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
+          <p className="text-xs text-gray-500 mb-4">Upload document and translate directly with Claude AI</p>
+
+          {!originalImages.length && (
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors mb-4"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf" onChange={handleFileSelect} className="hidden" />
+              <div className="text-4xl mb-2">📤</div>
+              <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Upload Document(s)</button>
+              <p className="text-xs text-gray-500 mt-2">Upload images or PDFs - supports multiple files</p>
+            </div>
+          )}
+
+          {processingStatus && (
+            <div className={`mb-4 p-3 rounded text-xs ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {processingStatus}
+            </div>
+          )}
+
+          {originalImages.length > 0 && (
+            <div className="mt-2">
+              {/* Multi-document navigation */}
+              {originalImages.length > 1 && (
+                <div className="flex items-center justify-between mb-3 p-2 bg-gray-100 rounded">
+                  <button
+                    onClick={goToPrevDocument}
+                    disabled={selectedResultIndex === 0}
+                    className="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded disabled:opacity-50"
+                  >
+                    ← Prev
+                  </button>
+                  <span className="text-xs font-medium">
+                    Document {selectedResultIndex + 1} of {originalImages.length}: {originalImages[selectedResultIndex]?.filename}
+                  </span>
+                  <button
+                    onClick={goToNextDocument}
+                    disabled={selectedResultIndex === originalImages.length - 1}
+                    className="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded disabled:opacity-50"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-medium text-gray-600">{sourceLanguage} → {targetLanguage}</span>
+                <button onClick={() => { setOriginalImages([]); setTranslationResults([]); setFiles([]); setSelectedResultIndex(0); }} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️ Clear All</button>
+              </div>
+
+              <div className="border rounded">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r"><span className="text-xs font-bold text-gray-700">📄 Original Document</span></div>
+                  <div className="px-3 py-2"><span className="text-xs font-bold text-gray-700">🌐 Translation ({targetLanguage})</span></div>
+                </div>
+                <div className="grid grid-cols-2 gap-0" style={{height: '450px'}}>
+                  <div className="border-r overflow-auto bg-gray-50 p-2">
+                    {originalImages[selectedResultIndex] && (
+                      originalImages[selectedResultIndex].filename.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '430px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    )}
+                  </div>
+                  <div className="overflow-auto bg-white">
+                    {translationResults[selectedResultIndex] ? (
+                      <iframe srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'} title="Translation" className="w-full h-full border-0" style={{minHeight: '450px'}} />
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">🌐</div>
+                          <p>Click "Translate" to start</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={handleDirectTranslate}
+                  disabled={isProcessing || !claudeApiKey}
+                  className="w-full py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-300"
+                >
+                  {isProcessing ? '⏳ Translating...' : `🌐 Translate All (${originalImages.length} document${originalImages.length > 1 ? 's' : ''})`}
+                </button>
+              </div>
+
+              {translationResults.length > 0 && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded flex justify-between items-center">
+                  <p className="text-xs text-green-700">✅ {translationResults.length} translation(s) complete!</p>
+                  <button onClick={() => setActiveSubTab('review')} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">Go to Review →</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-between items-center">
+            <button onClick={() => setActiveSubTab('cover')} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center">
+              <span className="mr-2">←</span> Back: Details
+            </button>
+            <button onClick={() => setActiveSubTab('review')} disabled={translationResults.length === 0} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center">
+              Next: Review <span className="ml-2">→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* REVIEW TAB - WITH EDITABLE TRANSLATION */}
+      {activeSubTab === 'review' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">✏️ Review & Edit Translation</h2>
+
+          {translationResults.length > 0 ? (
+            <>
+              {/* Multi-document navigation */}
+              {translationResults.length > 1 && (
+                <div className="flex items-center justify-between mb-3 p-2 bg-blue-50 rounded">
+                  <button
+                    onClick={goToPrevDocument}
+                    disabled={selectedResultIndex === 0}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded disabled:bg-gray-300"
+                  >
+                    ← Prev
+                  </button>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-medium">
+                      Document {selectedResultIndex + 1} of {translationResults.length}
+                    </span>
+                    <select
+                      value={selectedResultIndex}
+                      onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
+                      className="px-2 py-1 text-xs border rounded"
+                    >
+                      {translationResults.map((r, idx) => (
+                        <option key={idx} value={idx}>{r.filename}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleSaveIndividual(selectedResultIndex)}
+                      className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                    >
+                      💾 Save This
+                    </button>
+                  </div>
+                  <button
+                    onClick={goToNextDocument}
+                    disabled={selectedResultIndex === translationResults.length - 1}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded disabled:bg-gray-300"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+
+              {/* View Mode Toggle + Edit Toolbar */}
+              <div className="flex justify-between items-center mb-2">
+                <div className="inline-flex rounded-md shadow-sm" role="group">
+                  <button
+                    onClick={() => setReviewViewMode('preview')}
+                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                      reviewViewMode === 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    👁️ Preview
+                  </button>
+                  <button
+                    onClick={() => setReviewViewMode('edit')}
+                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                      reviewViewMode === 'edit' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    ✏️ Edit
+                  </button>
+                </div>
+
+                {/* Edit Toolbar - Only visible in edit mode */}
+                {reviewViewMode === 'edit' && (
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
+                    <button onClick={() => document.execCommand('bold')} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onClick={() => document.execCommand('italic')} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onClick={() => document.execCommand('underline')} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <select onChange={(e) => document.execCommand('fontSize', false, e.target.value)} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                      <option value="1">8pt</option>
+                      <option value="2">10pt</option>
+                      <option value="3">12pt</option>
+                      <option value="4">14pt</option>
+                      <option value="5">18pt</option>
+                      <option value="6">24pt</option>
+                    </select>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onClick={() => document.execCommand('justifyLeft')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onClick={() => document.execCommand('justifyCenter')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onClick={() => document.execCommand('justifyRight')} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Side by side view with Original visible */}
+              <div className="border rounded mb-4">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r">
+                    <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
+                  </div>
+                  <div className="px-3 py-2">
+                    <span className="text-xs font-bold text-gray-700">
+                      🌐 Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : '✏️ Editing'}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
+                  {/* Left: Original Document Image */}
+                  <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : (
+                      <pre className="p-3 text-xs font-mono whitespace-pre-wrap bg-gray-50 min-h-full">
+                        {translationResults[selectedResultIndex]?.originalText || ''}
+                      </pre>
+                    )}
+                  </div>
+
+                  {/* Right: Translation - Preview or Editable */}
+                  <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                    {reviewViewMode === 'preview' ? (
+                      <iframe
+                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
+                        title="Translation Preview"
+                        className="w-full h-full border-0"
+                        style={{minHeight: '384px'}}
+                      />
+                    ) : (
+                      <div
+                        ref={editableRef}
+                        contentEditable
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        className="w-full min-h-full p-3 text-xs focus:outline-none"
+                        style={{minHeight: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Correction Command */}
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                <label className="block text-xs font-medium text-gray-700 mb-1">📝 Send Correction Command to Claude</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={correctionCommand}
+                    onChange={(e) => setCorrectionCommand(e.target.value)}
+                    placeholder='e.g., "Change certificate to diploma" or "Fix formatting"'
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  />
+                  <button
+                    onClick={handleApplyCorrection}
+                    disabled={!correctionCommand.trim() || applyingCorrection}
+                    className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
+                  >
+                    {applyingCorrection ? '⏳' : '✨ Apply'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Download options for multiple files */}
+              {translationResults.length > 1 && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-blue-700">📦 Batch Options ({translationResults.length} documents)</span>
+                    <button
+                      onClick={handleDownloadAllZip}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      📥 Download All Combined
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="mt-4 flex justify-between items-center">
+                <button onClick={() => setActiveSubTab('ocr')} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center">
+                  <span className="mr-2">←</span> Back: Document
+                </button>
+                <button onClick={() => setActiveSubTab('approval')} className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center">
+                  Next: Deliver <span className="ml-2">→</span>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📄</div>
+              <p className="text-xs">No translations yet. Complete translation in <strong>3. Document</strong> first.</p>
+              <button onClick={() => setActiveSubTab('ocr')} className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">Go to Document</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* APPROVAL TAB */}
+      {activeSubTab === 'approval' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
+
+          {translationResults.length > 0 ? (
+            <>
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
+                <div className="space-y-3">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input type="checkbox" checked={approvalChecks.coverLetter} onChange={(e) => setApprovalChecks({...approvalChecks, coverLetter: e.target.checked})} className="mr-3 w-4 h-4" />
+                    <span className="font-medium">1. Cover Letter</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input type="checkbox" checked={approvalChecks.proofread} onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})} className="mr-3 w-4 h-4" />
+                    <span className="font-medium">2. Proofread</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-3">📥 Download Complete Package</h3>
+                <label className="flex items-center text-xs mb-3 cursor-pointer">
+                  <input type="checkbox" checked={includeCover} onChange={(e) => setIncludeCover(e.target.checked)} className="mr-2 w-4 h-4" />
+                  <span className="font-medium">Include Cover Letter</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => handleDownload('html')} className="py-3 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">📄 Download HTML</button>
+                  <button onClick={() => handleDownload('pdf')} className="py-3 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">📑 Print / Save PDF</button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-green-50 border border-green-200 rounded">
+                <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
+                <div className="flex space-x-2">
+                  <select value={selectedOrderId} onChange={(e) => setSelectedOrderId(e.target.value)} className="flex-1 px-2 py-1.5 text-xs border rounded">
+                    <option value="">-- Select Order --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>{order.order_number} - {order.client_name}</option>
+                    ))}
+                  </select>
+                  <button onClick={sendToProjects} disabled={!selectedOrderId || sendingToProjects} className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300">
+                    {sendingToProjects ? '⏳' : '📤 Send'}
+                  </button>
+                </div>
+              </div>
+
+              {processingStatus && (
+                <div className={`mt-4 p-3 rounded text-xs ${processingStatus.includes('❌') ? 'bg-red-100 text-red-700' : processingStatus.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {processingStatus}
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-start">
+                <button onClick={() => setActiveSubTab('review')} className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center">
+                  <span className="mr-2">←</span> Back: Review
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">📄</div>
+              <p className="text-xs">No translations yet. Complete the workflow first.</p>
+              <button onClick={() => setActiveSubTab('ocr')} className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">Go to Document</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== PROJECTS PAGE ====================
+const ProjectsPage = ({ adminKey }) => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      setOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStatus = async (orderId, newStatus) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, { translation_status: newStatus });
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update:', err);
+    }
+  };
+
+  const markPaid = async (orderId) => {
+    try {
+      await axios.post(`${API}/admin/orders/${orderId}/mark-paid?admin_key=${adminKey}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to mark paid:', err);
+    }
+  };
+
+  const deliverOrder = async (orderId) => {
+    try {
+      await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to deliver:', err);
+    }
+  };
+
+  const filtered = orders.filter(o => {
+    const matchSearch = o.client_name?.toLowerCase().includes(search.toLowerCase()) || o.client_email?.toLowerCase().includes(search.toLowerCase()) || o.order_number?.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const getStatusLabel = (status) => {
+    const labels = { 'received': 'Quote', 'in_translation': 'In progress', 'review': 'Client Review', 'ready': 'Completed', 'delivered': 'Delivered' };
+    return labels[status] || status;
+  };
+
+  if (loading) {
+    return <div className="p-4 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div></div>;
+  }
+
+  return (
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
+        <SearchBar value={search} onChange={setSearch} />
+      </div>
+
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
+              <th className="px-2 py-2 text-left font-medium">Client</th>
+              <th className="px-2 py-2 text-left font-medium">Status</th>
+              <th className="px-2 py-2 text-right font-medium">Total</th>
+              <th className="px-2 py-2 text-center font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filtered.map((order) => (
+              <tr key={order.id} className="hover:bg-gray-50">
+                <td className="px-2 py-2 font-medium text-blue-600">{order.order_number}</td>
+                <td className="px-2 py-2">{order.client_name}</td>
+                <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>
+                <td className="px-2 py-1 text-center">
+                  <div className="flex items-center justify-center space-x-1">
+                    {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]">▶</button>}
+                    {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]">👁</button>}
+                    {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>}
+                    {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]">📤</button>}
+                    {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]">$</button>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
+      </div>
+    </div>
+  );
+};
+
+// ==================== TRANSLATORS PAGE ====================
+const TranslatorsPage = ({ adminKey }) => {
+  const [translators] = useState([
+    { id: '1', name: 'Yasmin Costa', email: 'yasmin@legacy.com', languages: 'PT-BR, EN, ES', status: 'available' },
+    { id: '2', name: 'Noemi Santos', email: 'noemi@legacy.com', languages: 'PT-BR, EN', status: 'busy' },
+    { id: '3', name: 'Ana Clara', email: 'anaclara@legacy.com', languages: 'PT-BR, EN, FR', status: 'available' },
+  ]);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATORS</h1>
+      <div className="bg-white rounded shadow overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-3 py-2 text-left font-medium">Name</th>
+              <th className="px-3 py-2 text-left font-medium">Email</th>
+              <th className="px-3 py-2 text-left font-medium">Languages</th>
+              <th className="px-3 py-2 text-center font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {translators.map((t) => (
+              <tr key={t.id} className="hover:bg-gray-50">
+                <td className="px-3 py-2 font-medium">{t.name}</td>
+                <td className="px-3 py-2 text-gray-500">{t.email}</td>
+                <td className="px-3 py-2">{t.languages}</td>
+                <td className="px-3 py-2 text-center">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${t.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{t.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// ==================== SETTINGS PAGE ====================
+const SettingsPage = ({ adminKey }) => {
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
+      <div className="bg-white rounded shadow p-4">
+        <h2 className="text-sm font-bold text-gray-800 mb-3">API Configuration</h2>
+        <div className="space-y-2 text-xs">
+          <div>
+            <label className="block text-gray-500 mb-1">Backend URL</label>
+            <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== TRANSLATION TOOL PAGE ====================
+const TranslationToolPage = ({ adminKey, onLogout }) => {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">✍️</div>
+          <div>
+            <div className="font-bold text-sm">Translation Tool</div>
+            <div className="text-[10px] text-slate-400">Legacy Translations</div>
+          </div>
+        </div>
+        <div className="flex items-center space-x-3">
+          <a href="/admin" className="text-xs text-slate-300 hover:text-white">← Back to Admin</a>
+          <button onClick={onLogout} className="text-xs text-red-400 hover:text-red-300">Logout</button>
+        </div>
+      </div>
+      <TranslationWorkspace adminKey={adminKey} />
+    </div>
+  );
+};
+
+// ==================== MAIN APP ====================
+function AdminApp() {
+  const [adminKey, setAdminKey] = useState(null);
+  const [activeTab, setActiveTab] = useState('projects');
+  const isTranslationTool = window.location.pathname.includes('/admin/translation-tool');
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('admin_key');
+    if (savedKey) setAdminKey(savedKey);
+  }, []);
+
+  const handleLogin = (key) => {
+    setAdminKey(key);
+    localStorage.setItem('admin_key', key);
+  };
+
+  const handleLogout = () => {
+    setAdminKey(null);
+    localStorage.removeItem('admin_key');
+    window.location.href = '/admin';
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'projects': return <ProjectsPage adminKey={adminKey} />;
+      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
+      case 'settings': return <SettingsPage adminKey={adminKey} />;
+      default: return <ProjectsPage adminKey={adminKey} />;
+    }
+  };
+
+  if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
+
+  if (isTranslationTool) {
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <div className="flex-1 overflow-auto">{renderContent()}</div>
+    </div>
+  );
+}
+
+export default AdminApp;
