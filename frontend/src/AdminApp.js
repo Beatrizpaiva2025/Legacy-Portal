@@ -760,7 +760,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     if (externalTranslationText) {
       setTranslationResults([{
         original: 'Original document uploaded as image',
-        translated: externalTranslationText,
+        translatedText: externalTranslationText,
         filename: externalOriginalImages[0]?.filename || 'document'
       }]);
     }
