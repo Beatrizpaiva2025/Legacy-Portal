@@ -249,6 +249,7 @@ const TranslationWorkspace = ({ adminKey }) => {
   // Correction state
   const [correctionCommand, setCorrectionCommand] = useState('');
   const [applyingCorrection, setApplyingCorrection] = useState(false);
+  const [claudeNotes, setClaudeNotes] = useState(''); // Notes/changes made by Claude
 
   // Send to Projects state
   const [availableOrders, setAvailableOrders] = useState([]);
@@ -1029,12 +1030,38 @@ const TranslationWorkspace = ({ adminKey }) => {
       });
 
       if (response.data.status === 'success' || response.data.translation) {
+        let translationText = response.data.translation;
+        let notesText = '';
+
+        // Extract notes/changes made by Claude (text after "**Changes made:**" or similar patterns)
+        const notesPatterns = [
+          /(\*\*Changes made:\*\*[\s\S]*?)$/i,
+          /(\*\*Corrections:\*\*[\s\S]*?)$/i,
+          /(\*\*Notes:\*\*[\s\S]*?)$/i,
+          /(Note:[\s\S]*?changes[\s\S]*?)$/i
+        ];
+
+        for (const pattern of notesPatterns) {
+          const match = translationText.match(pattern);
+          if (match) {
+            notesText = match[1].trim();
+            translationText = translationText.replace(pattern, '').trim();
+            break;
+          }
+        }
+
         const updatedResults = [...translationResults];
         updatedResults[selectedResultIndex] = {
           ...currentResult,
-          translatedText: response.data.translation
+          translatedText: translationText
         };
         setTranslationResults(updatedResults);
+
+        // Save notes separately
+        if (notesText) {
+          setClaudeNotes(prev => prev ? prev + '\n\n---\n\n' + notesText : notesText);
+        }
+
         setCorrectionCommand('');
         setProcessingStatus('✅ Correction applied!');
       } else {
@@ -2745,6 +2772,13 @@ tradução juramentada | certified translation`}
                       ) : (
                         <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
                       )
+                    ) : translationResults[selectedResultIndex]?.original ? (
+                      // External translation: original image stored directly in results
+                      translationResults[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={translationResults[selectedResultIndex].original} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                      ) : (
+                        <img src={translationResults[selectedResultIndex].original} alt={translationResults[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
+                      )
                     ) : (
                       <pre className="p-3 text-xs font-mono whitespace-pre-wrap min-h-full" style={{fontWeight: 'bold'}}>
                         {translationResults[selectedResultIndex]?.originalText || ''}
@@ -2798,6 +2832,26 @@ tradução juramentada | certified translation`}
                   </button>
                 </div>
               </div>
+
+              {/* Claude Notes/Changes - Separate Field */}
+              {claudeNotes && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-medium text-green-700">
+                      📝 Changes Made by Claude
+                    </label>
+                    <button
+                      onClick={() => setClaudeNotes('')}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="text-xs text-green-800 bg-white p-2 rounded border border-green-200 whitespace-pre-wrap">
+                    {claudeNotes}
+                  </div>
+                </div>
+              )}
 
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
