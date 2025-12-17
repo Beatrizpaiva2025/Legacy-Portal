@@ -34,8 +34,23 @@ const FLAGS = {
 };
 
 const LANGUAGES = [
-  "English", "Spanish", "Portuguese", "Portuguese (Brazil)", "French", "German",
-  "Italian", "Chinese", "Japanese", "Korean", "Arabic", "Russian", "Dutch"
+  // Major Languages
+  "English", "English (USA)", "English (UK)",
+  "Spanish", "Spanish (Spain)", "Spanish (Latin America)",
+  "Portuguese", "Portuguese (Brazil)", "Portuguese (Portugal)",
+  "French", "French (France)", "French (Canada)",
+  "German", "Italian", "Dutch",
+  // Asian Languages
+  "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean",
+  "Vietnamese", "Thai", "Indonesian", "Malay", "Filipino/Tagalog", "Hindi",
+  // Middle Eastern & African
+  "Arabic", "Arabic (Saudi Arabia)", "Hebrew", "Turkish", "Persian/Farsi", "Swahili",
+  // European Languages
+  "Russian", "Polish", "Ukrainian", "Czech", "Slovak", "Hungarian",
+  "Romanian", "Bulgarian", "Greek", "Serbian", "Croatian", "Slovenian",
+  "Swedish", "Norwegian", "Danish", "Finnish", "Icelandic",
+  // Other Languages
+  "Catalan", "Basque", "Galician", "Latin"
 ];
 
 const TRANSLATORS = [
