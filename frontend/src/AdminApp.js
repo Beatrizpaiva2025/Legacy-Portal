@@ -240,8 +240,9 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
-  // External Translation Mode
-  const [workflowMode, setWorkflowMode] = useState('ai'); // 'ai' or 'external'
+  // Workflow Mode: 'ai', 'external', or 'ocr'
+  const [workflowMode, setWorkflowMode] = useState('ai');
+  const [translationType, setTranslationType] = useState('general'); // 'financial', 'education', 'general', 'personal'
   const [externalOriginalImages, setExternalOriginalImages] = useState([]); // Original document images
   const [externalTranslationText, setExternalTranslationText] = useState(''); // External translation text
   const [externalTranslationImages, setExternalTranslationImages] = useState([]); // External translation as images (if PDF)
@@ -307,6 +308,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     languageChanged: false,
     proofread: false
   });
+  const [saveToTM, setSaveToTM] = useState(true); // Save to Translation Memory on approval
 
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
@@ -846,7 +848,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
 
     if (useClaudeOcr && !claudeApiKey) {
-      alert('Claude API Key is required for Claude OCR. Please add it in Resources tab.');
+      alert('API Key is required for AI OCR. Please add it in Setup tab.');
       return;
     }
 
@@ -897,7 +899,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your Claude API Key in the Setup tab');
+      alert('Please configure your API Key in the Setup tab');
       setActiveSubTab('resources');
       return;
     }
@@ -956,7 +958,7 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
 
     if (!claudeApiKey) {
-      alert('Please configure your Claude API Key in the Setup tab');
+      alert('Please configure your API Key in the Setup tab');
       setActiveSubTab('resources');
       return;
     }
@@ -1114,8 +1116,61 @@ const TranslationWorkspace = ({ adminKey }) => {
     setTimeout(saveSelection, 0);
   };
 
+  // Save Translation Memory
+  const saveTranslationMemory = async () => {
+    if (!saveToTM || translationResults.length === 0) return;
+
+    const typeLabels = {
+      'financial': 'Financeiro',
+      'education': 'Educação',
+      'general': 'Geral',
+      'personal': 'Documentos Pessoais'
+    };
+
+    // Extract text from translations (strip HTML)
+    const extractText = (html) => {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      return temp.textContent || temp.innerText || '';
+    };
+
+    // Create TM entry
+    const tmEntry = {
+      id: Date.now(),
+      name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString()}`,
+      sourceLang: sourceLanguage,
+      targetLang: targetLanguage,
+      field: typeLabels[translationType] || 'Geral',
+      bidirectional: false,
+      terms: translationResults.map((result, idx) => ({
+        source: result.originalText || extractText(result.original || ''),
+        target: extractText(result.translatedText || ''),
+        context: `Page ${idx + 1} - ${orderNumber || 'No order'}`
+      })).filter(t => t.source && t.target)
+    };
+
+    if (tmEntry.terms.length > 0) {
+      // Save to glossaries
+      const newGlossaries = [...glossaries, tmEntry];
+      setGlossaries(newGlossaries);
+
+      // Persist to backend
+      try {
+        await axios.post(`${API_BASE_URL}/glossaries`, tmEntry, { withCredentials: true });
+      } catch (err) {
+        // Save to localStorage as fallback
+        localStorage.setItem('glossaries', JSON.stringify(newGlossaries));
+      }
+    }
+  };
+
   // Download certificate
   const handleDownload = (format = 'html') => {
+    // Save TM if enabled
+    if (saveToTM) {
+      saveTranslationMemory();
+    }
+
     const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
@@ -1379,15 +1434,15 @@ const TranslationWorkspace = ({ adminKey }) => {
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> 1️⃣ Add your Claude API Key → 2️⃣ Go to Details tab → 3️⃣ Upload Document → 4️⃣ Review → 5️⃣ Deliver
+              <strong>Quick Start:</strong> 1️⃣ Add your API Key → 2️⃣ Go to Details tab → 3️⃣ Upload Document → 4️⃣ Review → 5️⃣ Deliver
             </p>
           </div>
 
-          {/* Claude API Key Section */}
+          {/* API Key Section */}
           <div className="bg-white rounded shadow p-4">
             <div className="flex items-center space-x-2 mb-3">
               <span className="text-lg">🔑</span>
-              <h2 className="text-sm font-bold">Claude API Key</h2>
+              <h2 className="text-sm font-bold">API Key</h2>
             </div>
             <div className="flex space-x-2">
               <input
@@ -1405,148 +1460,6 @@ const TranslationWorkspace = ({ adminKey }) => {
               </button>
             </div>
             <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
-          </div>
-
-          {/* OCR for CAT Tool Section */}
-          <div className="bg-white rounded shadow p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <span className="text-lg">📝</span>
-              <h2 className="text-sm font-bold">OCR for CAT Tool</h2>
-              <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Optional</span>
-            </div>
-            <p className="text-xs text-gray-600 mb-3">
-              Extract text from documents to use in external CAT tools (SDL Trados, MemoQ, etc.)
-            </p>
-
-            {/* File Upload for OCR */}
-            <div
-              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 transition-colors mb-3"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,.pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <div className="text-2xl mb-1">📤</div>
-              <button className="px-3 py-1.5 bg-gray-600 text-white text-xs rounded hover:bg-gray-700">
-                Upload Document for OCR
-              </button>
-              <p className="text-[10px] text-gray-500 mt-1">
-                {files.length > 0 ? `${files.length} file(s) selected` : 'Images or PDF'}
-              </p>
-            </div>
-
-            {/* OCR Options */}
-            {files.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center space-x-4 text-xs">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={!useClaudeOcr}
-                      onChange={() => setUseClaudeOcr(false)}
-                      className="mr-2"
-                    />
-                    AWS Textract OCR
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      checked={useClaudeOcr}
-                      onChange={() => setUseClaudeOcr(true)}
-                      className="mr-2"
-                    />
-                    Claude AI OCR (better formatting)
-                  </label>
-                </div>
-
-                <button
-                  onClick={handleOCR}
-                  disabled={isProcessing || (useClaudeOcr && !claudeApiKey)}
-                  className="w-full py-2 bg-gray-700 text-white text-xs rounded hover:bg-gray-800 disabled:bg-gray-300"
-                >
-                  {isProcessing ? processingStatus : '🔍 Extract Text (OCR)'}
-                </button>
-
-                {/* OCR Results */}
-                {ocrResults.length > 0 && (
-                  <div className="border rounded p-3 bg-gray-50">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs font-medium">Extracted Text:</span>
-                      <button
-                        onClick={() => {
-                          const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
-                          const blob = new Blob([text], { type: 'text/plain' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = 'ocr_text_for_cat.txt';
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        }}
-                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                      >
-                        📥 Download for CAT Tool
-                      </button>
-                    </div>
-                    <textarea
-                      value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
-                      readOnly
-                      className="w-full h-32 text-xs font-mono border rounded p-2 bg-white"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Translation Instructions Section */}
-          <div className="bg-white rounded shadow">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">📖</span>
-                <div>
-                  <h2 className="text-sm font-bold">Translation Instructions</h2>
-                  <p className="text-xs text-gray-500">Manage translation guidelines by language pair</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setEditingInstruction(null); setInstructionForm({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' }); setShowInstructionModal(true); }}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-              >
-                <span className="mr-1">+</span> Add
-              </button>
-            </div>
-            <div className="p-4">
-              {instructions.length > 0 ? (
-                <div className="space-y-2">
-                  {instructions.map((instr) => (
-                    <div key={instr.id} className="p-3 border rounded hover:bg-gray-50 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center text-xs">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded">{FLAGS[instr.sourceLang?.toLowerCase()] || '🌐'} {instr.sourceLang}</span>
-                          <span className="mx-2">→</span>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded">{FLAGS[instr.targetLang?.toLowerCase()] || '🌐'} {instr.targetLang}</span>
-                        </div>
-                        <span className="text-xs font-medium">{instr.title}</span>
-                      </div>
-                      <div className="flex space-x-1">
-                        <button onClick={() => handleEditInstruction(instr)} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">✏️</button>
-                        <button onClick={() => handleDeleteInstruction(instr.id)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-xs">No instructions yet. Click "Add" to create one.</p>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Glossaries & Translation Memories Section */}
@@ -1583,11 +1496,10 @@ const TranslationWorkspace = ({ adminKey }) => {
                   className="px-3 py-1.5 text-xs border rounded"
                 >
                   <option>All Fields</option>
-                  <option>Legal</option>
-                  <option>Medical</option>
-                  <option>Technical</option>
-                  <option>Financial</option>
-                  <option>Certificates</option>
+                  <option>Financeiro</option>
+                  <option>Educação</option>
+                  <option>Geral</option>
+                  <option>Documentos Pessoais</option>
                 </select>
               </div>
 
@@ -1711,11 +1623,10 @@ const TranslationWorkspace = ({ adminKey }) => {
                         className="w-full px-2 py-1.5 text-xs border rounded"
                       >
                         <option>All Fields</option>
-                        <option>Legal</option>
-                        <option>Medical</option>
-                        <option>Technical</option>
-                        <option>Financial</option>
-                        <option>Certificates</option>
+                        <option>Financeiro</option>
+                        <option>Educação</option>
+                        <option>Geral</option>
+                        <option>Documentos Pessoais</option>
                       </select>
                     </div>
                   </div>
@@ -2288,10 +2199,41 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
 
+          {/* Translation Type Selector */}
+          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <label className="block text-xs font-medium text-purple-700 mb-2">📁 Tipo de Documento</label>
+            <div className="grid grid-cols-4 gap-2">
+              <button
+                onClick={() => setTranslationType('financial')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+              >
+                📊 Financeiro
+              </button>
+              <button
+                onClick={() => setTranslationType('education')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+              >
+                🎓 Educação
+              </button>
+              <button
+                onClick={() => setTranslationType('general')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+              >
+                📄 Geral
+              </button>
+              <button
+                onClick={() => setTranslationType('personal')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+              >
+                👤 Docs Pessoais
+              </button>
+            </div>
+          </div>
+
           {/* Workflow Mode Switch */}
           <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-            <div className="flex items-center justify-center gap-4">
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'ai' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+            <div className="flex items-center justify-center gap-3">
+              <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'ai' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
                   type="radio"
                   name="workflowMode"
@@ -2303,7 +2245,7 @@ tradução juramentada | certified translation`}
                 <span className="mr-2">🤖</span>
                 <span className="text-sm font-medium">Traduzir com AI</span>
               </label>
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'external' ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'external' ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
                   type="radio"
                   name="workflowMode"
@@ -2315,9 +2257,21 @@ tradução juramentada | certified translation`}
                 <span className="mr-2">📥</span>
                 <span className="text-sm font-medium">Tradução Externa</span>
               </label>
+              <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'ocr' ? 'bg-gray-700 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="workflowMode"
+                  value="ocr"
+                  checked={workflowMode === 'ocr'}
+                  onChange={() => setWorkflowMode('ocr')}
+                  className="sr-only"
+                />
+                <span className="mr-2">📝</span>
+                <span className="text-sm font-medium">OCR (CAT Tool)</span>
+              </label>
             </div>
             <p className="text-[10px] text-gray-500 text-center mt-2">
-              {workflowMode === 'ai' ? 'Upload document and translate with Claude AI' : 'Upload original + existing translation for review'}
+              {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)'}
             </p>
           </div>
 
@@ -2489,7 +2443,7 @@ tradução juramentada | certified translation`}
                 </button>
                 {!claudeApiKey && (
                   <p className="text-[10px] text-red-500 mt-1 text-center">
-                    ⚠️ Please add your Claude API Key in the Setup tab
+                    ⚠️ Please add your API Key in the Setup tab
                   </p>
                 )}
               </div>
@@ -2673,6 +2627,106 @@ tradução juramentada | certified translation`}
                   className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
                 >
                   Go to Review <span className="ml-2">→</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ============ OCR MODE ============ */}
+          {workflowMode === 'ocr' && (
+            <>
+              {/* File Upload for OCR */}
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-500 transition-colors mb-4"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <div className="text-3xl mb-2">📝</div>
+                <button className="px-4 py-2 bg-gray-700 text-white text-sm rounded hover:bg-gray-800">
+                  Upload Document for OCR
+                </button>
+                <p className="text-xs text-gray-500 mt-2">
+                  {files.length > 0 ? `${files.length} file(s) selected` : 'Images or PDF - Extract text for CAT tools'}
+                </p>
+              </div>
+
+              {/* OCR Options */}
+              {files.length > 0 && (
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-4 text-xs">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        checked={!useClaudeOcr}
+                        onChange={() => setUseClaudeOcr(false)}
+                        className="mr-2"
+                      />
+                      AWS Textract OCR
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        checked={useClaudeOcr}
+                        onChange={() => setUseClaudeOcr(true)}
+                        className="mr-2"
+                      />
+                      AI OCR (better formatting)
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={handleOCR}
+                    disabled={isProcessing || (useClaudeOcr && !claudeApiKey)}
+                    className="w-full py-2 bg-gray-700 text-white text-sm rounded hover:bg-gray-800 disabled:bg-gray-300"
+                  >
+                    {isProcessing ? processingStatus : '🔍 Extract Text (OCR)'}
+                  </button>
+
+                  {/* OCR Results */}
+                  {ocrResults.length > 0 && (
+                    <div className="border rounded p-3 bg-white">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-medium">Extracted Text:</span>
+                        <button
+                          onClick={() => {
+                            const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                            const blob = new Blob([text], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'ocr_text_for_cat.txt';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                        >
+                          📥 Download for CAT Tool
+                        </button>
+                      </div>
+                      <textarea
+                        value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
+                        readOnly
+                        className="w-full h-40 text-xs font-mono border rounded p-2 bg-gray-50"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="mt-4 flex justify-start">
+                <button
+                  onClick={() => setActiveSubTab('cover')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Details
                 </button>
               </div>
             </>
@@ -2958,6 +3012,24 @@ tradução juramentada | certified translation`}
                     <span className="font-medium">Excluir Original Document</span>
                   </label>
                 </div>
+              </div>
+
+              {/* Translation Memory Option */}
+              <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
+                <label className="flex items-center text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveToTM}
+                    onChange={(e) => setSaveToTM(e.target.checked)}
+                    className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  />
+                  <div>
+                    <span className="font-medium">💾 Salvar na Translation Memory</span>
+                    <p className="text-[10px] text-teal-600 mt-0.5">
+                      Categoria: {translationType === 'financial' ? '📊 Financeiro' : translationType === 'education' ? '🎓 Educação' : translationType === 'personal' ? '👤 Docs Pessoais' : '📄 Geral'}
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {/* Download Options */}
