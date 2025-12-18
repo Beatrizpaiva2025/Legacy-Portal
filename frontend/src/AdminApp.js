@@ -310,6 +310,11 @@ const TranslationWorkspace = ({ adminKey }) => {
   });
   const [saveToTM, setSaveToTM] = useState(true); // Save to Translation Memory on approval
 
+  // Quick Package state (for ready translations)
+  const [quickPackageMode, setQuickPackageMode] = useState(false);
+  const [quickTranslationFiles, setQuickTranslationFiles] = useState([]); // Ready translation files
+  const [quickOriginalFiles, setQuickOriginalFiles] = useState([]); // Original document files
+
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
 
@@ -1114,6 +1119,168 @@ const TranslationWorkspace = ({ adminKey }) => {
     }
     // Save selection after command for next operation
     setTimeout(saveSelection, 0);
+  };
+
+  // Quick Package file handlers
+  const handleQuickTranslationUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    const processedFiles = [];
+
+    for (const file of files) {
+      const base64 = await fileToBase64(file);
+      processedFiles.push({
+        filename: file.name,
+        data: base64,
+        type: file.type
+      });
+    }
+    setQuickTranslationFiles(prev => [...prev, ...processedFiles]);
+  };
+
+  const handleQuickOriginalUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    const processedFiles = [];
+
+    for (const file of files) {
+      const base64 = await fileToBase64(file);
+      processedFiles.push({
+        filename: file.name,
+        data: base64,
+        type: file.type
+      });
+    }
+    setQuickOriginalFiles(prev => [...prev, ...processedFiles]);
+  };
+
+  // Quick Package Download - generates complete certified translation package
+  const handleQuickPackageDownload = () => {
+    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = 'Certification of Translation Accuracy';
+
+    // Cover Letter HTML (same as in handleDownload)
+    const coverLetterHTML = `
+    <div class="cover-page">
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
+            </div>
+        </div>
+        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        <h1 class="main-title">${certTitle}</h1>
+        <div class="subtitle">
+            Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
+            <strong>${targetLanguage}</strong>
+        </div>
+        <p class="body-text">
+            We, Legacy Translations, a professional translation services company and ATA
+            Member (#275993), having no relation to the client, hereby certify that the
+            annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
+            executed by us, is to the best of our knowledge and belief, a true and accurate
+            translation of the original document, likewise annexed hereunto.
+        </p>
+        <p class="body-text">
+            This is to certify the correctness of the translation only. We do not guarantee
+            or verify the contents or the authenticity of the original document.
+        </p>
+        <p class="body-text">
+            We hereby affirm that ${translator?.name || 'Beatriz Paiva'} is competent to translate from <strong>${sourceLanguage}</strong>
+            to <strong>${targetLanguage}</strong> and that the translation is accurate and complete.
+        </p>
+        <div class="signature-section">
+            <div class="signature-line">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" style="max-height: 40px; max-width: 180px; object-fit: contain;" />`
+                  : `<span style="font-family: 'Rage Italic', 'Brush Script MT', cursive; font-size: 20px;">Beatriz Paiva</span>`}
+            </div>
+            <div class="signature-label">Authorized Representative</div>
+            ${logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="max-width: 80px; max-height: 80px; margin-top: 10px;" />` : ''}
+        </div>
+        <div class="date-line">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+    </div>`;
+
+    // Translation pages with letterhead
+    const translationPagesHTML = quickTranslationFiles.map((file, idx) => `
+    <div class="translation-page">
+        ${includeLetterhead ? `
+        <div class="letterhead">
+            <div class="letterhead-logo">
+                ${logoLeft ? `<img src="${logoLeft}" style="max-height: 30px;" />` : 'LEGACY TRANSLATIONS'}
+            </div>
+            <div class="letterhead-info">
+                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116 | (857) 316-7770
+            </div>
+        </div>` : ''}
+        <div class="translation-content">
+            <img src="${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; height: auto;" />
+        </div>
+    </div>`).join('');
+
+    // Original document pages
+    const originalPagesHTML = quickOriginalFiles.map((file, idx) => `
+    <div class="original-page">
+        <div class="original-label">ORIGINAL DOCUMENT - Page ${idx + 1}</div>
+        <img src="${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />
+    </div>`).join('');
+
+    // Complete HTML
+    const fullHTML = `<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<title>Certified Translation - ${orderNumber || 'Document'}</title>
+<style>
+    @page { size: ${pageSizeCSS}; margin: 0.5in; }
+    body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.4; margin: 0; padding: 20px; }
+    .cover-page { page-break-after: always; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    .logo-left img, .logo-right img { max-height: 50px; }
+    .header-center { text-align: center; flex: 1; }
+    .company-name { font-size: 16pt; font-weight: bold; color: #1a365d; }
+    .company-address { font-size: 9pt; color: #666; margin-top: 3px; }
+    .order-number { text-align: right; font-size: 10pt; margin: 15px 0; }
+    .main-title { text-align: center; font-size: 16pt; font-weight: bold; margin: 25px 0 15px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+    .subtitle { text-align: center; font-size: 12pt; margin-bottom: 25px; }
+    .body-text { text-align: justify; margin-bottom: 15px; text-indent: 30px; }
+    .signature-section { margin-top: 40px; text-align: center; }
+    .signature-line { margin-bottom: 5px; min-height: 40px; }
+    .signature-label { font-size: 10pt; }
+    .date-line { margin-top: 20px; text-align: center; }
+    .translation-page { page-break-before: always; }
+    .letterhead { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 15px; font-size: 9pt; color: #666; }
+    .translation-content { text-align: center; }
+    .translation-content img { max-width: 100%; border: 1px solid #eee; }
+    .original-page { page-break-before: always; }
+    .original-label { background: #f0f0f0; padding: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 10pt; }
+    .original-page img { max-width: 100%; border: 1px solid #ddd; }
+    @media print { body { padding: 0; } }
+</style>
+</head><body>
+${includeCover ? coverLetterHTML : ''}
+${translationPagesHTML}
+${includeOriginal ? originalPagesHTML : ''}
+</body></html>`;
+
+    // Open in new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(fullHTML);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   // Save Translation Memory
@@ -2943,7 +3110,246 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
-          {translationResults.length > 0 ? (
+          {/* Mode Switch: Normal vs Quick Package */}
+          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+            <div className="flex items-center justify-center gap-3">
+              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  checked={!quickPackageMode}
+                  onChange={() => setQuickPackageMode(false)}
+                  className="sr-only"
+                />
+                <span className="mr-2">📝</span>
+                <span className="text-sm font-medium">Fluxo Normal</span>
+              </label>
+              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  checked={quickPackageMode}
+                  onChange={() => setQuickPackageMode(true)}
+                  className="sr-only"
+                />
+                <span className="mr-2">📦</span>
+                <span className="text-sm font-medium">Quick Package</span>
+              </label>
+            </div>
+            <p className="text-[10px] text-gray-500 text-center mt-2">
+              {!quickPackageMode ? 'Usar tradução do fluxo anterior' : 'Montar pacote com tradução pronta (upload)'}
+            </p>
+          </div>
+
+          {/* ============ QUICK PACKAGE MODE ============ */}
+          {quickPackageMode && (
+            <>
+              {/* Certificate Fields */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-3">📜 Certificate Information</h3>
+
+                {/* Order Number */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Order #</label>
+                  <div className="flex items-center">
+                    <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l text-sm">P</span>
+                    <input
+                      type="text"
+                      value={orderNumber.replace('P', '')}
+                      onChange={(e) => setOrderNumber('P' + e.target.value.replace(/\D/g, ''))}
+                      placeholder="0000"
+                      className="flex-1 px-3 py-2 text-sm border rounded-r"
+                    />
+                  </div>
+                </div>
+
+                {/* Document Type */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Translation of</label>
+                  <input
+                    type="text"
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    placeholder="Birth Certificate"
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
+                </div>
+
+                {/* Language Pair */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+                    <select
+                      value={sourceLanguage}
+                      onChange={(e) => setSourceLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+                    <select
+                      value={targetLanguage}
+                      onChange={(e) => setTargetLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Upload Translation (Ready) */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Tradução Pronta</h3>
+                <p className="text-[10px] text-green-600 mb-3">Upload das páginas da tradução (serão ajustadas com letterhead)</p>
+
+                <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center cursor-pointer hover:border-green-500 transition-colors mb-2">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    onChange={handleQuickTranslationUpload}
+                    className="hidden"
+                    id="quick-translation-upload"
+                  />
+                  <label htmlFor="quick-translation-upload" className="cursor-pointer">
+                    <div className="text-2xl mb-1">📤</div>
+                    <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                      Upload Tradução
+                    </span>
+                    <p className="text-[10px] text-gray-500 mt-1">Múltiplos arquivos permitidos</p>
+                  </label>
+                </div>
+
+                {quickTranslationFiles.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} arquivo(s):</p>
+                    {quickTranslationFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
+                        <span className="truncate">{file.filename}</span>
+                        <button
+                          onClick={() => setQuickTranslationFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-red-500 hover:text-red-700 ml-2"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Originals */}
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Documentos Originais</h3>
+                <p className="text-[10px] text-orange-600 mb-3">Upload das páginas do documento original</p>
+
+                <div className="border-2 border-dashed border-orange-300 rounded-lg p-4 text-center cursor-pointer hover:border-orange-500 transition-colors mb-2">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    onChange={handleQuickOriginalUpload}
+                    className="hidden"
+                    id="quick-original-upload"
+                  />
+                  <label htmlFor="quick-original-upload" className="cursor-pointer">
+                    <div className="text-2xl mb-1">📤</div>
+                    <span className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded hover:bg-orange-700">
+                      Upload Originais
+                    </span>
+                    <p className="text-[10px] text-gray-500 mt-1">Múltiplos arquivos permitidos</p>
+                  </label>
+                </div>
+
+                {quickOriginalFiles.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-orange-700">{quickOriginalFiles.length} arquivo(s):</p>
+                    {quickOriginalFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
+                        <span className="truncate">{file.filename}</span>
+                        <button
+                          onClick={() => setQuickOriginalFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-red-500 hover:text-red-700 ml-2"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Options */}
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Opções</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeCover}
+                      onChange={(e) => setIncludeCover(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>Incluir Certificate of Accuracy</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeLetterhead}
+                      onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>Incluir Letterhead nas páginas</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeOriginal}
+                      onChange={(e) => setIncludeOriginal(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>Incluir Documentos Originais</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Document Order Preview */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-purple-700 mb-2">📋 Ordem do Documento Final</h3>
+                <div className="flex items-center gap-2 text-xs flex-wrap">
+                  {includeCover && (
+                    <>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
+                      <span className="text-gray-400">→</span>
+                    </>
+                  )}
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">📄 Tradução ({quickTranslationFiles.length} pág.)</span>
+                  {includeOriginal && quickOriginalFiles.length > 0 && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pág.)</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Download Button */}
+              <button
+                onClick={handleQuickPackageDownload}
+                disabled={quickTranslationFiles.length === 0}
+                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                📦 Gerar Pacote Completo (Print/PDF)
+              </button>
+              <p className="text-[10px] text-gray-500 mt-2 text-center">
+                Abre janela de impressão - salve como PDF
+              </p>
+            </>
+          )}
+
+          {/* ============ NORMAL FLOW ============ */}
+          {!quickPackageMode && translationResults.length > 0 && (
             <>
               {/* Approval Checklist */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
@@ -3129,13 +3535,17 @@ tradução juramentada | certified translation`}
                 </button>
               </div>
             </>
-          ) : (
+          )}
+
+          {/* No translations message - only in normal flow */}
+          {!quickPackageMode && translationResults.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">📄</div>
-              <p className="text-xs">No translations yet. Complete the translation workflow first.</p>
+              <p className="text-xs">No translations yet. Complete the translation workflow first,</p>
+              <p className="text-xs mb-4">or use <strong>Quick Package</strong> mode to upload ready translations.</p>
               <button
                 onClick={() => setActiveSubTab('ocr')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
               >
                 Go to Document
               </button>
