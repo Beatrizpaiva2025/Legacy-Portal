@@ -2799,6 +2799,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def create_default_partner():
+    """Create default partner from environment variables if set"""
+    default_email = os.environ.get('DEFAULT_PARTNER_EMAIL')
+    default_password = os.environ.get('DEFAULT_PARTNER_PASSWORD')
+
+    if default_email and default_password:
+        try:
+            # Check if partner already exists
+            existing = await db.partners.find_one({"email": default_email})
+            if not existing:
+                partner = Partner(
+                    company_name=os.environ.get('DEFAULT_PARTNER_COMPANY', 'Default Partner'),
+                    email=default_email,
+                    password_hash=hash_password(default_password),
+                    contact_name=os.environ.get('DEFAULT_PARTNER_NAME', 'Admin'),
+                    phone=os.environ.get('DEFAULT_PARTNER_PHONE', '')
+                )
+                await db.partners.insert_one(partner.dict())
+                logger.info(f"Default partner created: {default_email}")
+            else:
+                logger.info(f"Default partner already exists: {default_email}")
+        except Exception as e:
+            logger.error(f"Error creating default partner: {str(e)}")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
