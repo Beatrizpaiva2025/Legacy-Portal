@@ -399,8 +399,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
     }
   };
 
+  // Check if all approval checks are complete
+  const isApprovalComplete = approvalChecks.projectNumber && approvalChecks.languageChanged && approvalChecks.proofread;
+
   // Send translation to Projects
   const sendToProjects = async () => {
+    // Validate document type
+    if (!documentType.trim()) {
+      alert('Please fill in the Document Type field');
+      return;
+    }
+
+    // Validate approval checklist
+    if (!isApprovalComplete) {
+      alert('Please complete all items in the Approval Checklist before sending');
+      return;
+    }
+
     if (!selectedOrderId) {
       alert('Please select an order to link this translation');
       return;
@@ -3211,16 +3226,23 @@ tradução juramentada | certified translation`}
                   </div>
                 </div>
 
-                {/* Document Type */}
+                {/* Document Type - REQUIRED */}
                 <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Translation of</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Translation of <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     value={documentType}
                     onChange={(e) => setDocumentType(e.target.value)}
-                    placeholder="Birth Certificate"
-                    className="w-full px-3 py-2 text-sm border rounded"
+                    placeholder="Birth Certificate, Marriage Certificate, Diploma..."
+                    className={`w-full px-3 py-2 text-sm border rounded ${
+                      !documentType.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
                   />
+                  {!documentType.trim() && (
+                    <p className="text-[10px] text-red-500 mt-1">⚠️ Document type is required</p>
+                  )}
                 </div>
 
                 {/* Language Pair */}
@@ -3401,11 +3423,20 @@ tradução juramentada | certified translation`}
           {/* ============ NORMAL FLOW ============ */}
           {!quickPackageMode && translationResults.length > 0 && (
             <>
-              {/* Approval Checklist */}
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
+              {/* Approval Checklist - ALL REQUIRED */}
+              <div className={`p-4 rounded mb-4 ${
+                approvalChecks.projectNumber && approvalChecks.languageChanged && approvalChecks.proofread
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-purple-50 border-2 border-purple-300'
+              }`}>
+                <h3 className="text-sm font-bold text-purple-700 mb-1">
+                  📋 Translation Approval Checklist <span className="text-red-500">*</span>
+                </h3>
+                <p className="text-[10px] text-purple-600 mb-3">⚠️ All items must be checked before sending</p>
                 <div className="space-y-2">
-                  <label className="flex items-center text-xs cursor-pointer">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
+                  }`}>
                     <input
                       type="checkbox"
                       checked={approvalChecks.projectNumber}
@@ -3413,8 +3444,11 @@ tradução juramentada | certified translation`}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Você colocou o número do projeto?</span>
+                    {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.languageChanged ? 'bg-green-100' : 'bg-white'
+                  }`}>
                     <input
                       type="checkbox"
                       checked={approvalChecks.languageChanged}
@@ -3422,8 +3456,11 @@ tradução juramentada | certified translation`}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Mudou o idioma?</span>
+                    {approvalChecks.languageChanged && <span className="ml-auto text-green-600">✓</span>}
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.proofread ? 'bg-green-100' : 'bg-white'
+                  }`}>
                     <input
                       type="checkbox"
                       checked={approvalChecks.proofread}
@@ -3431,8 +3468,19 @@ tradução juramentada | certified translation`}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Fez o proofreading do documento?</span>
+                    {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
                   </label>
                 </div>
+                {!(approvalChecks.projectNumber && approvalChecks.languageChanged && approvalChecks.proofread) && (
+                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                    ⚠️ Complete all checklist items to enable sending
+                  </p>
+                )}
+                {approvalChecks.projectNumber && approvalChecks.languageChanged && approvalChecks.proofread && (
+                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                    ✅ All checks completed - Ready to send!
+                  </p>
+                )}
               </div>
 
               {/* Non-Certified Translation Options */}
@@ -3536,9 +3584,25 @@ tradução juramentada | certified translation`}
               </div>
 
               {/* Send to Projects */}
-              <div className="p-4 bg-green-50 border border-green-200 rounded">
+              <div className={`p-4 rounded ${
+                isApprovalComplete && documentType.trim()
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-gray-50 border border-gray-200'
+              }`}>
                 <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
                 <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for final review and delivery to client.</p>
+
+                {/* Validation warnings */}
+                {(!isApprovalComplete || !documentType.trim()) && (
+                  <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                    <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                      {!documentType.trim() && <li>Fill in Document Type (in Details tab)</li>}
+                      {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
+                    </ul>
+                  </div>
+                )}
+
                 <div className="flex space-x-2">
                   <select
                     value={selectedOrderId}
@@ -3554,7 +3618,7 @@ tradução juramentada | certified translation`}
                   </select>
                   <button
                     onClick={sendToProjects}
-                    disabled={!selectedOrderId || sendingToProjects}
+                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
                     className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
