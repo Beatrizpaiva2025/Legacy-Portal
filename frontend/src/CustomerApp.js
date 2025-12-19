@@ -38,14 +38,13 @@ const LANGUAGES = [
   { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
 ];
 
-// ==================== LOGIN PAGE ====================
-const LoginPage = ({ onLogin, onRegister }) => {
+// ==================== LOGIN PAGE (Customer) ====================
+const CustomerLoginPage = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    company_name: '',
-    contact_name: '',
+    full_name: '',
     phone: ''
   });
   const [error, setError] = useState('');
@@ -58,17 +57,16 @@ const LoginPage = ({ onLogin, onRegister }) => {
 
     try {
       if (isLogin) {
-        const response = await axios.post(`${API}/auth/login`, {
+        const response = await axios.post(`${API}/customer/auth/login`, {
           email: formData.email,
           password: formData.password
         });
         onLogin(response.data);
       } else {
-        const response = await axios.post(`${API}/auth/register`, {
+        const response = await axios.post(`${API}/customer/auth/register`, {
           email: formData.email,
           password: formData.password,
-          company_name: formData.company_name,
-          contact_name: formData.contact_name,
+          full_name: formData.full_name,
           phone: formData.phone
         });
         onLogin(response.data);
@@ -81,27 +79,20 @@ const LoginPage = ({ onLogin, onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-6">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div className="text-center mb-8">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4 h-16"
+            className="mx-auto mb-4"
           />
-        </div>
-
-        {/* Title and Badge */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Business Portal (B2B)</h1>
-          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
-            Corporate Clients Only
-          </span>
+          <h1 className="text-2xl font-bold text-gray-800">Customer Portal</h1>
+          <p className="text-gray-600">{isLogin ? 'Sign in to your account' : 'Create a new account'}</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
@@ -110,24 +101,13 @@ const LoginPage = ({ onLogin, onRegister }) => {
           {!isLogin && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  value={formData.company_name}
-                  onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                  placeholder="Your Company Inc."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  value={formData.contact_name}
-                  onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  value={formData.full_name}
+                  onChange={(e) => setFormData({...formData, full_name: e.target.value})}
                   placeholder="John Smith"
                 />
               </div>
@@ -135,7 +115,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   placeholder="+1 (555) 123-4567"
@@ -145,14 +125,13 @@ const LoginPage = ({ onLogin, onRegister }) => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
             <input
               type="email"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
-              placeholder="you@company.com"
             />
           </div>
 
@@ -161,81 +140,47 @@ const LoginPage = ({ onLogin, onRegister }) => {
             <input
               type="password"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
-              placeholder="Enter your password"
             />
           </div>
-
-          {isLogin && (
-            <div className="text-right">
-              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
-                Forgot password?
-              </a>
-            </div>
-          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
+            className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
           >
-            {loading ? 'Please wait...' : (isLogin ? 'Access Business Portal' : 'Create Business Account')}
+            {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
-        {/* Business Account Benefits */}
-        {isLogin && (
-          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">Business Account Benefits:</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>Monthly invoicing - Pay at end of month</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>Dedicated B2B support chat</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>Priority processing</span>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        <div className="mt-6 text-center">
+        <div className="mt-4 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
+            className="text-teal-600 hover:underline"
           >
             {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
           </button>
         </div>
 
-        {/* Contact link for non-B2B clients */}
-        {isLogin && (
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-500">
-              Not a B2B client yet?{' '}
-              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
-                Contact us
-              </a>
-            </p>
-          </div>
-        )}
+        <div className="mt-6 pt-6 border-t text-center">
+          <p className="text-sm text-gray-500">
+            Are you a partner?{' '}
+            <a href="/partner" className="text-teal-600 hover:underline">
+              Go to Partner Portal
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
-// ==================== SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
+// ==================== CUSTOMER SIDEBAR ====================
+const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
   const menuItems = [
     { id: 'new-order', label: 'New Order', icon: '➕' },
-    { id: 'saved-budgets', label: 'Saved Budgets', icon: '💾' },
     { id: 'orders', label: 'My Orders', icon: '📋' },
     { id: 'messages', label: 'Messages', icon: '✉️' }
   ];
@@ -249,7 +194,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
           className="w-40 h-auto mb-4"
         />
         <div className="text-sm text-gray-600 mb-2">Welcome,</div>
-        <div className="font-semibold text-gray-800">{partner?.company_name}</div>
+        <div className="font-semibold text-gray-800">{customer?.full_name}</div>
       </div>
 
       <nav className="flex-1 mt-4">
@@ -281,11 +226,12 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
   );
 };
 
-// ==================== NEW ORDER PAGE ====================
-const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
+// ==================== CUSTOMER NEW ORDER PAGE (Step-based with Auto-save) ====================
+const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
+  const [step, setStep] = useState(1); // 1: Email, 2: Upload & Configure, 3: Review & Order
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestName, setGuestName] = useState('');
   const [formData, setFormData] = useState({
-    client_name: '',
-    client_email: '',
     service_type: 'standard',
     translate_from: 'portuguese',
     translate_to: 'english',
@@ -298,26 +244,56 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quote, setQuote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [savingBudget, setSavingBudget] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [abandonedQuoteId, setAbandonedQuoteId] = useState(null);
+  const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState(null);
+  const [showExitPopup, setShowExitPopup] = useState(false);
+
+  // If logged in, skip email step
+  useEffect(() => {
+    if (customer) {
+      setGuestEmail(customer.email);
+      setGuestName(customer.full_name);
+      setStep(2);
+    }
+  }, [customer]);
 
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount]);
+
+  // Auto-save abandoned quote when user sees the price
+  useEffect(() => {
+    if (quote && guestEmail && uploadedFiles.length > 0 && !abandonedQuoteId) {
+      autoSaveAbandonedQuote();
+    }
+  }, [quote, guestEmail]);
+
+  // Exit intent detection
+  useEffect(() => {
+    const handleMouseLeave = (e) => {
+      if (e.clientY <= 0 && quote && !success && step >= 2) {
+        setShowExitPopup(true);
+      }
+    };
+
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, [quote, success, step]);
 
   const calculateQuote = () => {
     let basePrice = 0;
-    // Sum individual file pages instead of calculating from total words
     const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
 
     if (formData.service_type === 'standard') {
-      basePrice = pages * 24.99;  // Certified Translation
+      basePrice = pages * 24.99;
     } else {
-      basePrice = pages * 19.50;  // Professional Translation
+      basePrice = pages * 19.50;
     }
 
     let urgencyFee = 0;
@@ -327,17 +303,68 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
       urgencyFee = basePrice * 1.0;
     }
 
+    let subtotal = basePrice + urgencyFee;
+    let discountAmount = 0;
+
+    if (appliedDiscount) {
+      if (appliedDiscount.type === 'percentage') {
+        discountAmount = subtotal * (appliedDiscount.value / 100);
+      } else {
+        discountAmount = appliedDiscount.value;
+      }
+    }
+
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
-      total_price: basePrice + urgencyFee,
+      discount: discountAmount,
+      total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
     });
   };
 
+  const autoSaveAbandonedQuote = async () => {
+    try {
+      const quoteData = {
+        email: guestEmail,
+        name: guestName,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        word_count: wordCount,
+        urgency: formData.urgency,
+        total_price: quote?.total_price || 0,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        files_info: uploadedFiles.map(f => ({ fileName: f.fileName, wordCount: f.wordCount }))
+      };
+
+      const response = await axios.post(`${API}/abandoned-quotes/save`, quoteData);
+      setAbandonedQuoteId(response.data.quote_id);
+    } catch (err) {
+      console.error('Failed to auto-save quote:', err);
+    }
+  };
+
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${discountCode}`);
+      if (response.data.valid) {
+        setAppliedDiscount(response.data.discount);
+        setError('');
+      } else {
+        setError('Invalid or expired discount code');
+        setAppliedDiscount(null);
+      }
+    } catch (err) {
+      setError('Invalid or expired discount code');
+      setAppliedDiscount(null);
+    }
+  };
+
   const [processingStatus, setProcessingStatus] = useState('');
 
-  // File upload handler - accumulates files and word counts
   const onDrop = useCallback(async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return;
 
@@ -356,9 +383,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
         const formDataUpload = new FormData();
         formDataUpload.append('file', file);
 
-        const response = await axios.post(`${API}/upload-document?token=${token}`, formDataUpload, {
+        const response = await axios.post(`${API}/upload-document`, formDataUpload, {
           headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 120000 // 2 minute timeout for OCR processing
+          timeout: 120000
         });
 
         if (response.data?.word_count) {
@@ -371,7 +398,6 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
         }
       }
 
-      // Add new files to existing files (accumulate) - store with word counts and document IDs
       setUploadedFiles(prev => [...prev, ...newFiles]);
       setWordCount(prev => prev + newWords);
       setProcessingStatus('');
@@ -386,7 +412,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
       setIsProcessing(false);
       setProcessingStatus('');
     }
-  }, [token]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -399,48 +425,15 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
     multiple: true
   });
 
-  const handleSaveBudget = async () => {
-    if (wordCount === 0) {
-      setError('Please upload a document first');
-      return;
-    }
-
-    setSavingBudget(true);
-    setError('');
-
-    try {
-      const budgetData = {
-        service_type: formData.service_type,
-        translate_from: formData.translate_from,
-        translate_to: formData.translate_to,
-        word_count: wordCount,
-        urgency: formData.urgency,
-        notes: formData.notes,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        files_info: uploadedFiles.map(f => ({ fileName: f.fileName, wordCount: f.wordCount }))
-      };
-
-      const response = await axios.post(`${API}/partner/budgets/save?token=${token}`, budgetData);
-
-      setSuccess(`Budget saved successfully! Reference: ${response.data.budget.reference}`);
-
-      if (onSaveBudget) {
-        onSaveBudget(response.data.budget);
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save budget');
-    } finally {
-      setSavingBudget(false);
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (guestEmail && guestName) {
+      setStep(2);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!formData.client_name || !formData.client_email) {
-      setError('Please fill in client name and email');
-      return;
-    }
 
     if (wordCount === 0) {
       setError('Please upload a document first');
@@ -452,20 +445,32 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
     try {
       const orderData = {
-        ...formData,
+        email: guestEmail,
+        name: guestName,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
         word_count: wordCount,
+        urgency: formData.urgency,
+        reference: formData.reference,
+        notes: formData.notes,
         document_filename: uploadedFiles[0]?.fileName || null,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        discount_code: appliedDiscount ? discountCode : null,
+        abandoned_quote_id: abandonedQuoteId
       };
 
-      const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
+      let response;
+      if (token) {
+        response = await axios.post(`${API}/customer/orders/create?token=${token}`, orderData);
+      } else {
+        response = await axios.post(`${API}/guest/orders/create`, orderData);
+      }
 
-      setSuccess(`Order ${response.data.order.order_number} created successfully!`);
+      setSuccess(`Order ${response.data.order.order_number} created successfully! Check your email for confirmation.`);
 
       // Reset form
       setFormData({
-        client_name: '',
-        client_email: '',
         service_type: 'standard',
         translate_from: 'portuguese',
         translate_to: 'english',
@@ -476,6 +481,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
       setWordCount(0);
       setUploadedFiles([]);
       setQuote(null);
+      setAbandonedQuoteId(null);
+      setAppliedDiscount(null);
+      setDiscountCode('');
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -488,9 +496,95 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
     }
   };
 
+  // Step 1: Capture Email
+  if (step === 1) {
+    return (
+      <div className="p-8 max-w-xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-4">📧</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Get Your Free Quote</h1>
+            <p className="text-gray-600">Enter your details to receive an instant price quote</p>
+          </div>
+
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="John Smith"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Email *</label>
+              <input
+                type="email"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">We'll send your quote and order updates here</p>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold"
+            >
+              Continue to Upload Document
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-gray-500">
+            Already have an account?{' '}
+            <a href="/customer" className="text-teal-600 hover:underline" onClick={() => window.location.reload()}>
+              Sign In
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Create New Order</h1>
+      {/* Exit Intent Popup */}
+      {showExitPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center">
+            <div className="text-5xl mb-4">🎁</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Don't leave yet!</h2>
+            <p className="text-gray-600 mb-4">
+              We'll save your quote and send you a reminder with a special discount!
+            </p>
+            <div className="bg-teal-50 p-4 rounded-lg mb-4">
+              <p className="text-teal-800 font-semibold">Your quote has been saved</p>
+              <p className="text-sm text-teal-600">Check your email ({guestEmail}) for details</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitPopup(false)}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
+              >
+                Continue with Order
+              </button>
+              <button
+                onClick={() => setShowExitPopup(false)}
+                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Translation</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
@@ -504,36 +598,22 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
 
-            {/* Client Information */}
-            <div className="border-b pb-4">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Client Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Contact Info (read-only) */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between items-center">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                    value={formData.client_name}
-                    onChange={(e) => setFormData({...formData, client_name: e.target.value})}
-                    placeholder="John Smith"
-                  />
+                  <div className="text-sm text-gray-500">Sending quote to:</div>
+                  <div className="font-medium">{guestName} ({guestEmail})</div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Email *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                    value={formData.client_email}
-                    onChange={(e) => setFormData({...formData, client_email: e.target.value})}
-                    placeholder="client@email.com"
-                  />
-                </div>
+                {!customer && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="text-sm text-teal-600 hover:underline"
+                  >
+                    Change
+                  </button>
+                )}
               </div>
             </div>
 
@@ -696,47 +776,25 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
               </div>
             </div>
 
-            {/* Reference & Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
-                  value={formData.reference}
-                  onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder="PO number, project name..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Special instructions..."
-                />
-              </div>
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
+              <textarea
+                className="w-full px-4 py-2 border border-gray-300 rounded-md"
+                rows="3"
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                placeholder="Any special instructions for our translators..."
+              />
             </div>
 
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleSaveBudget}
-                disabled={savingBudget || wordCount === 0}
-                className="flex-1 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 font-semibold"
-              >
-                {savingBudget ? 'Saving...' : '💾 Save Budget'}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || wordCount === 0}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
-              >
-                {submitting ? 'Creating Order...' : 'Create Order'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={submitting || wordCount === 0}
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+            >
+              {submitting ? 'Creating Order...' : 'Place Order'}
+            </button>
           </form>
         </div>
 
@@ -767,6 +825,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                   <span>${quote.urgency_fee.toFixed(2)}</span>
                 </div>
               )}
+              {quote?.discount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount</span>
+                  <span>-${quote.discount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-3 mt-3">
@@ -776,8 +840,34 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
               </div>
             </div>
 
+            {/* Discount Code */}
+            <div className="border-t pt-3 mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Discount Code</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                />
+                <button
+                  type="button"
+                  onClick={applyDiscountCode}
+                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
+                >
+                  Apply
+                </button>
+              </div>
+              {appliedDiscount && (
+                <p className="text-green-600 text-xs mt-1">
+                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% off` : `$${appliedDiscount.value} off`} applied!
+                </p>
+              )}
+            </div>
+
             <div className="text-xs text-gray-500 mt-4">
-              * Payment via invoice (Net 30)
+              * Payment required to start translation
             </div>
           </div>
         </div>
@@ -786,8 +876,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
   );
 };
 
-// ==================== ORDERS LIST PAGE ====================
-const OrdersPage = ({ token }) => {
+// ==================== CUSTOMER ORDERS PAGE ====================
+const CustomerOrdersPage = ({ token }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -800,7 +890,7 @@ const OrdersPage = ({ token }) => {
   const fetchOrders = async () => {
     try {
       const params = filter !== 'all' ? `&status=${filter}` : '';
-      const response = await axios.get(`${API}/orders?token=${token}${params}`);
+      const response = await axios.get(`${API}/customer/orders?token=${token}${params}`);
       setOrders(response.data.orders || []);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
@@ -841,7 +931,7 @@ const OrdersPage = ({ token }) => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
         <div className="flex gap-2">
-          {['all', 'pending', 'paid', 'overdue'].map((f) => (
+          {['all', 'pending', 'paid'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -879,10 +969,7 @@ const OrdersPage = ({ token }) => {
                         {getTranslationBadge(order.translation_status)}
                         {getStatusBadge(order.payment_status)}
                       </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Client: {order.client_name} ({order.client_email})
-                      </div>
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-500 mt-1">
                         {order.translate_from} → {order.translate_to} | {order.word_count} words
                       </div>
                     </div>
@@ -890,7 +977,7 @@ const OrdersPage = ({ token }) => {
                   <div className="text-right">
                     <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
                     <div className="text-sm text-gray-500">
-                      Due: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
+                      {new Date(order.created_at).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
@@ -932,8 +1019,8 @@ const OrdersPage = ({ token }) => {
   );
 };
 
-// ==================== MESSAGES PAGE ====================
-const MessagesPage = ({ token }) => {
+// ==================== CUSTOMER MESSAGES PAGE ====================
+const CustomerMessagesPage = ({ token }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -943,7 +1030,7 @@ const MessagesPage = ({ token }) => {
 
   const fetchMessages = async () => {
     try {
-      const response = await axios.get(`${API}/messages?token=${token}`);
+      const response = await axios.get(`${API}/customer/messages?token=${token}`);
       setMessages(response.data.messages || []);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
@@ -954,7 +1041,7 @@ const MessagesPage = ({ token }) => {
 
   const markAsRead = async (messageId) => {
     try {
-      await axios.put(`${API}/messages/${messageId}/read?token=${token}`);
+      await axios.put(`${API}/customer/messages/${messageId}/read?token=${token}`);
       setMessages(messages.map(msg =>
         msg.id === messageId ? { ...msg, read: true } : msg
       ));
@@ -1044,315 +1131,101 @@ const MessagesPage = ({ token }) => {
   );
 };
 
-// ==================== SAVED BUDGETS PAGE ====================
-const SavedBudgetsPage = ({ token, onConvertToOrder }) => {
-  const [budgets, setBudgets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedBudget, setSelectedBudget] = useState(null);
-  const [convertModalBudget, setConvertModalBudget] = useState(null);
-  const [clientName, setClientName] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [converting, setConverting] = useState(false);
-
-  useEffect(() => {
-    fetchBudgets();
-  }, []);
-
-  const fetchBudgets = async () => {
-    try {
-      const response = await axios.get(`${API}/partner/budgets?token=${token}`);
-      setBudgets(response.data.budgets || []);
-    } catch (err) {
-      console.error('Failed to fetch budgets:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (budgetId) => {
-    if (!window.confirm('Are you sure you want to delete this saved budget?')) return;
-
-    try {
-      await axios.delete(`${API}/partner/budgets/${budgetId}?token=${token}`);
-      setBudgets(budgets.filter(b => b.id !== budgetId));
-    } catch (err) {
-      console.error('Failed to delete budget:', err);
-    }
-  };
-
-  const handleConvertToOrder = async () => {
-    if (!clientName || !clientEmail) {
-      alert('Please fill in client name and email');
-      return;
-    }
-
-    setConverting(true);
-    try {
-      const response = await axios.post(
-        `${API}/partner/budgets/${convertModalBudget.id}/convert?token=${token}&client_name=${encodeURIComponent(clientName)}&client_email=${encodeURIComponent(clientEmail)}`
-      );
-      if (onConvertToOrder) {
-        onConvertToOrder(response.data.order);
-      }
-      setConvertModalBudget(null);
-      setClientName('');
-      setClientEmail('');
-      fetchBudgets();
-    } catch (err) {
-      console.error('Failed to convert budget to order:', err);
-      alert('Failed to convert budget to order');
-    } finally {
-      setConverting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading saved budgets...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Saved Budgets</h1>
-
-      {/* Convert Modal */}
-      {convertModalBudget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Convert Budget to Order</h2>
-            <p className="text-gray-600 mb-4">
-              Enter client information to create an order from budget <strong>#{convertModalBudget.reference}</strong>
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="John Smith"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Email *</label>
-                <input
-                  type="email"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  placeholder="client@email.com"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setConvertModalBudget(null);
-                  setClientName('');
-                  setClientEmail('');
-                }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConvertToOrder}
-                disabled={converting || !clientName || !clientEmail}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-medium"
-              >
-                {converting ? 'Converting...' : 'Create Order'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {budgets.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="text-4xl mb-4">💾</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No saved budgets</h2>
-          <p className="text-gray-600">Save a budget from the New Order page to see it here</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {budgets.map((budget) => (
-            <div key={budget.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div
-                className="p-6 cursor-pointer hover:bg-gray-50"
-                onClick={() => setSelectedBudget(selectedBudget === budget.id ? null : budget.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-teal-600">#{budget.reference}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        budget.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {budget.status || 'Active'}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {budget.translate_from} → {budget.translate_to}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {budget.word_count} words | {Math.ceil(budget.word_count / 250)} pages
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${budget.total_price?.toFixed(2)}</div>
-                    <div className="text-sm text-gray-500">
-                      Saved: {new Date(budget.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedBudget === budget.id && (
-                <div className="border-t bg-gray-50 p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <div className="text-sm text-gray-500">Service</div>
-                      <div className="font-medium">{budget.service_type === 'standard' ? 'Certified' : 'Professional'}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency</div>
-                      <div className="font-medium capitalize">{budget.urgency === 'no' ? 'Standard' : budget.urgency}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${budget.base_price?.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${(budget.urgency_fee || 0).toFixed(2)}</div>
-                    </div>
-                  </div>
-
-                  {budget.files_info && budget.files_info.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-sm text-gray-500 mb-2">Documents:</div>
-                      {budget.files_info.map((file, i) => (
-                        <div key={i} className="text-sm text-gray-700">
-                          - {file.fileName} ({Math.ceil(file.wordCount / 250)} pages)
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {budget.expires_at && (
-                    <div className="mb-4 text-sm text-gray-500">
-                      Expires: {new Date(budget.expires_at).toLocaleDateString()}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setConvertModalBudget(budget)}
-                      className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
-                    >
-                      Convert to Order
-                    </button>
-                    <button
-                      onClick={() => handleDelete(budget.id)}
-                      className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== MAIN APP ====================
-function App() {
-  const [partner, setPartner] = useState(null);
+// ==================== MAIN CUSTOMER APP ====================
+function CustomerApp() {
+  const [customer, setCustomer] = useState(null);
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
 
   // Check for saved session
   useEffect(() => {
-    const savedPartner = localStorage.getItem('partner');
-    const savedToken = localStorage.getItem('token');
-    if (savedPartner && savedToken) {
-      setPartner(JSON.parse(savedPartner));
+    const savedCustomer = localStorage.getItem('customer');
+    const savedToken = localStorage.getItem('customer_token');
+    if (savedCustomer && savedToken) {
+      setCustomer(JSON.parse(savedCustomer));
       setToken(savedToken);
     }
   }, []);
 
   const handleLogin = (data) => {
-    setPartner(data);
+    setCustomer(data);
     setToken(data.token);
-    localStorage.setItem('partner', JSON.stringify(data));
-    localStorage.setItem('token', data.token);
+    localStorage.setItem('customer', JSON.stringify(data));
+    localStorage.setItem('customer_token', data.token);
   };
 
   const handleLogout = async () => {
     try {
-      await axios.post(`${API}/auth/logout?token=${token}`);
+      await axios.post(`${API}/customer/auth/logout?token=${token}`);
     } catch (err) {
       console.error('Logout error:', err);
     }
-    setPartner(null);
+    setCustomer(null);
     setToken(null);
-    localStorage.removeItem('partner');
-    localStorage.removeItem('token');
+    localStorage.removeItem('customer');
+    localStorage.removeItem('customer_token');
   };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'new-order':
         return (
-          <NewOrderPage
-            partner={partner}
+          <CustomerNewOrderPage
+            customer={customer}
             token={token}
             onOrderCreated={() => setActiveTab('orders')}
-            onSaveBudget={() => setActiveTab('saved-budgets')}
           />
         );
-      case 'saved-budgets':
-        return <SavedBudgetsPage token={token} onConvertToOrder={() => setActiveTab('orders')} />;
       case 'orders':
-        return <OrdersPage token={token} />;
+        return <CustomerOrdersPage token={token} />;
       case 'messages':
-        return <MessagesPage token={token} />;
+        return <CustomerMessagesPage token={token} />;
       default:
-        return <NewOrderPage partner={partner} token={token} />;
+        return <CustomerNewOrderPage customer={customer} token={token} />;
     }
   };
 
-  if (!partner) {
-    return <LoginPage onLogin={handleLogin} />;
+  // If not logged in, show the order page (which has step-based email capture)
+  if (!customer) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200 px-8 py-4">
+          <div className="flex justify-between items-center max-w-6xl mx-auto">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="h-12"
+            />
+            <a
+              href="/customer"
+              onClick={(e) => { e.preventDefault(); window.location.reload(); }}
+              className="text-teal-600 hover:underline"
+            >
+              Sign In
+            </a>
+          </div>
+        </header>
+        <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} />
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar
+      <CustomerSidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        partner={partner}
+        customer={customer}
         onLogout={handleLogout}
       />
       <div className="flex-1">
         <header className="bg-white border-b border-gray-200 px-8 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-semibold text-gray-800 capitalize">
-              {activeTab === 'new-order' ? 'New Order' : activeTab}
+              {activeTab === 'new-order' ? 'New Order' : activeTab.replace('-', ' ')}
             </h1>
             <div className="text-sm text-gray-600">
-              {partner?.contact_name} | {partner?.company_name}
+              {customer?.full_name} | {customer?.email}
             </div>
           </div>
         </header>
@@ -1362,4 +1235,4 @@ function App() {
   );
 }
 
-export default App;
+export default CustomerApp;
