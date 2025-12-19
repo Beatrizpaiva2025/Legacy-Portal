@@ -2358,6 +2358,9 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
             system_prompt = f"""You are a CERTIFIED PROFESSIONAL TRANSLATOR specializing in {request.document_type} documents.
 Translate from {request.source_language} to {request.target_language}.
 
+⚠️ IMPORTANT: The source language is EXPLICITLY specified as {request.source_language}.
+DO NOT attempt to auto-detect the language. Use {request.source_language} as the source language regardless of what you observe in the text.
+
 ═══════════════════════════════════════════════════════════════════
                     FUNDAMENTAL PRINCIPLES
 ═══════════════════════════════════════════════════════════════════
@@ -2465,6 +2468,15 @@ The document must be:
 ✅ Ready for print/PDF conversion
 ✅ Optimized to fit ONE page
 ✅ Clean with no extra elements
+
+═══════════════════════════════════════════════════════════════════
+                    END OF TRANSLATION MARKER
+═══════════════════════════════════════════════════════════════════
+
+At the very end of the translation content (but inside the HTML body), add the following marker in BOLD:
+<p style="text-align: center; font-weight: bold; margin-top: 20px;">[END OF TRANSLATION]</p>
+
+This marker must appear AFTER all translated content but BEFORE the closing body/html tags.
 {additional_instructions}"""
 
             user_message = f"Translate this {request.document_type} document to professional HTML format:\n\n{request.text}"
@@ -2489,8 +2501,15 @@ Provide a corrected version of the translation if needed, and briefly note what 
         else:
             # Custom command
             system_prompt = f"""You are a professional translator working with {request.document_type} documents.
-Follow the user's instructions to modify or improve the translation."""
-            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}"
+Follow the user's instructions to modify or improve the translation.
+
+CRITICAL OUTPUT RULES:
+- Output ONLY the corrected/modified HTML translation
+- Do NOT include any notes, comments, or explanations about what you changed
+- Do NOT add text like "Changes made:", "I corrected:", "Here are the modifications:"
+- The output must be clean HTML ready for printing - no meta-commentary
+- Start with <!DOCTYPE html> or <html> and end with </html>"""
+            user_message = f"Original text ({request.source_language}):\n{request.text}\n\nCurrent translation ({request.target_language}):\n{request.current_translation}\n\nInstruction: {request.action}\n\nIMPORTANT: Output ONLY the corrected HTML. No explanations or notes."
 
         # Call Claude API - with image if available for layout preservation
         async with httpx.AsyncClient(timeout=120.0) as client:

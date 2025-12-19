@@ -1085,7 +1085,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
           /(\*\*Changes made:\*\*[\s\S]*?)$/i,
           /(\*\*Corrections:\*\*[\s\S]*?)$/i,
           /(\*\*Notes:\*\*[\s\S]*?)$/i,
-          /(Note:[\s\S]*?changes[\s\S]*?)$/i
+          /(Note:[\s\S]*?changes[\s\S]*?)$/i,
+          /(\*\*Altera[çc][õo]es:\*\*[\s\S]*?)$/i,
+          /(\*\*Corre[çc][õo]es:\*\*[\s\S]*?)$/i,
+          /(\*\*Observa[çc][õo]es:\*\*[\s\S]*?)$/i,
+          /(---\s*\n[\s\S]*?(?:changes|alterações|correções|notes|notas)[\s\S]*?)$/i,
+          /(<hr[\s\S]*?>[\s\S]*?(?:changes|alterações|correções|notes|notas)[\s\S]*?)$/i,
+          /(I (?:made|applied|corrected|changed|fixed)[\s\S]*?)$/i,
+          /(Eu (?:fiz|apliquei|corrigi|mudei|alterei)[\s\S]*?)$/i,
+          /(Here are the changes[\s\S]*?)$/i,
+          /(The following changes[\s\S]*?)$/i,
+          /(Summary of changes[\s\S]*?)$/i,
+          /(As alterações foram[\s\S]*?)$/i
         ];
 
         for (const pattern of notesPatterns) {
@@ -1094,6 +1105,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
             notesText = match[1].trim();
             translationText = translationText.replace(pattern, '').trim();
             break;
+          }
+        }
+
+        // Also check for notes at the beginning (outside of HTML)
+        if (!notesText && !translationText.startsWith('<!DOCTYPE') && !translationText.startsWith('<html')) {
+          const htmlStart = translationText.search(/<(!DOCTYPE|html)/i);
+          if (htmlStart > 0) {
+            notesText = translationText.substring(0, htmlStart).trim();
+            translationText = translationText.substring(htmlStart).trim();
           }
         }
 
@@ -3074,6 +3094,14 @@ tradução juramentada | certified translation`}
                       <option value="4">14pt</option>
                       <option value="5">18pt</option>
                       <option value="6">24pt</option>
+                    </select>
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="Georgia">
+                      <option value="Arial">Arial</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Times New Roman">Times</option>
+                      <option value="Courier New">Courier</option>
+                      <option value="Verdana">Verdana</option>
+                      <option value="Tahoma">Tahoma</option>
                     </select>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
