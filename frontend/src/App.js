@@ -81,20 +81,27 @@ const LoginPage = ({ onLogin, onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <div className="text-center mb-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-6">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4"
+            className="mx-auto mb-4 h-16"
           />
-          <h1 className="text-2xl font-bold text-gray-800">Partner Portal</h1>
-          <p className="text-gray-600">{isLogin ? 'Sign in to your account' : 'Create a new account'}</p>
+        </div>
+
+        {/* Title and Badge */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Business Portal (B2B)</h1>
+          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
+            Corporate Clients Only
+          </span>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -107,9 +114,10 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.company_name}
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                  placeholder="Your Company Inc."
                 />
               </div>
               <div>
@@ -117,31 +125,34 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.contact_name}
                   onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                  placeholder="John Smith"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Company Email</label>
             <input
               type="email"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
+              placeholder="you@company.com"
             />
           </div>
 
@@ -150,29 +161,71 @@ const LoginPage = ({ onLogin, onRegister }) => {
             <input
               type="password"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
+              placeholder="Enter your password"
             />
           </div>
+
+          {isLogin && (
+            <div className="text-right">
+              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
+                Forgot password?
+              </a>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
+            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
           >
-            {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading ? 'Please wait...' : (isLogin ? 'Access Business Portal' : 'Create Business Account')}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        {/* Business Account Benefits */}
+        {isLogin && (
+          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Business Account Benefits:</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>Monthly invoicing - Pay at end of month</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>Dedicated B2B support chat</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>Priority processing</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:underline"
+            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
           >
             {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
           </button>
         </div>
+
+        {/* Contact link for non-B2B clients */}
+        {isLogin && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">
+              Not a B2B client yet?{' '}
+              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
+                Contact us
+              </a>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
