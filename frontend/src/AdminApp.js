@@ -1156,7 +1156,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
   // Execute formatting command and maintain focus on contentEditable
   const execFormatCommand = (command, value = null) => {
     restoreSelection();
-    document.execCommand(command, false, value);
+
+    // Handle fontSize and fontName specially since execCommand doesn't work well for these
+    if (command === 'fontSize' || command === 'fontName') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+
+        if (command === 'fontSize') {
+          // Map values 1-7 to actual pt sizes
+          const sizeMap = { '1': '8pt', '2': '10pt', '3': '12pt', '4': '14pt', '5': '18pt', '6': '24pt', '7': '36pt' };
+          span.style.fontSize = sizeMap[value] || value;
+        } else if (command === 'fontName') {
+          span.style.fontFamily = value;
+        }
+
+        try {
+          span.appendChild(range.extractContents());
+          range.insertNode(span);
+          // Select the new span content
+          selection.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          selection.addRange(newRange);
+        } catch (e) {
+          console.error('Error applying format:', e);
+        }
+      }
+    } else {
+      document.execCommand(command, false, value);
+    }
+
     if (editableRef.current) {
       editableRef.current.focus();
     }
@@ -3021,13 +3052,24 @@ tradução juramentada | certified translation`}
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
+                      <option value="">Font</option>
+                      <option value="Times New Roman, serif">Times New Roman</option>
+                      <option value="Arial, sans-serif">Arial</option>
+                      <option value="Georgia, serif">Georgia</option>
+                      <option value="Verdana, sans-serif">Verdana</option>
+                      <option value="Courier New, monospace">Courier New</option>
+                      <option value="Garamond, serif">Garamond</option>
+                    </select>
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
+                      <option value="">Size</option>
                       <option value="1">8pt</option>
                       <option value="2">10pt</option>
                       <option value="3">12pt</option>
                       <option value="4">14pt</option>
                       <option value="5">18pt</option>
                       <option value="6">24pt</option>
+                      <option value="7">36pt</option>
                     </select>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
