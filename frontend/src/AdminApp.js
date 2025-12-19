@@ -142,6 +142,7 @@ const AdminLogin = ({ onLogin }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
     { id: 'projects', label: 'Projects', icon: '📋' },
+    { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
@@ -174,17 +175,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
           </button>
         ))}
 
-        {/* Translation Tool - External Link */}
-        <a
-          href="/admin/translation-tool"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700"
-        >
-          <span className="mr-2">✍️</span>
-          <span>Translation Tool</span>
-          <span className="ml-auto text-[10px]">↗</span>
-        </a>
       </nav>
 
       <div className="p-2 border-t border-slate-700">
@@ -3923,6 +3913,7 @@ function AdminApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'projects': return <ProjectsPage adminKey={adminKey} />;
+      case 'translation': return <TranslationWorkspace adminKey={adminKey} />;
       case 'translators': return <TranslatorsPage adminKey={adminKey} />;
       case 'settings': return <SettingsPage adminKey={adminKey} />;
       default: return <ProjectsPage adminKey={adminKey} />;
