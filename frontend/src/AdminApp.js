@@ -144,6 +144,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'projects', label: 'Projects', icon: '📋' },
     { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
+    { id: 'translation', label: 'Translation Tool', icon: '✍️' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 
@@ -204,7 +205,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 );
 
 // ==================== TRANSLATION WORKSPACE ====================
-const TranslationWorkspace = ({ adminKey }) => {
+const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
   // State
   const [activeSubTab, setActiveSubTab] = useState('resources');
   const [files, setFiles] = useState([]);
@@ -214,7 +215,7 @@ const TranslationWorkspace = ({ adminKey }) => {
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
 
-  // Config state
+  // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
   const [targetLanguage, setTargetLanguage] = useState('English');
   const [documentType, setDocumentType] = useState('Birth Certificate');
@@ -340,6 +341,37 @@ const TranslationWorkspace = ({ adminKey }) => {
     fetchAvailableOrders();
   }, []);
 
+  // Pre-fill from selectedOrder when coming from Projects
+  useEffect(() => {
+    if (selectedOrder) {
+      // Set order number
+      setOrderNumber(selectedOrder.order_number || '');
+
+      // Set languages from order
+      if (selectedOrder.translate_from) setSourceLanguage(selectedOrder.translate_from);
+      if (selectedOrder.translate_to) setTargetLanguage(selectedOrder.translate_to);
+
+      // Set translator if assigned
+      if (selectedOrder.assigned_translator) {
+        setSelectedTranslator(selectedOrder.assigned_translator);
+      }
+
+      // Set translation type
+      if (selectedOrder.translation_type) {
+        setTranslationType(selectedOrder.translation_type === 'certified' ? 'certified' : 'professional');
+      }
+
+      // Pre-select this order for sending
+      setSelectedOrderId(selectedOrder.id);
+
+      // Show status
+      setProcessingStatus(`📋 Working on order ${selectedOrder.order_number} - ${selectedOrder.client_name}`);
+
+      // Skip to cover/details tab
+      setActiveSubTab('cover');
+    }
+  }, [selectedOrder]);
+
   // Fetch resources from backend
   const fetchResources = async () => {
     try {
@@ -409,8 +441,16 @@ const TranslationWorkspace = ({ adminKey }) => {
       });
 
       if (response.data.status === 'success' || response.data.success) {
-        setProcessingStatus('✅ Translation sent to Projects! Ready for review.');
+        setProcessingStatus('✅ Translation sent to Projects! Returning to Projects...');
         setSelectedOrderId('');
+
+        // Navigate back to Projects after a short delay
+        if (onBack) {
+          setTimeout(() => {
+            onBack();
+          }, 1500);
+        }
+
         // Refresh orders list
         fetchAvailableOrders();
       } else {
@@ -1560,7 +1600,29 @@ ${includeOriginal ? originalPagesHTML : ''}
 
   return (
     <div className="p-4">
-      <h1 className="text-lg font-bold text-blue-600 mb-4">TRANSLATION WORKSPACE</h1>
+      {/* Header with order info and back button */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-4">
+          <h1 className="text-lg font-bold text-blue-600">TRANSLATION WORKSPACE</h1>
+          {selectedOrder && (
+            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 rounded-full border border-blue-200">
+              <span className="text-blue-600 text-xs font-medium">📋 {selectedOrder.order_number}</span>
+              <span className="text-gray-400">|</span>
+              <span className="text-gray-600 text-xs">{selectedOrder.client_name}</span>
+              <span className="text-gray-400">|</span>
+              <span className="text-xs text-gray-500">{selectedOrder.translate_from} → {selectedOrder.translate_to}</span>
+            </div>
+          )}
+        </div>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center"
+          >
+            <span className="mr-1">←</span> Back to Projects
+          </button>
+        )}
+      </div>
 
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
@@ -3549,11 +3611,12 @@ tradução juramentada | certified translation`}
 };
 
 // ==================== PROJECTS PAGE ====================
-const ProjectsPage = ({ adminKey }) => {
+const ProjectsPage = ({ adminKey, onTranslate }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
 
   useEffect(() => {
     fetchOrders();
@@ -3595,6 +3658,27 @@ const ProjectsPage = ({ adminKey }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
+    }
+  };
+
+  // Assign translator to order
+  const assignTranslator = async (orderId, translatorName) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        assigned_translator: translatorName,
+        translation_status: 'in_translation'
+      });
+      setAssigningTranslator(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+    }
+  };
+
+  // Start translation - navigate to Translation Tool with order
+  const startTranslation = (order) => {
+    if (onTranslate) {
+      onTranslate(order);
     }
   };
 
@@ -3662,7 +3746,7 @@ const ProjectsPage = ({ adminKey }) => {
             <tr>
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
-              <th className="px-2 py-2 text-left font-medium">Start</th>
+              <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
               <th className="px-2 py-2 text-left font-medium">Tags</th>
@@ -3680,7 +3764,32 @@ const ProjectsPage = ({ adminKey }) => {
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="px-2 py-2 font-medium text-blue-600">{order.order_number}</td>
                   <td className="px-2 py-2">{order.client_name}<span className="text-gray-400 text-[10px] block">{order.client_email}</span></td>
-                  <td className="px-2 py-2 text-gray-500">{created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                  <td className="px-2 py-2">
+                    {assigningTranslator === order.id ? (
+                      <select
+                        autoFocus
+                        className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        onChange={(e) => {
+                          if (e.target.value) assignTranslator(order.id, e.target.value);
+                        }}
+                        onBlur={() => setAssigningTranslator(null)}
+                      >
+                        <option value="">Select...</option>
+                        {TRANSLATORS.map(t => (
+                          <option key={t.name} value={t.name}>{t.name}</option>
+                        ))}
+                      </select>
+                    ) : order.assigned_translator ? (
+                      <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                    ) : (
+                      <button
+                        onClick={() => setAssigningTranslator(order.id)}
+                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                      >
+                        + Assign
+                      </button>
+                    )}
+                  </td>
                   <td className="px-2 py-2">{deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     {daysUntil > 0 && order.translation_status !== 'delivered' && <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>in {daysUntil}d</span>}
                   </td>
@@ -3690,6 +3799,16 @@ const ProjectsPage = ({ adminKey }) => {
                   <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>
                   <td className="px-2 py-1 text-center">
                     <div className="flex items-center justify-center space-x-1">
+                      {/* Translate button - show for received or in_translation */}
+                      {['received', 'in_translation'].includes(order.translation_status) && (
+                        <button
+                          onClick={() => startTranslation(order)}
+                          className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]"
+                          title="Open Translation Tool"
+                        >
+                          ✍️
+                        </button>
+                      )}
                       {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]">▶</button>}
                       {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]">👁</button>}
                       {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>}
@@ -3839,24 +3958,6 @@ const SettingsPage = ({ adminKey }) => {
           </div>
         </div>
 
-        {/* External Tools */}
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">External Tools</h2>
-          <div className="space-y-2 text-xs">
-            <a
-              href="/admin/translation-tool"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center">
-                <span className="mr-2">✍️</span>
-                <span>Translation Program</span>
-              </div>
-              <span className="text-orange-500 text-[10px] font-medium">Open ↗</span>
-            </a>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -3890,6 +3991,7 @@ const TranslationToolPage = ({ adminKey, onLogout }) => {
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
   const [activeTab, setActiveTab] = useState('projects');
+  const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
 
   // Get current path
   const isTranslationTool = window.location.pathname.includes('/admin/translation-tool');
@@ -3910,13 +4012,25 @@ function AdminApp() {
     window.location.href = '/admin';
   };
 
+  // Navigate to translation with order
+  const navigateToTranslation = (order) => {
+    setSelectedOrder(order);
+    setActiveTab('translation');
+  };
+
+  // Navigate back to projects
+  const navigateToProjects = () => {
+    setSelectedOrder(null);
+    setActiveTab('projects');
+  };
+
   const renderContent = () => {
     switch (activeTab) {
-      case 'projects': return <ProjectsPage adminKey={adminKey} />;
-      case 'translation': return <TranslationWorkspace adminKey={adminKey} />;
+      case 'projects': return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
+      case 'translation': return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} />;
       case 'translators': return <TranslatorsPage adminKey={adminKey} />;
       case 'settings': return <SettingsPage adminKey={adminKey} />;
-      default: return <ProjectsPage adminKey={adminKey} />;
+      default: return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
     }
   };
 
