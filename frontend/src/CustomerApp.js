@@ -181,7 +181,6 @@ const CustomerLoginPage = ({ onLogin }) => {
 const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
   const menuItems = [
     { id: 'new-order', label: 'New Order', icon: '➕' },
-    { id: 'saved-quotes', label: 'Saved Quotes', icon: '💾' },
     { id: 'orders', label: 'My Orders', icon: '📋' },
     { id: 'messages', label: 'Messages', icon: '✉️' }
   ];
@@ -227,8 +226,11 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
   );
 };
 
-// ==================== CUSTOMER NEW ORDER PAGE ====================
-const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) => {
+// ==================== CUSTOMER NEW ORDER PAGE (Step-based with Auto-save) ====================
+const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
+  const [step, setStep] = useState(1); // 1: Email, 2: Upload & Configure, 3: Review & Order
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestName, setGuestName] = useState('');
   const [formData, setFormData] = useState({
     service_type: 'standard',
     translate_from: 'portuguese',
@@ -242,16 +244,47 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [quote, setQuote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [savingQuote, setSavingQuote] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [abandonedQuoteId, setAbandonedQuoteId] = useState(null);
+  const [discountCode, setDiscountCode] = useState('');
+  const [appliedDiscount, setAppliedDiscount] = useState(null);
+  const [showExitPopup, setShowExitPopup] = useState(false);
+
+  // If logged in, skip email step
+  useEffect(() => {
+    if (customer) {
+      setGuestEmail(customer.email);
+      setGuestName(customer.full_name);
+      setStep(2);
+    }
+  }, [customer]);
 
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount]);
+
+  // Auto-save abandoned quote when user sees the price
+  useEffect(() => {
+    if (quote && guestEmail && uploadedFiles.length > 0 && !abandonedQuoteId) {
+      autoSaveAbandonedQuote();
+    }
+  }, [quote, guestEmail]);
+
+  // Exit intent detection
+  useEffect(() => {
+    const handleMouseLeave = (e) => {
+      if (e.clientY <= 0 && quote && !success && step >= 2) {
+        setShowExitPopup(true);
+      }
+    };
+
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, [quote, success, step]);
 
   const calculateQuote = () => {
     let basePrice = 0;
@@ -270,12 +303,64 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
       urgencyFee = basePrice * 1.0;
     }
 
+    let subtotal = basePrice + urgencyFee;
+    let discountAmount = 0;
+
+    if (appliedDiscount) {
+      if (appliedDiscount.type === 'percentage') {
+        discountAmount = subtotal * (appliedDiscount.value / 100);
+      } else {
+        discountAmount = appliedDiscount.value;
+      }
+    }
+
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
-      total_price: basePrice + urgencyFee,
+      discount: discountAmount,
+      total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
     });
+  };
+
+  const autoSaveAbandonedQuote = async () => {
+    try {
+      const quoteData = {
+        email: guestEmail,
+        name: guestName,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        word_count: wordCount,
+        urgency: formData.urgency,
+        total_price: quote?.total_price || 0,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        files_info: uploadedFiles.map(f => ({ fileName: f.fileName, wordCount: f.wordCount }))
+      };
+
+      const response = await axios.post(`${API}/abandoned-quotes/save`, quoteData);
+      setAbandonedQuoteId(response.data.quote_id);
+    } catch (err) {
+      console.error('Failed to auto-save quote:', err);
+    }
+  };
+
+  const applyDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${discountCode}`);
+      if (response.data.valid) {
+        setAppliedDiscount(response.data.discount);
+        setError('');
+      } else {
+        setError('Invalid or expired discount code');
+        setAppliedDiscount(null);
+      }
+    } catch (err) {
+      setError('Invalid or expired discount code');
+      setAppliedDiscount(null);
+    }
   };
 
   const [processingStatus, setProcessingStatus] = useState('');
@@ -298,7 +383,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
         const formDataUpload = new FormData();
         formDataUpload.append('file', file);
 
-        const response = await axios.post(`${API}/upload-document?token=${token}`, formDataUpload, {
+        const response = await axios.post(`${API}/upload-document`, formDataUpload, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 120000
         });
@@ -327,7 +412,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
       setIsProcessing(false);
       setProcessingStatus('');
     }
-  }, [token]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -340,34 +425,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
     multiple: true
   });
 
-  const handleSaveQuote = async () => {
-    if (wordCount === 0) {
-      setError('Please upload a document first');
-      return;
-    }
-
-    setSavingQuote(true);
-    setError('');
-
-    try {
-      const quoteData = {
-        ...formData,
-        word_count: wordCount,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        files_info: uploadedFiles.map(f => ({ fileName: f.fileName, wordCount: f.wordCount }))
-      };
-
-      const response = await axios.post(`${API}/customer/budgets/save?token=${token}`, quoteData);
-
-      setSuccess(`Quote saved successfully! Reference: ${response.data.budget.reference}`);
-
-      if (onSaveQuote) {
-        onSaveQuote(response.data.budget);
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save quote');
-    } finally {
-      setSavingQuote(false);
+  const handleEmailSubmit = (e) => {
+    e.preventDefault();
+    if (guestEmail && guestName) {
+      setStep(2);
     }
   };
 
@@ -384,15 +445,29 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
 
     try {
       const orderData = {
-        ...formData,
+        email: guestEmail,
+        name: guestName,
+        service_type: formData.service_type,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
         word_count: wordCount,
+        urgency: formData.urgency,
+        reference: formData.reference,
+        notes: formData.notes,
         document_filename: uploadedFiles[0]?.fileName || null,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        discount_code: appliedDiscount ? discountCode : null,
+        abandoned_quote_id: abandonedQuoteId
       };
 
-      const response = await axios.post(`${API}/customer/orders/create?token=${token}`, orderData);
+      let response;
+      if (token) {
+        response = await axios.post(`${API}/customer/orders/create?token=${token}`, orderData);
+      } else {
+        response = await axios.post(`${API}/guest/orders/create`, orderData);
+      }
 
-      setSuccess(`Order ${response.data.order.order_number} created successfully!`);
+      setSuccess(`Order ${response.data.order.order_number} created successfully! Check your email for confirmation.`);
 
       // Reset form
       setFormData({
@@ -406,6 +481,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
       setWordCount(0);
       setUploadedFiles([]);
       setQuote(null);
+      setAbandonedQuoteId(null);
+      setAppliedDiscount(null);
+      setDiscountCode('');
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -418,8 +496,94 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
     }
   };
 
+  // Step 1: Capture Email
+  if (step === 1) {
+    return (
+      <div className="p-8 max-w-xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-4">📧</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Get Your Free Quote</h1>
+            <p className="text-gray-600">Enter your details to receive an instant price quote</p>
+          </div>
+
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
+              <input
+                type="text"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="John Smith"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Email *</label>
+              <input
+                type="email"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">We'll send your quote and order updates here</p>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold"
+            >
+              Continue to Upload Document
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-sm text-gray-500">
+            Already have an account?{' '}
+            <a href="/customer" className="text-teal-600 hover:underline" onClick={() => window.location.reload()}>
+              Sign In
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8">
+      {/* Exit Intent Popup */}
+      {showExitPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center">
+            <div className="text-5xl mb-4">🎁</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Don't leave yet!</h2>
+            <p className="text-gray-600 mb-4">
+              We'll save your quote and send you a reminder with a special discount!
+            </p>
+            <div className="bg-teal-50 p-4 rounded-lg mb-4">
+              <p className="text-teal-800 font-semibold">Your quote has been saved</p>
+              <p className="text-sm text-teal-600">Check your email ({guestEmail}) for details</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExitPopup(false)}
+                className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
+              >
+                Continue with Order
+              </button>
+              <button
+                onClick={() => setShowExitPopup(false)}
+                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Translation</h1>
 
       {error && (
@@ -433,6 +597,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
         {/* Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
+
+            {/* Contact Info (read-only) */}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-sm text-gray-500">Sending quote to:</div>
+                  <div className="font-medium">{guestName} ({guestEmail})</div>
+                </div>
+                {!customer && (
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="text-sm text-teal-600 hover:underline"
+                  >
+                    Change
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Service Type */}
             <div>
@@ -593,47 +776,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
               </div>
             </div>
 
-            {/* Reference & Notes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
-                  value={formData.reference}
-                  onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder="PO number, project name..."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Special instructions..."
-                />
-              </div>
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
+              <textarea
+                className="w-full px-4 py-2 border border-gray-300 rounded-md"
+                rows="3"
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                placeholder="Any special instructions for our translators..."
+              />
             </div>
 
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleSaveQuote}
-                disabled={savingQuote || wordCount === 0}
-                className="flex-1 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 font-semibold"
-              >
-                {savingQuote ? 'Saving...' : '💾 Save Quote'}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || wordCount === 0}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
-              >
-                {submitting ? 'Creating Order...' : 'Create Order'}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={submitting || wordCount === 0}
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+            >
+              {submitting ? 'Creating Order...' : 'Place Order'}
+            </button>
           </form>
         </div>
 
@@ -664,6 +825,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
                   <span>${quote.urgency_fee.toFixed(2)}</span>
                 </div>
               )}
+              {quote?.discount > 0 && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount</span>
+                  <span>-${quote.discount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-3 mt-3">
@@ -673,165 +840,38 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, onSaveQuote }) 
               </div>
             </div>
 
+            {/* Discount Code */}
+            <div className="border-t pt-3 mt-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Discount Code</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                />
+                <button
+                  type="button"
+                  onClick={applyDiscountCode}
+                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
+                >
+                  Apply
+                </button>
+              </div>
+              {appliedDiscount && (
+                <p className="text-green-600 text-xs mt-1">
+                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% off` : `$${appliedDiscount.value} off`} applied!
+                </p>
+              )}
+            </div>
+
             <div className="text-xs text-gray-500 mt-4">
               * Payment required to start translation
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-};
-
-// ==================== SAVED QUOTES PAGE ====================
-const SavedQuotesPage = ({ token, onConvertToOrder }) => {
-  const [quotes, setQuotes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedQuote, setSelectedQuote] = useState(null);
-
-  useEffect(() => {
-    fetchQuotes();
-  }, []);
-
-  const fetchQuotes = async () => {
-    try {
-      const response = await axios.get(`${API}/customer/budgets?token=${token}`);
-      setQuotes(response.data.budgets || []);
-    } catch (err) {
-      console.error('Failed to fetch quotes:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (budgetId) => {
-    if (!window.confirm('Are you sure you want to delete this saved quote?')) return;
-
-    try {
-      await axios.delete(`${API}/customer/budgets/${budgetId}?token=${token}`);
-      setQuotes(quotes.filter(q => q.id !== budgetId));
-    } catch (err) {
-      console.error('Failed to delete quote:', err);
-    }
-  };
-
-  const handleConvertToOrder = async (budget) => {
-    try {
-      const response = await axios.post(`${API}/customer/budgets/${budget.id}/convert?token=${token}`);
-      if (onConvertToOrder) {
-        onConvertToOrder(response.data.order);
-      }
-      fetchQuotes();
-    } catch (err) {
-      console.error('Failed to convert quote to order:', err);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading saved quotes...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Saved Quotes</h1>
-
-      {quotes.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="text-4xl mb-4">💾</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No saved quotes</h2>
-          <p className="text-gray-600">Save a quote from the New Order page to see it here</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {quotes.map((quote) => (
-            <div key={quote.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div
-                className="p-6 cursor-pointer hover:bg-gray-50"
-                onClick={() => setSelectedQuote(selectedQuote === quote.id ? null : quote.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-teal-600">#{quote.reference}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        quote.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {quote.status || 'Active'}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {quote.translate_from} → {quote.translate_to}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {quote.word_count} words | {Math.ceil(quote.word_count / 250)} pages
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${quote.total_price?.toFixed(2)}</div>
-                    <div className="text-sm text-gray-500">
-                      Saved: {new Date(quote.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedQuote === quote.id && (
-                <div className="border-t bg-gray-50 p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <div className="text-sm text-gray-500">Service</div>
-                      <div className="font-medium">{quote.service_type === 'standard' ? 'Certified' : 'Professional'}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency</div>
-                      <div className="font-medium capitalize">{quote.urgency || 'Standard'}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${quote.base_price?.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${(quote.urgency_fee || 0).toFixed(2)}</div>
-                    </div>
-                  </div>
-
-                  {quote.files_info && quote.files_info.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-sm text-gray-500 mb-2">Documents:</div>
-                      {quote.files_info.map((file, i) => (
-                        <div key={i} className="text-sm text-gray-700">
-                          - {file.fileName} ({Math.ceil(file.wordCount / 250)} pages)
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleConvertToOrder(quote)}
-                      className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
-                    >
-                      Convert to Order
-                    </button>
-                    <button
-                      onClick={() => handleDelete(quote.id)}
-                      className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 };
@@ -1134,14 +1174,6 @@ function CustomerApp() {
             customer={customer}
             token={token}
             onOrderCreated={() => setActiveTab('orders')}
-            onSaveQuote={() => setActiveTab('saved-quotes')}
-          />
-        );
-      case 'saved-quotes':
-        return (
-          <SavedQuotesPage
-            token={token}
-            onConvertToOrder={() => setActiveTab('orders')}
           />
         );
       case 'orders':
@@ -1153,8 +1185,29 @@ function CustomerApp() {
     }
   };
 
+  // If not logged in, show the order page (which has step-based email capture)
   if (!customer) {
-    return <CustomerLoginPage onLogin={handleLogin} />;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200 px-8 py-4">
+          <div className="flex justify-between items-center max-w-6xl mx-auto">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="h-12"
+            />
+            <a
+              href="/customer"
+              onClick={(e) => { e.preventDefault(); window.location.reload(); }}
+              className="text-teal-600 hover:underline"
+            >
+              Sign In
+            </a>
+          </div>
+        </header>
+        <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} />
+      </div>
+    );
   }
 
   return (

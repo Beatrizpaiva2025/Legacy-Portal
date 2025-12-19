@@ -3518,6 +3518,452 @@ async def convert_partner_budget_to_order(budget_id: str, token: str, client_nam
         raise HTTPException(status_code=500, detail="Failed to convert budget")
 
 
+# ==================== ABANDONED QUOTES (Cart Abandonment Recovery) ====================
+
+class AbandonedQuote(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    total_price: float
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+    status: str = "abandoned"  # abandoned, recovered, expired
+    reminder_sent: int = 0  # Number of reminder emails sent
+    discount_code: Optional[str] = None  # Generated discount code for recovery
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_reminder_at: Optional[datetime] = None
+
+class AbandonedQuoteCreate(BaseModel):
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    total_price: float
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+
+@api_router.post("/abandoned-quotes/save")
+async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
+    """Auto-save an abandoned quote when customer sees the price"""
+    try:
+        # Check if there's already an abandoned quote for this email
+        existing = await db.abandoned_quotes.find_one({
+            "email": quote_data.email,
+            "status": "abandoned"
+        })
+
+        if existing:
+            # Update existing abandoned quote
+            await db.abandoned_quotes.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "service_type": quote_data.service_type,
+                    "translate_from": quote_data.translate_from,
+                    "translate_to": quote_data.translate_to,
+                    "word_count": quote_data.word_count,
+                    "urgency": quote_data.urgency,
+                    "total_price": quote_data.total_price,
+                    "document_ids": quote_data.document_ids,
+                    "files_info": quote_data.files_info,
+                    "created_at": datetime.utcnow()
+                }}
+            )
+            return {"status": "updated", "quote_id": existing["id"]}
+
+        # Create new abandoned quote
+        quote = AbandonedQuote(
+            email=quote_data.email,
+            name=quote_data.name,
+            service_type=quote_data.service_type,
+            translate_from=quote_data.translate_from,
+            translate_to=quote_data.translate_to,
+            word_count=quote_data.word_count,
+            urgency=quote_data.urgency,
+            total_price=quote_data.total_price,
+            document_ids=quote_data.document_ids,
+            files_info=quote_data.files_info
+        )
+
+        await db.abandoned_quotes.insert_one(quote.dict())
+
+        return {"status": "created", "quote_id": quote.id}
+
+    except Exception as e:
+        logger.error(f"Error saving abandoned quote: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save quote")
+
+@api_router.get("/admin/abandoned-quotes")
+async def get_abandoned_quotes(admin_key: str, status: Optional[str] = None):
+    """Get all abandoned quotes for admin dashboard"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if status:
+        query["status"] = status
+
+    quotes = await db.abandoned_quotes.find(query).sort("created_at", -1).to_list(500)
+
+    for quote in quotes:
+        if '_id' in quote:
+            del quote['_id']
+        if quote.get("created_at"):
+            quote["created_at"] = quote["created_at"].isoformat()
+        if quote.get("last_reminder_at"):
+            quote["last_reminder_at"] = quote["last_reminder_at"].isoformat()
+
+    return {"quotes": quotes}
+
+@api_router.post("/admin/abandoned-quotes/{quote_id}/send-reminder")
+async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_discount: bool = False, discount_percent: int = 10):
+    """Send reminder email for abandoned quote with optional discount"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        quote = await db.abandoned_quotes.find_one({"id": quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Abandoned quote not found")
+
+        discount_code = None
+        if include_discount:
+            # Generate unique discount code
+            discount_code = f"COMEBACK{discount_percent}-{str(uuid.uuid4())[:6].upper()}"
+
+            # Save discount code to database
+            await db.discount_codes.insert_one({
+                "id": str(uuid.uuid4()),
+                "code": discount_code,
+                "type": "percentage",
+                "value": discount_percent,
+                "max_uses": 1,
+                "uses": 0,
+                "abandoned_quote_id": quote_id,
+                "expires_at": datetime.utcnow() + timedelta(days=7),
+                "created_at": datetime.utcnow()
+            })
+
+            # Update abandoned quote with discount code
+            await db.abandoned_quotes.update_one(
+                {"id": quote_id},
+                {"$set": {"discount_code": discount_code}}
+            )
+
+        # Send reminder email
+        try:
+            reminder_number = quote.get("reminder_sent", 0) + 1
+            await email_service.send_abandoned_quote_reminder(
+                quote["email"],
+                quote["name"],
+                {
+                    "service_type": quote["service_type"],
+                    "translate_from": quote["translate_from"],
+                    "translate_to": quote["translate_to"],
+                    "word_count": quote["word_count"],
+                    "total_price": quote["total_price"],
+                    "files_info": quote.get("files_info", [])
+                },
+                discount_code=discount_code,
+                discount_percent=discount_percent if include_discount else 0,
+                reminder_number=reminder_number
+            )
+        except Exception as e:
+            logger.error(f"Failed to send reminder email: {str(e)}")
+            # Continue even if email fails
+
+        # Update quote reminder count
+        await db.abandoned_quotes.update_one(
+            {"id": quote_id},
+            {
+                "$set": {"last_reminder_at": datetime.utcnow()},
+                "$inc": {"reminder_sent": 1}
+            }
+        )
+
+        return {
+            "status": "success",
+            "message": "Reminder sent",
+            "discount_code": discount_code
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending reminder: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send reminder")
+
+# ==================== DISCOUNT CODES ====================
+
+class DiscountCode(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str
+    type: str  # 'percentage' or 'fixed'
+    value: float  # percentage (e.g., 10 for 10%) or fixed amount
+    max_uses: Optional[int] = None  # None means unlimited
+    uses: int = 0
+    abandoned_quote_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DiscountCodeCreate(BaseModel):
+    code: str
+    type: str = "percentage"
+    value: float
+    max_uses: Optional[int] = None
+    expires_in_days: Optional[int] = 30
+
+@api_router.get("/discount-codes/validate")
+async def validate_discount_code(code: str):
+    """Validate a discount code"""
+    try:
+        discount = await db.discount_codes.find_one({
+            "code": code.upper(),
+            "is_active": True
+        })
+
+        if not discount:
+            return {"valid": False, "message": "Invalid discount code"}
+
+        # Check if expired
+        if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+            return {"valid": False, "message": "Discount code has expired"}
+
+        # Check max uses
+        if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+            return {"valid": False, "message": "Discount code has reached maximum uses"}
+
+        return {
+            "valid": True,
+            "discount": {
+                "type": discount["type"],
+                "value": discount["value"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error validating discount code: {str(e)}")
+        return {"valid": False, "message": "Error validating code"}
+
+@api_router.post("/admin/discount-codes")
+async def create_discount_code(data: DiscountCodeCreate, admin_key: str):
+    """Create a new discount code"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check if code already exists
+        existing = await db.discount_codes.find_one({"code": data.code.upper()})
+        if existing:
+            raise HTTPException(status_code=400, detail="Discount code already exists")
+
+        expires_at = None
+        if data.expires_in_days:
+            expires_at = datetime.utcnow() + timedelta(days=data.expires_in_days)
+
+        discount = DiscountCode(
+            code=data.code.upper(),
+            type=data.type,
+            value=data.value,
+            max_uses=data.max_uses,
+            expires_at=expires_at
+        )
+
+        await db.discount_codes.insert_one(discount.dict())
+
+        return {"status": "success", "discount": discount.dict()}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating discount code: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create discount code")
+
+@api_router.get("/admin/discount-codes")
+async def get_discount_codes(admin_key: str):
+    """Get all discount codes"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    codes = await db.discount_codes.find().sort("created_at", -1).to_list(500)
+
+    for code in codes:
+        if '_id' in code:
+            del code['_id']
+        if code.get("created_at"):
+            code["created_at"] = code["created_at"].isoformat()
+        if code.get("expires_at"):
+            code["expires_at"] = code["expires_at"].isoformat()
+
+    return {"codes": codes}
+
+@api_router.delete("/admin/discount-codes/{code_id}")
+async def delete_discount_code(code_id: str, admin_key: str):
+    """Delete/deactivate a discount code"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.discount_codes.update_one(
+        {"id": code_id},
+        {"$set": {"is_active": False}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Discount code not found")
+
+    return {"status": "success"}
+
+# ==================== GUEST ORDERS (No authentication required) ====================
+
+class GuestOrderCreate(BaseModel):
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    document_filename: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+    discount_code: Optional[str] = None
+    abandoned_quote_id: Optional[str] = None
+
+@api_router.post("/guest/orders/create")
+async def create_guest_order(order_data: GuestOrderCreate):
+    """Create a new order without authentication (for website customers)"""
+    try:
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            order_data.word_count,
+            order_data.service_type,
+            order_data.urgency
+        )
+
+        # Apply discount if provided
+        discount_amount = 0
+        if order_data.discount_code:
+            discount = await db.discount_codes.find_one({
+                "code": order_data.discount_code.upper(),
+                "is_active": True
+            })
+
+            if discount:
+                # Check validity
+                valid = True
+                if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+                    valid = False
+                if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+                    valid = False
+
+                if valid:
+                    if discount["type"] == "percentage":
+                        discount_amount = total_price * (discount["value"] / 100)
+                    else:
+                        discount_amount = discount["value"]
+
+                    total_price = max(0, total_price - discount_amount)
+
+                    # Increment uses
+                    await db.discount_codes.update_one(
+                        {"code": order_data.discount_code.upper()},
+                        {"$inc": {"uses": 1}}
+                    )
+
+        # Calculate page count
+        page_count = max(1, math.ceil(order_data.word_count / 250))
+
+        # Set due date
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        # Create order
+        order = CustomerOrder(
+            customer_id="guest",
+            customer_name=order_data.name,
+            customer_email=order_data.email,
+            service_type=order_data.service_type,
+            translate_from=order_data.translate_from,
+            translate_to=order_data.translate_to,
+            word_count=order_data.word_count,
+            page_count=page_count,
+            urgency=order_data.urgency,
+            reference=order_data.reference,
+            notes=order_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            due_date=due_date,
+            document_filename=order_data.document_filename
+        )
+
+        await db.customer_orders.insert_one(order.dict())
+
+        # Associate uploaded documents
+        if order_data.document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": order_data.document_ids}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
+        # Mark abandoned quote as recovered
+        if order_data.abandoned_quote_id:
+            await db.abandoned_quotes.update_one(
+                {"id": order_data.abandoned_quote_id},
+                {"$set": {"status": "recovered"}}
+            )
+
+        # Send confirmation email
+        try:
+            order_details = {
+                "reference": order.order_number,
+                "service_type": order.service_type,
+                "translate_from": order.translate_from,
+                "translate_to": order.translate_to,
+                "word_count": order.word_count,
+                "urgency": order.urgency,
+                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "base_price": order.base_price,
+                "urgency_fee": order.urgency_fee,
+                "total_price": order.total_price
+            }
+
+            await email_service.send_order_confirmation_email(
+                order_data.email,
+                order_details,
+                is_partner=False
+            )
+
+            # Also notify company
+            await email_service.send_order_confirmation_email(
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False
+            )
+        except Exception as e:
+            logger.error(f"Failed to send order emails: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Order created successfully",
+            "order": order.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating guest order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
