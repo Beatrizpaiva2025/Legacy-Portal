@@ -1230,12 +1230,21 @@ const TranslationWorkspace = ({ adminKey }) => {
         </div>
     </div>`).join('');
 
-    // Original document pages
-    const originalPagesHTML = quickOriginalFiles.map((file, idx) => `
+    // Original document pages (handle PDFs separately)
+    const originalPagesHTML = quickOriginalFiles.map((file, idx) => {
+        const isPDF = file.filename?.toLowerCase().endsWith('.pdf') || file.data?.includes('application/pdf');
+        return `
     <div class="original-page">
         <div class="original-label">ORIGINAL DOCUMENT - Page ${idx + 1}</div>
-        <img src="${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />
-    </div>`).join('');
+        ${isPDF
+            ? `<div style="border: 2px dashed #ccc; padding: 40px; text-align: center; background: #f9f9f9;">
+                <p style="font-size: 14px; color: #666;">📄 <strong>${file.filename}</strong></p>
+                <p style="font-size: 12px; color: #888; margin-top: 10px;">PDF document attached separately</p>
+               </div>`
+            : `<img src="${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />`
+        }
+    </div>`;
+    }).join('');
 
     // Complete HTML
     const fullHTML = `<!DOCTYPE html>
@@ -1451,15 +1460,25 @@ ${includeOriginal ? originalPagesHTML : ''}
     `).join('');
 
     // Original documents pages HTML (each image on separate page, title only on first)
-    const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
+    // Note: PDFs cannot be displayed as images, so we show them as embedded objects or display a note
+    const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => {
+        const isPDF = img.filename?.toLowerCase().endsWith('.pdf') || img.data?.includes('application/pdf');
+        return `
     <div class="original-documents-page">
         ${includeLetterhead ? letterheadHTML : ''}
         ${index === 0 ? '<div class="page-title">Original Document</div>' : ''}
         <div class="original-image-container">
-            <img src="${img.data}" alt="${img.filename}" class="original-image" />
+            ${isPDF
+                ? `<div style="border: 2px dashed #ccc; padding: 40px; text-align: center; background: #f9f9f9;">
+                    <p style="font-size: 14px; color: #666;">📄 <strong>${img.filename}</strong></p>
+                    <p style="font-size: 12px; color: #888; margin-top: 10px;">PDF document attached separately</p>
+                    <p style="font-size: 10px; color: #aaa; margin-top: 5px;">(PDFs cannot be embedded in print view - original file preserved)</p>
+                   </div>`
+                : `<img src="${img.data}" alt="${img.filename}" class="original-image" />`
+            }
         </div>
-    </div>
-    `).join('') : '';
+    </div>`;
+    }).join('') : '';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="en">
@@ -2951,12 +2970,21 @@ tradução juramentada | certified translation`}
 
                 {/* Edit Toolbar - Only visible in edit mode */}
                 {reviewViewMode === 'edit' && (
-                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded flex-wrap">
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="3">
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="Times New Roman" title="Font Family">
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Arial">Arial</option>
+                      <option value="Helvetica">Helvetica</option>
+                      <option value="Verdana">Verdana</option>
+                      <option value="Courier New">Courier New</option>
+                      <option value="Garamond">Garamond</option>
+                    </select>
+                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="3" title="Font Size">
                       <option value="1">8pt</option>
                       <option value="2">10pt</option>
                       <option value="3">12pt</option>
@@ -2968,6 +2996,14 @@ tradução juramentada | certified translation`}
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => {
+                      e.preventDefault();
+                      const tableHtml = '<table border="1" style="border-collapse: collapse; width: 100%;"><tr><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td></tr><tr><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td></tr><tr><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td><td style="border: 1px solid #000; padding: 8px;">&nbsp;</td></tr></table>';
+                      restoreSelection();
+                      document.execCommand('insertHTML', false, tableHtml);
+                      if (editableRef.current) editableRef.current.focus();
+                    }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Insert Table">📊</button>
                   </div>
                 )}
               </div>

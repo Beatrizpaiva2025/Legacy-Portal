@@ -595,26 +595,132 @@ def get_estimated_delivery(urgency: str) -> str:
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text})"
 
+def extract_table_from_textract(blocks: list) -> str:
+    """Extract table data from Textract analyze_document response and format it"""
+    # Build a map of block IDs to blocks
+    block_map = {block['Id']: block for block in blocks}
+
+    tables_text = []
+
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            table_data = {}
+
+            # Get all cells in this table
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for cell_id in rel['Ids']:
+                            cell_block = block_map.get(cell_id)
+                            if cell_block and cell_block['BlockType'] == 'CELL':
+                                row_idx = cell_block.get('RowIndex', 1)
+                                col_idx = cell_block.get('ColumnIndex', 1)
+
+                                # Get cell text
+                                cell_text = ""
+                                if 'Relationships' in cell_block:
+                                    for cell_rel in cell_block['Relationships']:
+                                        if cell_rel['Type'] == 'CHILD':
+                                            for word_id in cell_rel['Ids']:
+                                                word_block = block_map.get(word_id)
+                                                if word_block and word_block['BlockType'] == 'WORD':
+                                                    cell_text += word_block.get('Text', '') + ' '
+
+                                if row_idx not in table_data:
+                                    table_data[row_idx] = {}
+                                table_data[row_idx][col_idx] = cell_text.strip()
+
+            # Convert table to formatted text
+            if table_data:
+                # Find max columns
+                max_cols = max(max(row.keys()) for row in table_data.values()) if table_data else 0
+
+                # Calculate column widths
+                col_widths = {}
+                for row_idx in sorted(table_data.keys()):
+                    for col_idx in range(1, max_cols + 1):
+                        text = table_data[row_idx].get(col_idx, '')
+                        col_widths[col_idx] = max(col_widths.get(col_idx, 0), len(text), 3)
+
+                # Build table string with borders
+                table_lines = []
+                separator = '+' + '+'.join('-' * (col_widths.get(i, 3) + 2) for i in range(1, max_cols + 1)) + '+'
+
+                for row_idx in sorted(table_data.keys()):
+                    if row_idx == 1:
+                        table_lines.append(separator)
+
+                    row_text = '|'
+                    for col_idx in range(1, max_cols + 1):
+                        cell_text = table_data[row_idx].get(col_idx, '')
+                        width = col_widths.get(col_idx, 3)
+                        row_text += f' {cell_text:<{width}} |'
+                    table_lines.append(row_text)
+                    table_lines.append(separator)
+
+                tables_text.append('\n'.join(table_lines))
+
+    return '\n\n'.join(tables_text)
+
+
 def extract_text_with_textract(content: bytes, file_extension: str) -> str:
-    """Extract text using AWS Textract (best quality OCR)"""
+    """Extract text using AWS Textract with table detection (best quality OCR)"""
     if not textract_client:
         return None
 
     try:
-        # For images, use detect_document_text directly
+        # For images, use analyze_document with TABLES feature
         if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff']:
-            response = textract_client.detect_document_text(
-                Document={'Bytes': content}
+            response = textract_client.analyze_document(
+                Document={'Bytes': content},
+                FeatureTypes=['TABLES', 'FORMS']
             )
 
-            # Extract text from response
-            text_parts = []
-            for block in response.get('Blocks', []):
-                if block['BlockType'] == 'LINE':
-                    text_parts.append(block['Text'])
+            blocks = response.get('Blocks', [])
 
-            text = '\n'.join(text_parts)
-            logger.info(f"AWS Textract extracted {len(text)} characters from image")
+            # Check if there are tables
+            has_tables = any(block['BlockType'] == 'TABLE' for block in blocks)
+
+            if has_tables:
+                # Extract tables with formatting
+                tables_text = extract_table_from_textract(blocks)
+
+                # Also get non-table text (lines not in tables)
+                table_cell_ids = set()
+                for block in blocks:
+                    if block['BlockType'] == 'TABLE' and 'Relationships' in block:
+                        for rel in block['Relationships']:
+                            if rel['Type'] == 'CHILD':
+                                table_cell_ids.update(rel['Ids'])
+
+                # Get lines that are not part of tables
+                text_parts = []
+                for block in blocks:
+                    if block['BlockType'] == 'LINE':
+                        # Check if this line's words are part of a table
+                        is_in_table = False
+                        if 'Relationships' in block:
+                            for rel in block['Relationships']:
+                                if rel['Type'] == 'CHILD':
+                                    for word_id in rel['Ids']:
+                                        if word_id in table_cell_ids:
+                                            is_in_table = True
+                                            break
+                        if not is_in_table:
+                            text_parts.append(block['Text'])
+
+                # Combine non-table text with formatted tables
+                non_table_text = '\n'.join(text_parts)
+                text = non_table_text + '\n\n' + tables_text if non_table_text else tables_text
+            else:
+                # No tables, just extract lines
+                text_parts = []
+                for block in blocks:
+                    if block['BlockType'] == 'LINE':
+                        text_parts.append(block['Text'])
+                text = '\n'.join(text_parts)
+
+            logger.info(f"AWS Textract (analyze_document) extracted {len(text)} characters from image, tables: {has_tables}")
             return text
 
         # For PDFs, convert pages to images first
@@ -648,21 +754,55 @@ def extract_text_with_textract(content: bytes, file_extension: str) -> str:
                         logger.warning(f"Page {page_num + 1} image too large ({len(img_data)} bytes), skipping")
                         continue
 
-                    # Send to Textract
-                    response = textract_client.detect_document_text(
-                        Document={'Bytes': img_data}
+                    # Send to Textract with table detection
+                    response = textract_client.analyze_document(
+                        Document={'Bytes': img_data},
+                        FeatureTypes=['TABLES', 'FORMS']
                     )
 
-                    # Extract text from response
-                    for block in response.get('Blocks', []):
-                        if block['BlockType'] == 'LINE':
-                            text += block['Text'] + '\n'
+                    blocks = response.get('Blocks', [])
 
-                    text += '\n'  # Page separator
+                    # Check if there are tables on this page
+                    has_tables = any(block['BlockType'] == 'TABLE' for block in blocks)
+
+                    if has_tables:
+                        # Extract tables with formatting
+                        tables_text = extract_table_from_textract(blocks)
+
+                        # Also get non-table text
+                        table_cell_ids = set()
+                        for block in blocks:
+                            if block['BlockType'] == 'TABLE' and 'Relationships' in block:
+                                for rel in block['Relationships']:
+                                    if rel['Type'] == 'CHILD':
+                                        table_cell_ids.update(rel['Ids'])
+
+                        # Get lines that are not part of tables
+                        for block in blocks:
+                            if block['BlockType'] == 'LINE':
+                                is_in_table = False
+                                if 'Relationships' in block:
+                                    for rel in block['Relationships']:
+                                        if rel['Type'] == 'CHILD':
+                                            for word_id in rel['Ids']:
+                                                if word_id in table_cell_ids:
+                                                    is_in_table = True
+                                                    break
+                                if not is_in_table:
+                                    text += block['Text'] + '\n'
+
+                        text += '\n' + tables_text + '\n'
+                    else:
+                        # No tables, just extract lines
+                        for block in blocks:
+                            if block['BlockType'] == 'LINE':
+                                text += block['Text'] + '\n'
+
+                    text += '\n--- Page Break ---\n\n'  # Page separator
 
                 num_pages = pdf_document.page_count
                 pdf_document.close()
-                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages)")
+                logger.info(f"AWS Textract (analyze_document) extracted {len(text)} characters from PDF ({num_pages} pages)")
                 return text
 
             except Exception as e:
