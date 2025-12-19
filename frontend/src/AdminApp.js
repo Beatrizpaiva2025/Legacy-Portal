@@ -1272,7 +1272,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages (SAME as handleDownload)
+    // Letterhead for all pages (SAME as handleDownload) with blue line
     const letterheadHTML = `
         <div class="header">
             <div class="logo-left">
@@ -1292,7 +1292,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
                   ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
-        </div>`;
+        </div>
+        <div class="header-line"></div>`;
 
     // Translation pages with letterhead (uploaded images)
     const translationPagesHTML = quickTranslationFiles.map((file, idx) => `
@@ -1380,6 +1381,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; }
+        .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
@@ -1543,7 +1545,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
         </div>
     </div>`;
 
-    // Letterhead for all pages
+    // Letterhead for all pages with blue line
     const letterheadHTML = `
         <div class="header">
             <div class="logo-left">
@@ -1563,7 +1565,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
                   ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
-        </div>`;
+        </div>
+        <div class="header-line"></div>`;
 
     // Translation pages HTML (with or without letterhead)
     const translationPagesHTML = translationResults.map((result, index) => `
@@ -1649,6 +1652,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
+        .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
