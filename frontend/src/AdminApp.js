@@ -242,7 +242,7 @@ const TranslationWorkspace = ({ adminKey }) => {
 
   // Workflow Mode: 'ai', 'external', or 'ocr'
   const [workflowMode, setWorkflowMode] = useState('ai');
-  const [translationType, setTranslationType] = useState('general'); // 'financial', 'education', 'general', 'personal'
+  const [documentCategory, setDocumentCategory] = useState('general'); // 'financial', 'education', 'general', 'personal'
   const [externalOriginalImages, setExternalOriginalImages] = useState([]); // Original document images
   const [externalTranslationText, setExternalTranslationText] = useState(''); // External translation text
   const [externalTranslationImages, setExternalTranslationImages] = useState([]); // External translation as images (if PDF)
@@ -1307,7 +1307,7 @@ ${includeOriginal ? originalPagesHTML : ''}
       name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString()}`,
       sourceLang: sourceLanguage,
       targetLang: targetLanguage,
-      field: typeLabels[translationType] || 'Geral',
+      field: typeLabels[documentCategory] || 'Geral',
       bidirectional: false,
       terms: translationResults.map((result, idx) => ({
         source: result.originalText || extractText(result.original || ''),
@@ -2371,26 +2371,26 @@ tradução juramentada | certified translation`}
             <label className="block text-xs font-medium text-purple-700 mb-2">📁 Tipo de Documento</label>
             <div className="grid grid-cols-4 gap-2">
               <button
-                onClick={() => setTranslationType('financial')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                onClick={() => setDocumentCategory('financial')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
                 📊 Financeiro
               </button>
               <button
-                onClick={() => setTranslationType('education')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                onClick={() => setDocumentCategory('education')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
                 🎓 Educação
               </button>
               <button
-                onClick={() => setTranslationType('general')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                onClick={() => setDocumentCategory('general')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
                 📄 Geral
               </button>
               <button
-                onClick={() => setTranslationType('personal')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${translationType === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                onClick={() => setDocumentCategory('personal')}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
                 👤 Docs Pessoais
               </button>
@@ -3432,7 +3432,7 @@ tradução juramentada | certified translation`}
                   <div>
                     <span className="font-medium">💾 Salvar na Translation Memory</span>
                     <p className="text-[10px] text-teal-600 mt-0.5">
-                      Categoria: {translationType === 'financial' ? '📊 Financeiro' : translationType === 'education' ? '🎓 Educação' : translationType === 'personal' ? '👤 Docs Pessoais' : '📄 Geral'}
+                      Categoria: {documentCategory === 'financial' ? '📊 Financeiro' : documentCategory === 'education' ? '🎓 Educação' : documentCategory === 'personal' ? '👤 Docs Pessoais' : '📄 Geral'}
                     </p>
                   </div>
                 </label>
