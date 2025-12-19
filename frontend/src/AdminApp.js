@@ -302,8 +302,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
   // Approval checkboxes state
   const [approvalChecks, setApprovalChecks] = useState({
     projectNumber: false,
-    languageChanged: false,
-    proofread: false
+    languageCorrect: false,
+    proofread: false,
+    namesAccurate: false,
+    formattingPreserved: false,
+    translatorNotes: false,
+    readyForDelivery: false
   });
   const [saveToTM, setSaveToTM] = useState(true); // Save to Translation Memory on approval
 
@@ -1188,15 +1192,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
     setQuickOriginalFiles(prev => [...prev, ...processedFiles]);
   };
 
-  // Quick Package Download - generates complete certified translation package
+  // Quick Package Download - generates complete certified translation package (same layout as normal flow)
   const handleQuickPackageDownload = () => {
     const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
-    const certTitle = 'Certification of Translation Accuracy';
+    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML (same as in handleDownload)
+    // Cover Letter HTML (SAME as handleDownload)
     const coverLetterHTML = `
+    <!-- COVER LETTER PAGE -->
     <div class="cover-page">
+        <!-- HEADER WITH LOGOS -->
         <div class="header">
             <div class="logo-left">
                 ${logoLeft
@@ -1216,12 +1222,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
         </div>
+
         <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
             <strong>${targetLanguage}</strong>
         </div>
+
         <p class="body-text">
             We, Legacy Translations, a professional translation services company and ATA
             Member (#275993), having no relation to the client, hereby certify that the
@@ -1231,84 +1239,163 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
         </p>
         <p class="body-text">
             This is to certify the correctness of the translation only. We do not guarantee
-            or verify the contents or the authenticity of the original document.
+            that the original is a genuine document, or that the statements contained in the
+            original document are true. Further, Legacy Translations assumes no liability for
+            the way in which the translation is used by the customer or any third party,
+            including end-users of the translation.
         </p>
         <p class="body-text">
-            We hereby affirm that ${translator?.name || 'Beatriz Paiva'} is competent to translate from <strong>${sourceLanguage}</strong>
-            to <strong>${targetLanguage}</strong> and that the translation is accurate and complete.
+            A copy of the translation, and original files presented, are attached to this
+            certification.
         </p>
-        <div class="signature-section">
-            <div class="signature-line">
+
+        <div class="footer-section">
+            <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" style="max-height: 40px; max-width: 180px; object-fit: contain;" />`
-                  : `<span style="font-family: 'Rage Italic', 'Brush Script MT', cursive; font-size: 20px;">Beatriz Paiva</span>`}
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
+                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-date">Dated: ${translationDate}</div>
             </div>
-            <div class="signature-label">Authorized Representative</div>
-            ${logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="max-width: 80px; max-height: 80px; margin-top: 10px;" />` : ''}
+            <div class="stamp-container">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
+                  : `<div class="stamp">
+                    <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+                    <div class="stamp-center">
+                        <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                        <div class="stamp-ata">ATA # 275993</div>
+                    </div>
+                </div>`}
+            </div>
         </div>
-        <div class="date-line">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
     </div>`;
 
-    // Translation pages with letterhead
+    // Letterhead for all pages (SAME as handleDownload)
+    const letterheadHTML = `
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
+            </div>
+        </div>`;
+
+    // Translation pages with letterhead (uploaded images)
     const translationPagesHTML = quickTranslationFiles.map((file, idx) => `
     <div class="translation-page">
-        ${includeLetterhead ? `
-        <div class="letterhead">
-            <div class="letterhead-logo">
-                ${logoLeft ? `<img src="${logoLeft}" style="max-height: 30px;" />` : 'LEGACY TRANSLATIONS'}
-            </div>
-            <div class="letterhead-info">
-                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116 | (857) 316-7770
-            </div>
-        </div>` : ''}
+        ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">
-            <img src="${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; height: auto;" />
+            <img src="${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
         </div>
     </div>`).join('');
 
-    // Original document pages
-    const originalPagesHTML = quickOriginalFiles.map((file, idx) => `
-    <div class="original-page">
-        <div class="original-label">ORIGINAL DOCUMENT - Page ${idx + 1}</div>
-        <img src="${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />
-    </div>`).join('');
+    // Original document pages (SAME structure as handleDownload)
+    const originalPagesHTML = (includeOriginal && quickOriginalFiles.length > 0) ? quickOriginalFiles.map((file, idx) => `
+    <div class="original-documents-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+            <img src="${file.data}" alt="Original page ${idx + 1}" class="original-image" />
+        </div>
+    </div>`).join('') : '';
 
-    // Complete HTML
+    // Complete HTML with SAME styles as handleDownload
     const fullHTML = `<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8">
-<title>Certified Translation - ${orderNumber || 'Document'}</title>
-<style>
-    @page { size: ${pageSizeCSS}; margin: 0.5in; }
-    body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.4; margin: 0; padding: 20px; }
-    .cover-page { page-break-after: always; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-    .logo-left img, .logo-right img { max-height: 50px; }
-    .header-center { text-align: center; flex: 1; }
-    .company-name { font-size: 16pt; font-weight: bold; color: #1a365d; }
-    .company-address { font-size: 9pt; color: #666; margin-top: 3px; }
-    .order-number { text-align: right; font-size: 10pt; margin: 15px 0; }
-    .main-title { text-align: center; font-size: 16pt; font-weight: bold; margin: 25px 0 15px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
-    .subtitle { text-align: center; font-size: 12pt; margin-bottom: 25px; }
-    .body-text { text-align: justify; margin-bottom: 15px; text-indent: 30px; }
-    .signature-section { margin-top: 40px; text-align: center; }
-    .signature-line { margin-bottom: 5px; min-height: 40px; }
-    .signature-label { font-size: 10pt; }
-    .date-line { margin-top: 20px; text-align: center; }
-    .translation-page { page-break-before: always; }
-    .letterhead { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 8px; margin-bottom: 15px; font-size: 9pt; color: #666; }
-    .translation-content { text-align: center; }
-    .translation-content img { max-width: 100%; border: 1px solid #eee; }
-    .original-page { page-break-before: always; }
-    .original-label { background: #f0f0f0; padding: 8px; text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 10pt; }
-    .original-page img { max-width: 100%; border: 1px solid #ddd; }
-    @media print { body { padding: 0; } }
-</style>
-</head><body>
-${includeCover ? coverLetterHTML : ''}
-${translationPagesHTML}
-${includeOriginal ? originalPagesHTML : ''}
-</body></html>`;
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${certTitle} - ${orderNumber || 'Document'}</title>
+    <style>
+        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            padding: 40px 50px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left img { max-width: 100%; max-height: 100%; }
+        .logo-placeholder {
+            width: 120px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #999; background: #fafafa;
+        }
+        .header-center { text-align: center; flex: 1; padding: 0 20px; }
+        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
+        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .logo-right img { max-width: 100%; max-height: 100%; }
+        .logo-placeholder-right {
+            width: 80px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
+        }
+        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
+        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
+        .body-text:last-of-type { margin-bottom: 50px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+        .signature-block { line-height: 1.4; }
+        .signature-name { font-weight: bold; font-size: 14px; }
+        .signature-title { font-weight: bold; font-size: 13px; }
+        .signature-date { font-size: 13px; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
+        .stamp {
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
+        }
+        .stamp::before {
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
+        }
+        .stamp-text-top {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
+        .cover-page { page-break-after: always; }
+        .translation-page { page-break-before: always; padding-top: 20px; }
+        .translation-content { text-align: center; }
+        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .original-documents-page { page-break-before: always; padding-top: 20px; }
+        .original-image-container { text-align: center; margin-bottom: 15px; }
+        .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
+        @media print { body { padding: 0; } }
+    </style>
+</head>
+<body>
+    ${includeCover ? coverLetterHTML : ''}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
+</body>
+</html>`;
 
     // Open in new window for printing
     const printWindow = window.open('', '_blank');
@@ -3141,7 +3228,7 @@ tradução juramentada | certified translation`}
                   className="sr-only"
                 />
                 <span className="mr-2">📝</span>
-                <span className="text-sm font-medium">Fluxo Normal</span>
+                <span className="text-sm font-medium">Normal Flow</span>
               </label>
               <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
@@ -3311,7 +3398,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeCover(e.target.checked)}
                       className="mr-3 w-4 h-4"
                     />
-                    <span>Incluir Certificate of Accuracy</span>
+                    <span>Include Certificate of Accuracy</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3371,9 +3458,9 @@ tradução juramentada | certified translation`}
           {/* ============ NORMAL FLOW ============ */}
           {!quickPackageMode && translationResults.length > 0 && (
             <>
-              {/* Approval Checklist */}
+              {/* Translation Approval Checklist */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Approval Checklist</h3>
+                <h3 className="text-sm font-bold text-purple-700 mb-3">📋 Translation Approval Checklist</h3>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3382,16 +3469,16 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">Did you add the project number?</span>
+                    <span className="font-medium">Did you include the correct project number?</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={approvalChecks.languageChanged}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, languageChanged: e.target.checked})}
+                      checked={approvalChecks.languageCorrect}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">Mudou o idioma?</span>
+                    <span className="font-medium">Is the source and target language correct?</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3400,7 +3487,43 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">Fez o proofreading do documento?</span>
+                    <span className="font-medium">Did you proofread the entire document carefully?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.namesAccurate}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, namesAccurate: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Are names, dates, numbers, and addresses accurate and consistent with the source document?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.formattingPreserved}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, formattingPreserved: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Were formatting, layout, and page order preserved when applicable?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.translatorNotes}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, translatorNotes: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">If applicable, did you include the correct translator's notes or annotations?</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.readyForDelivery}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, readyForDelivery: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Is the document ready for certification and final delivery?</span>
                   </label>
                 </div>
               </div>
@@ -3417,7 +3540,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeCover(!e.target.checked)}
                       className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                     />
-                    <span className="font-medium">Excluir Certificate of Accuracy</span>
+                    <span className="font-medium">Exclude Certificate of Accuracy</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3426,7 +3549,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeLetterhead(!e.target.checked)}
                       className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                     />
-                    <span className="font-medium">Excluir Letterhead</span>
+                    <span className="font-medium">Exclude Letterhead</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3435,7 +3558,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeOriginal(!e.target.checked)}
                       className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                     />
-                    <span className="font-medium">Excluir Original Document</span>
+                    <span className="font-medium">Exclude Original Document</span>
                   </label>
                 </div>
               </div>
