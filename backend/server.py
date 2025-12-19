@@ -412,6 +412,48 @@ class PartnerResponse(BaseModel):
     phone: Optional[str] = None
     token: str
 
+# Admin User Models (with roles: admin, pm, translator)
+class AdminUser(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    password_hash: str
+    name: str
+    role: str  # 'admin', 'pm', 'translator'
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    # For translators: track pages translated
+    pages_translated: int = 0
+    pages_pending_payment: int = 0
+    # For PM: list of project IDs they manage
+    assigned_projects: List[str] = []
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str  # 'admin', 'pm', 'translator'
+
+class AdminUserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+    token: str
+    pages_translated: Optional[int] = 0
+    pages_pending_payment: Optional[int] = 0
+
+class AdminUserPublic(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -491,6 +533,7 @@ def generate_token() -> str:
 
 # In-memory token storage (in production, use Redis or database)
 active_tokens: Dict[str, str] = {}  # token -> partner_id
+active_admin_tokens: Dict[str, dict] = {}  # token -> {user_id, role}
 
 async def get_current_partner(token: str = None) -> Optional[dict]:
     """Get current partner from token"""
@@ -499,6 +542,28 @@ async def get_current_partner(token: str = None) -> Optional[dict]:
     partner_id = active_tokens[token]
     partner = await db.partners.find_one({"id": partner_id})
     return partner
+
+async def get_current_admin_user(token: str = None) -> Optional[dict]:
+    """Get current admin user from token"""
+    if not token or token not in active_admin_tokens:
+        return None
+    user_info = active_admin_tokens[token]
+    user = await db.admin_users.find_one({"id": user_info["user_id"]})
+    return user
+
+def require_admin_role(allowed_roles: List[str]):
+    """Decorator helper to check if user has required role"""
+    async def check_role(token: str) -> dict:
+        if not token or token not in active_admin_tokens:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_info = active_admin_tokens[token]
+        if user_info["role"] not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        user = await db.admin_users.find_one({"id": user_info["user_id"]})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    return check_role
 
 # Utility functions
 def count_words(text: str) -> int:
@@ -1403,6 +1468,164 @@ async def get_current_partner_info(token: str):
         "contact_name": partner["contact_name"],
         "phone": partner.get("phone")
     }
+
+# ==================== ADMIN USER AUTHENTICATION ====================
+
+@api_router.post("/admin/auth/register")
+async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
+    """Register a new admin user (only admin can create users)"""
+    # Verify admin key for initial setup, or verify caller is admin
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Validate role
+    if user_data.role not in ['admin', 'pm', 'translator']:
+        raise HTTPException(status_code=400, detail="Invalid role. Must be: admin, pm, or translator")
+
+    try:
+        # Check if email already exists
+        existing = await db.admin_users.find_one({"email": user_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create user
+        user = AdminUser(
+            email=user_data.email,
+            password_hash=hash_password(user_data.password),
+            name=user_data.name,
+            role=user_data.role
+        )
+
+        await db.admin_users.insert_one(user.dict())
+        logger.info(f"Admin user created: {user.email} with role {user.role}")
+
+        return {"status": "success", "message": f"User {user.name} created with role {user.role}", "user_id": user.id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating admin user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+@api_router.post("/admin/auth/login")
+async def login_admin_user(login_data: AdminUserLogin):
+    """Login admin user and return token with role"""
+    try:
+        # Find user by email
+        user = await db.admin_users.find_one({"email": login_data.email})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Verify password
+        if not verify_password(login_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if active
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+
+        # Generate token
+        token = generate_token()
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+
+        return AdminUserResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            is_active=user.get("is_active", True),
+            token=token,
+            pages_translated=user.get("pages_translated", 0),
+            pages_pending_payment=user.get("pages_pending_payment", 0)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in admin user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to login")
+
+@api_router.post("/admin/auth/logout")
+async def logout_admin_user(token: str):
+    """Logout admin user"""
+    if token in active_admin_tokens:
+        del active_admin_tokens[token]
+    return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.get("/admin/auth/me")
+async def get_current_admin_user_info(token: str):
+    """Get current admin user info from token"""
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "is_active": user.get("is_active", True),
+        "pages_translated": user.get("pages_translated", 0),
+        "pages_pending_payment": user.get("pages_pending_payment", 0)
+    }
+
+@api_router.get("/admin/users")
+async def list_admin_users(token: str, admin_key: str):
+    """List all admin users (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find().to_list(100)
+        return [AdminUserPublic(
+            id=u["id"],
+            email=u["email"],
+            name=u["name"],
+            role=u["role"],
+            is_active=u.get("is_active", True)
+        ) for u in users]
+    except Exception as e:
+        logger.error(f"Error listing admin users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list users")
+
+@api_router.put("/admin/users/{user_id}/toggle-active")
+async def toggle_admin_user_active(user_id: str, admin_key: str):
+    """Toggle admin user active status (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        user = await db.admin_users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        new_status = not user.get("is_active", True)
+        await db.admin_users.update_one({"id": user_id}, {"$set": {"is_active": new_status}})
+
+        return {"status": "success", "is_active": new_status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling user status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_admin_user(user_id: str, admin_key: str):
+    """Delete admin user (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.admin_users.delete_one({"id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {"status": "success", "message": "User deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 # ==================== TRANSLATION ORDERS ====================
 

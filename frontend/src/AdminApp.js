@@ -70,9 +70,12 @@ const TRANSLATORS = [
 
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
-  const [adminKey, setAdminKey] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
+  const [adminKey, setAdminKey] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,12 +83,28 @@ const AdminLogin = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      if (response.data) {
-        onLogin(adminKey);
+      if (useAdminKey) {
+        // Legacy admin key login (for backward compatibility)
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        if (response.data) {
+          onLogin({ adminKey, role: 'admin', name: 'Admin', email: 'admin@legacy.com' });
+        }
+      } else {
+        // New user-based login
+        const response = await axios.post(`${API}/admin/auth/login`, { email, password });
+        if (response.data && response.data.token) {
+          onLogin({
+            adminKey: response.data.token,
+            token: response.data.token,
+            role: response.data.role,
+            name: response.data.name,
+            email: response.data.email,
+            id: response.data.id
+          });
+        }
       }
     } catch (err) {
-      setError('Invalid admin key');
+      setError(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -109,29 +128,64 @@ const AdminLogin = ({ onLogin }) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
-            <input
-              type="password"
-              required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              value={adminKey}
-              onChange={(e) => setAdminKey(e.target.value)}
-              placeholder="Enter admin key..."
-            />
-          </div>
+          {useAdminKey ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
+              <input
+                type="password"
+                required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                value={adminKey}
+                onChange={(e) => setAdminKey(e.target.value)}
+                placeholder="Enter admin key..."
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
           >
-            {loading ? 'Verifying...' : 'Access'}
+            {loading ? 'Verifying...' : 'Login'}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
+        <div className="mt-4 text-center space-y-2">
+          <button
+            onClick={() => setUseAdminKey(!useAdminKey)}
+            className="text-gray-500 hover:text-teal-600 text-xs"
+          >
+            {useAdminKey ? '← Login with email' : 'Use admin key instead'}
+          </button>
+          <div>
+            <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
+          </div>
         </div>
       </div>
     </div>
@@ -139,13 +193,28 @@ const AdminLogin = ({ onLogin }) => {
 };
 
 // ==================== COMPACT SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
-  const menuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋' },
-    { id: 'translation', label: 'Translation', icon: '✍️' },
-    { id: 'translators', label: 'Translators', icon: '👥' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' }
+const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
+  // Define menu items with role-based access
+  const allMenuItems = [
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
+    { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'translators', label: 'Translators', icon: '👥', roles: ['admin'] },
+    { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
+    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
+
+  // Filter menu items based on user role
+  const userRole = user?.role || 'admin';
+  const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
+
+  // Role display names and colors
+  const roleConfig = {
+    admin: { label: 'Administrator', color: 'bg-red-500' },
+    pm: { label: 'Project Manager', color: 'bg-blue-500' },
+    translator: { label: 'Translator', color: 'bg-green-500' }
+  };
+
+  const roleInfo = roleConfig[userRole] || roleConfig.admin;
 
   return (
     <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
@@ -157,6 +226,15 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <div className="text-[10px] text-slate-400">Management</div>
           </div>
         </div>
+        {/* User info */}
+        {user && (
+          <div className="mt-3 pt-2 border-t border-slate-700">
+            <div className="text-xs font-medium text-white truncate">{user.name}</div>
+            <div className={`inline-block mt-1 px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
+              {roleInfo.label}
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 py-2">
@@ -4109,9 +4187,186 @@ const TranslationToolPage = ({ adminKey, onLogout }) => {
   );
 };
 
+// ==================== USERS MANAGEMENT PAGE ====================
+const UsersPage = ({ adminKey }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator' });
+  const [creating, setCreating] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
+      setUsers(response.data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchUsers(); }, [adminKey]);
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, newUser);
+      setNewUser({ name: '', email: '', password: '', role: 'translator' });
+      setShowCreateForm(false);
+      fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error creating user');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggleActive = async (userId) => {
+    try {
+      await axios.put(`${API}/admin/users/${userId}/toggle-active?admin_key=${adminKey}`);
+      fetchUsers();
+    } catch (err) {
+      alert('Error toggling user status');
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Delete user "${userName}"?`)) return;
+    try {
+      await axios.delete(`${API}/admin/users/${userId}?admin_key=${adminKey}`);
+      fetchUsers();
+    } catch (err) {
+      alert('Error deleting user');
+    }
+  };
+
+  const roleColors = {
+    admin: 'bg-red-100 text-red-800',
+    pm: 'bg-blue-100 text-blue-800',
+    translator: 'bg-green-100 text-green-800'
+  };
+
+  if (loading) return <div className="p-6 text-center">Loading users...</div>;
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">👤 User Management</h1>
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
+        >
+          + Create User
+        </button>
+      </div>
+
+      {/* Create User Form */}
+      {showCreateForm && (
+        <div className="bg-white p-4 rounded-lg shadow mb-6">
+          <h3 className="font-bold text-sm mb-3">Create New User</h3>
+          <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Name"
+              value={newUser.name}
+              onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={newUser.email}
+              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <select
+              value={newUser.role}
+              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+              className="px-3 py-2 text-sm border rounded"
+            >
+              <option value="translator">Translator</option>
+              <option value="pm">Project Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+            <div className="col-span-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-600 text-sm">Cancel</button>
+              <button type="submit" disabled={creating} className="px-4 py-2 bg-teal-600 text-white rounded text-sm disabled:bg-gray-400">
+                {creating ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Users Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium">{user.name}</td>
+                <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[user.role]}`}>
+                    {user.role.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded text-xs ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 space-x-2">
+                  <button
+                    onClick={() => handleToggleActive(user.id)}
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    {user.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user.id, user.name)}
+                    className="text-red-600 hover:text-red-800 text-xs"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {users.length === 0 && (
+          <div className="p-6 text-center text-gray-500">No users found. Create your first user above.</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
+  const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
 
@@ -4120,17 +4375,51 @@ function AdminApp() {
 
   useEffect(() => {
     const savedKey = localStorage.getItem('admin_key');
-    if (savedKey) setAdminKey(savedKey);
+    const savedUser = localStorage.getItem('admin_user');
+    if (savedKey) {
+      setAdminKey(savedKey);
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          // Set default tab based on role
+          if (parsedUser.role === 'translator') {
+            setActiveTab('translation');
+          }
+        } catch (e) {
+          console.error('Error parsing saved user:', e);
+        }
+      }
+    }
   }, []);
 
-  const handleLogin = (key) => {
+  const handleLogin = (userData) => {
+    // userData can be: { adminKey, role, name, email, id, token }
+    const key = userData.adminKey || userData.token;
     setAdminKey(key);
+    setUser(userData);
     localStorage.setItem('admin_key', key);
+    localStorage.setItem('admin_user', JSON.stringify(userData));
+
+    // Set default tab based on role
+    if (userData.role === 'translator') {
+      setActiveTab('translation');
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Try to logout from server if we have a token
+    if (user?.token) {
+      try {
+        await axios.post(`${API}/admin/auth/logout?token=${user.token}`);
+      } catch (e) {
+        // Ignore logout errors
+      }
+    }
     setAdminKey(null);
+    setUser(null);
     localStorage.removeItem('admin_key');
+    localStorage.removeItem('admin_user');
     window.location.href = '/admin';
   };
 
@@ -4147,12 +4436,31 @@ function AdminApp() {
   };
 
   const renderContent = () => {
+    const userRole = user?.role || 'admin';
+
     switch (activeTab) {
-      case 'projects': return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
-      case 'translation': return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} />;
-      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
-      case 'settings': return <SettingsPage adminKey={adminKey} />;
-      default: return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
+      case 'projects':
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'translation':
+        return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+      case 'translators':
+        return userRole === 'admin'
+          ? <TranslatorsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'users':
+        return userRole === 'admin'
+          ? <UsersPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'settings':
+        return userRole === 'admin'
+          ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      default:
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
     }
   };
 
@@ -4165,7 +4473,7 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );
