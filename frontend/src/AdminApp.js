@@ -3811,16 +3811,55 @@ tradução juramentada | certified translation`}
 };
 
 // ==================== PROJECTS PAGE ====================
-const ProjectsPage = ({ adminKey, onTranslate }) => {
+const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
 
+  // New Project Form
+  const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [pmList, setPmList] = useState([]);
+  const [translatorList, setTranslatorList] = useState([]);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [newProject, setNewProject] = useState({
+    client_name: '',
+    client_email: '',
+    translate_from: 'Portuguese',
+    translate_to: 'English',
+    service_type: 'standard',
+    page_count: 1,
+    word_count: 0,
+    urgency: 'no',
+    notes: '',
+    internal_notes: '',
+    assigned_pm_id: '',
+    assigned_translator_id: '',
+    deadline: '',
+    base_price: 0,
+    total_price: 0
+  });
+
+  const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
+
   useEffect(() => {
     fetchOrders();
+    fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const [pmRes, transRes] = await Promise.all([
+        axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`)
+      ]);
+      setPmList(pmRes.data || []);
+      setTranslatorList(transRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -3882,6 +3921,38 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
     }
   };
 
+  // Create new project manually
+  const createProject = async (e) => {
+    e.preventDefault();
+    setCreatingProject(true);
+    try {
+      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, newProject);
+      setShowNewProjectForm(false);
+      setNewProject({
+        client_name: '',
+        client_email: '',
+        translate_from: 'Portuguese',
+        translate_to: 'English',
+        service_type: 'standard',
+        page_count: 1,
+        word_count: 0,
+        urgency: 'no',
+        notes: '',
+        internal_notes: '',
+        assigned_pm_id: '',
+        assigned_translator_id: '',
+        deadline: '',
+        base_price: 0,
+        total_price: 0
+      });
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error creating project');
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   const filtered = orders.filter(o => {
     const matchSearch =
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -3928,6 +3999,12 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
           <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
+          <button
+            onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+            className="px-3 py-1 bg-teal-600 text-white text-xs rounded hover:bg-teal-700"
+          >
+            + New Project
+          </button>
           <div className="flex space-x-1">
             {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
@@ -3939,6 +4016,171 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
         </div>
         <SearchBar value={search} onChange={setSearch} />
       </div>
+
+      {/* New Project Form */}
+      {showNewProjectForm && (
+        <div className="bg-white rounded-lg shadow mb-4 p-4">
+          <h3 className="text-sm font-bold text-gray-800 mb-3">📝 Create New Project</h3>
+          <form onSubmit={createProject}>
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              {/* Client Info */}
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
+                <input
+                  type="text"
+                  value={newProject.client_name}
+                  onChange={(e) => setNewProject({...newProject, client_name: e.target.value})}
+                  required
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Email *</label>
+                <input
+                  type="email"
+                  value={newProject.client_email}
+                  onChange={(e) => setNewProject({...newProject, client_email: e.target.value})}
+                  required
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="client@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">From Language *</label>
+                <select
+                  value={newProject.translate_from}
+                  onChange={(e) => setNewProject({...newProject, translate_from: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">To Language *</label>
+                <select
+                  value={newProject.translate_to}
+                  onChange={(e) => setNewProject({...newProject, translate_to: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
+                <select
+                  value={newProject.service_type}
+                  onChange={(e) => setNewProject({...newProject, service_type: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="standard">Certified</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Pages</label>
+                <input
+                  type="number"
+                  value={newProject.page_count}
+                  onChange={(e) => setNewProject({...newProject, page_count: parseInt(e.target.value) || 1})}
+                  min="1"
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgency</label>
+                <select
+                  value={newProject.urgency}
+                  onChange={(e) => setNewProject({...newProject, urgency: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="no">Normal</option>
+                  <option value="priority">Priority</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Deadline</label>
+                <input
+                  type="date"
+                  value={newProject.deadline}
+                  onChange={(e) => setNewProject({...newProject, deadline: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Price ($)</label>
+                <input
+                  type="number"
+                  value={newProject.total_price}
+                  onChange={(e) => setNewProject({...newProject, total_price: parseFloat(e.target.value) || 0, base_price: parseFloat(e.target.value) || 0})}
+                  min="0"
+                  step="0.01"
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Project Manager</label>
+                <select
+                  value={newProject.assigned_pm_id}
+                  onChange={(e) => setNewProject({...newProject, assigned_pm_id: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="">-- Select PM --</option>
+                  {pmList.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Translator</label>
+                <select
+                  value={newProject.assigned_translator_id}
+                  onChange={(e) => setNewProject({...newProject, assigned_translator_id: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="">-- Select Translator --</option>
+                  {translatorList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Notes</label>
+                <input
+                  type="text"
+                  value={newProject.notes}
+                  onChange={(e) => setNewProject({...newProject, notes: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="Notes visible to client"
+                />
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-gray-600 mb-1">Internal Notes (Admin/PM only)</label>
+              <textarea
+                value={newProject.internal_notes}
+                onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                rows="2"
+                placeholder="Internal notes not visible to client or translator"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowNewProjectForm(false)} className="px-4 py-1.5 text-gray-600 text-xs">
+                Cancel
+              </button>
+              <button type="submit" disabled={creatingProject} className="px-4 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-400">
+                {creatingProject ? 'Creating...' : 'Create Project'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-xs">

@@ -490,6 +490,14 @@ class TranslationOrder(BaseModel):
     document_filename: Optional[str] = None
     translated_file: Optional[str] = None  # Base64 encoded translated file
     translated_filename: Optional[str] = None
+    # NEW: Assignment and source tracking
+    source_type: str = "partner_portal"  # partner_portal, manual
+    assigned_pm_id: Optional[str] = None  # PM responsible for this project
+    assigned_pm_name: Optional[str] = None
+    assigned_translator_id: Optional[str] = None  # Translator assigned
+    assigned_translator_name: Optional[str] = None
+    deadline: Optional[datetime] = None  # Translation deadline
+    internal_notes: Optional[str] = None  # Notes visible only to admin/PM
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -510,6 +518,39 @@ class TranslationOrderUpdate(BaseModel):
     payment_date: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
+    # Assignment updates
+    assigned_pm_id: Optional[str] = None
+    assigned_translator_id: Optional[str] = None
+    deadline: Optional[datetime] = None
+    internal_notes: Optional[str] = None
+
+# Manual Project Creation (by Admin)
+class ManualProjectCreate(BaseModel):
+    # Client info
+    client_name: str
+    client_email: EmailStr
+    client_phone: Optional[str] = None
+    # Translation details
+    service_type: str = "standard"  # standard (certified), professional
+    translate_from: str
+    translate_to: str
+    word_count: int = 0
+    page_count: int = 1
+    urgency: str = "no"  # no, priority, urgent
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    internal_notes: Optional[str] = None
+    # Pricing (optional - can be set later)
+    base_price: Optional[float] = 0.0
+    urgency_fee: Optional[float] = 0.0
+    total_price: Optional[float] = 0.0
+    # Assignment
+    assigned_pm_id: Optional[str] = None
+    assigned_translator_id: Optional[str] = None
+    deadline: Optional[str] = None  # ISO date string
+    # Files (base64)
+    document_data: Optional[str] = None
+    document_filename: Optional[str] = None
 
 # Helper functions for authentication
 def hash_password(password: str) -> str:
@@ -1841,6 +1882,112 @@ async def admin_get_all_orders(admin_key: str):
         }
     }
 
+@api_router.post("/admin/orders/manual")
+async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key: str):
+    """Create a new project manually (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Generate order number
+        order_number = f"P{datetime.now().strftime('%y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
+
+        # Get PM and Translator names if assigned
+        pm_name = None
+        translator_name = None
+
+        if project_data.assigned_pm_id:
+            pm = await db.admin_users.find_one({"id": project_data.assigned_pm_id})
+            if pm:
+                pm_name = pm.get("name", "")
+
+        if project_data.assigned_translator_id:
+            translator = await db.admin_users.find_one({"id": project_data.assigned_translator_id})
+            if translator:
+                translator_name = translator.get("name", "")
+
+        # Parse deadline if provided
+        deadline = None
+        if project_data.deadline:
+            try:
+                deadline = datetime.fromisoformat(project_data.deadline.replace('Z', '+00:00'))
+            except:
+                pass
+
+        # Calculate price if not provided
+        base_price = project_data.base_price or 0.0
+        urgency_fee = project_data.urgency_fee or 0.0
+        total_price = project_data.total_price or (base_price + urgency_fee)
+
+        # Create the order
+        order = TranslationOrder(
+            order_number=order_number,
+            partner_id="manual",
+            partner_company="Manual Entry",
+            client_name=project_data.client_name,
+            client_email=project_data.client_email,
+            service_type=project_data.service_type,
+            translate_from=project_data.translate_from,
+            translate_to=project_data.translate_to,
+            word_count=project_data.word_count,
+            page_count=project_data.page_count,
+            urgency=project_data.urgency,
+            reference=project_data.reference,
+            notes=project_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            translation_status="received",
+            payment_status="pending",
+            due_date=datetime.utcnow() + timedelta(days=30),
+            document_filename=project_data.document_filename,
+            # New fields
+            source_type="manual",
+            assigned_pm_id=project_data.assigned_pm_id,
+            assigned_pm_name=pm_name,
+            assigned_translator_id=project_data.assigned_translator_id,
+            assigned_translator_name=translator_name,
+            deadline=deadline,
+            internal_notes=project_data.internal_notes
+        )
+
+        await db.translation_orders.insert_one(order.dict())
+        logger.info(f"Manual order created: {order.order_number}")
+
+        # If document data provided, save it
+        if project_data.document_data and project_data.document_filename:
+            doc_record = {
+                "id": str(uuid.uuid4()),
+                "order_id": order.id,
+                "filename": project_data.document_filename,
+                "data": project_data.document_data,
+                "uploaded_at": datetime.utcnow()
+            }
+            await db.order_documents.insert_one(doc_record)
+
+        return {
+            "status": "success",
+            "message": f"Project {order.order_number} created successfully",
+            "order": order.dict()
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating manual order: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
+
+@api_router.get("/admin/users/by-role/{role}")
+async def get_users_by_role(role: str, admin_key: str):
+    """Get users by role (for dropdown selectors)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+        return [{"id": u["id"], "name": u["name"], "email": u["email"]} for u in users]
+    except Exception as e:
+        logger.error(f"Error fetching users by role: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch users")
+
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
     """Update order status (admin only)"""
@@ -1860,6 +2007,29 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["delivered_at"] = update_data.delivered_at
         if update_data.notes:
             update_dict["notes"] = update_data.notes
+        # NEW: Assignment fields
+        if update_data.assigned_pm_id is not None:
+            update_dict["assigned_pm_id"] = update_data.assigned_pm_id
+            # Get PM name
+            if update_data.assigned_pm_id:
+                pm = await db.admin_users.find_one({"id": update_data.assigned_pm_id})
+                if pm:
+                    update_dict["assigned_pm_name"] = pm.get("name", "")
+            else:
+                update_dict["assigned_pm_name"] = None
+        if update_data.assigned_translator_id is not None:
+            update_dict["assigned_translator_id"] = update_data.assigned_translator_id
+            # Get translator name
+            if update_data.assigned_translator_id:
+                translator = await db.admin_users.find_one({"id": update_data.assigned_translator_id})
+                if translator:
+                    update_dict["assigned_translator_name"] = translator.get("name", "")
+            else:
+                update_dict["assigned_translator_name"] = None
+        if update_data.deadline:
+            update_dict["deadline"] = update_data.deadline
+        if update_data.internal_notes is not None:
+            update_dict["internal_notes"] = update_data.internal_notes
 
         if not update_dict:
             raise HTTPException(status_code=400, detail="No update data provided")
