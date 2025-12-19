@@ -144,7 +144,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
     { id: 'projects', label: 'Projects', icon: '📋' },
     { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
-    { id: 'translation', label: 'Translation Tool', icon: '✍️' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 
