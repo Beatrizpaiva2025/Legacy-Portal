@@ -70,9 +70,12 @@ const TRANSLATORS = [
 
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
-  const [adminKey, setAdminKey] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
+  const [adminKey, setAdminKey] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,12 +83,28 @@ const AdminLogin = ({ onLogin }) => {
     setLoading(true);
 
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      if (response.data) {
-        onLogin(adminKey);
+      if (useAdminKey) {
+        // Legacy admin key login (for backward compatibility)
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        if (response.data) {
+          onLogin({ adminKey, role: 'admin', name: 'Admin', email: 'admin@legacy.com' });
+        }
+      } else {
+        // New user-based login
+        const response = await axios.post(`${API}/admin/auth/login`, { email, password });
+        if (response.data && response.data.token) {
+          onLogin({
+            adminKey: response.data.token,
+            token: response.data.token,
+            role: response.data.role,
+            name: response.data.name,
+            email: response.data.email,
+            id: response.data.id
+          });
+        }
       }
     } catch (err) {
-      setError('Invalid admin key');
+      setError(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -109,44 +128,200 @@ const AdminLogin = ({ onLogin }) => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
-            <input
-              type="password"
-              required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              value={adminKey}
-              onChange={(e) => setAdminKey(e.target.value)}
-              placeholder="Enter admin key..."
-            />
-          </div>
+          {useAdminKey ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
+              <input
+                type="password"
+                required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                value={adminKey}
+                onChange={(e) => setAdminKey(e.target.value)}
+                placeholder="Enter admin key..."
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
           >
-            {loading ? 'Verifying...' : 'Access'}
+            {loading ? 'Verifying...' : 'Login'}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
+        <div className="mt-4 text-center space-y-2">
+          <button
+            onClick={() => setUseAdminKey(!useAdminKey)}
+            className="text-gray-500 hover:text-teal-600 text-xs"
+          >
+            {useAdminKey ? '← Login with email' : 'Use admin key instead'}
+          </button>
+          <div>
+            <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
+// ==================== NOTIFICATION BELL ====================
+const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const fetchNotifications = async () => {
+    if (!user?.token) return;
+    try {
+      const response = await axios.get(`${API}/admin/notifications?admin_key=${adminKey}&token=${user.token}`);
+      setNotifications(response.data.notifications || []);
+      setUnreadCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.token]);
+
+  const markAsRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/notifications/${notifId}/read?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await axios.put(`${API}/admin/notifications/read-all?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded"
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {showDropdown && (
+        <div className="absolute left-full top-0 ml-2 w-72 bg-white rounded-lg shadow-xl z-50 text-gray-800 max-h-96 overflow-hidden">
+          <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+            <span className="font-bold text-xs">Notifications</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:text-blue-800">
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 text-xs">No notifications</div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => { markAsRead(notif.id); if (onNotificationClick) onNotificationClick(notif); }}
+                  className={`p-2 border-b cursor-pointer hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="flex items-start">
+                    <span className="text-sm mr-2">
+                      {notif.type === 'project_assigned' ? '📋' : notif.type === 'revision_requested' ? '🔄' : '📌'}
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-medium text-xs">{notif.title}</div>
+                      <div className="text-[10px] text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-[9px] text-gray-400 mt-1">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    {!notif.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== COMPACT SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
-  const menuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋' },
-    { id: 'translation', label: 'Translation', icon: '✍️' },
-    { id: 'translators', label: 'Translators', icon: '👥' },
-    { id: 'translation', label: 'Translation Tool', icon: '✍️' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' }
+const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
+  // Define menu items with role-based access
+  const allMenuItems = [
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
+    { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'production', label: 'Production', icon: '📊', roles: ['admin'] },
+    { id: 'translators', label: 'Translators', icon: '👥', roles: ['admin'] },
+    { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
+    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
+
+  // Filter menu items based on user role
+  const userRole = user?.role || 'admin';
+  const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
+
+  // Role display names and colors
+  const roleConfig = {
+    admin: { label: 'Administrator', color: 'bg-red-500' },
+    pm: { label: 'Project Manager', color: 'bg-blue-500' },
+    translator: { label: 'Translator', color: 'bg-green-500' }
+  };
+
+  const roleInfo = roleConfig[userRole] || roleConfig.admin;
+
+  const handleNotificationClick = (notif) => {
+    // Navigate to the relevant project if it's a project notification
+    if (notif.order_id && (notif.type === 'project_assigned' || notif.type === 'revision_requested')) {
+      setActiveTab('translation');
+    }
+  };
 
   return (
     <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
@@ -158,6 +333,20 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <div className="text-[10px] text-slate-400">Management</div>
           </div>
         </div>
+        {/* User info */}
+        {user && (
+          <div className="mt-3 pt-2 border-t border-slate-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-white truncate">{user.name}</div>
+                <div className={`inline-block mt-1 px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
+                  {roleInfo.label}
+                </div>
+              </div>
+              <NotificationBell adminKey={adminKey} user={user} onNotificationClick={handleNotificationClick} />
+            </div>
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 py-2">
@@ -3804,22 +3993,72 @@ tradução juramentada | certified translation`}
 };
 
 // ==================== PROJECTS PAGE ====================
-const ProjectsPage = ({ adminKey, onTranslate }) => {
+const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
 
+  // New Project Form
+  const [showNewProjectForm, setShowNewProjectForm] = useState(false);
+  const [pmList, setPmList] = useState([]);
+  const [translatorList, setTranslatorList] = useState([]);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [newProject, setNewProject] = useState({
+    client_name: '',
+    client_email: '',
+    translate_from: 'Portuguese',
+    translate_to: 'English',
+    service_type: 'standard',
+    page_count: 1,
+    word_count: 0,
+    urgency: 'no',
+    notes: '',
+    internal_notes: '',
+    assigned_pm_id: '',
+    assigned_translator_id: '',
+    deadline: '',
+    base_price: 0,
+    total_price: 0
+  });
+
+  const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
+
   useEffect(() => {
     fetchOrders();
+    fetchUsers();
   }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const [pmRes, transRes] = await Promise.all([
+        axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`)
+      ]);
+      setPmList(pmRes.data || []);
+      setTranslatorList(transRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      setOrders(response.data.orders || []);
+      // Use filtered endpoint for PM and Translator roles
+      const userRole = user?.role || 'admin';
+      const userToken = user?.token || '';
+
+      if (userRole === 'admin') {
+        // Admin sees all projects
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        setOrders(response.data.orders || []);
+      } else {
+        // PM and Translator see only their assigned projects
+        const response = await axios.get(`${API}/admin/orders/my-projects?admin_key=${adminKey}&token=${userToken}`);
+        setOrders(response.data.orders || []);
+      }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -3875,6 +4114,38 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
     }
   };
 
+  // Create new project manually
+  const createProject = async (e) => {
+    e.preventDefault();
+    setCreatingProject(true);
+    try {
+      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, newProject);
+      setShowNewProjectForm(false);
+      setNewProject({
+        client_name: '',
+        client_email: '',
+        translate_from: 'Portuguese',
+        translate_to: 'English',
+        service_type: 'standard',
+        page_count: 1,
+        word_count: 0,
+        urgency: 'no',
+        notes: '',
+        internal_notes: '',
+        assigned_pm_id: '',
+        assigned_translator_id: '',
+        deadline: '',
+        base_price: 0,
+        total_price: 0
+      });
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error creating project');
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   const filtered = orders.filter(o => {
     const matchSearch =
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -3921,6 +4192,12 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
           <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
+          <button
+            onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+            className="px-3 py-1 bg-teal-600 text-white text-xs rounded hover:bg-teal-700"
+          >
+            + New Project
+          </button>
           <div className="flex space-x-1">
             {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
@@ -3932,6 +4209,171 @@ const ProjectsPage = ({ adminKey, onTranslate }) => {
         </div>
         <SearchBar value={search} onChange={setSearch} />
       </div>
+
+      {/* New Project Form */}
+      {showNewProjectForm && (
+        <div className="bg-white rounded-lg shadow mb-4 p-4">
+          <h3 className="text-sm font-bold text-gray-800 mb-3">📝 Create New Project</h3>
+          <form onSubmit={createProject}>
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              {/* Client Info */}
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
+                <input
+                  type="text"
+                  value={newProject.client_name}
+                  onChange={(e) => setNewProject({...newProject, client_name: e.target.value})}
+                  required
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Email *</label>
+                <input
+                  type="email"
+                  value={newProject.client_email}
+                  onChange={(e) => setNewProject({...newProject, client_email: e.target.value})}
+                  required
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="client@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">From Language *</label>
+                <select
+                  value={newProject.translate_from}
+                  onChange={(e) => setNewProject({...newProject, translate_from: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">To Language *</label>
+                <select
+                  value={newProject.translate_to}
+                  onChange={(e) => setNewProject({...newProject, translate_to: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
+                <select
+                  value={newProject.service_type}
+                  onChange={(e) => setNewProject({...newProject, service_type: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="standard">Certified</option>
+                  <option value="professional">Professional</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Pages</label>
+                <input
+                  type="number"
+                  value={newProject.page_count}
+                  onChange={(e) => setNewProject({...newProject, page_count: parseInt(e.target.value) || 1})}
+                  min="1"
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgency</label>
+                <select
+                  value={newProject.urgency}
+                  onChange={(e) => setNewProject({...newProject, urgency: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="no">Normal</option>
+                  <option value="priority">Priority</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Deadline</label>
+                <input
+                  type="date"
+                  value={newProject.deadline}
+                  onChange={(e) => setNewProject({...newProject, deadline: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Price ($)</label>
+                <input
+                  type="number"
+                  value={newProject.total_price}
+                  onChange={(e) => setNewProject({...newProject, total_price: parseFloat(e.target.value) || 0, base_price: parseFloat(e.target.value) || 0})}
+                  min="0"
+                  step="0.01"
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Project Manager</label>
+                <select
+                  value={newProject.assigned_pm_id}
+                  onChange={(e) => setNewProject({...newProject, assigned_pm_id: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="">-- Select PM --</option>
+                  {pmList.map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Translator</label>
+                <select
+                  value={newProject.assigned_translator_id}
+                  onChange={(e) => setNewProject({...newProject, assigned_translator_id: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  <option value="">-- Select Translator --</option>
+                  {translatorList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Notes</label>
+                <input
+                  type="text"
+                  value={newProject.notes}
+                  onChange={(e) => setNewProject({...newProject, notes: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="Notes visible to client"
+                />
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-gray-600 mb-1">Internal Notes (Admin/PM only)</label>
+              <textarea
+                value={newProject.internal_notes}
+                onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
+                className="w-full px-2 py-1.5 text-xs border rounded"
+                rows="2"
+                placeholder="Internal notes not visible to client or translator"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowNewProjectForm(false)} className="px-4 py-1.5 text-gray-600 text-xs">
+                Cancel
+              </button>
+              <button type="submit" disabled={creatingProject} className="px-4 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-400">
+                {creatingProject ? 'Creating...' : 'Create Project'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="bg-white rounded shadow overflow-x-auto">
         <table className="w-full text-xs">
@@ -4180,9 +4622,638 @@ const TranslationToolPage = ({ adminKey, onLogout }) => {
   );
 };
 
+// ==================== USERS MANAGEMENT PAGE ====================
+const UsersPage = ({ adminKey }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator' });
+  const [creating, setCreating] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
+      setUsers(response.data);
+    } catch (err) {
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchUsers(); }, [adminKey]);
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    try {
+      await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, newUser);
+      setNewUser({ name: '', email: '', password: '', role: 'translator' });
+      setShowCreateForm(false);
+      fetchUsers();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error creating user');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggleActive = async (userId) => {
+    try {
+      await axios.put(`${API}/admin/users/${userId}/toggle-active?admin_key=${adminKey}`);
+      fetchUsers();
+    } catch (err) {
+      alert('Error toggling user status');
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Delete user "${userName}"?`)) return;
+    try {
+      await axios.delete(`${API}/admin/users/${userId}?admin_key=${adminKey}`);
+      fetchUsers();
+    } catch (err) {
+      alert('Error deleting user');
+    }
+  };
+
+  const roleColors = {
+    admin: 'bg-red-100 text-red-800',
+    pm: 'bg-blue-100 text-blue-800',
+    translator: 'bg-green-100 text-green-800'
+  };
+
+  if (loading) return <div className="p-6 text-center">Loading users...</div>;
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">👤 User Management</h1>
+        <button
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
+        >
+          + Create User
+        </button>
+      </div>
+
+      {/* Create User Form */}
+      {showCreateForm && (
+        <div className="bg-white p-4 rounded-lg shadow mb-6">
+          <h3 className="font-bold text-sm mb-3">Create New User</h3>
+          <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
+            <input
+              type="text"
+              placeholder="Name"
+              value={newUser.name}
+              onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={newUser.email}
+              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+              required
+              className="px-3 py-2 text-sm border rounded"
+            />
+            <select
+              value={newUser.role}
+              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+              className="px-3 py-2 text-sm border rounded"
+            >
+              <option value="translator">Translator</option>
+              <option value="pm">Project Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+            <div className="col-span-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-600 text-sm">Cancel</button>
+              <button type="submit" disabled={creating} className="px-4 py-2 bg-teal-600 text-white rounded text-sm disabled:bg-gray-400">
+                {creating ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Users Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium">{user.name}</td>
+                <td className="px-4 py-3 text-gray-600">{user.email}</td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[user.role]}`}>
+                    {user.role.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`px-2 py-1 rounded text-xs ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-4 py-3 space-x-2">
+                  <button
+                    onClick={() => handleToggleActive(user.id)}
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    {user.is_active ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user.id, user.name)}
+                    className="text-red-600 hover:text-red-800 text-xs"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {users.length === 0 && (
+          <div className="p-6 text-center text-gray-500">No users found. Create your first user above.</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==================== PRODUCTION & PAYMENTS PAGE ====================
+const ProductionPage = ({ adminKey }) => {
+  const [stats, setStats] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('stats'); // stats, payments
+  const [selectedTranslator, setSelectedTranslator] = useState(null);
+  const [translatorOrders, setTranslatorOrders] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    translator_id: '',
+    period_start: '',
+    period_end: '',
+    pages_count: 0,
+    rate_per_page: 25.0,
+    total_amount: 0,
+    payment_method: '',
+    payment_reference: '',
+    notes: ''
+  });
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/production/stats?admin_key=${adminKey}`);
+      setStats(response.data.stats || []);
+    } catch (err) {
+      console.error('Error fetching production stats:', err);
+    }
+  };
+
+  const fetchPayments = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/payments?admin_key=${adminKey}`);
+      setPayments(response.data.payments || []);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+    }
+  };
+
+  const fetchTranslatorOrders = async (translatorId) => {
+    try {
+      const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}&status=completed`);
+      setTranslatorOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Error fetching translator orders:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchStats(), fetchPayments()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey]);
+
+  const handleSelectTranslator = async (translator) => {
+    setSelectedTranslator(translator);
+    await fetchTranslatorOrders(translator.translator_id);
+  };
+
+  const openPaymentModal = (translator) => {
+    const today = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    setPaymentForm({
+      translator_id: translator.translator_id,
+      period_start: firstOfMonth,
+      period_end: today,
+      pages_count: translator.pending_payment_pages || 0,
+      rate_per_page: 25.0,
+      total_amount: (translator.pending_payment_pages || 0) * 25.0,
+      payment_method: 'bank_transfer',
+      payment_reference: '',
+      notes: ''
+    });
+    setShowPaymentModal(true);
+  };
+
+  const handleCreatePayment = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/admin/payments?admin_key=${adminKey}`, paymentForm);
+      setShowPaymentModal(false);
+      fetchStats();
+      fetchPayments();
+      alert('Pagamento registrado com sucesso!');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Erro ao registrar pagamento');
+    }
+  };
+
+  const handleMarkAsPaid = async (paymentId) => {
+    if (!window.confirm('Confirmar pagamento como realizado?')) return;
+    try {
+      await axios.put(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`, { status: 'paid' });
+      fetchPayments();
+      fetchStats();
+    } catch (err) {
+      alert('Erro ao atualizar pagamento');
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Excluir este registro de pagamento?')) return;
+    try {
+      await axios.delete(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`);
+      fetchPayments();
+      fetchStats();
+    } catch (err) {
+      alert('Erro ao excluir pagamento');
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  if (loading) return <div className="p-6 text-center">Carregando estatísticas...</div>;
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">📊 Produção & Pagamentos</h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setActiveView('stats')}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'stats' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Estatísticas
+          </button>
+          <button
+            onClick={() => setActiveView('payments')}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Histórico de Pagamentos
+          </button>
+        </div>
+      </div>
+
+      {activeView === 'stats' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Translator Stats Cards */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b">
+              <h2 className="text-sm font-bold text-gray-800">Tradutores</h2>
+            </div>
+            <div className="p-4 space-y-3">
+              {stats.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">Nenhum tradutor encontrado</div>
+              ) : (
+                stats.map((translator) => (
+                  <div
+                    key={translator.translator_id}
+                    onClick={() => handleSelectTranslator(translator)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedTranslator?.translator_id === translator.translator_id
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 hover:border-teal-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-medium text-gray-800">{translator.translator_name}</div>
+                        <div className="text-xs text-gray-500">{translator.translator_email}</div>
+                      </div>
+                      {translator.pending_payment_pages > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openPaymentModal(translator); }}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                        >
+                          Registrar Pagamento
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                      <div className="bg-gray-100 rounded p-2">
+                        <div className="text-gray-500">Total</div>
+                        <div className="font-bold text-gray-800">{translator.total_pages}</div>
+                      </div>
+                      <div className="bg-green-100 rounded p-2">
+                        <div className="text-green-600">Concluídas</div>
+                        <div className="font-bold text-green-700">{translator.completed_pages}</div>
+                      </div>
+                      <div className="bg-blue-100 rounded p-2">
+                        <div className="text-blue-600">Pagas</div>
+                        <div className="font-bold text-blue-700">{translator.paid_pages}</div>
+                      </div>
+                      <div className="bg-yellow-100 rounded p-2">
+                        <div className="text-yellow-600">A Pagar</div>
+                        <div className="font-bold text-yellow-700">{translator.pending_payment_pages}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {translator.completed_orders} de {translator.orders_count} projetos concluídos
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Selected Translator Orders */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b">
+              <h2 className="text-sm font-bold text-gray-800">
+                {selectedTranslator ? `Projetos de ${selectedTranslator.translator_name}` : 'Selecione um tradutor'}
+              </h2>
+            </div>
+            <div className="p-4">
+              {!selectedTranslator ? (
+                <div className="text-center text-gray-500 py-8">
+                  Clique em um tradutor para ver seus projetos
+                </div>
+              ) : translatorOrders.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">Nenhum projeto concluído</div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {translatorOrders.map((order) => (
+                    <div key={order.id} className="p-3 border rounded-lg text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
+                          <div className="text-gray-500">{order.client_name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-teal-600">{order.page_count || 0} pág.</div>
+                          <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'payments' && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-4 border-b">
+            <h2 className="text-sm font-bold text-gray-800">Histórico de Pagamentos</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Tradutor</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Período</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Páginas</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Valor</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Data Pag.</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {payments.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      Nenhum pagamento registrado
+                    </td>
+                  </tr>
+                ) : (
+                  payments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{payment.translator_name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatDate(payment.period_start)} - {formatDate(payment.period_end)}
+                      </td>
+                      <td className="px-4 py-3 text-center">{payment.pages_count}</td>
+                      <td className="px-4 py-3 text-center font-bold text-teal-600">
+                        {formatCurrency(payment.total_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          payment.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {payment.status === 'paid' ? 'Pago' : 'Pendente'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {payment.payment_date ? formatDate(payment.payment_date) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center space-x-2">
+                        {payment.status !== 'paid' && (
+                          <button
+                            onClick={() => handleMarkAsPaid(payment.id)}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            Confirmar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">Registrar Pagamento</h3>
+              <button onClick={() => setShowPaymentModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onSubmit={handleCreatePayment} className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Período Início</label>
+                  <input
+                    type="date"
+                    value={paymentForm.period_start}
+                    onChange={(e) => setPaymentForm({...paymentForm, period_start: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Período Fim</label>
+                  <input
+                    type="date"
+                    value={paymentForm.period_end}
+                    onChange={(e) => setPaymentForm({...paymentForm, period_end: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Páginas</label>
+                  <input
+                    type="number"
+                    value={paymentForm.pages_count}
+                    onChange={(e) => {
+                      const pages = parseInt(e.target.value) || 0;
+                      setPaymentForm({
+                        ...paymentForm,
+                        pages_count: pages,
+                        total_amount: pages * paymentForm.rate_per_page
+                      });
+                    }}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Valor por Página ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={paymentForm.rate_per_page}
+                    onChange={(e) => {
+                      const rate = parseFloat(e.target.value) || 0;
+                      setPaymentForm({
+                        ...paymentForm,
+                        rate_per_page: rate,
+                        total_amount: paymentForm.pages_count * rate
+                      });
+                    }}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Valor Total</label>
+                <input
+                  type="text"
+                  value={formatCurrency(paymentForm.total_amount)}
+                  readOnly
+                  className="w-full px-3 py-2 border rounded text-sm bg-gray-100 font-bold text-teal-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Método de Pagamento</label>
+                <select
+                  value={paymentForm.payment_method}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="pix">PIX</option>
+                  <option value="check">Cheque</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Referência/ID da Transação</label>
+                <input
+                  type="text"
+                  value={paymentForm.payment_reference}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_reference: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  placeholder="Opcional"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Notas</label>
+                <textarea
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows="2"
+                  placeholder="Observações opcionais..."
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+                >
+                  Registrar Pagamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
+  const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
 
@@ -4191,17 +5262,51 @@ function AdminApp() {
 
   useEffect(() => {
     const savedKey = localStorage.getItem('admin_key');
-    if (savedKey) setAdminKey(savedKey);
+    const savedUser = localStorage.getItem('admin_user');
+    if (savedKey) {
+      setAdminKey(savedKey);
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          // Set default tab based on role
+          if (parsedUser.role === 'translator') {
+            setActiveTab('translation');
+          }
+        } catch (e) {
+          console.error('Error parsing saved user:', e);
+        }
+      }
+    }
   }, []);
 
-  const handleLogin = (key) => {
+  const handleLogin = (userData) => {
+    // userData can be: { adminKey, role, name, email, id, token }
+    const key = userData.adminKey || userData.token;
     setAdminKey(key);
+    setUser(userData);
     localStorage.setItem('admin_key', key);
+    localStorage.setItem('admin_user', JSON.stringify(userData));
+
+    // Set default tab based on role
+    if (userData.role === 'translator') {
+      setActiveTab('translation');
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Try to logout from server if we have a token
+    if (user?.token) {
+      try {
+        await axios.post(`${API}/admin/auth/logout?token=${user.token}`);
+      } catch (e) {
+        // Ignore logout errors
+      }
+    }
     setAdminKey(null);
+    setUser(null);
     localStorage.removeItem('admin_key');
+    localStorage.removeItem('admin_user');
     window.location.href = '/admin';
   };
 
@@ -4218,12 +5323,35 @@ function AdminApp() {
   };
 
   const renderContent = () => {
+    const userRole = user?.role || 'admin';
+
     switch (activeTab) {
-      case 'projects': return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
-      case 'translation': return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} />;
-      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
-      case 'settings': return <SettingsPage adminKey={adminKey} />;
-      default: return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
+      case 'projects':
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'translation':
+        return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+      case 'translators':
+        return userRole === 'admin'
+          ? <TranslatorsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'production':
+        return userRole === 'admin'
+          ? <ProductionPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'users':
+        return userRole === 'admin'
+          ? <UsersPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'settings':
+        return userRole === 'admin'
+          ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      default:
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
     }
   };
 
@@ -4236,7 +5364,7 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );

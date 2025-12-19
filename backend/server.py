@@ -412,6 +412,48 @@ class PartnerResponse(BaseModel):
     phone: Optional[str] = None
     token: str
 
+# Admin User Models (with roles: admin, pm, translator)
+class AdminUser(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    password_hash: str
+    name: str
+    role: str  # 'admin', 'pm', 'translator'
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    # For translators: track pages translated
+    pages_translated: int = 0
+    pages_pending_payment: int = 0
+    # For PM: list of project IDs they manage
+    assigned_projects: List[str] = []
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str  # 'admin', 'pm', 'translator'
+
+class AdminUserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+    token: str
+    pages_translated: Optional[int] = 0
+    pages_pending_payment: Optional[int] = 0
+
+class AdminUserPublic(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -448,6 +490,14 @@ class TranslationOrder(BaseModel):
     document_filename: Optional[str] = None
     translated_file: Optional[str] = None  # Base64 encoded translated file
     translated_filename: Optional[str] = None
+    # NEW: Assignment and source tracking
+    source_type: str = "partner_portal"  # partner_portal, manual
+    assigned_pm_id: Optional[str] = None  # PM responsible for this project
+    assigned_pm_name: Optional[str] = None
+    assigned_translator_id: Optional[str] = None  # Translator assigned
+    assigned_translator_name: Optional[str] = None
+    deadline: Optional[datetime] = None  # Translation deadline
+    internal_notes: Optional[str] = None  # Notes visible only to admin/PM
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -468,6 +518,104 @@ class TranslationOrderUpdate(BaseModel):
     payment_date: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
+    # Assignment updates
+    assigned_pm_id: Optional[str] = None
+    assigned_translator_id: Optional[str] = None
+    deadline: Optional[datetime] = None
+    internal_notes: Optional[str] = None
+
+# Manual Project Creation (by Admin)
+class ManualProjectCreate(BaseModel):
+    # Client info
+    client_name: str
+    client_email: EmailStr
+    client_phone: Optional[str] = None
+    # Translation details
+    service_type: str = "standard"  # standard (certified), professional
+    translate_from: str
+    translate_to: str
+    word_count: int = 0
+    page_count: int = 1
+    urgency: str = "no"  # no, priority, urgent
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    internal_notes: Optional[str] = None
+    # Pricing (optional - can be set later)
+    base_price: Optional[float] = 0.0
+    urgency_fee: Optional[float] = 0.0
+    total_price: Optional[float] = 0.0
+    # Assignment
+    assigned_pm_id: Optional[str] = None
+    assigned_translator_id: Optional[str] = None
+    deadline: Optional[str] = None  # ISO date string
+    # Files (base64)
+    document_data: Optional[str] = None
+    document_filename: Optional[str] = None
+
+# Notification Model
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str  # Recipient user ID
+    type: str  # project_assigned, revision_requested, project_completed, etc.
+    title: str
+    message: str
+    order_id: Optional[str] = None  # Related order
+    order_number: Optional[str] = None
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Translator Payment Model
+class TranslatorPayment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    translator_id: str
+    translator_name: str
+    period_start: datetime
+    period_end: datetime
+    pages_count: int
+    rate_per_page: float = 25.0  # Default rate per page
+    total_amount: float
+    status: str = "pending"  # pending, paid
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None  # bank_transfer, paypal, etc.
+    payment_reference: Optional[str] = None  # Transaction ID
+    notes: Optional[str] = None
+    order_ids: List[str] = []  # Orders included in this payment
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by_id: Optional[str] = None
+    created_by_name: Optional[str] = None
+
+class PaymentCreate(BaseModel):
+    translator_id: str
+    period_start: str  # ISO date
+    period_end: str  # ISO date
+    pages_count: int
+    rate_per_page: float = 25.0
+    total_amount: float
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
+    notes: Optional[str] = None
+    order_ids: List[str] = []
+
+class PaymentUpdate(BaseModel):
+    status: Optional[str] = None
+    payment_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
+    notes: Optional[str] = None
+
+# Helper function to create notifications
+async def create_notification(user_id: str, notif_type: str, title: str, message: str, order_id: str = None, order_number: str = None):
+    """Create a notification for a user"""
+    notif = Notification(
+        user_id=user_id,
+        type=notif_type,
+        title=title,
+        message=message,
+        order_id=order_id,
+        order_number=order_number
+    )
+    await db.notifications.insert_one(notif.dict())
+    return notif
 
 # Helper functions for authentication
 def hash_password(password: str) -> str:
@@ -491,6 +639,7 @@ def generate_token() -> str:
 
 # In-memory token storage (in production, use Redis or database)
 active_tokens: Dict[str, str] = {}  # token -> partner_id
+active_admin_tokens: Dict[str, dict] = {}  # token -> {user_id, role}
 
 async def get_current_partner(token: str = None) -> Optional[dict]:
     """Get current partner from token"""
@@ -499,6 +648,28 @@ async def get_current_partner(token: str = None) -> Optional[dict]:
     partner_id = active_tokens[token]
     partner = await db.partners.find_one({"id": partner_id})
     return partner
+
+async def get_current_admin_user(token: str = None) -> Optional[dict]:
+    """Get current admin user from token"""
+    if not token or token not in active_admin_tokens:
+        return None
+    user_info = active_admin_tokens[token]
+    user = await db.admin_users.find_one({"id": user_info["user_id"]})
+    return user
+
+def require_admin_role(allowed_roles: List[str]):
+    """Decorator helper to check if user has required role"""
+    async def check_role(token: str) -> dict:
+        if not token or token not in active_admin_tokens:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+        user_info = active_admin_tokens[token]
+        if user_info["role"] not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        user = await db.admin_users.find_one({"id": user_info["user_id"]})
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    return check_role
 
 # Utility functions
 def count_words(text: str) -> int:
@@ -1404,6 +1575,164 @@ async def get_current_partner_info(token: str):
         "phone": partner.get("phone")
     }
 
+# ==================== ADMIN USER AUTHENTICATION ====================
+
+@api_router.post("/admin/auth/register")
+async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
+    """Register a new admin user (only admin can create users)"""
+    # Verify admin key for initial setup, or verify caller is admin
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Validate role
+    if user_data.role not in ['admin', 'pm', 'translator']:
+        raise HTTPException(status_code=400, detail="Invalid role. Must be: admin, pm, or translator")
+
+    try:
+        # Check if email already exists
+        existing = await db.admin_users.find_one({"email": user_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create user
+        user = AdminUser(
+            email=user_data.email,
+            password_hash=hash_password(user_data.password),
+            name=user_data.name,
+            role=user_data.role
+        )
+
+        await db.admin_users.insert_one(user.dict())
+        logger.info(f"Admin user created: {user.email} with role {user.role}")
+
+        return {"status": "success", "message": f"User {user.name} created with role {user.role}", "user_id": user.id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating admin user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+@api_router.post("/admin/auth/login")
+async def login_admin_user(login_data: AdminUserLogin):
+    """Login admin user and return token with role"""
+    try:
+        # Find user by email
+        user = await db.admin_users.find_one({"email": login_data.email})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Verify password
+        if not verify_password(login_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if active
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+
+        # Generate token
+        token = generate_token()
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+
+        return AdminUserResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            is_active=user.get("is_active", True),
+            token=token,
+            pages_translated=user.get("pages_translated", 0),
+            pages_pending_payment=user.get("pages_pending_payment", 0)
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in admin user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to login")
+
+@api_router.post("/admin/auth/logout")
+async def logout_admin_user(token: str):
+    """Logout admin user"""
+    if token in active_admin_tokens:
+        del active_admin_tokens[token]
+    return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.get("/admin/auth/me")
+async def get_current_admin_user_info(token: str):
+    """Get current admin user info from token"""
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "is_active": user.get("is_active", True),
+        "pages_translated": user.get("pages_translated", 0),
+        "pages_pending_payment": user.get("pages_pending_payment", 0)
+    }
+
+@api_router.get("/admin/users")
+async def list_admin_users(token: str, admin_key: str):
+    """List all admin users (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find().to_list(100)
+        return [AdminUserPublic(
+            id=u["id"],
+            email=u["email"],
+            name=u["name"],
+            role=u["role"],
+            is_active=u.get("is_active", True)
+        ) for u in users]
+    except Exception as e:
+        logger.error(f"Error listing admin users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list users")
+
+@api_router.put("/admin/users/{user_id}/toggle-active")
+async def toggle_admin_user_active(user_id: str, admin_key: str):
+    """Toggle admin user active status (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        user = await db.admin_users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        new_status = not user.get("is_active", True)
+        await db.admin_users.update_one({"id": user_id}, {"$set": {"is_active": new_status}})
+
+        return {"status": "success", "is_active": new_status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling user status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
+
+@api_router.delete("/admin/users/{user_id}")
+async def delete_admin_user(user_id: str, admin_key: str):
+    """Delete admin user (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.admin_users.delete_one({"id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {"status": "success", "message": "User deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete user")
+
 # ==================== TRANSLATION ORDERS ====================
 
 @api_router.post("/orders/create")
@@ -1618,6 +1947,439 @@ async def admin_get_all_orders(admin_key: str):
         }
     }
 
+@api_router.get("/admin/orders/my-projects")
+async def get_my_projects(token: str, admin_key: str):
+    """Get projects based on user role - PM sees their projects, Translator sees assigned projects"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get user from token
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user_role = user.get("role", "")
+    user_id = user.get("id", "")
+
+    # Build query based on role
+    if user_role == "admin":
+        # Admin sees all
+        orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+    elif user_role == "pm":
+        # PM sees projects assigned to them
+        orders = await db.translation_orders.find({"assigned_pm_id": user_id}).sort("created_at", -1).to_list(500)
+    elif user_role == "translator":
+        # Translator sees projects assigned to them
+        orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
+    else:
+        orders = []
+
+    for order in orders:
+        if '_id' in order:
+            del order['_id']
+
+    # Calculate summary
+    total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
+    total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
+    in_translation = sum(1 for o in orders if o.get("translation_status") == "in_translation")
+    completed = sum(1 for o in orders if o.get("translation_status") in ["ready", "delivered"])
+
+    return {
+        "orders": orders,
+        "user_role": user_role,
+        "summary": {
+            "total_projects": len(orders),
+            "pending_payment": total_pending,
+            "paid": total_paid,
+            "in_translation": in_translation,
+            "completed": completed
+        }
+    }
+
+@api_router.post("/admin/orders/manual")
+async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key: str):
+    """Create a new project manually (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Generate order number
+        order_number = f"P{datetime.now().strftime('%y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
+
+        # Get PM and Translator names if assigned
+        pm_name = None
+        translator_name = None
+
+        if project_data.assigned_pm_id:
+            pm = await db.admin_users.find_one({"id": project_data.assigned_pm_id})
+            if pm:
+                pm_name = pm.get("name", "")
+
+        if project_data.assigned_translator_id:
+            translator = await db.admin_users.find_one({"id": project_data.assigned_translator_id})
+            if translator:
+                translator_name = translator.get("name", "")
+
+        # Parse deadline if provided
+        deadline = None
+        if project_data.deadline:
+            try:
+                deadline = datetime.fromisoformat(project_data.deadline.replace('Z', '+00:00'))
+            except:
+                pass
+
+        # Calculate price if not provided
+        base_price = project_data.base_price or 0.0
+        urgency_fee = project_data.urgency_fee or 0.0
+        total_price = project_data.total_price or (base_price + urgency_fee)
+
+        # Create the order
+        order = TranslationOrder(
+            order_number=order_number,
+            partner_id="manual",
+            partner_company="Manual Entry",
+            client_name=project_data.client_name,
+            client_email=project_data.client_email,
+            service_type=project_data.service_type,
+            translate_from=project_data.translate_from,
+            translate_to=project_data.translate_to,
+            word_count=project_data.word_count,
+            page_count=project_data.page_count,
+            urgency=project_data.urgency,
+            reference=project_data.reference,
+            notes=project_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            translation_status="received",
+            payment_status="pending",
+            due_date=datetime.utcnow() + timedelta(days=30),
+            document_filename=project_data.document_filename,
+            # New fields
+            source_type="manual",
+            assigned_pm_id=project_data.assigned_pm_id,
+            assigned_pm_name=pm_name,
+            assigned_translator_id=project_data.assigned_translator_id,
+            assigned_translator_name=translator_name,
+            deadline=deadline,
+            internal_notes=project_data.internal_notes
+        )
+
+        await db.translation_orders.insert_one(order.dict())
+        logger.info(f"Manual order created: {order.order_number}")
+
+        # If document data provided, save it
+        if project_data.document_data and project_data.document_filename:
+            doc_record = {
+                "id": str(uuid.uuid4()),
+                "order_id": order.id,
+                "filename": project_data.document_filename,
+                "data": project_data.document_data,
+                "uploaded_at": datetime.utcnow()
+            }
+            await db.order_documents.insert_one(doc_record)
+
+        return {
+            "status": "success",
+            "message": f"Project {order.order_number} created successfully",
+            "order": order.dict()
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating manual order: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
+
+@api_router.get("/admin/users/by-role/{role}")
+async def get_users_by_role(role: str, admin_key: str):
+    """Get users by role (for dropdown selectors)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+        return [{"id": u["id"], "name": u["name"], "email": u["email"]} for u in users]
+    except Exception as e:
+        logger.error(f"Error fetching users by role: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch users")
+
+# ==================== NOTIFICATIONS ====================
+
+@api_router.get("/admin/notifications")
+async def get_user_notifications(token: str, admin_key: str, unread_only: bool = False):
+    """Get notifications for current user"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    query = {"user_id": user["id"]}
+    if unread_only:
+        query["is_read"] = False
+
+    notifications = await db.notifications.find(query).sort("created_at", -1).to_list(50)
+
+    for notif in notifications:
+        if '_id' in notif:
+            del notif['_id']
+
+    unread_count = await db.notifications.count_documents({"user_id": user["id"], "is_read": False})
+
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+@api_router.put("/admin/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, token: str, admin_key: str):
+    """Mark a notification as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.notifications.update_one(
+        {"id": notif_id, "user_id": user["id"]},
+        {"$set": {"is_read": True}}
+    )
+
+    return {"status": "success"}
+
+@api_router.put("/admin/notifications/read-all")
+async def mark_all_notifications_read(token: str, admin_key: str):
+    """Mark all notifications as read for current user"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.notifications.update_many(
+        {"user_id": user["id"], "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+
+    return {"status": "success"}
+
+# ==================== PRODUCTION & PAYMENTS ====================
+
+@api_router.get("/admin/production/stats")
+async def get_production_stats(admin_key: str, translator_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get production statistics for translators"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get all translators
+    translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
+
+    stats = []
+    for translator in translators:
+        if translator_id and translator["id"] != translator_id:
+            continue
+
+        # Build query for orders assigned to this translator
+        query = {"assigned_translator_id": translator["id"]}
+
+        # Add date filters if provided
+        if start_date or end_date:
+            query["created_at"] = {}
+            if start_date:
+                query["created_at"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            if end_date:
+                query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+        # Get orders
+        orders = await db.orders.find(query).to_list(1000)
+
+        # Calculate stats
+        total_pages = 0
+        completed_pages = 0
+        pending_pages = 0
+
+        for order in orders:
+            pages = order.get("page_count", 0) or 0
+            total_pages += pages
+            if order.get("translation_status") == "completed":
+                completed_pages += pages
+            else:
+                pending_pages += pages
+
+        # Get paid pages from payments
+        paid_query = {"translator_id": translator["id"], "status": "paid"}
+        paid_payments = await db.translator_payments.find(paid_query).to_list(100)
+        paid_pages = sum(p.get("pages_count", 0) for p in paid_payments)
+
+        # Pending payment = completed but not yet paid
+        pending_payment_pages = completed_pages - paid_pages
+        if pending_payment_pages < 0:
+            pending_payment_pages = 0
+
+        stats.append({
+            "translator_id": translator["id"],
+            "translator_name": translator.get("name", "Unknown"),
+            "translator_email": translator.get("email", ""),
+            "total_pages": total_pages,
+            "completed_pages": completed_pages,
+            "pending_pages": pending_pages,
+            "paid_pages": paid_pages,
+            "pending_payment_pages": pending_payment_pages,
+            "orders_count": len(orders),
+            "completed_orders": len([o for o in orders if o.get("translation_status") == "completed"])
+        })
+
+    return {"stats": stats}
+
+@api_router.get("/admin/production/translator/{translator_id}/orders")
+async def get_translator_orders(translator_id: str, admin_key: str, status: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get orders for a specific translator"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {"assigned_translator_id": translator_id}
+
+    if status:
+        query["translation_status"] = status
+
+    if start_date or end_date:
+        query["created_at"] = {}
+        if start_date:
+            query["created_at"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+    orders = await db.orders.find(query).sort("created_at", -1).to_list(500)
+
+    for order in orders:
+        if '_id' in order:
+            del order['_id']
+
+    return {"orders": orders}
+
+@api_router.post("/admin/payments")
+async def create_payment(payment_data: PaymentCreate, admin_key: str, token: Optional[str] = None):
+    """Create a payment record for a translator"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get translator info
+    translator = await db.admin_users.find_one({"id": payment_data.translator_id})
+    if not translator:
+        raise HTTPException(status_code=404, detail="Translator not found")
+
+    # Get current user if token provided
+    current_user = None
+    if token:
+        current_user = await get_current_admin_user(token)
+
+    payment = TranslatorPayment(
+        translator_id=payment_data.translator_id,
+        translator_name=translator.get("name", "Unknown"),
+        period_start=datetime.fromisoformat(payment_data.period_start.replace('Z', '+00:00')),
+        period_end=datetime.fromisoformat(payment_data.period_end.replace('Z', '+00:00')),
+        pages_count=payment_data.pages_count,
+        rate_per_page=payment_data.rate_per_page,
+        total_amount=payment_data.total_amount,
+        payment_method=payment_data.payment_method,
+        payment_reference=payment_data.payment_reference,
+        notes=payment_data.notes,
+        order_ids=payment_data.order_ids,
+        created_by_id=current_user["id"] if current_user else None,
+        created_by_name=current_user.get("name") if current_user else None
+    )
+
+    await db.translator_payments.insert_one(payment.dict())
+
+    # Create notification for translator
+    await create_notification(
+        user_id=payment_data.translator_id,
+        notif_type="payment_registered",
+        title="Pagamento Registrado",
+        message=f"Um pagamento de ${payment_data.total_amount:.2f} foi registrado para {payment_data.pages_count} páginas."
+    )
+
+    return {"status": "success", "payment": payment.dict()}
+
+@api_router.get("/admin/payments")
+async def get_payments(admin_key: str, translator_id: Optional[str] = None, status: Optional[str] = None):
+    """Get all payments with optional filters"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if translator_id:
+        query["translator_id"] = translator_id
+    if status:
+        query["status"] = status
+
+    payments = await db.translator_payments.find(query).sort("created_at", -1).to_list(500)
+
+    for payment in payments:
+        if '_id' in payment:
+            del payment['_id']
+
+    return {"payments": payments}
+
+@api_router.put("/admin/payments/{payment_id}")
+async def update_payment(payment_id: str, update_data: PaymentUpdate, admin_key: str):
+    """Update a payment record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    update_dict = {}
+    if update_data.status:
+        update_dict["status"] = update_data.status
+        if update_data.status == "paid" and not update_data.payment_date:
+            update_dict["payment_date"] = datetime.utcnow()
+    if update_data.payment_date:
+        update_dict["payment_date"] = datetime.fromisoformat(update_data.payment_date.replace('Z', '+00:00'))
+    if update_data.payment_method:
+        update_dict["payment_method"] = update_data.payment_method
+    if update_data.payment_reference:
+        update_dict["payment_reference"] = update_data.payment_reference
+    if update_data.notes is not None:
+        update_dict["notes"] = update_data.notes
+
+    result = await db.translator_payments.update_one(
+        {"id": payment_id},
+        {"$set": update_dict}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Get updated payment
+    payment = await db.translator_payments.find_one({"id": payment_id})
+    if '_id' in payment:
+        del payment['_id']
+
+    # Notify translator if marked as paid
+    if update_data.status == "paid":
+        await create_notification(
+            user_id=payment["translator_id"],
+            notif_type="payment_completed",
+            title="Pagamento Confirmado",
+            message=f"Seu pagamento de ${payment['total_amount']:.2f} foi confirmado."
+        )
+
+    return {"status": "success", "payment": payment}
+
+@api_router.delete("/admin/payments/{payment_id}")
+async def delete_payment(payment_id: str, admin_key: str):
+    """Delete a payment record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translator_payments.delete_one({"id": payment_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    return {"status": "success"}
+
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
     """Update order status (admin only)"""
@@ -1637,6 +2399,40 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["delivered_at"] = update_data.delivered_at
         if update_data.notes:
             update_dict["notes"] = update_data.notes
+        # NEW: Assignment fields
+        if update_data.assigned_pm_id is not None:
+            update_dict["assigned_pm_id"] = update_data.assigned_pm_id
+            # Get PM name
+            if update_data.assigned_pm_id:
+                pm = await db.admin_users.find_one({"id": update_data.assigned_pm_id})
+                if pm:
+                    update_dict["assigned_pm_name"] = pm.get("name", "")
+            else:
+                update_dict["assigned_pm_name"] = None
+        if update_data.assigned_translator_id is not None:
+            update_dict["assigned_translator_id"] = update_data.assigned_translator_id
+            # Get translator name
+            if update_data.assigned_translator_id:
+                translator = await db.admin_users.find_one({"id": update_data.assigned_translator_id})
+                if translator:
+                    update_dict["assigned_translator_name"] = translator.get("name", "")
+                    # Create notification for assigned translator
+                    current_order = await db.translation_orders.find_one({"id": order_id})
+                    if current_order:
+                        await create_notification(
+                            user_id=update_data.assigned_translator_id,
+                            notif_type="project_assigned",
+                            title="New Project Assigned",
+                            message=f"You have been assigned to project {current_order.get('order_number', order_id)}. Client: {current_order.get('client_name', 'N/A')}. Language: {current_order.get('translate_from', '')} → {current_order.get('translate_to', '')}",
+                            order_id=order_id,
+                            order_number=current_order.get('order_number')
+                        )
+            else:
+                update_dict["assigned_translator_name"] = None
+        if update_data.deadline:
+            update_dict["deadline"] = update_data.deadline
+        if update_data.internal_notes is not None:
+            update_dict["internal_notes"] = update_data.internal_notes
 
         if not update_dict:
             raise HTTPException(status_code=400, detail="No update data provided")
