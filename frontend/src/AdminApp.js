@@ -143,6 +143,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
     { id: 'projects', label: 'Projects', icon: '📋' },
     { id: 'translators', label: 'Translators', icon: '👥' },
+    { id: 'translation', label: 'Translation Tool', icon: '✍️' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ];
 
@@ -173,18 +174,6 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <span>{item.label}</span>
           </button>
         ))}
-
-        {/* Translation Tool - External Link */}
-        <a
-          href="/admin/translation-tool"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full flex items-center px-3 py-2 text-left transition-colors text-slate-300 hover:bg-slate-700"
-        >
-          <span className="mr-2">✍️</span>
-          <span>Translation Tool</span>
-          <span className="ml-auto text-[10px]">↗</span>
-        </a>
       </nav>
 
       <div className="p-2 border-t border-slate-700">
@@ -3849,24 +3838,6 @@ const SettingsPage = ({ adminKey }) => {
           </div>
         </div>
 
-        {/* External Tools */}
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold text-gray-800 mb-3">External Tools</h2>
-          <div className="space-y-2 text-xs">
-            <a
-              href="/admin/translation-tool"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
-            >
-              <div className="flex items-center">
-                <span className="mr-2">✍️</span>
-                <span>Translation Program</span>
-              </div>
-              <span className="text-orange-500 text-[10px] font-medium">Open ↗</span>
-            </a>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -3924,6 +3895,7 @@ function AdminApp() {
     switch (activeTab) {
       case 'projects': return <ProjectsPage adminKey={adminKey} />;
       case 'translators': return <TranslatorsPage adminKey={adminKey} />;
+      case 'translation': return <TranslationWorkspace adminKey={adminKey} />;
       case 'settings': return <SettingsPage adminKey={adminKey} />;
       default: return <ProjectsPage adminKey={adminKey} />;
     }
