@@ -142,6 +142,7 @@ const AdminLogin = ({ onLogin }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
   const menuItems = [
     { id: 'projects', label: 'Projects', icon: '📋' },
+    { id: 'translation', label: 'Translation', icon: '✍️' },
     { id: 'translators', label: 'Translators', icon: '👥' },
     { id: 'translation', label: 'Translation Tool', icon: '✍️' },
     { id: 'settings', label: 'Settings', icon: '⚙️' }
@@ -174,6 +175,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }) => {
             <span>{item.label}</span>
           </button>
         ))}
+
       </nav>
 
       <div className="p-2 border-t border-slate-700">
@@ -205,7 +207,13 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
   // State
-  const [activeSubTab, setActiveSubTab] = useState('resources');
+  const [activeSubTab, setActiveSubTab] = useState('start');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
+  const [customCoverLetters, setCustomCoverLetters] = useState(() => {
+    const saved = localStorage.getItem('custom_cover_letters');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
   const [translationResults, setTranslationResults] = useState([]);
@@ -365,8 +373,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
       // Show status
       setProcessingStatus(`📋 Working on order ${selectedOrder.order_number} - ${selectedOrder.client_name}`);
 
-      // Skip to cover/details tab
-      setActiveSubTab('cover');
+      // Skip to start tab
+      setActiveSubTab('start');
     }
   }, [selectedOrder]);
 
@@ -933,7 +941,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
 
     if (!claudeApiKey) {
       alert('Please configure your API Key in the Setup tab');
-      setActiveSubTab('resources');
+      setActiveSubTab('start');
       return;
     }
 
@@ -992,7 +1000,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
 
     if (!claudeApiKey) {
       alert('Please configure your API Key in the Setup tab');
-      setActiveSubTab('resources');
+      setActiveSubTab('start');
       return;
     }
 
@@ -1316,10 +1324,10 @@ ${includeOriginal ? originalPagesHTML : ''}
     if (!saveToTM || translationResults.length === 0) return;
 
     const typeLabels = {
-      'financial': 'Financeiro',
-      'education': 'Educação',
-      'general': 'Geral',
-      'personal': 'Documentos Pessoais'
+      'financial': 'Financial',
+      'education': 'Education',
+      'general': 'General',
+      'personal': 'Personal Documents'
     };
 
     // Extract text from translations (strip HTML)
@@ -1335,7 +1343,7 @@ ${includeOriginal ? originalPagesHTML : ''}
       name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString()}`,
       sourceLang: sourceLanguage,
       targetLang: targetLanguage,
-      field: typeLabels[documentCategory] || 'Geral',
+      field: typeLabels[documentCategory] || 'General',
       bidirectional: false,
       terms: translationResults.map((result, idx) => ({
         source: result.originalText || extractText(result.original || ''),
@@ -1625,11 +1633,10 @@ ${includeOriginal ? originalPagesHTML : ''}
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
-          { id: 'resources', label: '1. Setup', icon: '⚙️' },
-          { id: 'cover', label: '2. Details', icon: '📝' },
-          { id: 'ocr', label: '3. Document', icon: '📄' },
-          { id: 'review', label: '4. Review', icon: '🔍' },
-          { id: 'approval', label: '5. Deliver', icon: '✅' }
+          { id: 'start', label: 'START', icon: '📝' },
+          { id: 'translate', label: 'TRANSLATE', icon: '📄' },
+          { id: 'review', label: 'REVIEW', icon: '🔍' },
+          { id: 'deliver', label: 'DELIVER', icon: '✅' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -1645,41 +1652,138 @@ ${includeOriginal ? originalPagesHTML : ''}
         ))}
       </div>
 
-      {/* RESOURCES TAB */}
-      {activeSubTab === 'resources' && (
-        <div className="space-y-6">
+      {/* START TAB - Combined Setup & Cover Letter */}
+      {activeSubTab === 'start' && (
+        <div className="space-y-4">
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> 1️⃣ Add your API Key → 2️⃣ Go to Details tab → 3️⃣ Upload Document → 4️⃣ Review → 5️⃣ Deliver
+              <strong>Quick Start:</strong> 1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver
             </p>
           </div>
 
-          {/* API Key Section */}
-          <div className="bg-white rounded shadow p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <span className="text-lg">🔑</span>
-              <h2 className="text-sm font-bold">API Key</h2>
-            </div>
-            <div className="flex space-x-2">
-              <input
-                type="password"
-                value={claudeApiKey}
-                onChange={(e) => setClaudeApiKey(e.target.value)}
-                placeholder="sk-ant-api03-..."
-                className="flex-1 px-3 py-2 text-xs border rounded"
-              />
-              <button
-                onClick={saveApiKey}
-                className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+          {/* API Key - Collapsible */}
+          <div className="bg-white rounded shadow">
+            <button
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
+            >
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">🔑</span>
+                <span className="text-sm font-medium">API Key Settings</span>
+                {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
+              </div>
+              <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
+            </button>
+            {showApiKey && (
+              <div className="p-4 border-t">
+                <div className="flex space-x-2">
+                  <input
+                    type="password"
+                    value={claudeApiKey}
+                    onChange={(e) => setClaudeApiKey(e.target.value)}
+                    placeholder="sk-ant-api03-..."
+                    className="flex-1 px-3 py-2 text-xs border rounded"
+                  />
+                  <button
+                    onClick={saveApiKey}
+                    className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+              </div>
+            )}
           </div>
 
-          {/* Glossaries & Translation Memories Section */}
+          {/* Cover Letter Template Selector */}
+          <div className="bg-white rounded shadow p-4">
+            <h3 className="text-sm font-bold mb-3">📋 Cover Letter Template</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+              <button
+                onClick={() => setSelectedCoverLetter('default')}
+                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'default' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+              >
+                <div className="font-bold">Default</div>
+                <div className="text-[10px] text-gray-500">Standard Certificate</div>
+              </button>
+              <button
+                onClick={() => setSelectedCoverLetter('rmv-ma')}
+                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'rmv-ma' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+              >
+                <div className="font-bold">RMV - Massachusetts</div>
+                <div className="text-[10px] text-gray-500">Driver's License</div>
+              </button>
+              <button
+                onClick={() => setSelectedCoverLetter('dmv-fl')}
+                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'dmv-fl' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+              >
+                <div className="font-bold">DMV - Florida</div>
+                <div className="text-[10px] text-gray-500">Driver's License</div>
+              </button>
+              <button
+                onClick={() => {
+                  const name = prompt('Enter template name:');
+                  if (name) {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.pdf,.doc,.docx,.html';
+                    input.onchange = (e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const newTemplate = { id: Date.now(), name, content: ev.target.result, type: file.type };
+                          const updated = [...customCoverLetters, newTemplate];
+                          setCustomCoverLetters(updated);
+                          localStorage.setItem('custom_cover_letters', JSON.stringify(updated));
+                          setSelectedCoverLetter(`custom-${newTemplate.id}`);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    };
+                    input.click();
+                  }
+                }}
+                className="p-3 text-xs rounded border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              >
+                <div className="font-bold text-blue-600">+ Upload Custom</div>
+                <div className="text-[10px] text-gray-500">Add your template</div>
+              </button>
+            </div>
+            {/* Custom Templates */}
+            {customCoverLetters.length > 0 && (
+              <div className="border-t pt-3">
+                <p className="text-xs font-medium text-gray-600 mb-2">Custom Templates:</p>
+                <div className="flex flex-wrap gap-2">
+                  {customCoverLetters.map(tpl => (
+                    <div key={tpl.id} className="flex items-center">
+                      <button
+                        onClick={() => setSelectedCoverLetter(`custom-${tpl.id}`)}
+                        className={`px-3 py-1.5 text-xs rounded-l border ${selectedCoverLetter === `custom-${tpl.id}` ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200'}`}
+                      >
+                        {tpl.name}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated = customCoverLetters.filter(t => t.id !== tpl.id);
+                          setCustomCoverLetters(updated);
+                          localStorage.setItem('custom_cover_letters', JSON.stringify(updated));
+                          if (selectedCoverLetter === `custom-${tpl.id}`) setSelectedCoverLetter('default');
+                        }}
+                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-l-0 border-red-200 rounded-r hover:bg-red-100"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Glossaries & Translation Memories Section - Collapsible */}
           <div className="bg-white rounded shadow">
             <div className="p-4 border-b flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1713,10 +1817,10 @@ ${includeOriginal ? originalPagesHTML : ''}
                   className="px-3 py-1.5 text-xs border rounded"
                 >
                   <option>All Fields</option>
-                  <option>Financeiro</option>
-                  <option>Educação</option>
-                  <option>Geral</option>
-                  <option>Documentos Pessoais</option>
+                  <option>Financial</option>
+                  <option>Education</option>
+                  <option>General</option>
+                  <option>Personal Documents</option>
                 </select>
               </div>
 
@@ -1840,10 +1944,10 @@ ${includeOriginal ? originalPagesHTML : ''}
                         className="w-full px-2 py-1.5 text-xs border rounded"
                       >
                         <option>All Fields</option>
-                        <option>Financeiro</option>
-                        <option>Educação</option>
-                        <option>Geral</option>
-                        <option>Documentos Pessoais</option>
+                        <option>Financial</option>
+                        <option>Education</option>
+                        <option>General</option>
+                        <option>Personal Documents</option>
                       </select>
                     </div>
                   </div>
@@ -2073,28 +2177,9 @@ tradução juramentada | certified translation`}
             </div>
           )}
 
-          {/* Navigation */}
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={() => setActiveSubTab('cover')}
-              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
-            >
-              Next: Details <span className="ml-2">→</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* COVER LETTER TAB */}
-      {activeSubTab === 'cover' && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">📋 Cover Letter & Certificate Setup</h2>
-
           {/* Certificate Logos Section */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-            <h3 className="text-xs font-bold text-blue-700 mb-3">🖼️ Certificate Logos</h3>
-            <p className="text-[10px] text-gray-600 mb-4">Upload custom logos for the certificate. They will be saved in your browser.</p>
-
+          <div className="bg-white rounded shadow p-4">
+            <h3 className="text-xs font-bold text-gray-700 mb-3">🖼️ Certificate Logos & Signature</h3>
             <div className="grid grid-cols-4 gap-4">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
@@ -2106,29 +2191,10 @@ tradução juramentada | certified translation`}
                     <span className="text-xs text-gray-400">No logo</span>
                   )}
                 </div>
-                <input
-                  ref={logoLeftInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'left')}
-                  className="hidden"
-                />
+                <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-2">
-                  <button
-                    onClick={() => logoLeftInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoLeft && (
-                    <button
-                      onClick={() => removeLogo('left')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                      title="Remove logo"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
+                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -2142,29 +2208,10 @@ tradução juramentada | certified translation`}
                     <span className="text-xs text-gray-400">No logo</span>
                   )}
                 </div>
-                <input
-                  ref={logoRightInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'right')}
-                  className="hidden"
-                />
+                <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-2">
-                  <button
-                    onClick={() => logoRightInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoRight && (
-                    <button
-                      onClick={() => removeLogo('right')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                      title="Remove logo"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  <button onClick={() => logoRightInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
+                  {logoRight && <button onClick={() => removeLogo('right')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -2178,29 +2225,10 @@ tradução juramentada | certified translation`}
                     <span className="text-xs text-gray-400">No logo</span>
                   )}
                 </div>
-                <input
-                  ref={logoStampInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'stamp')}
-                  className="hidden"
-                />
+                <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-2">
-                  <button
-                    onClick={() => logoStampInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {logoStamp && (
-                    <button
-                      onClick={() => removeLogo('stamp')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                      title="Remove logo"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  <button onClick={() => logoStampInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
+                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -2214,36 +2242,17 @@ tradução juramentada | certified translation`}
                     <span className="text-xs text-gray-400">No signature</span>
                   )}
                 </div>
-                <input
-                  ref={signatureInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleLogoUpload(e, 'signature')}
-                  className="hidden"
-                />
+                <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-2">
-                  <button
-                    onClick={() => signatureInputRef.current?.click()}
-                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                  >
-                    Upload
-                  </button>
-                  {signatureImage && (
-                    <button
-                      onClick={() => removeLogo('signature')}
-                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
-                      title="Remove signature"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  <button onClick={() => signatureInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
+                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
           </div>
 
           {/* Certificate Preview - LIVE with Editable Fields */}
-          <div className="p-4 bg-white border-2 border-blue-300 rounded mb-4">
+          <div className="bg-white rounded shadow p-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
               <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
@@ -2253,7 +2262,7 @@ tradução juramentada | certified translation`}
             <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
 
               {/* Header with logos */}
-              <div className="flex justify-between items-center mb-4 pb-2">
+              <div className="flex justify-between items-center mb-2 pb-2">
                 <div className="w-32">
                   {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
                 </div>
@@ -2266,17 +2275,13 @@ tradução juramentada | certified translation`}
                   {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
                 </div>
               </div>
+              {/* Light blue line below header */}
+              <div className="w-full h-0.5 bg-blue-200 mb-4"></div>
 
               {/* Order Number */}
               <div className="text-right mb-6 text-sm">
                 <span>Order # </span>
-                <input
-                  type="text"
-                  value={orderNumber}
-                  onChange={(e) => setOrderNumber(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600"
-                  placeholder="P6287"
-                />
+                <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
               </div>
 
               {/* Main Title */}
@@ -2285,27 +2290,13 @@ tradução juramentada | certified translation`}
               {/* Translation of ... */}
               <p className="text-center mb-6 text-sm">
                 Translation of{' '}
-                <input
-                  type="text"
-                  value={documentType}
-                  onChange={(e) => setDocumentType(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600"
-                  placeholder="School Transcript"
-                />
+                <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600" placeholder="School Transcript" />
                 {' '}from<br/>
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => setSourceLanguage(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1"
-                >
+                <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1">
                   {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
                 {' '}to{' '}
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600"
-                >
+                <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600">
                   {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </p>
@@ -2329,7 +2320,6 @@ tradução juramentada | certified translation`}
 
               {/* Signature and Stamp Section */}
               <div className="mt-8 flex justify-between items-end">
-                {/* Signature */}
                 <div>
                   {signatureImage ? (
                     <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
@@ -2340,15 +2330,9 @@ tradução juramentada | certified translation`}
                   <div className="text-xs">Legacy Translations Inc.</div>
                   <div className="text-xs mt-2">
                     Dated:{' '}
-                    <input
-                      type="text"
-                      value={translationDate}
-                      onChange={(e) => setTranslationDate(e.target.value)}
-                      className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600"
-                    />
+                    <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
                   </div>
                 </div>
-                {/* Stamp */}
                 <div className="text-center">
                   {logoStamp ? (
                     <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
@@ -2365,27 +2349,19 @@ tradução juramentada | certified translation`}
           </div>
 
           {/* Page Format Section */}
-          <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
+          <div className="bg-white rounded shadow p-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
-                <select
-                  value={translationType}
-                  onChange={(e) => saveTranslationType(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
+                <select value={translationType} onChange={(e) => saveTranslationType(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
                   <option value="certified">Certified Translation</option>
                   <option value="sworn">Sworn Translation</option>
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
-                <select
-                  value={pageFormat}
-                  onChange={(e) => savePageFormat(e.target.value)}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                >
+                <select value={pageFormat} onChange={(e) => savePageFormat(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
                   <option value="letter">Letter (8.5" x 11") - US Standard</option>
                   <option value="a4">A4 (210mm x 297mm) - International</option>
                 </select>
@@ -2394,55 +2370,49 @@ tradução juramentada | certified translation`}
           </div>
 
           {/* Navigation */}
-          <div className="mt-4 flex justify-between items-center">
+          <div className="mt-4 flex justify-end">
             <button
-              onClick={() => setActiveSubTab('resources')}
-              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
-            >
-              <span className="mr-2">←</span> Back: Setup
-            </button>
-            <button
-              onClick={() => setActiveSubTab('ocr')}
+              onClick={() => setActiveSubTab('translate')}
               className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
             >
-              Next: Document <span className="ml-2">→</span>
+              Next: Translate <span className="ml-2">→</span>
             </button>
           </div>
         </div>
       )}
 
       {/* DOCUMENT TAB - Direct Translation */}
-      {activeSubTab === 'ocr' && (
+      {activeSubTab === 'translate' && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
 
           {/* Translation Type Selector */}
           <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <label className="block text-xs font-medium text-purple-700 mb-2">📁 Tipo de Documento</label>
+            <label className="block text-xs font-medium text-purple-700 mb-2">📁 Document Type</label>
             <div className="grid grid-cols-4 gap-2">
               <button
                 onClick={() => setDocumentCategory('financial')}
                 className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
-                📊 Financeiro
+                📊 Financial
               </button>
               <button
                 onClick={() => setDocumentCategory('education')}
                 className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
-                🎓 Educação
+                🎓 Education
               </button>
               <button
                 onClick={() => setDocumentCategory('general')}
                 className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
-                📄 Geral
+                📄 General
               </button>
               <button
                 onClick={() => setDocumentCategory('personal')}
                 className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
               >
-                👤 Docs Pessoais
+                👤 Personal
               </button>
             </div>
           </div>
@@ -2460,7 +2430,7 @@ tradução juramentada | certified translation`}
                   className="sr-only"
                 />
                 <span className="mr-2">🤖</span>
-                <span className="text-sm font-medium">Traduzir com AI</span>
+                <span className="text-sm font-medium">Translate with AI</span>
               </label>
               <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'external' ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
@@ -2472,7 +2442,7 @@ tradução juramentada | certified translation`}
                   className="sr-only"
                 />
                 <span className="mr-2">📥</span>
-                <span className="text-sm font-medium">Tradução Externa</span>
+                <span className="text-sm font-medium">External Translation</span>
               </label>
               <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'ocr' ? 'bg-gray-700 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                 <input
@@ -2682,7 +2652,7 @@ tradução juramentada | certified translation`}
           {/* Navigation */}
           <div className="mt-4 flex justify-between items-center">
             <button
-              onClick={() => setActiveSubTab('cover')}
+              onClick={() => setActiveSubTab('start')}
               className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
             >
               <span className="mr-2">←</span> Back: Details
@@ -2833,7 +2803,7 @@ tradução juramentada | certified translation`}
               {/* Navigation for External Mode */}
               <div className="mt-4 flex justify-between items-center">
                 <button
-                  onClick={() => setActiveSubTab('cover')}
+                  onClick={() => setActiveSubTab('start')}
                   className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
                 >
                   <span className="mr-2">←</span> Back: Details
@@ -2940,7 +2910,7 @@ tradução juramentada | certified translation`}
               {/* Navigation */}
               <div className="mt-4 flex justify-start">
                 <button
-                  onClick={() => setActiveSubTab('cover')}
+                  onClick={() => setActiveSubTab('start')}
                   className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
                 >
                   <span className="mr-2">←</span> Back: Details
@@ -3127,13 +3097,13 @@ tradução juramentada | certified translation`}
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
                 <button
-                  onClick={() => setActiveSubTab('ocr')}
+                  onClick={() => setActiveSubTab('translate')}
                   className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
                 >
                   <span className="mr-2">←</span> Back: Document
                 </button>
                 <button
-                  onClick={() => setActiveSubTab('approval')}
+                  onClick={() => setActiveSubTab('deliver')}
                   className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
                 >
                   Next: Deliver <span className="ml-2">→</span>
@@ -3145,7 +3115,7 @@ tradução juramentada | certified translation`}
               <div className="text-4xl mb-2">📄</div>
               <p className="text-xs">No translations yet. Complete OCR and translation in <strong>3. Document</strong> first.</p>
               <button
-                onClick={() => setActiveSubTab('ocr')}
+                onClick={() => setActiveSubTab('translate')}
                 className="mt-4 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
               >
                 Go to Document
@@ -3156,7 +3126,7 @@ tradução juramentada | certified translation`}
       )}
 
       {/* APPROVAL TAB */}
-      {activeSubTab === 'approval' && (
+      {activeSubTab === 'deliver' && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
@@ -3185,7 +3155,7 @@ tradução juramentada | certified translation`}
               </label>
             </div>
             <p className="text-[10px] text-gray-500 text-center mt-2">
-              {!quickPackageMode ? 'Usar tradução do fluxo anterior' : 'Montar pacote com tradução pronta (upload)'}
+              {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
             </p>
           </div>
 
@@ -3250,8 +3220,8 @@ tradução juramentada | certified translation`}
 
               {/* Upload Translation (Ready) */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Tradução Pronta</h3>
-                <p className="text-[10px] text-green-600 mb-3">Upload das páginas da tradução (serão ajustadas com letterhead)</p>
+                <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
+                <p className="text-[10px] text-green-600 mb-3">Upload translation pages (will be adjusted with letterhead)</p>
 
                 <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center cursor-pointer hover:border-green-500 transition-colors mb-2">
                   <input
@@ -3265,9 +3235,9 @@ tradução juramentada | certified translation`}
                   <label htmlFor="quick-translation-upload" className="cursor-pointer">
                     <div className="text-2xl mb-1">📤</div>
                     <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                      Upload Tradução
+                      Upload Translation
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Múltiplos arquivos permitidos</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed</p>
                   </label>
                 </div>
 
@@ -3291,8 +3261,8 @@ tradução juramentada | certified translation`}
 
               {/* Upload Originals */}
               <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Documentos Originais</h3>
-                <p className="text-[10px] text-orange-600 mb-3">Upload das páginas do documento original</p>
+                <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Original Documents</h3>
+                <p className="text-[10px] text-orange-600 mb-3">Upload original document pages</p>
 
                 <div className="border-2 border-dashed border-orange-300 rounded-lg p-4 text-center cursor-pointer hover:border-orange-500 transition-colors mb-2">
                   <input
@@ -3308,7 +3278,7 @@ tradução juramentada | certified translation`}
                     <span className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded hover:bg-orange-700">
                       Upload Originais
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Múltiplos arquivos permitidos</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed</p>
                   </label>
                 </div>
 
@@ -3332,7 +3302,7 @@ tradução juramentada | certified translation`}
 
               {/* Options */}
               <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Opções</h3>
+                <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3350,7 +3320,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeLetterhead(e.target.checked)}
                       className="mr-3 w-4 h-4"
                     />
-                    <span>Incluir Letterhead nas páginas</span>
+                    <span>Include Letterhead on pages</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3359,14 +3329,14 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setIncludeOriginal(e.target.checked)}
                       className="mr-3 w-4 h-4"
                     />
-                    <span>Incluir Documentos Originais</span>
+                    <span>Include Original Documents</span>
                   </label>
                 </div>
               </div>
 
               {/* Document Order Preview */}
               <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-purple-700 mb-2">📋 Ordem do Documento Final</h3>
+                <h3 className="text-sm font-bold text-purple-700 mb-2">📋 Final Document Order</h3>
                 <div className="flex items-center gap-2 text-xs flex-wrap">
                   {includeCover && (
                     <>
@@ -3374,11 +3344,11 @@ tradução juramentada | certified translation`}
                       <span className="text-gray-400">→</span>
                     </>
                   )}
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">📄 Tradução ({quickTranslationFiles.length} pág.)</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">📄 Translation ({quickTranslationFiles.length} pages)</span>
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pág.)</span>
+                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
                     </>
                   )}
                 </div>
@@ -3390,10 +3360,10 @@ tradução juramentada | certified translation`}
                 disabled={quickTranslationFiles.length === 0}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                📦 Gerar Pacote Completo (Print/PDF)
+                📦 Generate Complete Package (Print/PDF)
               </button>
               <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Abre janela de impressão - salve como PDF
+                Opens print window - save as PDF
               </p>
             </>
           )}
@@ -3412,7 +3382,7 @@ tradução juramentada | certified translation`}
                       onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">Você colocou o número do projeto?</span>
+                    <span className="font-medium">Did you add the project number?</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3437,8 +3407,8 @@ tradução juramentada | certified translation`}
 
               {/* Non-Certified Translation Options */}
               <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-orange-700 mb-2">📄 Para traduções não certificadas</h3>
-                <p className="text-[10px] text-orange-600 mb-3">Marque para EXCLUIR do documento final:</p>
+                <h3 className="text-sm font-bold text-orange-700 mb-2">📄 For non-certified translations</h3>
+                <p className="text-[10px] text-orange-600 mb-3">Check to EXCLUDE from final document:</p>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
@@ -3480,9 +3450,9 @@ tradução juramentada | certified translation`}
                     className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
                   />
                   <div>
-                    <span className="font-medium">💾 Salvar na Translation Memory</span>
+                    <span className="font-medium">💾 Save to Translation Memory</span>
                     <p className="text-[10px] text-teal-600 mt-0.5">
-                      Categoria: {documentCategory === 'financial' ? '📊 Financeiro' : documentCategory === 'education' ? '🎓 Educação' : documentCategory === 'personal' ? '👤 Docs Pessoais' : '📄 Geral'}
+                      Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
                     </p>
                   </div>
                 </label>
@@ -3511,7 +3481,7 @@ tradução juramentada | certified translation`}
                     )}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-2">
-                    {includeLetterhead ? '✓ Letterhead em todas as páginas' : '✗ Sem letterhead'}
+                    {includeLetterhead ? '✓ Letterhead on all pages' : '✗ No letterhead'}
                   </p>
                 </div>
 
@@ -3594,7 +3564,7 @@ tradução juramentada | certified translation`}
               <p className="text-xs">No translations yet. Complete the translation workflow first,</p>
               <p className="text-xs mb-4">or use <strong>Quick Package</strong> mode to upload ready translations.</p>
               <button
-                onClick={() => setActiveSubTab('ocr')}
+                onClick={() => setActiveSubTab('translate')}
                 className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
               >
                 Go to Document
@@ -4025,8 +3995,8 @@ function AdminApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'projects': return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
-      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
       case 'translation': return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} />;
+      case 'translators': return <TranslatorsPage adminKey={adminKey} />;
       case 'settings': return <SettingsPage adminKey={adminKey} />;
       default: return <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} />;
     }
