@@ -1300,7 +1300,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
             </div>
         </div>` : ''}
         <div class="translation-content">
-            <img src="${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; height: auto;" />
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" style="max-width: 100%; height: auto;" />
         </div>
     </div>`).join('');
 
@@ -1308,7 +1308,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
     const originalPagesHTML = quickOriginalFiles.map((file, idx) => `
     <div class="original-page">
         <div class="original-label">ORIGINAL DOCUMENT - Page ${idx + 1}</div>
-        <img src="${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />
+        <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Original page ${idx + 1}" style="max-width: 100%; height: auto;" />
     </div>`).join('');
 
     // Complete HTML
