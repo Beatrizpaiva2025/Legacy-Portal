@@ -564,6 +564,45 @@ class Notification(BaseModel):
     is_read: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+# Translator Payment Model
+class TranslatorPayment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    translator_id: str
+    translator_name: str
+    period_start: datetime
+    period_end: datetime
+    pages_count: int
+    rate_per_page: float = 25.0  # Default rate per page
+    total_amount: float
+    status: str = "pending"  # pending, paid
+    payment_date: Optional[datetime] = None
+    payment_method: Optional[str] = None  # bank_transfer, paypal, etc.
+    payment_reference: Optional[str] = None  # Transaction ID
+    notes: Optional[str] = None
+    order_ids: List[str] = []  # Orders included in this payment
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by_id: Optional[str] = None
+    created_by_name: Optional[str] = None
+
+class PaymentCreate(BaseModel):
+    translator_id: str
+    period_start: str  # ISO date
+    period_end: str  # ISO date
+    pages_count: int
+    rate_per_page: float = 25.0
+    total_amount: float
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
+    notes: Optional[str] = None
+    order_ids: List[str] = []
+
+class PaymentUpdate(BaseModel):
+    status: Optional[str] = None
+    payment_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_reference: Optional[str] = None
+    notes: Optional[str] = None
+
 # Helper function to create notifications
 async def create_notification(user_id: str, notif_type: str, title: str, message: str, order_id: str = None, order_number: str = None):
     """Create a notification for a user"""
@@ -2123,6 +2162,221 @@ async def mark_all_notifications_read(token: str, admin_key: str):
         {"user_id": user["id"], "is_read": False},
         {"$set": {"is_read": True}}
     )
+
+    return {"status": "success"}
+
+# ==================== PRODUCTION & PAYMENTS ====================
+
+@api_router.get("/admin/production/stats")
+async def get_production_stats(admin_key: str, translator_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get production statistics for translators"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get all translators
+    translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
+
+    stats = []
+    for translator in translators:
+        if translator_id and translator["id"] != translator_id:
+            continue
+
+        # Build query for orders assigned to this translator
+        query = {"assigned_translator_id": translator["id"]}
+
+        # Add date filters if provided
+        if start_date or end_date:
+            query["created_at"] = {}
+            if start_date:
+                query["created_at"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            if end_date:
+                query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+        # Get orders
+        orders = await db.orders.find(query).to_list(1000)
+
+        # Calculate stats
+        total_pages = 0
+        completed_pages = 0
+        pending_pages = 0
+
+        for order in orders:
+            pages = order.get("page_count", 0) or 0
+            total_pages += pages
+            if order.get("translation_status") == "completed":
+                completed_pages += pages
+            else:
+                pending_pages += pages
+
+        # Get paid pages from payments
+        paid_query = {"translator_id": translator["id"], "status": "paid"}
+        paid_payments = await db.translator_payments.find(paid_query).to_list(100)
+        paid_pages = sum(p.get("pages_count", 0) for p in paid_payments)
+
+        # Pending payment = completed but not yet paid
+        pending_payment_pages = completed_pages - paid_pages
+        if pending_payment_pages < 0:
+            pending_payment_pages = 0
+
+        stats.append({
+            "translator_id": translator["id"],
+            "translator_name": translator.get("name", "Unknown"),
+            "translator_email": translator.get("email", ""),
+            "total_pages": total_pages,
+            "completed_pages": completed_pages,
+            "pending_pages": pending_pages,
+            "paid_pages": paid_pages,
+            "pending_payment_pages": pending_payment_pages,
+            "orders_count": len(orders),
+            "completed_orders": len([o for o in orders if o.get("translation_status") == "completed"])
+        })
+
+    return {"stats": stats}
+
+@api_router.get("/admin/production/translator/{translator_id}/orders")
+async def get_translator_orders(translator_id: str, admin_key: str, status: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get orders for a specific translator"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {"assigned_translator_id": translator_id}
+
+    if status:
+        query["translation_status"] = status
+
+    if start_date or end_date:
+        query["created_at"] = {}
+        if start_date:
+            query["created_at"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            query["created_at"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+    orders = await db.orders.find(query).sort("created_at", -1).to_list(500)
+
+    for order in orders:
+        if '_id' in order:
+            del order['_id']
+
+    return {"orders": orders}
+
+@api_router.post("/admin/payments")
+async def create_payment(payment_data: PaymentCreate, admin_key: str, token: Optional[str] = None):
+    """Create a payment record for a translator"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get translator info
+    translator = await db.admin_users.find_one({"id": payment_data.translator_id})
+    if not translator:
+        raise HTTPException(status_code=404, detail="Translator not found")
+
+    # Get current user if token provided
+    current_user = None
+    if token:
+        current_user = await get_current_admin_user(token)
+
+    payment = TranslatorPayment(
+        translator_id=payment_data.translator_id,
+        translator_name=translator.get("name", "Unknown"),
+        period_start=datetime.fromisoformat(payment_data.period_start.replace('Z', '+00:00')),
+        period_end=datetime.fromisoformat(payment_data.period_end.replace('Z', '+00:00')),
+        pages_count=payment_data.pages_count,
+        rate_per_page=payment_data.rate_per_page,
+        total_amount=payment_data.total_amount,
+        payment_method=payment_data.payment_method,
+        payment_reference=payment_data.payment_reference,
+        notes=payment_data.notes,
+        order_ids=payment_data.order_ids,
+        created_by_id=current_user["id"] if current_user else None,
+        created_by_name=current_user.get("name") if current_user else None
+    )
+
+    await db.translator_payments.insert_one(payment.dict())
+
+    # Create notification for translator
+    await create_notification(
+        user_id=payment_data.translator_id,
+        notif_type="payment_registered",
+        title="Pagamento Registrado",
+        message=f"Um pagamento de ${payment_data.total_amount:.2f} foi registrado para {payment_data.pages_count} páginas."
+    )
+
+    return {"status": "success", "payment": payment.dict()}
+
+@api_router.get("/admin/payments")
+async def get_payments(admin_key: str, translator_id: Optional[str] = None, status: Optional[str] = None):
+    """Get all payments with optional filters"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if translator_id:
+        query["translator_id"] = translator_id
+    if status:
+        query["status"] = status
+
+    payments = await db.translator_payments.find(query).sort("created_at", -1).to_list(500)
+
+    for payment in payments:
+        if '_id' in payment:
+            del payment['_id']
+
+    return {"payments": payments}
+
+@api_router.put("/admin/payments/{payment_id}")
+async def update_payment(payment_id: str, update_data: PaymentUpdate, admin_key: str):
+    """Update a payment record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    update_dict = {}
+    if update_data.status:
+        update_dict["status"] = update_data.status
+        if update_data.status == "paid" and not update_data.payment_date:
+            update_dict["payment_date"] = datetime.utcnow()
+    if update_data.payment_date:
+        update_dict["payment_date"] = datetime.fromisoformat(update_data.payment_date.replace('Z', '+00:00'))
+    if update_data.payment_method:
+        update_dict["payment_method"] = update_data.payment_method
+    if update_data.payment_reference:
+        update_dict["payment_reference"] = update_data.payment_reference
+    if update_data.notes is not None:
+        update_dict["notes"] = update_data.notes
+
+    result = await db.translator_payments.update_one(
+        {"id": payment_id},
+        {"$set": update_dict}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Get updated payment
+    payment = await db.translator_payments.find_one({"id": payment_id})
+    if '_id' in payment:
+        del payment['_id']
+
+    # Notify translator if marked as paid
+    if update_data.status == "paid":
+        await create_notification(
+            user_id=payment["translator_id"],
+            notif_type="payment_completed",
+            title="Pagamento Confirmado",
+            message=f"Seu pagamento de ${payment['total_amount']:.2f} foi confirmado."
+        )
+
+    return {"status": "success", "payment": payment}
+
+@api_router.delete("/admin/payments/{payment_id}")
+async def delete_payment(payment_id: str, admin_key: str):
+    """Delete a payment record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translator_payments.delete_one({"id": payment_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
 
     return {"status": "success"}
 

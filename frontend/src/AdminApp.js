@@ -297,6 +297,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'production', label: 'Production', icon: '📊', roles: ['admin'] },
     { id: 'translators', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
@@ -4727,6 +4728,458 @@ const UsersPage = ({ adminKey }) => {
   );
 };
 
+// ==================== PRODUCTION & PAYMENTS PAGE ====================
+const ProductionPage = ({ adminKey }) => {
+  const [stats, setStats] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('stats'); // stats, payments
+  const [selectedTranslator, setSelectedTranslator] = useState(null);
+  const [translatorOrders, setTranslatorOrders] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    translator_id: '',
+    period_start: '',
+    period_end: '',
+    pages_count: 0,
+    rate_per_page: 25.0,
+    total_amount: 0,
+    payment_method: '',
+    payment_reference: '',
+    notes: ''
+  });
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/production/stats?admin_key=${adminKey}`);
+      setStats(response.data.stats || []);
+    } catch (err) {
+      console.error('Error fetching production stats:', err);
+    }
+  };
+
+  const fetchPayments = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/payments?admin_key=${adminKey}`);
+      setPayments(response.data.payments || []);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+    }
+  };
+
+  const fetchTranslatorOrders = async (translatorId) => {
+    try {
+      const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}&status=completed`);
+      setTranslatorOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Error fetching translator orders:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchStats(), fetchPayments()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey]);
+
+  const handleSelectTranslator = async (translator) => {
+    setSelectedTranslator(translator);
+    await fetchTranslatorOrders(translator.translator_id);
+  };
+
+  const openPaymentModal = (translator) => {
+    const today = new Date().toISOString().split('T')[0];
+    const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+    setPaymentForm({
+      translator_id: translator.translator_id,
+      period_start: firstOfMonth,
+      period_end: today,
+      pages_count: translator.pending_payment_pages || 0,
+      rate_per_page: 25.0,
+      total_amount: (translator.pending_payment_pages || 0) * 25.0,
+      payment_method: 'bank_transfer',
+      payment_reference: '',
+      notes: ''
+    });
+    setShowPaymentModal(true);
+  };
+
+  const handleCreatePayment = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/admin/payments?admin_key=${adminKey}`, paymentForm);
+      setShowPaymentModal(false);
+      fetchStats();
+      fetchPayments();
+      alert('Pagamento registrado com sucesso!');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Erro ao registrar pagamento');
+    }
+  };
+
+  const handleMarkAsPaid = async (paymentId) => {
+    if (!window.confirm('Confirmar pagamento como realizado?')) return;
+    try {
+      await axios.put(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`, { status: 'paid' });
+      fetchPayments();
+      fetchStats();
+    } catch (err) {
+      alert('Erro ao atualizar pagamento');
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm('Excluir este registro de pagamento?')) return;
+    try {
+      await axios.delete(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`);
+      fetchPayments();
+      fetchStats();
+    } catch (err) {
+      alert('Erro ao excluir pagamento');
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  if (loading) return <div className="p-6 text-center">Carregando estatísticas...</div>;
+
+  return (
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">📊 Produção & Pagamentos</h1>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setActiveView('stats')}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'stats' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Estatísticas
+          </button>
+          <button
+            onClick={() => setActiveView('payments')}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+          >
+            Histórico de Pagamentos
+          </button>
+        </div>
+      </div>
+
+      {activeView === 'stats' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Translator Stats Cards */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b">
+              <h2 className="text-sm font-bold text-gray-800">Tradutores</h2>
+            </div>
+            <div className="p-4 space-y-3">
+              {stats.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">Nenhum tradutor encontrado</div>
+              ) : (
+                stats.map((translator) => (
+                  <div
+                    key={translator.translator_id}
+                    onClick={() => handleSelectTranslator(translator)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      selectedTranslator?.translator_id === translator.translator_id
+                        ? 'border-teal-500 bg-teal-50'
+                        : 'border-gray-200 hover:border-teal-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <div className="font-medium text-gray-800">{translator.translator_name}</div>
+                        <div className="text-xs text-gray-500">{translator.translator_email}</div>
+                      </div>
+                      {translator.pending_payment_pages > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openPaymentModal(translator); }}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                        >
+                          Registrar Pagamento
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                      <div className="bg-gray-100 rounded p-2">
+                        <div className="text-gray-500">Total</div>
+                        <div className="font-bold text-gray-800">{translator.total_pages}</div>
+                      </div>
+                      <div className="bg-green-100 rounded p-2">
+                        <div className="text-green-600">Concluídas</div>
+                        <div className="font-bold text-green-700">{translator.completed_pages}</div>
+                      </div>
+                      <div className="bg-blue-100 rounded p-2">
+                        <div className="text-blue-600">Pagas</div>
+                        <div className="font-bold text-blue-700">{translator.paid_pages}</div>
+                      </div>
+                      <div className="bg-yellow-100 rounded p-2">
+                        <div className="text-yellow-600">A Pagar</div>
+                        <div className="font-bold text-yellow-700">{translator.pending_payment_pages}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500">
+                      {translator.completed_orders} de {translator.orders_count} projetos concluídos
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Selected Translator Orders */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b">
+              <h2 className="text-sm font-bold text-gray-800">
+                {selectedTranslator ? `Projetos de ${selectedTranslator.translator_name}` : 'Selecione um tradutor'}
+              </h2>
+            </div>
+            <div className="p-4">
+              {!selectedTranslator ? (
+                <div className="text-center text-gray-500 py-8">
+                  Clique em um tradutor para ver seus projetos
+                </div>
+              ) : translatorOrders.length === 0 ? (
+                <div className="text-center text-gray-500 py-4">Nenhum projeto concluído</div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {translatorOrders.map((order) => (
+                    <div key={order.id} className="p-3 border rounded-lg text-xs">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-800">{order.order_number || order.reference}</div>
+                          <div className="text-gray-500">{order.client_name}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-teal-600">{order.page_count || 0} pág.</div>
+                          <div className="text-gray-500">{formatDate(order.created_at)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'payments' && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-4 border-b">
+            <h2 className="text-sm font-bold text-gray-800">Histórico de Pagamentos</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Tradutor</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Período</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Páginas</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Valor</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Data Pag.</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {payments.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      Nenhum pagamento registrado
+                    </td>
+                  </tr>
+                ) : (
+                  payments.map((payment) => (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-800">{payment.translator_name}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {formatDate(payment.period_start)} - {formatDate(payment.period_end)}
+                      </td>
+                      <td className="px-4 py-3 text-center">{payment.pages_count}</td>
+                      <td className="px-4 py-3 text-center font-bold text-teal-600">
+                        {formatCurrency(payment.total_amount)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          payment.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {payment.status === 'paid' ? 'Pago' : 'Pendente'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {payment.payment_date ? formatDate(payment.payment_date) : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center space-x-2">
+                        {payment.status !== 'paid' && (
+                          <button
+                            onClick={() => handleMarkAsPaid(payment.id)}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            Confirmar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeletePayment(payment.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">Registrar Pagamento</h3>
+              <button onClick={() => setShowPaymentModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onSubmit={handleCreatePayment} className="p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Período Início</label>
+                  <input
+                    type="date"
+                    value={paymentForm.period_start}
+                    onChange={(e) => setPaymentForm({...paymentForm, period_start: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Período Fim</label>
+                  <input
+                    type="date"
+                    value={paymentForm.period_end}
+                    onChange={(e) => setPaymentForm({...paymentForm, period_end: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Páginas</label>
+                  <input
+                    type="number"
+                    value={paymentForm.pages_count}
+                    onChange={(e) => {
+                      const pages = parseInt(e.target.value) || 0;
+                      setPaymentForm({
+                        ...paymentForm,
+                        pages_count: pages,
+                        total_amount: pages * paymentForm.rate_per_page
+                      });
+                    }}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Valor por Página ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={paymentForm.rate_per_page}
+                    onChange={(e) => {
+                      const rate = parseFloat(e.target.value) || 0;
+                      setPaymentForm({
+                        ...paymentForm,
+                        rate_per_page: rate,
+                        total_amount: paymentForm.pages_count * rate
+                      });
+                    }}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Valor Total</label>
+                <input
+                  type="text"
+                  value={formatCurrency(paymentForm.total_amount)}
+                  readOnly
+                  className="w-full px-3 py-2 border rounded text-sm bg-gray-100 font-bold text-teal-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Método de Pagamento</label>
+                <select
+                  value={paymentForm.payment_method}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">Selecione...</option>
+                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="pix">PIX</option>
+                  <option value="check">Cheque</option>
+                  <option value="other">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Referência/ID da Transação</label>
+                <input
+                  type="text"
+                  value={paymentForm.payment_reference}
+                  onChange={(e) => setPaymentForm({...paymentForm, payment_reference: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  placeholder="Opcional"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Notas</label>
+                <textarea
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows="2"
+                  placeholder="Observações opcionais..."
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(false)}
+                  className="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+                >
+                  Registrar Pagamento
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
@@ -4812,6 +5265,10 @@ function AdminApp() {
       case 'translators':
         return userRole === 'admin'
           ? <TranslatorsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'production':
+        return userRole === 'admin'
+          ? <ProductionPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'users':
         return userRole === 'admin'
