@@ -192,8 +192,107 @@ const AdminLogin = ({ onLogin }) => {
   );
 };
 
+// ==================== NOTIFICATION BELL ====================
+const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const fetchNotifications = async () => {
+    if (!user?.token) return;
+    try {
+      const response = await axios.get(`${API}/admin/notifications?admin_key=${adminKey}&token=${user.token}`);
+      setNotifications(response.data.notifications || []);
+      setUnreadCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.token]);
+
+  const markAsRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/notifications/${notifId}/read?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await axios.put(`${API}/admin/notifications/read-all?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded"
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {showDropdown && (
+        <div className="absolute left-full top-0 ml-2 w-72 bg-white rounded-lg shadow-xl z-50 text-gray-800 max-h-96 overflow-hidden">
+          <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+            <span className="font-bold text-xs">Notifications</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:text-blue-800">
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 text-xs">No notifications</div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => { markAsRead(notif.id); if (onNotificationClick) onNotificationClick(notif); }}
+                  className={`p-2 border-b cursor-pointer hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="flex items-start">
+                    <span className="text-sm mr-2">
+                      {notif.type === 'project_assigned' ? '📋' : notif.type === 'revision_requested' ? '🔄' : '📌'}
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-medium text-xs">{notif.title}</div>
+                      <div className="text-[10px] text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-[9px] text-gray-400 mt-1">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    {!notif.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== COMPACT SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
@@ -216,6 +315,13 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
 
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
 
+  const handleNotificationClick = (notif) => {
+    // Navigate to the relevant project if it's a project notification
+    if (notif.order_id && (notif.type === 'project_assigned' || notif.type === 'revision_requested')) {
+      setActiveTab('translation');
+    }
+  };
+
   return (
     <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
       <div className="p-3 border-b border-slate-700">
@@ -229,9 +335,14 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user }) => {
         {/* User info */}
         {user && (
           <div className="mt-3 pt-2 border-t border-slate-700">
-            <div className="text-xs font-medium text-white truncate">{user.name}</div>
-            <div className={`inline-block mt-1 px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
-              {roleInfo.label}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-medium text-white truncate">{user.name}</div>
+                <div className={`inline-block mt-1 px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
+                  {roleInfo.label}
+                </div>
+              </div>
+              <NotificationBell adminKey={adminKey} user={user} onNotificationClick={handleNotificationClick} />
             </div>
           </div>
         )}
@@ -3864,8 +3975,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      setOrders(response.data.orders || []);
+      // Use filtered endpoint for PM and Translator roles
+      const userRole = user?.role || 'admin';
+      const userToken = user?.token || '';
+
+      if (userRole === 'admin') {
+        // Admin sees all projects
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        setOrders(response.data.orders || []);
+      } else {
+        // PM and Translator see only their assigned projects
+        const response = await axios.get(`${API}/admin/orders/my-projects?admin_key=${adminKey}&token=${userToken}`);
+        setOrders(response.data.orders || []);
+      }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -4715,7 +4837,7 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );

@@ -552,6 +552,32 @@ class ManualProjectCreate(BaseModel):
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
 
+# Notification Model
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str  # Recipient user ID
+    type: str  # project_assigned, revision_requested, project_completed, etc.
+    title: str
+    message: str
+    order_id: Optional[str] = None  # Related order
+    order_number: Optional[str] = None
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Helper function to create notifications
+async def create_notification(user_id: str, notif_type: str, title: str, message: str, order_id: str = None, order_number: str = None):
+    """Create a notification for a user"""
+    notif = Notification(
+        user_id=user_id,
+        type=notif_type,
+        title=title,
+        message=message,
+        order_id=order_id,
+        order_number=order_number
+    )
+    await db.notifications.insert_one(notif.dict())
+    return notif
+
 # Helper functions for authentication
 def hash_password(password: str) -> str:
     """Hash password with salt"""
@@ -1882,6 +1908,55 @@ async def admin_get_all_orders(admin_key: str):
         }
     }
 
+@api_router.get("/admin/orders/my-projects")
+async def get_my_projects(token: str, admin_key: str):
+    """Get projects based on user role - PM sees their projects, Translator sees assigned projects"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get user from token
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    user_role = user.get("role", "")
+    user_id = user.get("id", "")
+
+    # Build query based on role
+    if user_role == "admin":
+        # Admin sees all
+        orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+    elif user_role == "pm":
+        # PM sees projects assigned to them
+        orders = await db.translation_orders.find({"assigned_pm_id": user_id}).sort("created_at", -1).to_list(500)
+    elif user_role == "translator":
+        # Translator sees projects assigned to them
+        orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
+    else:
+        orders = []
+
+    for order in orders:
+        if '_id' in order:
+            del order['_id']
+
+    # Calculate summary
+    total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
+    total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
+    in_translation = sum(1 for o in orders if o.get("translation_status") == "in_translation")
+    completed = sum(1 for o in orders if o.get("translation_status") in ["ready", "delivered"])
+
+    return {
+        "orders": orders,
+        "user_role": user_role,
+        "summary": {
+            "total_projects": len(orders),
+            "pending_payment": total_pending,
+            "paid": total_paid,
+            "in_translation": in_translation,
+            "completed": completed
+        }
+    }
+
 @api_router.post("/admin/orders/manual")
 async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key: str):
     """Create a new project manually (admin only)"""
@@ -1988,6 +2063,69 @@ async def get_users_by_role(role: str, admin_key: str):
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
+# ==================== NOTIFICATIONS ====================
+
+@api_router.get("/admin/notifications")
+async def get_user_notifications(token: str, admin_key: str, unread_only: bool = False):
+    """Get notifications for current user"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    query = {"user_id": user["id"]}
+    if unread_only:
+        query["is_read"] = False
+
+    notifications = await db.notifications.find(query).sort("created_at", -1).to_list(50)
+
+    for notif in notifications:
+        if '_id' in notif:
+            del notif['_id']
+
+    unread_count = await db.notifications.count_documents({"user_id": user["id"], "is_read": False})
+
+    return {
+        "notifications": notifications,
+        "unread_count": unread_count
+    }
+
+@api_router.put("/admin/notifications/{notif_id}/read")
+async def mark_notification_read(notif_id: str, token: str, admin_key: str):
+    """Mark a notification as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.notifications.update_one(
+        {"id": notif_id, "user_id": user["id"]},
+        {"$set": {"is_read": True}}
+    )
+
+    return {"status": "success"}
+
+@api_router.put("/admin/notifications/read-all")
+async def mark_all_notifications_read(token: str, admin_key: str):
+    """Mark all notifications as read for current user"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.notifications.update_many(
+        {"user_id": user["id"], "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+
+    return {"status": "success"}
+
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
     """Update order status (admin only)"""
@@ -2024,6 +2162,17 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                 translator = await db.admin_users.find_one({"id": update_data.assigned_translator_id})
                 if translator:
                     update_dict["assigned_translator_name"] = translator.get("name", "")
+                    # Create notification for assigned translator
+                    current_order = await db.translation_orders.find_one({"id": order_id})
+                    if current_order:
+                        await create_notification(
+                            user_id=update_data.assigned_translator_id,
+                            notif_type="project_assigned",
+                            title="New Project Assigned",
+                            message=f"You have been assigned to project {current_order.get('order_number', order_id)}. Client: {current_order.get('client_name', 'N/A')}. Language: {current_order.get('translate_from', '')} → {current_order.get('translate_to', '')}",
+                            order_id=order_id,
+                            order_number=current_order.get('order_number')
+                        )
             else:
                 update_dict["assigned_translator_name"] = None
         if update_data.deadline:
