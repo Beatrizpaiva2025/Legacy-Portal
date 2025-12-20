@@ -4132,6 +4132,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
 
+  // Translator stats for PM view
+  const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
+
+  // Check if user is PM
+  const isPM = user?.role === 'pm';
+  const isAdmin = user?.role === 'admin';
+
   // New Project Form
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
   const [pmList, setPmList] = useState([]);
@@ -4190,6 +4197,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   useEffect(() => {
     fetchOrders();
     fetchUsers();
+    if (isPM) fetchTranslatorStats();
   }, []);
 
   const fetchUsers = async () => {
@@ -4205,22 +4213,46 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Fetch translator availability stats (for PM view)
+  const fetchTranslatorStats = async () => {
+    try {
+      const [transRes, ordersRes] = await Promise.all([
+        axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/orders?admin_key=${adminKey}`)
+      ]);
+      const translators = transRes.data || [];
+      const activeOrders = (ordersRes.data.orders || []).filter(o =>
+        ['received', 'in_translation', 'review'].includes(o.translation_status)
+      );
+      // Count busy translators (those with active orders)
+      const busyTranslatorIds = new Set(activeOrders.map(o => o.assigned_translator_id).filter(Boolean));
+      const busyTranslatorNames = new Set(activeOrders.map(o => o.assigned_translator).filter(Boolean));
+      const busy = translators.filter(t => busyTranslatorIds.has(t.id) || busyTranslatorNames.has(t.name)).length;
+      setTranslatorStats({
+        total: translators.length,
+        busy: busy,
+        available: translators.length - busy
+      });
+    } catch (err) {
+      console.error('Failed to fetch translator stats:', err);
+    }
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      // Use filtered endpoint for PM and Translator roles
-      const userRole = user?.role || 'admin';
-      const userToken = user?.token || '';
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      let allOrders = response.data.orders || [];
 
-      if (userRole === 'admin') {
-        // Admin sees all projects
-        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-        setOrders(response.data.orders || []);
-      } else {
-        // PM and Translator see only their assigned projects
-        const response = await axios.get(`${API}/admin/orders/my-projects?admin_key=${adminKey}&token=${userToken}`);
-        setOrders(response.data.orders || []);
+      // PM only sees orders assigned to them
+      if (isPM && user?.id) {
+        allOrders = allOrders.filter(order =>
+          order.assigned_pm_id === user.id ||
+          order.assigned_pm_name === user.name
+        );
       }
+
+      setOrders(allOrders);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -4398,34 +4430,57 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
-      <div className="grid grid-cols-4 gap-3 mb-4">
-        <div className="bg-white rounded shadow p-3">
-          <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
-          <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+      {/* Stats Cards - Different for Admin vs PM */}
+      {isPM ? (
+        /* PM sees: My Orders, Translators Available, Translators Busy */
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-white rounded shadow p-3">
+            <div className="text-[10px] text-gray-500 uppercase">Meus Pedidos</div>
+            <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+          </div>
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
+            <div className="text-[10px] uppercase opacity-80">Tradutores Disponíveis</div>
+            <div className="text-xl font-bold">{translatorStats.available}</div>
+          </div>
+          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded shadow p-3 text-white">
+            <div className="text-[10px] uppercase opacity-80">Tradutores Ocupados</div>
+            <div className="text-xl font-bold">{translatorStats.busy}</div>
+          </div>
         </div>
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
-          <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
-          <div className="text-xl font-bold">${totalReceive.toFixed(2)}</div>
+      ) : (
+        /* Admin sees: Total Orders, Revenue, Paid, Pending */
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          <div className="bg-white rounded shadow p-3">
+            <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
+            <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+          </div>
+          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
+            <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
+            <div className="text-xl font-bold">${totalReceive.toFixed(2)}</div>
+          </div>
+          <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded shadow p-3 text-white">
+            <div className="text-[10px] uppercase opacity-80">Paid</div>
+            <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
+          </div>
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
+            <div className="text-[10px] uppercase opacity-80">Pending</div>
+            <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
+          </div>
         </div>
-        <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded shadow p-3 text-white">
-          <div className="text-[10px] uppercase opacity-80">Paid</div>
-          <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
-        </div>
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
-          <div className="text-[10px] uppercase opacity-80">Pending</div>
-          <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
-        </div>
-      </div>
+      )}
 
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
-          <h1 className="text-lg font-bold text-blue-600">PROJECTS</h1>
-          <button
-            onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-            className="px-3 py-1 bg-teal-600 text-white text-xs rounded hover:bg-teal-700"
-          >
-            + New Project
-          </button>
+          <h1 className="text-lg font-bold text-blue-600">{isPM ? 'MEUS PROJETOS' : 'PROJECTS'}</h1>
+          {/* New Project button - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setShowNewProjectForm(!showNewProjectForm)}
+              className="px-3 py-1 bg-teal-600 text-white text-xs rounded hover:bg-teal-700"
+            >
+              + New Project
+            </button>
+          )}
           <div className="flex space-x-1">
             {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
@@ -4653,8 +4708,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
               <th className="px-2 py-2 text-left font-medium">Tags</th>
-              <th className="px-2 py-2 text-right font-medium">Total</th>
-              <th className="px-2 py-2 text-center font-medium">Payment</th>
+              {/* Total and Payment columns - Admin only */}
+              {isAdmin && <th className="px-2 py-2 text-right font-medium">Total</th>}
+              {isAdmin && <th className="px-2 py-2 text-center font-medium">Payment</th>}
               <th className="px-2 py-2 text-center font-medium">Actions</th>
             </tr>
           </thead>
@@ -4717,33 +4773,63 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>
-                  <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>
+                  {/* Total and Payment columns - Admin only */}
+                  {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
+                  {isAdmin && <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
                   <td className="px-2 py-1 text-center">
                     <div className="flex items-center justify-center space-x-1">
-                      {/* Translate button - show for received or in_translation */}
-                      {['received', 'in_translation'].includes(order.translation_status) && (
-                        <button
-                          onClick={() => startTranslation(order)}
-                          className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]"
-                          title="Open Translation Tool"
-                        >
-                          ✍️
-                        </button>
+                      {/* PM Actions */}
+                      {isPM && (
+                        <>
+                          {/* Send to Review (when translation is done) */}
+                          {order.translation_status === 'in_translation' && (
+                            <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Enviar para Revisão">
+                              📋 Revisão
+                            </button>
+                          )}
+                          {/* Mark ready (after review) */}
+                          {order.translation_status === 'review' && (
+                            <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Marcar Pronto">
+                              ✓ Pronto
+                            </button>
+                          )}
+                          {/* Deliver to client */}
+                          {order.translation_status === 'ready' && (
+                            <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Enviar para Cliente">
+                              📤 Enviar
+                            </button>
+                          )}
+                        </>
                       )}
-                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
-                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
-                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
-                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
-                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
-                      {/* Delete button - always visible */}
-                      <button
-                        onClick={() => deleteOrder(order.id, order.order_number)}
-                        className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
-                        title="Delete Order"
-                      >
-                        🗑️
-                      </button>
+
+                      {/* Admin Actions */}
+                      {isAdmin && (
+                        <>
+                          {/* Translate button - show for received or in_translation */}
+                          {['received', 'in_translation'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => startTranslation(order)}
+                              className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]"
+                              title="Open Translation Tool"
+                            >
+                              ✍️
+                            </button>
+                          )}
+                          {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
+                          {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
+                          {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
+                          {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
+                          {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
+                          {/* Delete button - Admin only */}
+                          <button
+                            onClick={() => deleteOrder(order.id, order.order_number)}
+                            className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
+                            title="Delete Order"
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
