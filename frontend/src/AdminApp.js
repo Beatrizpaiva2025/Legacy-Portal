@@ -395,9 +395,13 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 );
 
 // ==================== TRANSLATION WORKSPACE ====================
-const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
+const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
+
+  // Assigned orders for translator
+  const [assignedOrders, setAssignedOrders] = useState([]);
+  const [loadingAssigned, setLoadingAssigned] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
   const [customCoverLetters, setCustomCoverLetters] = useState(() => {
@@ -571,6 +575,81 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
       setActiveSubTab('start');
     }
   }, [selectedOrder]);
+
+  // Fetch assigned orders for translator/PM
+  const fetchAssignedOrders = async () => {
+    if (!user?.id) return;
+    setLoadingAssigned(true);
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      // Filter orders assigned to this user (as translator or PM)
+      const myOrders = (response.data.orders || []).filter(order =>
+        order.assigned_translator_id === user.id ||
+        order.assigned_pm_id === user.id ||
+        order.assigned_translator === user.name ||
+        order.assigned_pm_name === user.name
+      ).filter(order =>
+        ['received', 'in_translation', 'review'].includes(order.translation_status)
+      );
+      setAssignedOrders(myOrders);
+    } catch (err) {
+      console.error('Failed to fetch assigned orders:', err);
+    } finally {
+      setLoadingAssigned(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'translator' || user?.role === 'pm') {
+      fetchAssignedOrders();
+    }
+  }, [user]);
+
+  // Load document from order
+  const loadOrderDocument = async (order) => {
+    setProcessingStatus(`📂 Carregando documento do pedido ${order.order_number}...`);
+    try {
+      // Fetch documents for this order
+      const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      const docs = response.data.documents || [];
+
+      if (docs.length === 0) {
+        setProcessingStatus(`⚠️ Nenhum documento encontrado para ${order.order_number}`);
+        return;
+      }
+
+      // Download the first document
+      const doc = docs[0];
+      const downloadResponse = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+
+      if (downloadResponse.data.file_data) {
+        // Convert base64 to File object
+        const byteString = atob(downloadResponse.data.file_data);
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([ab], { type: downloadResponse.data.content_type || 'application/pdf' });
+        const file = new File([blob], doc.filename || 'document.pdf', { type: blob.type });
+
+        // Set the file in the workspace
+        setFiles([file]);
+
+        // Update order info
+        setOrderNumber(order.order_number);
+        if (order.translate_from) setSourceLanguage(order.translate_from);
+        if (order.translate_to) setTargetLanguage(order.translate_to);
+        setSelectedOrderId(order.id);
+
+        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload.`);
+        setActiveSubTab('upload');
+      }
+    } catch (err) {
+      console.error('Failed to load document:', err);
+      setProcessingStatus(`❌ Erro ao carregar documento: ${err.message}`);
+    }
+  };
 
   // Fetch resources from backend
   const fetchResources = async () => {
@@ -2002,6 +2081,58 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Assigned Orders for Translator/PM */}
+          {(user?.role === 'translator' || user?.role === 'pm') && (
+            <div className="bg-white rounded shadow">
+              <div className="p-3 border-b bg-gradient-to-r from-teal-500 to-teal-600">
+                <h3 className="text-sm font-bold text-white flex items-center">
+                  📋 Meus Pedidos Atribuídos
+                  {assignedOrders.length > 0 && (
+                    <span className="ml-2 bg-white text-teal-600 px-2 py-0.5 rounded-full text-xs">{assignedOrders.length}</span>
+                  )}
+                </h3>
+              </div>
+              <div className="p-3">
+                {loadingAssigned ? (
+                  <div className="text-center py-4 text-gray-500 text-xs">Carregando pedidos...</div>
+                ) : assignedOrders.length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {assignedOrders.map(order => (
+                      <div key={order.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100">
+                        <div className="flex-1">
+                          <div className="text-xs font-medium text-blue-600">{order.order_number}</div>
+                          <div className="text-[10px] text-gray-600">{order.client_name} • {order.translate_from} → {order.translate_to}</div>
+                          <div className="text-[10px] text-gray-400">
+                            Status: <span className={`px-1 py-0.5 rounded ${order.translation_status === 'received' ? 'bg-gray-100' : order.translation_status === 'in_translation' ? 'bg-yellow-100' : 'bg-purple-100'}`}>
+                              {order.translation_status}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => loadOrderDocument(order)}
+                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center"
+                        >
+                          📄 Carregar Documento
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-400 text-xs">
+                    <div className="text-2xl mb-1">📭</div>
+                    Nenhum pedido atribuído no momento.
+                  </div>
+                )}
+                <button
+                  onClick={fetchAssignedOrders}
+                  className="mt-2 w-full py-1 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded"
+                >
+                  🔄 Atualizar lista
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
