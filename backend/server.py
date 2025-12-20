@@ -736,6 +736,27 @@ def require_admin_role(allowed_roles: List[str]):
         return user
     return check_role
 
+async def validate_admin_or_user_token(admin_key: str) -> dict:
+    """Validate admin_key (master key) or user token. Returns user info or None for master key."""
+    expected_key = os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+
+    # Check master admin key
+    if admin_key == expected_key:
+        return {"role": "admin", "is_master": True}
+
+    # Check if it's a valid user token in memory
+    if admin_key in active_admin_tokens:
+        return {"role": active_admin_tokens[admin_key]["role"], "user_id": active_admin_tokens[admin_key]["user_id"], "is_master": False}
+
+    # Check database for valid token
+    user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+    if user:
+        # Cache the token
+        active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
+        return {"role": user["role"], "user_id": user["id"], "is_master": False}
+
+    return None
+
 # Utility functions
 def count_words(text: str) -> int:
     """Count words in text with improved accuracy"""
@@ -2205,8 +2226,10 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
 @api_router.get("/admin/users/by-role/{role}")
 async def get_users_by_role(role: str, admin_key: str):
     """Get users by role (for dropdown selectors)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     try:
         users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
@@ -2214,6 +2237,77 @@ async def get_users_by_role(role: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
+
+@api_router.get("/admin/translators/status")
+async def get_translators_with_status(admin_key: str):
+    """Get all translators with their current project status and deadlines"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Get all translators
+        translators = await db.admin_users.find({"role": "translator", "is_active": True}).to_list(100)
+
+        result = []
+        for translator in translators:
+            translator_name = translator["name"]
+
+            # Find active projects assigned to this translator
+            active_projects = await db.translation_orders.find({
+                "assigned_translator": translator_name,
+                "translation_status": {"$in": ["in_translation", "review", "pending"]}
+            }).sort("deadline", 1).to_list(10)
+
+            # Determine status
+            if len(active_projects) > 0:
+                status = "busy"
+                # Get the earliest deadline
+                current_project = active_projects[0]
+                deadline = current_project.get("deadline")
+                project_code = current_project.get("id", "")[:13]  # Get code like P251220-4F2D
+                project_status = current_project.get("translation_status", "")
+            else:
+                status = "available"
+                deadline = None
+                project_code = None
+                project_status = None
+
+            result.append({
+                "id": translator["id"],
+                "name": translator_name,
+                "email": translator["email"],
+                "status": status,
+                "active_projects_count": len(active_projects),
+                "current_deadline": deadline,
+                "current_project_code": project_code,
+                "current_project_status": project_status,
+                "projects": [{
+                    "code": p.get("id", "")[:13],
+                    "client": p.get("client_name", ""),
+                    "deadline": p.get("deadline"),
+                    "status": p.get("translation_status")
+                } for p in active_projects[:3]]  # Show up to 3 projects
+            })
+
+        # Sort: available first, then by name
+        result.sort(key=lambda x: (0 if x["status"] == "available" else 1, x["name"]))
+
+        available_count = sum(1 for t in result if t["status"] == "available")
+        busy_count = sum(1 for t in result if t["status"] == "busy")
+
+        return {
+            "translators": result,
+            "summary": {
+                "total": len(result),
+                "available": available_count,
+                "busy": busy_count
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching translators status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch translators")
 
 # ==================== NOTIFICATIONS ====================
 
@@ -3299,9 +3393,11 @@ async def admin_download_document(document_id: str, admin_key: str):
 
 @api_router.get("/admin/orders/{order_id}/documents")
 async def admin_get_order_documents(order_id: str, admin_key: str):
-    """Admin: Get all documents for an order (from both collections)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Admin/PM/Translator: Get all documents for an order (from both collections)"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     # Get documents from main documents collection
     docs_main = await db.documents.find({"order_id": order_id}).to_list(50)
@@ -3335,9 +3431,11 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
 
 @api_router.get("/admin/order-documents/{doc_id}/download")
 async def admin_download_order_document(doc_id: str, admin_key: str):
-    """Admin: Download a document from order_documents collection"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Admin/PM/Translator: Download a document from order_documents collection"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     # Try order_documents first (manual uploads)
     document = await db.order_documents.find_one({"id": doc_id})

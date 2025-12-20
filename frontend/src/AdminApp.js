@@ -4134,6 +4134,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
+  const [translatorsWithStatus, setTranslatorsWithStatus] = useState([]); // List of translators with details
+  const [showTranslatorsList, setShowTranslatorsList] = useState(false); // Toggle translator list view
 
   // Check if user is PM
   const isPM = user?.role === 'pm';
@@ -4216,25 +4218,37 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Fetch translator availability stats (for PM view)
   const fetchTranslatorStats = async () => {
     try {
-      const [transRes, ordersRes] = await Promise.all([
-        axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`),
-        axios.get(`${API}/admin/orders?admin_key=${adminKey}`)
-      ]);
-      const translators = transRes.data || [];
-      const activeOrders = (ordersRes.data.orders || []).filter(o =>
-        ['received', 'in_translation', 'review'].includes(o.translation_status)
-      );
-      // Count busy translators (those with active orders)
-      const busyTranslatorIds = new Set(activeOrders.map(o => o.assigned_translator_id).filter(Boolean));
-      const busyTranslatorNames = new Set(activeOrders.map(o => o.assigned_translator).filter(Boolean));
-      const busy = translators.filter(t => busyTranslatorIds.has(t.id) || busyTranslatorNames.has(t.name)).length;
+      const response = await axios.get(`${API}/admin/translators/status?admin_key=${adminKey}`);
+      const data = response.data;
       setTranslatorStats({
-        total: translators.length,
-        busy: busy,
-        available: translators.length - busy
+        total: data.summary.total,
+        busy: data.summary.busy,
+        available: data.summary.available
       });
+      setTranslatorsWithStatus(data.translators || []);
     } catch (err) {
       console.error('Failed to fetch translator stats:', err);
+      // Fallback to old method if new endpoint fails
+      try {
+        const [transRes, ordersRes] = await Promise.all([
+          axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`),
+          axios.get(`${API}/admin/orders?admin_key=${adminKey}`)
+        ]);
+        const translators = transRes.data || [];
+        const activeOrders = (ordersRes.data.orders || []).filter(o =>
+          ['received', 'in_translation', 'review'].includes(o.translation_status)
+        );
+        const busyTranslatorIds = new Set(activeOrders.map(o => o.assigned_translator_id).filter(Boolean));
+        const busyTranslatorNames = new Set(activeOrders.map(o => o.assigned_translator).filter(Boolean));
+        const busy = translators.filter(t => busyTranslatorIds.has(t.id) || busyTranslatorNames.has(t.name)).length;
+        setTranslatorStats({
+          total: translators.length,
+          busy: busy,
+          available: translators.length - busy
+        });
+      } catch (e) {
+        console.error('Fallback also failed:', e);
+      }
     }
   };
 
@@ -4433,20 +4447,87 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {/* Stats Cards - Different for Admin vs PM */}
       {isPM ? (
         /* PM sees: My Orders, Translators Available, Translators Busy */
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="bg-white rounded shadow p-3">
-            <div className="text-[10px] text-gray-500 uppercase">Meus Pedidos</div>
-            <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+        <>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-white rounded shadow p-3">
+              <div className="text-[10px] text-gray-500 uppercase">Meus Pedidos</div>
+              <div className="text-xl font-bold text-gray-800">{orders.length}</div>
+            </div>
+            <div
+              onClick={() => setShowTranslatorsList(!showTranslatorsList)}
+              className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white cursor-pointer hover:from-green-600 hover:to-green-700 transition-all"
+            >
+              <div className="text-[10px] uppercase opacity-80">Tradutores Disponíveis</div>
+              <div className="text-xl font-bold">{translatorStats.available}</div>
+              <div className="text-[9px] opacity-70 mt-1">Clique para ver lista</div>
+            </div>
+            <div
+              onClick={() => setShowTranslatorsList(!showTranslatorsList)}
+              className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded shadow p-3 text-white cursor-pointer hover:from-yellow-600 hover:to-yellow-700 transition-all"
+            >
+              <div className="text-[10px] uppercase opacity-80">Tradutores Ocupados</div>
+              <div className="text-xl font-bold">{translatorStats.busy}</div>
+              <div className="text-[9px] opacity-70 mt-1">Clique para ver lista</div>
+            </div>
           </div>
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Tradutores Disponíveis</div>
-            <div className="text-xl font-bold">{translatorStats.available}</div>
-          </div>
-          <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Tradutores Ocupados</div>
-            <div className="text-xl font-bold">{translatorStats.busy}</div>
-          </div>
-        </div>
+
+          {/* Translators List Panel */}
+          {showTranslatorsList && (
+            <div className="bg-white rounded-lg shadow mb-4 p-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-bold text-gray-800">👥 Lista de Tradutores</h3>
+                <button onClick={() => setShowTranslatorsList(false)} className="text-gray-500 hover:text-gray-700 text-xl">×</button>
+              </div>
+              {translatorsWithStatus.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 text-xs">Nenhum tradutor cadastrado</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {translatorsWithStatus.map((translator) => (
+                    <div
+                      key={translator.id}
+                      className={`p-3 rounded-lg border-2 ${
+                        translator.status === 'available'
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-yellow-200 bg-yellow-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center">
+                          <div className={`w-2 h-2 rounded-full mr-2 ${translator.status === 'available' ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                          <span className="font-medium text-sm text-gray-800">{translator.name}</span>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          translator.status === 'available'
+                            ? 'bg-green-500 text-white'
+                            : 'bg-yellow-500 text-white'
+                        }`}>
+                          {translator.status === 'available' ? 'Disponível' : 'Ocupado'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mb-1">{translator.email}</div>
+                      {translator.status === 'busy' && translator.projects && translator.projects.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="text-[10px] font-medium text-gray-600 mb-1">Projetos Ativos:</div>
+                          {translator.projects.map((proj, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-[10px] py-0.5">
+                              <span className="text-blue-600 font-mono">{proj.code}</span>
+                              <span className="text-gray-500">
+                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {translator.status === 'available' && (
+                        <div className="mt-2 text-[10px] text-green-600">✓ Pronto para novos projetos</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         /* Admin sees: Total Orders, Revenue, Paid, Pending */
         <div className="grid grid-cols-4 gap-3 mb-4">
