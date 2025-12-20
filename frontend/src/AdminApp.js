@@ -4153,6 +4153,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [orderDocuments, setOrderDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
 
+  // Editing states for inline edits
+  const [editingTags, setEditingTags] = useState(null); // Order ID being edited
+  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited
+  const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
+  const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4310,6 +4316,56 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       console.error('Failed to delete:', err);
       alert('Erro ao deletar pedido');
     }
+  };
+
+  // Edit tags
+  const startEditingTags = (order) => {
+    setEditingTags(order.id);
+    setTempTagValue({
+      type: order.translation_type || 'professional',
+      notes: order.internal_notes || ''
+    });
+  };
+
+  const saveTagsEdit = async (orderId) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_type: tempTagValue.type,
+        internal_notes: tempTagValue.notes
+      });
+      setEditingTags(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+    }
+  };
+
+  // Edit deadline
+  const startEditingDeadline = (order) => {
+    setEditingDeadline(order.id);
+    const deadlineDate = order.deadline ? new Date(order.deadline) : new Date();
+    setTempDeadlineValue({
+      date: deadlineDate.toISOString().split('T')[0],
+      time: deadlineDate.toTimeString().slice(0, 5)
+    });
+  };
+
+  const saveDeadlineEdit = async (orderId) => {
+    try {
+      const deadlineDateTime = `${tempDeadlineValue.date}T${tempDeadlineValue.time || '17:00'}:00`;
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        deadline: deadlineDateTime
+      });
+      setEditingDeadline(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update deadline:', err);
+    }
+  };
+
+  // Send email to client
+  const sendEmailToClient = (email, orderNumber) => {
+    window.location.href = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
   };
 
   // View order documents
@@ -4529,23 +4585,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           )}
         </>
       ) : (
-        /* Admin sees: Total Orders, Revenue, Paid, Pending */
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        /* Admin sees: Only Total Orders - Financial data moved to Finances page */
+        <div className="grid grid-cols-1 gap-3 mb-4 max-w-xs">
           <div className="bg-white rounded shadow p-3">
             <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
             <div className="text-xl font-bold text-gray-800">{orders.length}</div>
-          </div>
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
-            <div className="text-xl font-bold">${totalReceive.toFixed(2)}</div>
-          </div>
-          <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Paid</div>
-            <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
-          </div>
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Pending</div>
-            <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
           </div>
         </div>
       )}
@@ -4784,6 +4828,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
+              <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
@@ -4798,10 +4843,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const deadline = new Date(created); deadline.setDate(deadline.getDate() + 5);
-              const daysUntil = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
+              const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
+              const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
               return (
                 <tr key={order.id} className="hover:bg-gray-50">
+                  {/* Code */}
                   <td className="px-2 py-2 font-medium">
                     <button
                       onClick={() => viewOrderDocuments(order)}
@@ -4811,7 +4857,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {order.order_number}
                     </button>
                   </td>
-                  <td className="px-2 py-2">{order.client_name}<span className="text-gray-400 text-[10px] block">{order.client_email}</span></td>
+                  {/* Order Date */}
+                  <td className="px-2 py-2 text-gray-600">
+                    {created.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    <span className="text-[10px] text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </td>
+                  {/* Client with email button */}
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1">
+                      <div>
+                        {order.client_name}
+                        <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
+                      </div>
+                      <button
+                        onClick={() => sendEmailToClient(order.client_email, order.order_number)}
+                        className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
+                        title="Enviar email para cliente"
+                      >
+                        ✉️
+                      </button>
+                    </div>
+                  </td>
+                  {/* Translator */}
                   <td className="px-2 py-2">
                     {assigningTranslator === order.id ? (
                       <select
@@ -4838,21 +4905,83 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </button>
                     )}
                   </td>
-                  <td className="px-2 py-2">{deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {daysUntil > 0 && order.translation_status !== 'delivered' && <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>in {daysUntil}d</span>}
-                  </td>
-                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  {/* Deadline with date+time */}
                   <td className="px-2 py-2">
-                    <div className="flex items-center gap-1">
-                      <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
-                      <span>{FLAGS[order.translate_to] || '🌐'}</span>
-                      {order.internal_notes && (
-                        <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
-                      )}
-                      {order.notes && (
-                        <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
-                      )}
-                    </div>
+                    {editingDeadline === order.id && isAdmin ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="date"
+                          value={tempDeadlineValue.date}
+                          onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, date: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <input
+                          type="time"
+                          value={tempDeadlineValue.time}
+                          onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, time: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveDeadlineEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
+                          <button onClick={() => setEditingDeadline(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <div>
+                          {orderDeadline.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          <span className="text-[10px] text-gray-500 block">{orderDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {daysUntil > 0 && order.translation_status !== 'delivered' && (
+                            <span className={`text-[10px] ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar deadline">✏️</button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  {/* Status */}
+                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  {/* Tags - Editable */}
+                  <td className="px-2 py-2">
+                    {editingTags === order.id && isAdmin ? (
+                      <div className="flex flex-col gap-1">
+                        <select
+                          value={tempTagValue.type}
+                          onChange={(e) => setTempTagValue({...tempTagValue, type: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded"
+                        >
+                          <option value="professional">PROF</option>
+                          <option value="certified">CERT</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Nota interna..."
+                          value={tempTagValue.notes}
+                          onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveTagsEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
+                          <button onClick={() => setEditingTags(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
+                        <span>{FLAGS[order.translate_to] || '🌐'}</span>
+                        {order.internal_notes && (
+                          <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
+                        )}
+                        {order.notes && (
+                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
+                        )}
+                        {isAdmin && (
+                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar tags">✏️</button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   {/* Total and Payment columns - Admin only */}
                   {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
