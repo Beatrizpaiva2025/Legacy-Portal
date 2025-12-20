@@ -479,29 +479,21 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     try {
       // Step 1: Create a quote first
       const quoteData = {
+        reference: `WEB-${Date.now()}`,
         service_type: formData.service_type,
         translate_from: formData.translate_from,
         translate_to: formData.translate_to,
         word_count: wordCount,
-        urgency: formData.urgency,
-        customer_email: guestEmail,
-        customer_name: guestName,
-        notes: formData.notes,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        // Certification options
-        notarization: certifications.notarization,
-        e_apostille: certifications.eApostille,
-        certification_fee: quote?.certification_fee || 0
+        urgency: formData.urgency
       };
 
       // Create quote
       const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
-      const quoteId = quoteResponse.data.quote_id;
+      const quoteId = quoteResponse.data.id;
 
       // Step 2: Create Stripe checkout session
       const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
         quote_id: quoteId,
-        customer_email: guestEmail,
         origin_url: window.location.origin + '/customer'
       });
 
