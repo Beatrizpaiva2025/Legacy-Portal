@@ -284,33 +284,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   }, []);
 
-  // Calculate quote when relevant fields change
-  useEffect(() => {
-    if (uploadedFiles.length > 0) {
-      calculateQuote();
-    }
-  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications]);
-
-  // Auto-save abandoned quote when user sees the price
-  useEffect(() => {
-    if (quote && guestEmail && uploadedFiles.length > 0 && !abandonedQuoteId) {
-      autoSaveAbandonedQuote();
-    }
-  }, [quote, guestEmail]);
-
-  // Exit intent detection
-  useEffect(() => {
-    const handleMouseLeave = (e) => {
-      if (e.clientY <= 0 && quote && !success && guestEmail) {
-        setShowExitPopup(true);
-      }
-    };
-
-    document.addEventListener('mouseleave', handleMouseLeave);
-    return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, [quote, success, guestEmail]);
-
-  const calculateQuote = () => {
+  // Calculate quote function (defined before useEffect that calls it)
+  const calculateQuote = useCallback(() => {
     let basePrice = 0;
     const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
 
@@ -355,7 +330,33 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
     });
-  };
+  }, [uploadedFiles, formData.service_type, formData.urgency, certifications, appliedDiscount]);
+
+  // Calculate quote when relevant fields change
+  useEffect(() => {
+    if (uploadedFiles.length > 0) {
+      calculateQuote();
+    }
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications, calculateQuote]);
+
+  // Auto-save abandoned quote when user sees the price
+  useEffect(() => {
+    if (quote && guestEmail && uploadedFiles.length > 0 && !abandonedQuoteId) {
+      autoSaveAbandonedQuote();
+    }
+  }, [quote, guestEmail]);
+
+  // Exit intent detection
+  useEffect(() => {
+    const handleMouseLeave = (e) => {
+      if (e.clientY <= 0 && quote && !success && guestEmail) {
+        setShowExitPopup(true);
+      }
+    };
+
+    document.addEventListener('mouseleave', handleMouseLeave);
+    return () => document.removeEventListener('mouseleave', handleMouseLeave);
+  }, [quote, success, guestEmail]);
 
   const autoSaveAbandonedQuote = async () => {
     try {
