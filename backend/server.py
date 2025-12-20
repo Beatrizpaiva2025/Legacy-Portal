@@ -3251,6 +3251,68 @@ async def admin_download_document(document_id: str, admin_key: str):
         "extracted_text": document.get("extracted_text", "")
     }
 
+@api_router.get("/admin/orders/{order_id}/documents")
+async def admin_get_order_documents(order_id: str, admin_key: str):
+    """Admin: Get all documents for an order (from both collections)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get documents from main documents collection
+    docs_main = await db.documents.find({"order_id": order_id}).to_list(50)
+
+    # Get documents from order_documents collection (manual uploads)
+    docs_manual = await db.order_documents.find({"order_id": order_id}).to_list(50)
+
+    all_docs = []
+
+    for doc in docs_main:
+        doc["_id"] = str(doc["_id"])
+        all_docs.append({
+            "id": doc.get("id"),
+            "filename": doc.get("filename"),
+            "content_type": doc.get("content_type", "application/pdf"),
+            "has_data": bool(doc.get("file_data")),
+            "source": "partner_upload"
+        })
+
+    for doc in docs_manual:
+        doc["_id"] = str(doc["_id"])
+        all_docs.append({
+            "id": doc.get("id"),
+            "filename": doc.get("filename"),
+            "content_type": doc.get("content_type", "application/pdf"),
+            "has_data": bool(doc.get("data")),
+            "source": "manual_upload"
+        })
+
+    return {"documents": all_docs, "count": len(all_docs)}
+
+@api_router.get("/admin/order-documents/{doc_id}/download")
+async def admin_download_order_document(doc_id: str, admin_key: str):
+    """Admin: Download a document from order_documents collection"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Try order_documents first (manual uploads)
+    document = await db.order_documents.find_one({"id": doc_id})
+    if document:
+        return {
+            "filename": document.get("filename", "document.pdf"),
+            "content_type": "application/pdf",
+            "file_data": document.get("data", "")
+        }
+
+    # Try main documents collection
+    document = await db.documents.find_one({"id": doc_id})
+    if document:
+        return {
+            "filename": document.get("filename", "document.pdf"),
+            "content_type": document.get("content_type", "application/pdf"),
+            "file_data": document.get("file_data", "")
+        }
+
+    raise HTTPException(status_code=404, detail="Document not found")
+
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
 
