@@ -3936,6 +3936,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [pmList, setPmList] = useState([]);
   const [translatorList, setTranslatorList] = useState([]);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [documentFile, setDocumentFile] = useState(null);
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -3950,9 +3951,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     assigned_pm_id: '',
     assigned_translator_id: '',
     deadline: '',
-    base_price: 0,
-    total_price: 0,
-    revenue_source: 'website'
+    base_price: '',
+    total_price: '',
+    revenue_source: 'website',
+    payment_method: ''
   });
 
   const REVENUE_SOURCES = [
@@ -3962,6 +3964,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     { value: 'referral', label: 'Indicação' },
     { value: 'partner', label: 'Parceiro' },
     { value: 'other', label: 'Outros' }
+  ];
+
+  const PAYMENT_METHODS = [
+    { value: '', label: '-- Select --' },
+    { value: 'credit_card', label: 'Credit Card' },
+    { value: 'debit', label: 'Debit Card' },
+    { value: 'paypal', label: 'PayPal' },
+    { value: 'zelle', label: 'Zelle' },
+    { value: 'venmo', label: 'Venmo' },
+    { value: 'pix', label: 'PIX' },
+    { value: 'apple_pay', label: 'Apple Pay' },
+    { value: 'bank_transfer', label: 'Bank Transfer' }
   ];
 
   const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
@@ -4071,7 +4085,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     e.preventDefault();
     setCreatingProject(true);
     try {
-      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, newProject);
+      // Prepare project data with document if uploaded
+      let projectData = { ...newProject };
+
+      // Convert document to base64 if provided
+      if (documentFile) {
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve, reject) => {
+          reader.onload = () => {
+            const base64 = reader.result.split(',')[1]; // Remove data:...;base64, prefix
+            resolve(base64);
+          };
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(documentFile);
+        const base64Data = await base64Promise;
+        projectData.document_data = base64Data;
+        projectData.document_filename = documentFile.name;
+      }
+
+      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, projectData);
       setShowNewProjectForm(false);
       setNewProject({
         client_name: '',
@@ -4087,10 +4120,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         assigned_pm_id: '',
         assigned_translator_id: '',
         deadline: '',
-        base_price: 0,
-        total_price: 0,
-        revenue_source: 'website'
+        base_price: '',
+        total_price: '',
+        revenue_source: 'website',
+        payment_method: ''
       });
+      setDocumentFile(null);
       fetchOrders();
     } catch (err) {
       alert(err.response?.data?.detail || 'Error creating project');
@@ -4262,12 +4297,40 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <input
                   type="number"
                   value={newProject.total_price}
-                  onChange={(e) => setNewProject({...newProject, total_price: parseFloat(e.target.value) || 0, base_price: parseFloat(e.target.value) || 0})}
+                  onChange={(e) => setNewProject({...newProject, total_price: e.target.value, base_price: e.target.value})}
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 />
               </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Payment Method</label>
+                <select
+                  value={newProject.payment_method}
+                  onChange={(e) => setNewProject({...newProject, payment_method: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {PAYMENT_METHODS.map(pm => <option key={pm.value} value={pm.value}>{pm.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Document Upload */}
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-gray-600 mb-1">Document to Translate</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="file"
+                  onChange={(e) => setDocumentFile(e.target.files[0])}
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                  className="text-xs"
+                />
+                {documentFile && (
+                  <span className="text-xs text-green-600">✓ {documentFile.name}</span>
+                )}
+              </div>
+              <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG</p>
             </div>
 
             <div className="grid grid-cols-4 gap-3 mb-3">

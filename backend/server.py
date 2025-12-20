@@ -499,6 +499,7 @@ class TranslationOrder(BaseModel):
     deadline: Optional[datetime] = None  # Translation deadline
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
+    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -551,6 +552,7 @@ class ManualProjectCreate(BaseModel):
     assigned_translator_id: Optional[str] = None
     deadline: Optional[str] = None  # ISO date string
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
+    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
     # Files (base64)
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
@@ -2125,7 +2127,9 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             assigned_translator_id=project_data.assigned_translator_id,
             assigned_translator_name=translator_name,
             deadline=deadline,
-            internal_notes=project_data.internal_notes
+            internal_notes=project_data.internal_notes,
+            revenue_source=project_data.revenue_source,
+            payment_method=project_data.payment_method
         )
 
         await db.translation_orders.insert_one(order.dict())
