@@ -647,6 +647,56 @@ class ExpenseUpdate(BaseModel):
     vendor: Optional[str] = None
     notes: Optional[str] = None
 
+# ==================== PAYMENT PROOF MODELS ====================
+class PaymentProof(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: Optional[str] = None  # Related order (if any)
+    order_number: Optional[str] = None
+    quote_id: Optional[str] = None  # Related quote (if any)
+    # Customer info
+    customer_name: str
+    customer_email: EmailStr
+    customer_phone: Optional[str] = None
+    # Payment details
+    payment_method: str  # pix, zelle
+    amount: float
+    currency: str = "USD"  # USD or BRL
+    # Proof file
+    proof_filename: str
+    proof_file_data: str  # Base64 encoded file
+    proof_file_type: str  # image/png, image/jpeg, application/pdf
+    # Status
+    status: str = "pending"  # pending, approved, rejected
+    admin_notes: Optional[str] = None
+    reviewed_by_id: Optional[str] = None
+    reviewed_by_name: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PaymentProofCreate(BaseModel):
+    order_id: Optional[str] = None
+    quote_id: Optional[str] = None
+    customer_name: str
+    customer_email: EmailStr
+    customer_phone: Optional[str] = None
+    payment_method: str  # pix, zelle
+    amount: float
+    currency: str = "USD"
+
+class PaymentProofResponse(BaseModel):
+    id: str
+    order_id: Optional[str] = None
+    order_number: Optional[str] = None
+    customer_name: str
+    customer_email: str
+    payment_method: str
+    amount: float
+    currency: str
+    status: str
+    proof_filename: str
+    created_at: datetime
+
 # Expense categories with labels
 EXPENSE_CATEGORIES = {
     'fixed': 'Despesas Fixas',
@@ -2931,6 +2981,249 @@ async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFi
     )
 
     return {"status": "success", "message": f"Translation file '{file.filename}' uploaded successfully"}
+
+# ==================== PAYMENT PROOF ENDPOINTS ====================
+@api_router.post("/payment-proofs/upload")
+async def upload_payment_proof(
+    customer_name: str = Form(...),
+    customer_email: str = Form(...),
+    payment_method: str = Form(...),
+    amount: float = Form(...),
+    currency: str = Form("USD"),
+    order_id: Optional[str] = Form(None),
+    quote_id: Optional[str] = Form(None),
+    customer_phone: Optional[str] = Form(None),
+    file: UploadFile = File(...)
+):
+    """Upload payment proof (PIX/Zelle receipt) from customer"""
+    try:
+        # Validate file type
+        allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only images and PDFs are allowed.")
+
+        # Read and encode file
+        file_content = await file.read()
+        file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+        # Get order number if order_id provided
+        order_number = None
+        if order_id:
+            order = await db.translation_orders.find_one({"id": order_id})
+            if order:
+                order_number = order.get("order_number")
+
+        # Create payment proof record
+        payment_proof = PaymentProof(
+            order_id=order_id,
+            order_number=order_number,
+            quote_id=quote_id,
+            customer_name=customer_name,
+            customer_email=customer_email,
+            customer_phone=customer_phone,
+            payment_method=payment_method,
+            amount=amount,
+            currency=currency,
+            proof_filename=file.filename,
+            proof_file_data=file_base64,
+            proof_file_type=file.content_type,
+            status="pending"
+        )
+
+        await db.payment_proofs.insert_one(payment_proof.dict())
+
+        # Send notification to admins
+        admin_users = await db.admin_users.find({"role": "admin"}).to_list(100)
+        for admin in admin_users:
+            notification = Notification(
+                user_id=admin["id"],
+                type="payment_proof_received",
+                title="New Payment Proof Received",
+                message=f"Payment proof from {customer_name} - {payment_method.upper()} ${amount:.2f}",
+                order_id=order_id,
+                order_number=order_number
+            )
+            await db.notifications.insert_one(notification.dict())
+
+        logger.info(f"Payment proof uploaded: {payment_proof.id} from {customer_email}")
+
+        return {
+            "success": True,
+            "proof_id": payment_proof.id,
+            "message": "Payment proof uploaded successfully. Our team will review it shortly."
+        }
+
+    except Exception as e:
+        logger.error(f"Error uploading payment proof: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload payment proof: {str(e)}")
+
+@api_router.get("/admin/payment-proofs")
+async def get_payment_proofs(
+    admin_key: str,
+    status: Optional[str] = None,
+    token: Optional[str] = None
+):
+    """Get all payment proofs for admin review"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        # Check if it's a valid admin token
+        if token:
+            user = await db.admin_users.find_one({"token": token, "role": "admin"})
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if status:
+        query["status"] = status
+
+    proofs = await db.payment_proofs.find(query).sort("created_at", -1).to_list(500)
+
+    # Remove MongoDB _id and prepare response
+    result = []
+    for proof in proofs:
+        if '_id' in proof:
+            del proof['_id']
+        # Don't send the full file data in list, just metadata
+        proof_data = {
+            "id": proof["id"],
+            "order_id": proof.get("order_id"),
+            "order_number": proof.get("order_number"),
+            "quote_id": proof.get("quote_id"),
+            "customer_name": proof["customer_name"],
+            "customer_email": proof["customer_email"],
+            "customer_phone": proof.get("customer_phone"),
+            "payment_method": proof["payment_method"],
+            "amount": proof["amount"],
+            "currency": proof.get("currency", "USD"),
+            "proof_filename": proof["proof_filename"],
+            "proof_file_type": proof.get("proof_file_type"),
+            "status": proof["status"],
+            "admin_notes": proof.get("admin_notes"),
+            "reviewed_by_name": proof.get("reviewed_by_name"),
+            "reviewed_at": proof.get("reviewed_at"),
+            "created_at": proof["created_at"]
+        }
+        result.append(proof_data)
+
+    return {"payment_proofs": result}
+
+@api_router.get("/admin/payment-proofs/{proof_id}")
+async def get_payment_proof_detail(proof_id: str, admin_key: str, token: Optional[str] = None):
+    """Get full payment proof detail including file data"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        if token:
+            user = await db.admin_users.find_one({"token": token, "role": "admin"})
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    proof = await db.payment_proofs.find_one({"id": proof_id})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found")
+
+    if '_id' in proof:
+        del proof['_id']
+
+    return {"payment_proof": proof}
+
+@api_router.put("/admin/payment-proofs/{proof_id}/review")
+async def review_payment_proof(
+    proof_id: str,
+    admin_key: str,
+    status: str,  # approved, rejected
+    admin_notes: Optional[str] = None,
+    token: Optional[str] = None
+):
+    """Approve or reject a payment proof"""
+    admin_user = None
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        if token:
+            admin_user = await db.admin_users.find_one({"token": token, "role": "admin"})
+            if not admin_user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
+
+    proof = await db.payment_proofs.find_one({"id": proof_id})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found")
+
+    update_data = {
+        "status": status,
+        "reviewed_at": datetime.utcnow(),
+        "admin_notes": admin_notes
+    }
+
+    if admin_user:
+        update_data["reviewed_by_id"] = admin_user["id"]
+        update_data["reviewed_by_name"] = admin_user["name"]
+    else:
+        update_data["reviewed_by_name"] = "Admin"
+
+    await db.payment_proofs.update_one(
+        {"id": proof_id},
+        {"$set": update_data}
+    )
+
+    # If approved and linked to an order, update order payment status
+    if status == "approved" and proof.get("order_id"):
+        await db.translation_orders.update_one(
+            {"id": proof["order_id"]},
+            {"$set": {
+                "payment_status": "paid",
+                "payment_date": datetime.utcnow(),
+                "payment_method": proof["payment_method"]
+            }}
+        )
+        logger.info(f"Order {proof['order_id']} marked as paid via {proof['payment_method']}")
+
+    # Send email notification to customer
+    try:
+        email_service = EmailService()
+        if status == "approved":
+            subject = "Payment Confirmed - Legacy Translations"
+            content = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #059669;">Payment Confirmed!</h2>
+                    <p>Dear {proof['customer_name']},</p>
+                    <p>Your payment of <strong>${proof['amount']:.2f}</strong> via <strong>{proof['payment_method'].upper()}</strong> has been confirmed.</p>
+                    <p>We will start processing your translation order immediately.</p>
+                    <p>Thank you for choosing Legacy Translations!</p>
+                    <hr>
+                    <p style="color: #666; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+                </body>
+            </html>
+            """
+        else:
+            subject = "Payment Verification Required - Legacy Translations"
+            content = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #dc2626;">Payment Verification Issue</h2>
+                    <p>Dear {proof['customer_name']},</p>
+                    <p>Unfortunately, we were unable to verify your payment of <strong>${proof['amount']:.2f}</strong> via <strong>{proof['payment_method'].upper()}</strong>.</p>
+                    {f'<p><strong>Notes:</strong> {admin_notes}</p>' if admin_notes else ''}
+                    <p>Please contact us for assistance or submit a new payment proof.</p>
+                    <p>Contact: info@legacytranslations.com</p>
+                    <hr>
+                    <p style="color: #666; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+                </body>
+            </html>
+            """
+
+        await email_service.send_email(proof['customer_email'], subject, content)
+    except Exception as e:
+        logger.error(f"Failed to send payment notification email: {str(e)}")
+
+    logger.info(f"Payment proof {proof_id} {status} by {update_data.get('reviewed_by_name', 'Admin')}")
+
+    return {"success": True, "message": f"Payment proof {status}"}
 
 class TranslationData(BaseModel):
     translation_html: str

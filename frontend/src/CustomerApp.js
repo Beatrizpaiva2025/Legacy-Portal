@@ -250,6 +250,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
 
+  // Payment proof states
+  const [showDirectPayment, setShowDirectPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('pix');
+  const [proofFile, setProofFile] = useState(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofUploaded, setProofUploaded] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
+
   // Certification options
   const [certifications, setCertifications] = useState({
     notarization: false,
@@ -395,6 +403,57 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     } catch (err) {
       setError('Invalid or expired discount code');
       setAppliedDiscount(null);
+    }
+  };
+
+  // PIX/Zelle payment info
+  const PIX_KEY = "13380336000179"; // CNPJ Legacy Translations
+  const PIX_NAME = "Legacy Translations";
+  const ZELLE_NUMBER = "8572081139";
+  const ZELLE_NAME = "Legacy Translations Inc";
+  const USD_TO_BRL_RATE = 6.10;
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setPixCopied(true);
+    setTimeout(() => setPixCopied(false), 2000);
+  };
+
+  // Calculate PIX amount in BRL
+  const pixAmountBRL = quote ? (quote.total_price * USD_TO_BRL_RATE).toFixed(2) : 0;
+
+  // Upload payment proof
+  const handleUploadProof = async () => {
+    if (!proofFile || !guestName || !guestEmail) {
+      setError('Please fill in your name and email, and select a proof file');
+      return;
+    }
+
+    setUploadingProof(true);
+    setError('');
+
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('customer_name', guestName);
+      formDataUpload.append('customer_email', guestEmail);
+      formDataUpload.append('payment_method', paymentMethod);
+      formDataUpload.append('amount', quote?.total_price || 0);
+      formDataUpload.append('currency', paymentMethod === 'pix' ? 'BRL' : 'USD');
+      formDataUpload.append('file', proofFile);
+
+      const response = await axios.post(`${API}/payment-proofs/upload`, formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data.success) {
+        setProofUploaded(true);
+        setSuccess('Payment proof uploaded successfully! Our team will review it and confirm your payment shortly. You will receive an email confirmation.');
+        setShowDirectPayment(false);
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to upload payment proof. Please try again.');
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -786,13 +845,212 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </a>
             </div>
 
-            <button
-              type="submit"
-              disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
-            >
-              {submitting ? 'Processing...' : 'Continue to Payment'}
-            </button>
+            {/* Direct Payment Section (PIX/Zelle) */}
+            {quote && quote.total_price > 0 && (
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Payment Options</h2>
+                </div>
+
+                {/* Payment Method Toggle */}
+                <div className="space-y-3">
+                  {/* Stripe (Card) Option */}
+                  <div className={`p-4 border rounded-lg ${!showDirectPayment ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!showDirectPayment}
+                        onChange={() => setShowDirectPayment(false)}
+                        className="mr-3"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium flex items-center gap-2">
+                          <span>Pay with Card</span>
+                        </div>
+                        <p className="text-sm text-gray-500">Secure payment via Stripe</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Direct Payment (PIX/Zelle) Option */}
+                  <div className={`p-4 border rounded-lg ${showDirectPayment ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={showDirectPayment}
+                        onChange={() => setShowDirectPayment(true)}
+                        className="mr-3"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium flex items-center gap-2">
+                          <span>Direct Payment (PIX / Zelle)</span>
+                        </div>
+                        <p className="text-sm text-gray-500">Pay via bank transfer and upload receipt</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Direct Payment Details */}
+                {showDirectPayment && (
+                  <div className="mt-4 p-4 bg-gradient-to-br from-green-50 to-teal-50 rounded-lg border border-green-200">
+                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      Direct Payments / Pagamentos Diretos
+                    </h3>
+
+                    {/* Payment Method Tabs */}
+                    <div className="flex gap-2 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('pix')}
+                        className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                          paymentMethod === 'pix'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-white text-gray-700 border hover:bg-gray-50'
+                        }`}
+                      >
+                        PIX (Brazil)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod('zelle')}
+                        className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-colors ${
+                          paymentMethod === 'zelle'
+                            ? 'bg-teal-600 text-white'
+                            : 'bg-white text-gray-700 border hover:bg-gray-50'
+                        }`}
+                      >
+                        Zelle (USA)
+                      </button>
+                    </div>
+
+                    {/* PIX Info */}
+                    {paymentMethod === 'pix' && (
+                      <div className="space-y-3">
+                        <div className="bg-white p-3 rounded-md">
+                          <p className="text-xs text-gray-500 mb-1">PIX Key (CNPJ)</p>
+                          <div className="flex items-center justify-between">
+                            <code className="font-mono text-sm">{PIX_KEY}</code>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(PIX_KEY)}
+                              className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+                            >
+                              {pixCopied ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{PIX_NAME}</p>
+                        </div>
+                        <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+                          <p className="text-sm text-yellow-800">
+                            <strong>Amount in BRL:</strong> R$ {pixAmountBRL}
+                          </p>
+                          <p className="text-xs text-yellow-600 mt-1">
+                            Rate: 1 USD = {USD_TO_BRL_RATE} BRL
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          * PIX available only for Brazilian bank accounts
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Zelle Info */}
+                    {paymentMethod === 'zelle' && (
+                      <div className="space-y-3">
+                        <div className="bg-white p-3 rounded-md">
+                          <p className="text-xs text-gray-500 mb-1">Zelle Number</p>
+                          <div className="flex items-center justify-between">
+                            <code className="font-mono text-sm">{ZELLE_NUMBER}</code>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(ZELLE_NUMBER)}
+                              className="text-teal-600 hover:text-teal-700 text-sm font-medium"
+                            >
+                              {pixCopied ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{ZELLE_NAME}</p>
+                        </div>
+                        <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                          <p className="text-sm text-blue-800">
+                            <strong>Amount:</strong> ${quote?.total_price?.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload Proof Section */}
+                    <div className="mt-4 pt-4 border-t border-green-200">
+                      <h4 className="font-medium text-gray-800 mb-2">
+                        Upload Payment Proof / Enviar Comprovante
+                      </h4>
+                      <p className="text-xs text-gray-500 mb-3">
+                        After making the payment, upload a screenshot or PDF of your receipt
+                      </p>
+
+                      <div className="space-y-3">
+                        <div
+                          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                            proofFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-teal-400'
+                          }`}
+                          onClick={() => document.getElementById('proof-file-input').click()}
+                        >
+                          <input
+                            id="proof-file-input"
+                            type="file"
+                            accept="image/*,application/pdf"
+                            className="hidden"
+                            onChange={(e) => setProofFile(e.target.files[0])}
+                          />
+                          {proofFile ? (
+                            <div className="flex items-center justify-center gap-2 text-green-600">
+                              <span className="text-xl">✓</span>
+                              <span className="font-medium">{proofFile.name}</span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-2xl mb-1">📄</div>
+                              <p className="text-sm text-gray-600">Click to select file</p>
+                              <p className="text-xs text-gray-400">PNG, JPG, PDF</p>
+                            </>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleUploadProof}
+                          disabled={!proofFile || uploadingProof || !guestName || !guestEmail}
+                          className="w-full py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 font-semibold flex items-center justify-center gap-2"
+                        >
+                          {uploadingProof ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              Upload Proof & Complete Order
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Card Payment Button */}
+            {!showDirectPayment && (
+              <button
+                type="submit"
+                disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
+                className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+              >
+                {submitting ? 'Processing...' : 'Continue to Payment'}
+              </button>
+            )}
           </form>
         </div>
 
