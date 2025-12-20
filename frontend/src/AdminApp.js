@@ -5716,7 +5716,10 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs
+  const [paymentProofs, setPaymentProofs] = useState([]);
+  const [selectedProof, setSelectedProof] = useState(null);
+  const [proofFilter, setProofFilter] = useState('pending');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
@@ -5767,14 +5770,53 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const fetchPaymentProofs = async () => {
+    try {
+      const statusParam = proofFilter !== 'all' ? `&status=${proofFilter}` : '';
+      const response = await axios.get(`${API}/admin/payment-proofs?admin_key=${adminKey}${statusParam}`);
+      setPaymentProofs(response.data.payment_proofs || []);
+    } catch (err) {
+      console.error('Error fetching payment proofs:', err);
+    }
+  };
+
+  const fetchProofDetail = async (proofId) => {
+    try {
+      const response = await axios.get(`${API}/admin/payment-proofs/${proofId}?admin_key=${adminKey}`);
+      setSelectedProof(response.data.payment_proof);
+    } catch (err) {
+      console.error('Error fetching proof detail:', err);
+    }
+  };
+
+  const reviewProof = async (proofId, status, notes = '') => {
+    try {
+      await axios.put(
+        `${API}/admin/payment-proofs/${proofId}/review?admin_key=${adminKey}&status=${status}${notes ? `&admin_notes=${encodeURIComponent(notes)}` : ''}`
+      );
+      setSelectedProof(null);
+      fetchPaymentProofs();
+      alert(status === 'approved' ? 'Payment approved!' : 'Payment rejected');
+    } catch (err) {
+      console.error('Error reviewing proof:', err);
+      alert('Error processing review');
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchExpenses()]);
+      await Promise.all([fetchSummary(), fetchExpenses(), fetchPaymentProofs()]);
       setLoading(false);
     };
     loadData();
   }, [adminKey, period]);
+
+  useEffect(() => {
+    if (activeView === 'payment-proofs') {
+      fetchPaymentProofs();
+    }
+  }, [proofFilter, activeView]);
 
   const handleCreateExpense = async (e) => {
     e.preventDefault();
@@ -5900,6 +5942,17 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Despesas
+            </button>
+            <button
+              onClick={() => setActiveView('payment-proofs')}
+              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'payment-proofs' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              Comprovantes
+              {paymentProofs.filter(p => p.status === 'pending').length > 0 && (
+                <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {paymentProofs.filter(p => p.status === 'pending').length}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -6169,6 +6222,234 @@ const FinancesPage = ({ adminKey }) => {
                 <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700">Salvar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Proofs View */}
+      {activeView === 'payment-proofs' && (
+        <div className="space-y-4">
+          {/* Filter */}
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-2">
+              {['pending', 'approved', 'rejected', 'all'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setProofFilter(status)}
+                  className={`px-3 py-1.5 rounded text-sm capitalize ${
+                    proofFilter === status
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {status === 'all' ? 'Todos' : status === 'pending' ? 'Pendentes' : status === 'approved' ? 'Aprovados' : 'Rejeitados'}
+                  {status === 'pending' && paymentProofs.filter(p => p.status === 'pending').length > 0 && (
+                    <span className="ml-1 bg-red-500 text-white text-xs px-1.5 rounded-full">
+                      {paymentProofs.filter(p => p.status === 'pending').length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={fetchPaymentProofs}
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
+            >
+              Atualizar
+            </button>
+          </div>
+
+          {/* Proofs List */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Data</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Cliente</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Método</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Valor</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {paymentProofs.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                      Nenhum comprovante encontrado
+                    </td>
+                  </tr>
+                ) : (
+                  paymentProofs.map((proof) => (
+                    <tr key={proof.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        {new Date(proof.created_at).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{proof.customer_name}</div>
+                        <div className="text-xs text-gray-500">{proof.customer_email}</div>
+                        {proof.order_number && (
+                          <div className="text-xs text-teal-600">Pedido: {proof.order_number}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          proof.payment_method === 'pix'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {proof.payment_method.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium">
+                        {proof.currency === 'BRL' ? 'R$' : '$'} {proof.amount.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                          proof.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : proof.status === 'approved'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {proof.status === 'pending' ? 'Pendente' : proof.status === 'approved' ? 'Aprovado' : 'Rejeitado'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => fetchProofDetail(proof.id)}
+                          className="text-teal-600 hover:text-teal-800 font-medium"
+                        >
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Proof Detail Modal */}
+      {selectedProof && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">Comprovante de Pagamento</h3>
+              <button onClick={() => setSelectedProof(null)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+              {/* Customer Info */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs text-gray-500">Cliente</label>
+                  <div className="font-medium">{selectedProof.customer_name}</div>
+                  <div className="text-sm text-gray-600">{selectedProof.customer_email}</div>
+                  {selectedProof.customer_phone && (
+                    <div className="text-sm text-gray-600">{selectedProof.customer_phone}</div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500">Pagamento</label>
+                  <div className="font-medium">
+                    <span className={`inline-flex items-center px-2 py-1 rounded text-sm ${
+                      selectedProof.payment_method === 'pix'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      {selectedProof.payment_method.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold mt-1">
+                    {selectedProof.currency === 'BRL' ? 'R$' : '$'} {selectedProof.amount.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {selectedProof.order_number && (
+                <div className="mb-4 p-2 bg-teal-50 rounded text-sm">
+                  <strong>Pedido vinculado:</strong> {selectedProof.order_number}
+                </div>
+              )}
+
+              {/* Proof Image/PDF */}
+              <div className="mb-4">
+                <label className="text-xs text-gray-500 block mb-2">Comprovante ({selectedProof.proof_filename})</label>
+                <div className="border rounded-lg overflow-hidden bg-gray-100">
+                  {selectedProof.proof_file_type?.startsWith('image/') ? (
+                    <img
+                      src={`data:${selectedProof.proof_file_type};base64,${selectedProof.proof_file_data}`}
+                      alt="Payment proof"
+                      className="max-w-full h-auto mx-auto"
+                      style={{ maxHeight: '400px' }}
+                    />
+                  ) : selectedProof.proof_file_type === 'application/pdf' ? (
+                    <div className="p-4 text-center">
+                      <p className="text-gray-600 mb-2">Arquivo PDF</p>
+                      <a
+                        href={`data:application/pdf;base64,${selectedProof.proof_file_data}`}
+                        download={selectedProof.proof_filename}
+                        className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+                      >
+                        Baixar PDF
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-gray-500">
+                      Formato não suportado para visualização
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Info */}
+              {selectedProof.status !== 'pending' && (
+                <div className={`p-3 rounded mb-4 ${
+                  selectedProof.status === 'approved' ? 'bg-green-50' : 'bg-red-50'
+                }`}>
+                  <div className="font-medium">
+                    {selectedProof.status === 'approved' ? 'Aprovado' : 'Rejeitado'} por {selectedProof.reviewed_by_name}
+                  </div>
+                  {selectedProof.reviewed_at && (
+                    <div className="text-sm text-gray-600">
+                      {new Date(selectedProof.reviewed_at).toLocaleString('pt-BR')}
+                    </div>
+                  )}
+                  {selectedProof.admin_notes && (
+                    <div className="text-sm mt-1">Notas: {selectedProof.admin_notes}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            {selectedProof.status === 'pending' && (
+              <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
+                <button
+                  onClick={() => {
+                    const notes = prompt('Motivo da rejeição (opcional):');
+                    reviewProof(selectedProof.id, 'rejected', notes || '');
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Rejeitar
+                </button>
+                <button
+                  onClick={() => reviewProof(selectedProof.id, 'approved')}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Aprovar Pagamento
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
