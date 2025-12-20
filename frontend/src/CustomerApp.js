@@ -267,6 +267,23 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   }, [customer]);
 
+  // Check for payment success/cancel from Stripe redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+    const paymentCanceled = urlParams.get('payment_canceled');
+    const sessionId = urlParams.get('session_id');
+
+    if (paymentSuccess === 'true' && sessionId) {
+      setSuccess('Payment successful! Your order has been confirmed. Check your email for details.');
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentCanceled === 'true') {
+      setError('Payment was canceled. Your order has been saved - you can complete payment later.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
@@ -459,59 +476,43 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     setError('');
 
     try {
-      const orderData = {
-        email: guestEmail,
-        name: guestName,
+      // Step 1: Create a quote first
+      const quoteData = {
         service_type: formData.service_type,
         translate_from: formData.translate_from,
         translate_to: formData.translate_to,
         word_count: wordCount,
         urgency: formData.urgency,
-        reference: formData.reference,
+        customer_email: guestEmail,
+        customer_name: guestName,
         notes: formData.notes,
-        document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        discount_code: appliedDiscount ? discountCode : null,
-        abandoned_quote_id: abandonedQuoteId,
         // Certification options
         notarization: certifications.notarization,
         e_apostille: certifications.eApostille,
         certification_fee: quote?.certification_fee || 0
       };
 
-      let response;
-      if (token) {
-        response = await axios.post(`${API}/customer/orders/create?token=${token}`, orderData);
-      } else {
-        response = await axios.post(`${API}/guest/orders/create`, orderData);
-      }
+      // Create quote
+      const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
+      const quoteId = quoteResponse.data.quote_id;
 
-      setSuccess(`Order ${response.data.order.order_number} created successfully! Check your email for confirmation.`);
-
-      // Reset form
-      setFormData({
-        service_type: 'standard',
-        translate_from: 'portuguese',
-        translate_to: 'english',
-        urgency: 'no',
-        reference: '',
-        notes: ''
+      // Step 2: Create Stripe checkout session
+      const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        origin_url: window.location.origin + '/customer'
       });
-      setWordCount(0);
-      setUploadedFiles([]);
-      setQuote(null);
-      setAbandonedQuoteId(null);
-      setAppliedDiscount(null);
-      setDiscountCode('');
-      setCertifications({ notarization: false, eApostille: false });
 
-      if (onOrderCreated) {
-        onOrderCreated(response.data.order);
+      // Step 3: Redirect to Stripe checkout
+      if (checkoutResponse.data.checkout_url) {
+        window.location.href = checkoutResponse.data.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
       }
 
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create order');
-    } finally {
+      setError(err.response?.data?.detail || 'Failed to process payment. Please try again.');
       setSubmitting(false);
     }
   };
