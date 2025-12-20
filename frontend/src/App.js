@@ -376,14 +376,8 @@ const useLocale = () => {
   return context;
 };
 
-// Detect user's locale from browser
-const detectUserLocale = () => {
-  const browserLang = navigator.language || navigator.userLanguage || 'en';
-  const langCode = browserLang.split('-')[0].toLowerCase();
-
-  // Map browser language to our supported languages
-  if (langCode === 'pt') return { lang: 'pt', currency: 'BRL' };
-  if (langCode === 'es') return { lang: 'es', currency: 'USD' };
+// Default locale - always English (user can change manually)
+const getDefaultLocale = () => {
   return { lang: 'en', currency: 'USD' };
 };
 
@@ -391,7 +385,7 @@ const LocaleProvider = ({ children }) => {
   const [locale, setLocale] = useState(() => {
     const saved = localStorage.getItem('locale');
     if (saved) return JSON.parse(saved);
-    return detectUserLocale();
+    return getDefaultLocale();
   });
 
   useEffect(() => {
