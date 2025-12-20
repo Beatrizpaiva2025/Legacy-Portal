@@ -150,7 +150,7 @@ class EmailService:
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                     <h2 style="color: #2c5aa0;">Translation Order Confirmation</h2>
                     
-                    <p>{'Thank you for your order!' if is_partner else 'New order received from partner portal.'}</p>
+                    <p>{'Thank you for your order!' if is_partner else 'New translation order received.'}</p>
                     
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
                         <h3 style="margin-top: 0;">Order Details:</h3>
@@ -4732,17 +4732,18 @@ async def create_guest_order(order_data: GuestOrderCreate):
                 "total_price": order.total_price
             }
 
+            # Send confirmation to customer (friendly message)
             await email_service.send_order_confirmation_email(
                 order_data.email,
                 order_details,
-                is_partner=False
+                is_partner=True  # Customer gets "Thank you for your order!"
             )
 
-            # Also notify company
+            # Also notify company (internal notification)
             await email_service.send_order_confirmation_email(
                 "contact@legacytranslations.com",
                 order_details,
-                is_partner=False
+                is_partner=False  # Company gets "New translation order received."
             )
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")

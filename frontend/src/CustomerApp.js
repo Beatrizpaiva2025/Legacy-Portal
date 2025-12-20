@@ -226,9 +226,8 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
   );
 };
 
-// ==================== CUSTOMER NEW ORDER PAGE (Step-based with Auto-save) ====================
+// ==================== CUSTOMER NEW ORDER PAGE (Single page with inline email capture) ====================
 const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
-  const [step, setStep] = useState(1); // 1: Email, 2: Upload & Configure, 3: Review & Order
   const [guestEmail, setGuestEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   const [formData, setFormData] = useState({
@@ -251,21 +250,46 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
 
-  // If logged in, skip email step
+  // Certification options
+  const [certifications, setCertifications] = useState({
+    notarization: false,
+    eApostille: false
+  });
+
+  // MIA WhatsApp number
+  const MIA_WHATSAPP = "https://wa.me/17863109734?text=Hi%20MIA,%20I%20have%20questions%20about%20my%20translation%20quote";
+
+  // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
       setGuestEmail(customer.email);
       setGuestName(customer.full_name);
-      setStep(2);
     }
   }, [customer]);
+
+  // Check for payment success/cancel from Stripe redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+    const paymentCanceled = urlParams.get('payment_canceled');
+    const sessionId = urlParams.get('session_id');
+
+    if (paymentSuccess === 'true' && sessionId) {
+      setSuccess('Payment successful! Your order has been confirmed. Check your email for details.');
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentCanceled === 'true') {
+      setError('Payment was canceled. Your order has been saved - you can complete payment later.');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications]);
 
   // Auto-save abandoned quote when user sees the price
   useEffect(() => {
@@ -277,14 +301,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   // Exit intent detection
   useEffect(() => {
     const handleMouseLeave = (e) => {
-      if (e.clientY <= 0 && quote && !success && step >= 2) {
+      if (e.clientY <= 0 && quote && !success && guestEmail) {
         setShowExitPopup(true);
       }
     };
 
     document.addEventListener('mouseleave', handleMouseLeave);
     return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, [quote, success, step]);
+  }, [quote, success, guestEmail]);
 
   const calculateQuote = () => {
     let basePrice = 0;
@@ -293,7 +317,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;
     } else {
-      basePrice = pages * 19.50;
+      basePrice = pages * 19.99;
     }
 
     let urgencyFee = 0;
@@ -303,7 +327,16 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       urgencyFee = basePrice * 1.0;
     }
 
-    let subtotal = basePrice + urgencyFee;
+    // Certification fees
+    let certificationFee = 0;
+    if (certifications.notarization) {
+      certificationFee += 19.95;
+    }
+    if (certifications.eApostille) {
+      certificationFee += 79.95;
+    }
+
+    let subtotal = basePrice + urgencyFee + certificationFee;
     let discountAmount = 0;
 
     if (appliedDiscount) {
@@ -317,6 +350,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
+      certification_fee: certificationFee,
       discount: discountAmount,
       total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
@@ -425,15 +459,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     multiple: true
   });
 
-  const handleEmailSubmit = (e) => {
-    e.preventDefault();
-    if (guestEmail && guestName) {
-      setStep(2);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!guestName || !guestEmail) {
+      setError('Please enter your name and email');
+      return;
+    }
 
     if (wordCount === 0) {
       setError('Please upload a document first');
@@ -444,112 +476,46 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     setError('');
 
     try {
-      const orderData = {
-        email: guestEmail,
-        name: guestName,
+      // Step 1: Create a quote first
+      const quoteData = {
         service_type: formData.service_type,
         translate_from: formData.translate_from,
         translate_to: formData.translate_to,
         word_count: wordCount,
         urgency: formData.urgency,
-        reference: formData.reference,
+        customer_email: guestEmail,
+        customer_name: guestName,
         notes: formData.notes,
-        document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        discount_code: appliedDiscount ? discountCode : null,
-        abandoned_quote_id: abandonedQuoteId
+        // Certification options
+        notarization: certifications.notarization,
+        e_apostille: certifications.eApostille,
+        certification_fee: quote?.certification_fee || 0
       };
 
-      let response;
-      if (token) {
-        response = await axios.post(`${API}/customer/orders/create?token=${token}`, orderData);
-      } else {
-        response = await axios.post(`${API}/guest/orders/create`, orderData);
-      }
+      // Create quote
+      const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
+      const quoteId = quoteResponse.data.quote_id;
 
-      setSuccess(`Order ${response.data.order.order_number} created successfully! Check your email for confirmation.`);
-
-      // Reset form
-      setFormData({
-        service_type: 'standard',
-        translate_from: 'portuguese',
-        translate_to: 'english',
-        urgency: 'no',
-        reference: '',
-        notes: ''
+      // Step 2: Create Stripe checkout session
+      const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
+        quote_id: quoteId,
+        customer_email: guestEmail,
+        origin_url: window.location.origin + '/customer'
       });
-      setWordCount(0);
-      setUploadedFiles([]);
-      setQuote(null);
-      setAbandonedQuoteId(null);
-      setAppliedDiscount(null);
-      setDiscountCode('');
 
-      if (onOrderCreated) {
-        onOrderCreated(response.data.order);
+      // Step 3: Redirect to Stripe checkout
+      if (checkoutResponse.data.checkout_url) {
+        window.location.href = checkoutResponse.data.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
       }
 
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create order');
-    } finally {
+      setError(err.response?.data?.detail || 'Failed to process payment. Please try again.');
       setSubmitting(false);
     }
   };
-
-  // Step 1: Capture Email
-  if (step === 1) {
-    return (
-      <div className="p-8 max-w-xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <div className="text-4xl mb-4">📧</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Get Your Free Quote</h1>
-            <p className="text-gray-600">Enter your details to receive an instant price quote</p>
-          </div>
-
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
-              <input
-                type="text"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="John Smith"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Email *</label>
-              <input
-                type="email"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
-              <p className="text-xs text-gray-500 mt-1">We'll send your quote and order updates here</p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold"
-            >
-              Continue to Upload Document
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            Already have an account?{' '}
-            <a href="/customer" className="text-teal-600 hover:underline" onClick={() => window.location.reload()}>
-              Sign In
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-8">
@@ -598,23 +564,36 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
 
-            {/* Contact Info (read-only) */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
+            {/* Contact Info - Subtle at top */}
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-100">
+              <p className="text-sm text-gray-600 mb-3">Enter your details to receive your quote</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <div className="text-sm text-gray-500">Sending quote to:</div>
-                  <div className="font-medium">{guestName} ({guestEmail})</div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="John Smith"
+                    disabled={!!customer}
+                  />
                 </div>
-                {!customer && (
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="text-sm text-teal-600 hover:underline"
-                  >
-                    Change
-                  </button>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Email *</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    disabled={!!customer}
+                  />
+                </div>
               </div>
+              <p className="text-xs text-gray-400 mt-2">We'll send your quote and order updates here</p>
             </div>
 
             {/* Service Type */}
@@ -654,7 +633,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     <div className="font-medium">Professional Translation</div>
                     <div className="text-sm text-gray-500">Business, marketing, general content</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.50/page</div>
+                  <div className="font-semibold text-teal-600">$19.99/page</div>
                 </label>
               </div>
             </div>
@@ -749,6 +728,19 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   </div>
                 </div>
               )}
+
+              {/* Contact support link - shown after upload section */}
+              <div className="mt-3 text-center">
+                <p className="text-xs text-gray-400">
+                  Having trouble uploading?{' '}
+                  <a
+                    href="mailto:info@legacytranslations.com?subject=Document Upload Issue"
+                    className="text-teal-600 hover:underline"
+                  >
+                    Contact us via email
+                  </a>
+                </p>
+              </div>
             </div>
 
             {/* Urgency */}
@@ -776,6 +768,54 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
             </div>
 
+            {/* Certification Options */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Certification options</h2>
+              <div className="space-y-3">
+                {/* Notarization */}
+                <label className="block p-4 border rounded-lg border-gray-200 bg-gray-50 cursor-not-allowed opacity-75">
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      disabled
+                      className="mt-1 mr-3 h-4 w-4 text-gray-400 rounded cursor-not-allowed"
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-gray-600">Notarization</span>
+                        <span className="font-semibold text-teal-600 text-sm">Coming soon</span>
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Stamp, signature, and tamper-evident digital certificate verifying the translation certification, valid in all 50 states.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+
+                {/* E-Apostille */}
+                <label className="block p-4 border rounded-lg border-gray-200 bg-gray-50 cursor-not-allowed opacity-75">
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      disabled
+                      className="mt-1 mr-3 h-4 w-4 text-gray-400 rounded cursor-not-allowed"
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-gray-600">E-Apostille</span>
+                        <span className="font-semibold text-teal-600 text-sm">Coming soon</span>
+                      </div>
+                      <p className="text-sm text-gray-400 mt-1">
+                        An e-apostille verifies the notarization's authenticity for use in Hague Convention member countries around the world.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
@@ -788,12 +828,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               />
             </div>
 
+            {/* Questions about pricing? - MIA Contact */}
+            <div className="bg-gray-50 p-5 rounded-lg text-center">
+              <p className="text-gray-600 mb-3">Questions about your pricing?</p>
+              <a
+                href={MIA_WHATSAPP}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
+              >
+                Request a quote instead
+              </a>
+            </div>
+
             <button
               type="submit"
-              disabled={submitting || wordCount === 0}
+              disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
-              {submitting ? 'Creating Order...' : 'Place Order'}
+              {submitting ? 'Processing...' : 'Continue to Payment'}
             </button>
           </form>
         </div>
@@ -823,6 +876,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 <div className="flex justify-between text-orange-600">
                   <span>Urgency Fee</span>
                   <span>${quote.urgency_fee.toFixed(2)}</span>
+                </div>
+              )}
+              {quote?.certification_fee > 0 && (
+                <div className="flex justify-between text-purple-600">
+                  <span>Certification</span>
+                  <span>${quote.certification_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
