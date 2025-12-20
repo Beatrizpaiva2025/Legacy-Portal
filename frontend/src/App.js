@@ -446,7 +446,7 @@ const LocaleProvider = ({ children }) => {
   );
 };
 
-// Language Selector Component
+// Language Selector Component (with currency - for internal pages)
 const LanguageSelector = () => {
   const { locale, setLanguage, setCurrency } = useLocale();
 
@@ -486,6 +486,36 @@ const LanguageSelector = () => {
           </option>
         ))}
       </select>
+    </div>
+  );
+};
+
+// Simple Flag Selector for Login Page (flags only, no currency)
+const FlagSelector = () => {
+  const { locale, setLanguage } = useLocale();
+
+  const languages = [
+    { code: 'en', flag: '🇺🇸', name: 'English' },
+    { code: 'es', flag: '🇪🇸', name: 'Español' },
+    { code: 'pt', flag: '🇧🇷', name: 'Português' }
+  ];
+
+  return (
+    <div className="flex items-center gap-3">
+      {languages.map(lang => (
+        <button
+          key={lang.code}
+          onClick={() => setLanguage(lang.code)}
+          className={`text-2xl p-2 rounded-lg transition-all ${
+            locale.lang === lang.code
+              ? 'bg-teal-100 ring-2 ring-teal-500 scale-110'
+              : 'hover:bg-gray-100 opacity-60 hover:opacity-100'
+          }`}
+          title={lang.name}
+        >
+          {lang.flag}
+        </button>
+      ))}
     </div>
   );
 };
@@ -568,11 +598,6 @@ const LoginPage = ({ onLogin, onRegister }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        {/* Language Selector */}
-        <div className="flex justify-end mb-4">
-          <LanguageSelector />
-        </div>
-
         {/* Logo */}
         <div className="text-center mb-6">
           <img
@@ -588,6 +613,11 @@ const LoginPage = ({ onLogin, onRegister }) => {
           <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
             {t('corporateOnly')}
           </span>
+        </div>
+
+        {/* Language Flags */}
+        <div className="flex justify-center mb-6">
+          <FlagSelector />
         </div>
 
         {error && (
