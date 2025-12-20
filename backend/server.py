@@ -498,6 +498,7 @@ class TranslationOrder(BaseModel):
     assigned_translator_name: Optional[str] = None
     deadline: Optional[datetime] = None  # Translation deadline
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
+    revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -523,6 +524,7 @@ class TranslationOrderUpdate(BaseModel):
     assigned_translator_id: Optional[str] = None
     deadline: Optional[datetime] = None
     internal_notes: Optional[str] = None
+    revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -548,6 +550,7 @@ class ManualProjectCreate(BaseModel):
     assigned_pm_id: Optional[str] = None
     assigned_translator_id: Optional[str] = None
     deadline: Optional[str] = None  # ISO date string
+    revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     # Files (base64)
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
@@ -602,6 +605,66 @@ class PaymentUpdate(BaseModel):
     payment_method: Optional[str] = None
     payment_reference: Optional[str] = None
     notes: Optional[str] = None
+
+# ==================== EXPENSE MODELS ====================
+class Expense(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    category: str  # fixed, translators, ai, marketing, office, utilities, other
+    subcategory: Optional[str] = None  # rent, software, ads, etc.
+    description: str
+    amount: float
+    date: datetime = Field(default_factory=datetime.utcnow)
+    is_recurring: bool = False
+    recurring_period: Optional[str] = None  # monthly, yearly
+    vendor: Optional[str] = None
+    receipt_url: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by_id: Optional[str] = None
+    created_by_name: Optional[str] = None
+
+class ExpenseCreate(BaseModel):
+    category: str
+    subcategory: Optional[str] = None
+    description: str
+    amount: float
+    date: Optional[str] = None
+    is_recurring: bool = False
+    recurring_period: Optional[str] = None
+    vendor: Optional[str] = None
+    notes: Optional[str] = None
+
+class ExpenseUpdate(BaseModel):
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
+    description: Optional[str] = None
+    amount: Optional[float] = None
+    date: Optional[str] = None
+    is_recurring: Optional[bool] = None
+    recurring_period: Optional[str] = None
+    vendor: Optional[str] = None
+    notes: Optional[str] = None
+
+# Expense categories with labels
+EXPENSE_CATEGORIES = {
+    'fixed': 'Despesas Fixas',
+    'translators': 'Tradutores',
+    'ai': 'AI & Tecnologia',
+    'marketing': 'Marketing',
+    'office': 'Escritório',
+    'utilities': 'Utilidades',
+    'other': 'Outros'
+}
+
+# Revenue sources
+REVENUE_SOURCES = {
+    'website': 'Website',
+    'whatsapp': 'WhatsApp',
+    'social_media': 'Social Media',
+    'referral': 'Indicação',
+    'partner': 'Parceiro',
+    'other': 'Outros'
+}
 
 # Helper function to create notifications
 async def create_notification(user_id: str, notif_type: str, title: str, message: str, order_id: str = None, order_number: str = None):
@@ -2379,6 +2442,259 @@ async def delete_payment(payment_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Payment not found")
 
     return {"status": "success"}
+
+# ==================== EXPENSES ====================
+
+@api_router.post("/admin/expenses")
+async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Optional[str] = None):
+    """Create a new expense record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    current_user = None
+    if token:
+        current_user = await get_current_admin_user(token)
+
+    expense = Expense(
+        category=expense_data.category,
+        subcategory=expense_data.subcategory,
+        description=expense_data.description,
+        amount=expense_data.amount,
+        date=datetime.fromisoformat(expense_data.date.replace('Z', '+00:00')) if expense_data.date else datetime.utcnow(),
+        is_recurring=expense_data.is_recurring,
+        recurring_period=expense_data.recurring_period,
+        vendor=expense_data.vendor,
+        notes=expense_data.notes,
+        created_by_id=current_user["id"] if current_user else None,
+        created_by_name=current_user.get("name") if current_user else None
+    )
+
+    await db.expenses.insert_one(expense.dict())
+    return {"status": "success", "expense": expense.dict()}
+
+@api_router.get("/admin/expenses")
+async def get_expenses(admin_key: str, category: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """Get all expenses with optional filters"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if category:
+        query["category"] = category
+
+    if start_date or end_date:
+        query["date"] = {}
+        if start_date:
+            query["date"]["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date:
+            query["date"]["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+
+    expenses = await db.expenses.find(query).sort("date", -1).to_list(500)
+
+    for expense in expenses:
+        if '_id' in expense:
+            del expense['_id']
+
+    return {"expenses": expenses}
+
+@api_router.put("/admin/expenses/{expense_id}")
+async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key: str):
+    """Update an expense record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    update_dict = {}
+    if update_data.category:
+        update_dict["category"] = update_data.category
+    if update_data.subcategory is not None:
+        update_dict["subcategory"] = update_data.subcategory
+    if update_data.description:
+        update_dict["description"] = update_data.description
+    if update_data.amount is not None:
+        update_dict["amount"] = update_data.amount
+    if update_data.date:
+        update_dict["date"] = datetime.fromisoformat(update_data.date.replace('Z', '+00:00'))
+    if update_data.is_recurring is not None:
+        update_dict["is_recurring"] = update_data.is_recurring
+    if update_data.recurring_period is not None:
+        update_dict["recurring_period"] = update_data.recurring_period
+    if update_data.vendor is not None:
+        update_dict["vendor"] = update_data.vendor
+    if update_data.notes is not None:
+        update_dict["notes"] = update_data.notes
+
+    result = await db.expenses.update_one({"id": expense_id}, {"$set": update_dict})
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if '_id' in expense:
+        del expense['_id']
+
+    return {"status": "success", "expense": expense}
+
+@api_router.delete("/admin/expenses/{expense_id}")
+async def delete_expense(expense_id: str, admin_key: str):
+    """Delete an expense record"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.expenses.delete_one({"id": expense_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    return {"status": "success"}
+
+# ==================== FINANCIAL SUMMARY ====================
+
+@api_router.get("/admin/finances/summary")
+async def get_financial_summary(admin_key: str, period: str = "month"):
+    """Get financial summary with income, expenses, profit/loss"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    now = datetime.utcnow()
+
+    # Determine date range based on period
+    if period == "month":
+        start_date = datetime(now.year, now.month, 1)
+        if now.month == 12:
+            end_date = datetime(now.year + 1, 1, 1)
+        else:
+            end_date = datetime(now.year, now.month + 1, 1)
+    elif period == "year":
+        start_date = datetime(now.year, 1, 1)
+        end_date = datetime(now.year + 1, 1, 1)
+    elif period == "last30":
+        start_date = now - timedelta(days=30)
+        end_date = now
+    elif period == "last365":
+        start_date = now - timedelta(days=365)
+        end_date = now
+    else:
+        start_date = datetime(now.year, now.month, 1)
+        end_date = now
+
+    # Get revenue (paid orders)
+    orders = await db.orders.find({
+        "payment_status": "paid",
+        "created_at": {"$gte": start_date, "$lt": end_date}
+    }).to_list(1000)
+
+    total_revenue = sum(o.get("total_price", 0) for o in orders)
+
+    # Revenue by source
+    revenue_by_source = {}
+    for source in REVENUE_SOURCES.keys():
+        source_orders = [o for o in orders if o.get("revenue_source", "website") == source]
+        revenue_by_source[source] = {
+            "label": REVENUE_SOURCES[source],
+            "amount": sum(o.get("total_price", 0) for o in source_orders),
+            "count": len(source_orders)
+        }
+
+    # Revenue by language pair
+    revenue_by_language = {}
+    for order in orders:
+        lang_pair = f"{order.get('translate_from', 'Unknown')} → {order.get('translate_to', 'Unknown')}"
+        if lang_pair not in revenue_by_language:
+            revenue_by_language[lang_pair] = {"amount": 0, "count": 0}
+        revenue_by_language[lang_pair]["amount"] += order.get("total_price", 0)
+        revenue_by_language[lang_pair]["count"] += 1
+
+    # Get expenses
+    expenses = await db.expenses.find({
+        "date": {"$gte": start_date, "$lt": end_date}
+    }).to_list(1000)
+
+    total_expenses = sum(e.get("amount", 0) for e in expenses)
+
+    # Expenses by category
+    expenses_by_category = {}
+    for cat_key, cat_label in EXPENSE_CATEGORIES.items():
+        cat_expenses = [e for e in expenses if e.get("category") == cat_key]
+        expenses_by_category[cat_key] = {
+            "label": cat_label,
+            "amount": sum(e.get("amount", 0) for e in cat_expenses),
+            "count": len(cat_expenses)
+        }
+
+    # Get translator payments in period
+    translator_payments = await db.translator_payments.find({
+        "status": "paid",
+        "payment_date": {"$gte": start_date, "$lt": end_date}
+    }).to_list(500)
+    translator_payments_total = sum(p.get("total_amount", 0) for p in translator_payments)
+
+    # Add translator payments to expenses
+    expenses_by_category["translators"]["amount"] += translator_payments_total
+    total_expenses += translator_payments_total
+
+    # Invoices summary
+    all_orders = await db.orders.find({
+        "created_at": {"$gte": start_date, "$lt": end_date}
+    }).to_list(1000)
+
+    paid_invoices = sum(o.get("total_price", 0) for o in all_orders if o.get("payment_status") == "paid")
+    pending_invoices = sum(o.get("total_price", 0) for o in all_orders if o.get("payment_status") == "pending")
+    overdue_invoices = sum(o.get("total_price", 0) for o in all_orders if o.get("payment_status") == "overdue")
+
+    # Profit/Loss
+    net_profit = total_revenue - total_expenses
+
+    # Previous period for comparison
+    if period == "month":
+        prev_start = datetime(now.year, now.month - 1, 1) if now.month > 1 else datetime(now.year - 1, 12, 1)
+        prev_end = start_date
+    else:
+        prev_start = start_date - (end_date - start_date)
+        prev_end = start_date
+
+    prev_orders = await db.orders.find({
+        "payment_status": "paid",
+        "created_at": {"$gte": prev_start, "$lt": prev_end}
+    }).to_list(1000)
+    prev_revenue = sum(o.get("total_price", 0) for o in prev_orders)
+
+    prev_expenses = await db.expenses.find({
+        "date": {"$gte": prev_start, "$lt": prev_end}
+    }).to_list(1000)
+    prev_expenses_total = sum(e.get("amount", 0) for e in prev_expenses)
+
+    revenue_change = ((total_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else 0
+    expenses_change = ((total_expenses - prev_expenses_total) / prev_expenses_total * 100) if prev_expenses_total > 0 else 0
+
+    return {
+        "period": period,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "profit_loss": {
+            "net_profit": net_profit,
+            "total_revenue": total_revenue,
+            "total_expenses": total_expenses,
+            "revenue_change_percent": round(revenue_change, 1),
+            "expenses_change_percent": round(expenses_change, 1)
+        },
+        "revenue": {
+            "total": total_revenue,
+            "by_source": revenue_by_source,
+            "by_language": dict(sorted(revenue_by_language.items(), key=lambda x: x[1]["amount"], reverse=True)[:10])
+        },
+        "expenses": {
+            "total": total_expenses,
+            "by_category": expenses_by_category
+        },
+        "invoices": {
+            "paid": paid_invoices,
+            "pending": pending_invoices,
+            "overdue": overdue_invoices,
+            "paid_count": len([o for o in all_orders if o.get("payment_status") == "paid"]),
+            "pending_count": len([o for o in all_orders if o.get("payment_status") == "pending"]),
+            "overdue_count": len([o for o in all_orders if o.get("payment_status") == "overdue"])
+        }
+    }
 
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
