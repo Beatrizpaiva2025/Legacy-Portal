@@ -4159,6 +4159,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
   const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
 
+  // Send to Client modal state
+  const [sendingOrder, setSendingOrder] = useState(null); // Order being sent
+  const [translatedDocInfo, setTranslatedDocInfo] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [sendingToClient, setSendingToClient] = useState(false);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4366,6 +4372,79 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Send email to client
   const sendEmailToClient = (email, orderNumber) => {
     window.location.href = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+  };
+
+  // Open "Send to Client" modal
+  const openSendToClientModal = async (order) => {
+    setSendingOrder(order);
+    setTranslatedDocInfo(null);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
+      setTranslatedDocInfo(response.data);
+    } catch (err) {
+      console.error('Failed to get translated document info:', err);
+      setTranslatedDocInfo({ has_translated_document: false });
+    }
+  };
+
+  // Download translated document
+  const downloadTranslatedDocument = async (orderId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/orders/${orderId}/download-translation?admin_key=${adminKey}`);
+      if (response.data.type === 'file' && response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type};base64,${response.data.file_data}`;
+        link.download = response.data.filename || filename || 'translation.pdf';
+        link.click();
+      } else if (response.data.type === 'html') {
+        // Open HTML in new tab for printing
+        const newWindow = window.open('', '_blank');
+        newWindow.document.write(response.data.html_content);
+        newWindow.document.close();
+      }
+    } catch (err) {
+      console.error('Failed to download translation:', err);
+      alert('Erro ao baixar tradução');
+    }
+  };
+
+  // Upload new translated document
+  const uploadTranslatedDocument = async (orderId, file) => {
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await axios.post(`${API}/admin/orders/${orderId}/upload-translation?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      // Refresh doc info
+      const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
+      setTranslatedDocInfo(response.data);
+      alert('Documento enviado com sucesso!');
+    } catch (err) {
+      console.error('Failed to upload translation:', err);
+      alert('Erro ao enviar documento');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  // Send translation to client (deliver)
+  const sendTranslationToClient = async (orderId) => {
+    setSendingToClient(true);
+    try {
+      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
+      alert(response.data.attachment_sent
+        ? 'Tradução enviada para o cliente com sucesso! (com anexo)'
+        : 'Pedido marcado como entregue! (email enviado sem anexo)');
+      setSendingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to deliver:', err);
+      alert('Erro ao enviar para cliente');
+    } finally {
+      setSendingToClient(false);
+    }
   };
 
   // View order documents
@@ -4862,20 +4941,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     {created.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                     <span className="text-[10px] text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                   </td>
-                  {/* Client with email button */}
+                  {/* Client with email and send buttons */}
                   <td className="px-2 py-2">
                     <div className="flex items-center gap-1">
                       <div>
                         {order.client_name}
                         <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
                       </div>
-                      <button
-                        onClick={() => sendEmailToClient(order.client_email, order.order_number)}
-                        className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
-                        title="Enviar email para cliente"
-                      >
-                        ✉️
-                      </button>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => sendEmailToClient(order.client_email, order.order_number)}
+                          className="p-0.5 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
+                          title="Enviar email para cliente"
+                        >
+                          ✉️
+                        </button>
+                        {/* Send translation button - shows when ready or review */}
+                        {['ready', 'review'].includes(order.translation_status) && (isAdmin || isPM) && (
+                          <button
+                            onClick={() => openSendToClientModal(order)}
+                            className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
+                            title="Enviar tradução para cliente"
+                          >
+                            📤
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </td>
                   {/* Translator */}
@@ -5121,6 +5212,112 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="p-3 border-t bg-gray-50 flex justify-end">
               <button onClick={() => setViewingOrder(null)} className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send to Client Modal */}
+      {sendingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-teal-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📤 Enviar para Cliente</h3>
+                <p className="text-xs opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
+              </div>
+              <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4">
+              {/* Client Info */}
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs font-medium text-gray-600 mb-1">Cliente:</div>
+                <div className="text-sm font-medium">{sendingOrder.client_name}</div>
+                <div className="text-xs text-gray-500">{sendingOrder.client_email}</div>
+              </div>
+
+              {/* Translated Document Status */}
+              <div className="mb-4">
+                <div className="text-xs font-medium text-gray-600 mb-2">📄 Documento Traduzido:</div>
+                {!translatedDocInfo ? (
+                  <div className="text-center py-3 text-gray-500 text-xs">Carregando...</div>
+                ) : translatedDocInfo.has_translated_document ? (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <span className="text-green-600 text-lg mr-2">✅</span>
+                        <div>
+                          <div className="text-xs font-medium text-green-800">Tradução disponível</div>
+                          <div className="text-[10px] text-green-600">
+                            {translatedDocInfo.translated_filename || 'HTML gerado no workspace'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
+                        className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        ⬇️ Baixar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <div className="flex items-center">
+                      <span className="text-yellow-600 text-lg mr-2">⚠️</span>
+                      <div className="text-xs text-yellow-800">
+                        Nenhuma tradução anexada. Faça upload abaixo ou envie sem anexo.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload new document */}
+              <div className="mb-4">
+                <div className="text-xs font-medium text-gray-600 mb-2">📎 Enviar novo documento:</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="translationFile"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files[0]) {
+                        uploadTranslatedDocument(sendingOrder.id, e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="translationFile"
+                    className={`flex-1 px-3 py-2 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-xs ${uploadingFile ? 'opacity-50' : ''}`}
+                  >
+                    {uploadingFile ? 'Enviando...' : '📁 Clique para selecionar arquivo (PDF, DOC)'}
+                  </label>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
+                💡 Ao clicar em "Enviar", o cliente receberá um email com a tradução anexada (se disponível).
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg">
+              <button
+                onClick={() => setSendingOrder(null)}
+                className="px-4 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => sendTranslationToClient(sendingOrder.id)}
+                disabled={sendingToClient}
+                className="px-4 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 disabled:bg-gray-400"
+              >
+                {sendingToClient ? 'Enviando...' : '📤 Enviar para Cliente'}
               </button>
             </div>
           </div>

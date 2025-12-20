@@ -2991,9 +2991,10 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
 @api_router.post("/admin/orders/{order_id}/upload-translation")
 async def admin_upload_translation(order_id: str, admin_key: str, file: UploadFile = File(...)):
-    """Upload translated file for an order (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Upload translated file for an order (admin/PM only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -3080,9 +3081,10 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str):
-    """Mark order as delivered and send translation to client (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Mark order as delivered and send translation to client (admin/PM only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -3177,6 +3179,61 @@ async def admin_deliver_order(order_id: str, admin_key: str):
         logger.error(f"Failed to send delivery emails: {str(e)}")
         return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
 
+@api_router.get("/admin/orders/{order_id}/translated-document")
+async def get_translated_document(order_id: str, admin_key: str):
+    """Get translated document info for an order (admin/PM only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    has_file = bool(order.get("translated_file"))
+    has_html = bool(order.get("translation_html"))
+
+    return {
+        "has_translated_document": has_file or has_html,
+        "translated_filename": order.get("translated_filename"),
+        "translated_file_type": order.get("translated_file_type"),
+        "translation_ready": order.get("translation_ready", False),
+        "translation_ready_at": order.get("translation_ready_at"),
+        "has_file_attachment": has_file,
+        "has_html_translation": has_html,
+        "translation_status": order.get("translation_status"),
+        "client_name": order.get("client_name"),
+        "client_email": order.get("client_email"),
+        "order_number": order.get("order_number")
+    }
+
+@api_router.get("/admin/orders/{order_id}/download-translation")
+async def download_translated_document(order_id: str, admin_key: str):
+    """Download the translated document for an order (admin/PM only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.get("translated_file"):
+        return {
+            "type": "file",
+            "filename": order.get("translated_filename", "translation.pdf"),
+            "content_type": order.get("translated_file_type", "application/pdf"),
+            "file_data": order.get("translated_file")
+        }
+    elif order.get("translation_html"):
+        return {
+            "type": "html",
+            "html_content": order.get("translation_html"),
+            "translator_name": order.get("translation_translator_name"),
+            "translation_date": order.get("translation_date")
+        }
+    else:
+        raise HTTPException(status_code=404, detail="No translated document found")
 
 # ==================== MESSAGES ENDPOINTS ====================
 
