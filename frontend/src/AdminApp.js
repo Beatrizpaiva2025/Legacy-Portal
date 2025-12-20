@@ -295,10 +295,10 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Production', icon: '📊', roles: ['admin'] },
-    { id: 'translators', label: 'Translators', icon: '👥', roles: ['admin'] },
+    { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
@@ -311,7 +311,8 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const roleConfig = {
     admin: { label: 'Administrator', color: 'bg-red-500' },
     pm: { label: 'Project Manager', color: 'bg-blue-500' },
-    translator: { label: 'Translator', color: 'bg-green-500' }
+    translator: { label: 'Translator', color: 'bg-green-500' },
+    sales: { label: 'Sales', color: 'bg-purple-500' }
   };
 
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
@@ -4005,6 +4006,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [pmList, setPmList] = useState([]);
   const [translatorList, setTranslatorList] = useState([]);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [documentFile, setDocumentFile] = useState(null);
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4019,9 +4021,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     assigned_pm_id: '',
     assigned_translator_id: '',
     deadline: '',
-    base_price: 0,
-    total_price: 0
+    base_price: '',
+    total_price: '',
+    revenue_source: 'website',
+    payment_method: ''
   });
+
+  const REVENUE_SOURCES = [
+    { value: 'website', label: 'Website' },
+    { value: 'whatsapp', label: 'WhatsApp' },
+    { value: 'social_media', label: 'Social Media' },
+    { value: 'referral', label: 'Indicação' },
+    { value: 'partner', label: 'Parceiro' },
+    { value: 'other', label: 'Outros' }
+  ];
+
+  const PAYMENT_METHODS = [
+    { value: '', label: '-- Select --' },
+    { value: 'credit_card', label: 'Credit Card' },
+    { value: 'debit', label: 'Debit Card' },
+    { value: 'paypal', label: 'PayPal' },
+    { value: 'zelle', label: 'Zelle' },
+    { value: 'venmo', label: 'Venmo' },
+    { value: 'pix', label: 'PIX' },
+    { value: 'apple_pay', label: 'Apple Pay' },
+    { value: 'bank_transfer', label: 'Bank Transfer' }
+  ];
 
   const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
 
@@ -4093,6 +4118,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  const deleteOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o pedido ${orderNumber}?\n\nEsta ação não pode ser desfeita.`)) return;
+    try {
+      await axios.delete(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      alert('Erro ao deletar pedido');
+    }
+  };
+
   // Assign translator to order
   const assignTranslator = async (orderId, translatorName) => {
     try {
@@ -4119,7 +4155,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     e.preventDefault();
     setCreatingProject(true);
     try {
-      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, newProject);
+      // Prepare project data with document if uploaded
+      let projectData = { ...newProject };
+
+      // Convert document to base64 if provided
+      if (documentFile) {
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve, reject) => {
+          reader.onload = () => {
+            const base64 = reader.result.split(',')[1]; // Remove data:...;base64, prefix
+            resolve(base64);
+          };
+          reader.onerror = reject;
+        });
+        reader.readAsDataURL(documentFile);
+        const base64Data = await base64Promise;
+        projectData.document_data = base64Data;
+        projectData.document_filename = documentFile.name;
+      }
+
+      await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, projectData);
       setShowNewProjectForm(false);
       setNewProject({
         client_name: '',
@@ -4135,9 +4190,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         assigned_pm_id: '',
         assigned_translator_id: '',
         deadline: '',
-        base_price: 0,
-        total_price: 0
+        base_price: '',
+        total_price: '',
+        revenue_source: 'website',
+        payment_method: ''
       });
+      setDocumentFile(null);
       fetchOrders();
     } catch (err) {
       alert(err.response?.data?.detail || 'Error creating project');
@@ -4309,12 +4367,40 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <input
                   type="number"
                   value={newProject.total_price}
-                  onChange={(e) => setNewProject({...newProject, total_price: parseFloat(e.target.value) || 0, base_price: parseFloat(e.target.value) || 0})}
+                  onChange={(e) => setNewProject({...newProject, total_price: e.target.value, base_price: e.target.value})}
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 />
               </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Payment Method</label>
+                <select
+                  value={newProject.payment_method}
+                  onChange={(e) => setNewProject({...newProject, payment_method: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {PAYMENT_METHODS.map(pm => <option key={pm.value} value={pm.value}>{pm.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Document Upload */}
+            <div className="mb-3">
+              <label className="block text-[10px] font-medium text-gray-600 mb-1">Document to Translate</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="file"
+                  onChange={(e) => setDocumentFile(e.target.files[0])}
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                  className="text-xs"
+                />
+                {documentFile && (
+                  <span className="text-xs text-green-600">✓ {documentFile.name}</span>
+                )}
+              </div>
+              <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG</p>
             </div>
 
             <div className="grid grid-cols-4 gap-3 mb-3">
@@ -4352,15 +4438,27 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
             </div>
 
-            <div className="mb-3">
-              <label className="block text-[10px] font-medium text-gray-600 mb-1">Internal Notes (Admin/PM only)</label>
-              <textarea
-                value={newProject.internal_notes}
-                onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
-                className="w-full px-2 py-1.5 text-xs border rounded"
-                rows="2"
-                placeholder="Internal notes not visible to client or translator"
-              />
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Revenue Source</label>
+                <select
+                  value={newProject.revenue_source}
+                  onChange={(e) => setNewProject({...newProject, revenue_source: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {REVENUE_SOURCES.map(src => <option key={src.value} value={src.value}>{src.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Internal Notes (Admin/PM only)</label>
+                <textarea
+                  value={newProject.internal_notes}
+                  onChange={(e) => setNewProject({...newProject, internal_notes: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  rows="1"
+                  placeholder="Internal notes"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -4444,11 +4542,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           ✍️
                         </button>
                       )}
-                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]">▶</button>}
-                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]">👁</button>}
-                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>}
-                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]">📤</button>}
-                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]">$</button>}
+                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
+                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
+                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
+                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
+                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
+                      {/* Delete button - always visible */}
+                      <button
+                        onClick={() => deleteOrder(order.id, order.order_number)}
+                        className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
+                        title="Delete Order"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -4680,7 +4786,8 @@ const UsersPage = ({ adminKey }) => {
   const roleColors = {
     admin: 'bg-red-100 text-red-800',
     pm: 'bg-blue-100 text-blue-800',
-    translator: 'bg-green-100 text-green-800'
+    translator: 'bg-green-100 text-green-800',
+    sales: 'bg-purple-100 text-purple-800'
   };
 
   if (loading) return <div className="p-6 text-center">Loading users...</div>;
@@ -4733,6 +4840,7 @@ const UsersPage = ({ adminKey }) => {
             >
               <option value="translator">Translator</option>
               <option value="pm">Project Manager</option>
+              <option value="sales">Sales</option>
               <option value="admin">Admin</option>
             </select>
             <div className="col-span-4 flex justify-end gap-2">
@@ -5250,6 +5358,472 @@ const ProductionPage = ({ adminKey }) => {
   );
 };
 
+// ==================== FINANCES PAGE ====================
+const FinancesPage = ({ adminKey }) => {
+  const [summary, setSummary] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('month');
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    category: 'fixed',
+    subcategory: '',
+    description: '',
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    is_recurring: false,
+    recurring_period: '',
+    vendor: '',
+    notes: ''
+  });
+
+  const EXPENSE_CATEGORIES = {
+    fixed: { label: 'Despesas Fixas', color: '#3B82F6' },
+    translators: { label: 'Tradutores', color: '#10B981' },
+    ai: { label: 'AI & Tecnologia', color: '#8B5CF6' },
+    marketing: { label: 'Marketing', color: '#F59E0B' },
+    office: { label: 'Escritório', color: '#EF4444' },
+    utilities: { label: 'Utilidades', color: '#06B6D4' },
+    other: { label: 'Outros', color: '#6B7280' }
+  };
+
+  const REVENUE_SOURCES = {
+    website: { label: 'Website', color: '#3B82F6' },
+    whatsapp: { label: 'WhatsApp', color: '#22C55E' },
+    social_media: { label: 'Social Media', color: '#A855F7' },
+    referral: { label: 'Indicação', color: '#F59E0B' },
+    partner: { label: 'Parceiro', color: '#06B6D4' },
+    other: { label: 'Outros', color: '#6B7280' }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/finances/summary?admin_key=${adminKey}&period=${period}`);
+      setSummary(response.data);
+    } catch (err) {
+      console.error('Error fetching financial summary:', err);
+    }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
+      setExpenses(response.data.expenses || []);
+    } catch (err) {
+      console.error('Error fetching expenses:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchSummary(), fetchExpenses()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey, period]);
+
+  const handleCreateExpense = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API}/admin/expenses?admin_key=${adminKey}`, expenseForm);
+      setShowExpenseModal(false);
+      setExpenseForm({
+        category: 'fixed', subcategory: '', description: '', amount: 0,
+        date: new Date().toISOString().split('T')[0], is_recurring: false,
+        recurring_period: '', vendor: '', notes: ''
+      });
+      fetchExpenses();
+      fetchSummary();
+    } catch (err) {
+      alert('Erro ao criar despesa');
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm('Excluir esta despesa?')) return;
+    try {
+      await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
+      fetchExpenses();
+      fetchSummary();
+    } catch (err) {
+      alert('Erro ao excluir despesa');
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  };
+
+  // Simple Donut Chart Component
+  const DonutChart = ({ data, total }) => {
+    const items = Object.entries(data).filter(([_, v]) => v.amount > 0);
+    if (items.length === 0) return <div className="text-center text-gray-500 py-8">Sem dados</div>;
+
+    let currentAngle = 0;
+    const segments = items.map(([key, value]) => {
+      const percentage = total > 0 ? (value.amount / total) * 100 : 0;
+      const angle = (percentage / 100) * 360;
+      const segment = { key, ...value, percentage, startAngle: currentAngle, angle };
+      currentAngle += angle;
+      return segment;
+    });
+
+    return (
+      <div className="flex items-center justify-center space-x-4">
+        <div className="relative w-32 h-32">
+          <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+            {segments.map((seg, i) => {
+              const radius = 40;
+              const circumference = 2 * Math.PI * radius;
+              const strokeDasharray = (seg.angle / 360) * circumference;
+              const strokeDashoffset = -(seg.startAngle / 360) * circumference;
+              const color = EXPENSE_CATEGORIES[seg.key]?.color || REVENUE_SOURCES[seg.key]?.color || '#6B7280';
+              return (
+                <circle
+                  key={seg.key}
+                  cx="50" cy="50" r={radius}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="20"
+                  strokeDasharray={`${strokeDasharray} ${circumference}`}
+                  strokeDashoffset={strokeDashoffset}
+                />
+              );
+            })}
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-sm font-bold text-gray-700">{formatCurrency(total)}</span>
+          </div>
+        </div>
+        <div className="space-y-1 text-xs">
+          {segments.map((seg) => {
+            const catInfo = EXPENSE_CATEGORIES[seg.key] || REVENUE_SOURCES[seg.key] || { label: seg.key, color: '#6B7280' };
+            return (
+              <div key={seg.key} className="flex items-center">
+                <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: catInfo.color }}></div>
+                <span className="text-gray-600">{catInfo.label}: {formatCurrency(seg.amount)}</span>
+                <span className="ml-1 text-gray-400">({seg.percentage.toFixed(0)}%)</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  if (loading) return <div className="p-6 text-center">Carregando dados financeiros...</div>;
+
+  return (
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-xl font-bold text-gray-800">💰 Finanças</h1>
+        <div className="flex items-center space-x-4">
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="px-3 py-2 border rounded text-sm"
+          >
+            <option value="month">Este Mês</option>
+            <option value="last30">Últimos 30 dias</option>
+            <option value="year">Este Ano</option>
+            <option value="last365">Últimos 365 dias</option>
+          </select>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setActiveView('overview')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              Visão Geral
+            </button>
+            <button
+              onClick={() => setActiveView('expenses')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              Despesas
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {activeView === 'overview' && summary && (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            {/* Profit & Loss */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium text-gray-500 uppercase">Lucro & Prejuízo</h3>
+              </div>
+              <div className={`text-2xl font-bold ${summary.profit_loss.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(summary.profit_loss.net_profit)}
+              </div>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Receitas</span>
+                  <span className="font-medium text-green-600">{formatCurrency(summary.profit_loss.total_revenue)}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-green-500 h-2 rounded-full" style={{ width: `${Math.min(100, (summary.profit_loss.total_revenue / (summary.profit_loss.total_revenue + summary.profit_loss.total_expenses)) * 100)}%` }}></div>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Despesas</span>
+                  <span className="font-medium text-red-600">{formatCurrency(summary.profit_loss.total_expenses)}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-red-500 h-2 rounded-full" style={{ width: `${Math.min(100, (summary.profit_loss.total_expenses / (summary.profit_loss.total_revenue + summary.profit_loss.total_expenses)) * 100)}%` }}></div>
+                </div>
+              </div>
+              {summary.profit_loss.revenue_change_percent !== 0 && (
+                <div className={`mt-3 text-xs ${summary.profit_loss.revenue_change_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {summary.profit_loss.revenue_change_percent >= 0 ? '↑' : '↓'} {Math.abs(summary.profit_loss.revenue_change_percent)}% vs período anterior
+                </div>
+              )}
+            </div>
+
+            {/* Expenses Breakdown */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-sm font-medium text-gray-500 uppercase">Despesas</h3>
+                <span className="text-lg font-bold text-gray-800">{formatCurrency(summary.expenses.total)}</span>
+              </div>
+              <DonutChart data={summary.expenses.by_category} total={summary.expenses.total} />
+            </div>
+
+            {/* Invoices */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-2">Faturas</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Pendentes</span>
+                  <span className="font-bold text-yellow-600">{formatCurrency(summary.invoices.pending)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Atrasadas</span>
+                  <span className="font-bold text-red-600">{formatCurrency(summary.invoices.overdue)}</span>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Pagas (período)</span>
+                    <span className="font-bold text-green-600">{formatCurrency(summary.invoices.paid)}</span>
+                  </div>
+                </div>
+                <div className="mt-2 flex space-x-1">
+                  <div className="h-2 bg-red-500 rounded" style={{ width: `${(summary.invoices.overdue / (summary.invoices.paid + summary.invoices.pending + summary.invoices.overdue || 1)) * 100}%` }}></div>
+                  <div className="h-2 bg-yellow-500 rounded" style={{ width: `${(summary.invoices.pending / (summary.invoices.paid + summary.invoices.pending + summary.invoices.overdue || 1)) * 100}%` }}></div>
+                  <div className="h-2 bg-green-500 rounded flex-1"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue Sources & Languages */}
+          <div className="grid grid-cols-2 gap-6">
+            {/* Revenue by Source */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Receitas por Fonte</h3>
+              <div className="space-y-3">
+                {Object.entries(summary.revenue.by_source).map(([key, value]) => {
+                  const sourceInfo = REVENUE_SOURCES[key] || { label: key, color: '#6B7280' };
+                  const percentage = summary.revenue.total > 0 ? (value.amount / summary.revenue.total) * 100 : 0;
+                  return (
+                    <div key={key}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">{sourceInfo.label}</span>
+                        <span className="font-medium">{formatCurrency(value.amount)} ({value.count})</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="h-2 rounded-full" style={{ width: `${percentage}%`, backgroundColor: sourceInfo.color }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Revenue by Language */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Receitas por Idioma</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {Object.entries(summary.revenue.by_language).map(([langPair, value]) => {
+                  const percentage = summary.revenue.total > 0 ? (value.amount / summary.revenue.total) * 100 : 0;
+                  return (
+                    <div key={langPair} className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">{langPair}</span>
+                      <div className="flex items-center">
+                        <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                          <div className="h-2 rounded-full bg-teal-500" style={{ width: `${percentage}%` }}></div>
+                        </div>
+                        <span className="font-medium w-20 text-right">{formatCurrency(value.amount)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeView === 'expenses' && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="font-bold text-gray-800">Lista de Despesas</h3>
+            <button
+              onClick={() => setShowExpenseModal(true)}
+              className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+            >
+              + Nova Despesa
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Data</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Categoria</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Descrição</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Fornecedor</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Valor</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {expenses.length === 0 ? (
+                  <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">Nenhuma despesa registrada</td></tr>
+                ) : (
+                  expenses.map((expense) => (
+                    <tr key={expense.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">{formatDate(expense.date)}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded text-xs" style={{
+                          backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
+                          color: EXPENSE_CATEGORIES[expense.category]?.color
+                        }}>
+                          {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{expense.description}</td>
+                      <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
+                      <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Excluir</button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Expense Modal */}
+      {showExpenseModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-bold text-gray-800">Nova Despesa</h3>
+              <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <form onSubmit={handleCreateExpense} className="p-4 space-y-4">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Categoria</label>
+                <select
+                  value={expenseForm.category}
+                  onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                >
+                  {Object.entries(EXPENSE_CATEGORIES).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Descrição</label>
+                <input
+                  type="text"
+                  value={expenseForm.description}
+                  onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Valor ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({...expenseForm, amount: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Data</label>
+                  <input
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={(e) => setExpenseForm({...expenseForm, date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Fornecedor (opcional)</label>
+                <input
+                  type="text"
+                  value={expenseForm.vendor}
+                  onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                />
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={expenseForm.is_recurring}
+                  onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
+                  className="mr-2"
+                />
+                <label className="text-sm text-gray-600">Despesa recorrente</label>
+              </div>
+              {expenseForm.is_recurring && (
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Período</label>
+                  <select
+                    value={expenseForm.recurring_period}
+                    onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="monthly">Mensal</option>
+                    <option value="yearly">Anual</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex justify-end space-x-2 pt-2">
+                <button type="button" onClick={() => setShowExpenseModal(false)} className="px-4 py-2 border rounded text-sm text-gray-600">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700">Salvar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
@@ -5332,13 +5906,13 @@ function AdminApp() {
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'translation':
         return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
-      case 'translators':
-        return userRole === 'admin'
-          ? <TranslatorsPage adminKey={adminKey} />
-          : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'production':
         return userRole === 'admin'
           ? <ProductionPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'finances':
+        return userRole === 'admin'
+          ? <FinancesPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'users':
         return userRole === 'admin'

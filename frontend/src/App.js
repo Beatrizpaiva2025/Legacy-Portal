@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './App.css';
@@ -9,45 +9,17 @@ const API = `${BACKEND_URL}/api`;
 // ==================== INTERNATIONALIZATION ====================
 const TRANSLATIONS = {
   en: {
-    // Login
-    businessPortal: 'Business Portal (B2B)',
-    corporateOnly: 'Corporate Clients Only',
-    companyEmail: 'Company Email',
-    password: 'Password',
-    forgotPassword: 'Forgot password?',
-    accessPortal: 'Access Business Portal',
-    createAccount: 'Create Business Account',
-    pleaseWait: 'Please wait...',
-    noAccount: "Don't have an account? Register",
-    hasAccount: 'Already have an account? Sign In',
-    notB2B: 'Not a B2B client yet?',
-    contactUs: 'Contact us',
-    companyName: 'Company Name',
-    contactName: 'Contact Name',
-    phoneOptional: 'Phone (optional)',
-    // Benefits
-    benefits: 'Business Account Benefits:',
-    benefit1: 'Monthly invoicing - Pay at end of month',
-    benefit2: 'Dedicated B2B support chat',
-    benefit3: 'Priority processing',
-    // Sidebar
     newOrder: 'New Order',
-    savedBudgets: 'Saved Budgets',
+    createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
-    welcome: 'Welcome,',
+    welcome: 'Welcome',
     logout: 'Logout',
-    // New Order Page
-    createNewOrder: 'Create New Order',
-    clientInfo: 'Client Information',
-    clientName: 'Client Name',
-    clientEmail: 'Client Email',
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
-    certifiedDesc: 'Official documents, legal, immigration',
+    certifiedDesc: 'Official documents, USCIS, legal purposes',
     professionalTranslation: 'Professional Translation',
     professionalDesc: 'Business, marketing, general content',
-    perPage: '/page',
     translateFrom: 'Translate From',
     translateTo: 'Translate To',
     uploadDocument: 'Upload Document',
@@ -55,9 +27,9 @@ const TRANSLATIONS = {
     fileTypes: 'PDF, DOCX, Images, TXT',
     processing: 'Processing document...',
     processingNote: 'This may take a moment for large or image-based files',
-    pages: 'pages',
     page: 'page',
-    total: 'Total:',
+    pages: 'pages',
+    total: 'Total',
     urgency: 'Urgency',
     standard: 'Standard (2-3 days)',
     priority: 'Priority (24 hours)',
@@ -66,449 +38,166 @@ const TRANSLATIONS = {
     referencePlaceholder: 'PO number, project name...',
     notes: 'Notes (optional)',
     notesPlaceholder: 'Special instructions...',
-    saveBudget: 'Save Budget',
-    saving: 'Saving...',
-    createOrder: 'Create Order',
-    creatingOrder: 'Creating Order...',
-    // Quote Summary
-    quoteSummary: 'Quote Summary',
-    service: 'Service',
-    certified: 'Certified',
-    professional: 'Professional',
+    getQuote: 'Get Quote',
+    yourQuote: 'Your Quote',
     basePrice: 'Base Price',
     urgencyFee: 'Urgency Fee',
     totalPrice: 'Total',
-    paymentNote: '* Payment via invoice (Net 30)',
-    // Orders Page
-    noOrders: 'No orders yet',
-    noOrdersDesc: 'Create your first order to get started',
-    all: 'All',
-    pending: 'Pending',
-    paid: 'Paid',
-    overdue: 'Overdue',
-    client: 'Client',
-    words: 'words',
-    due: 'Due:',
-    created: 'Created',
-    // Saved Budgets
-    noSavedBudgets: 'No saved budgets',
-    noSavedBudgetsDesc: 'Save a budget from the New Order page to see it here',
-    convertToOrder: 'Convert to Order',
-    delete: 'Delete',
-    expires: 'Expires:',
-    saved: 'Saved:',
-    documents: 'Documents:',
-    convertBudgetTitle: 'Convert Budget to Order',
-    convertBudgetDesc: 'Enter client information to create an order from budget',
-    cancel: 'Cancel',
-    // Messages
-    noMessages: 'No messages',
-    noMessagesDesc: 'Messages from Legacy Translations will appear here',
-    new: 'New',
-    markAsRead: 'Mark as read',
-    // Errors
-    uploadFirst: 'Please upload a document first',
-    fillClientInfo: 'Please fill in client name and email',
-    errorOccurred: 'An error occurred',
-    // Languages
-    langEnglish: 'English (USA)',
-    langSpanish: 'Spanish',
-    langFrench: 'French',
-    langGerman: 'German',
-    langPortuguese: 'Portuguese (Brazil)',
-    langItalian: 'Italian',
-    langChinese: 'Chinese',
-    langJapanese: 'Japanese',
-    langKorean: 'Korean',
-    langArabic: 'Arabic',
-    langRussian: 'Russian',
-    langDutch: 'Dutch',
-  },
-  pt: {
-    // Login
-    businessPortal: 'Portal Empresarial (B2B)',
-    corporateOnly: 'Apenas Clientes Corporativos',
-    companyEmail: 'E-mail Corporativo',
-    password: 'Senha',
-    forgotPassword: 'Esqueceu a senha?',
-    accessPortal: 'Acessar Portal Empresarial',
-    createAccount: 'Criar Conta Empresarial',
-    pleaseWait: 'Aguarde...',
-    noAccount: 'Não tem conta? Cadastre-se',
-    hasAccount: 'Já tem conta? Entrar',
-    notB2B: 'Ainda não é cliente B2B?',
-    contactUs: 'Fale conosco',
-    companyName: 'Nome da Empresa',
-    contactName: 'Nome do Contato',
-    phoneOptional: 'Telefone (opcional)',
-    // Benefits
-    benefits: 'Benefícios da Conta Empresarial:',
-    benefit1: 'Faturamento mensal - Pague no final do mês',
-    benefit2: 'Chat de suporte B2B dedicado',
-    benefit3: 'Processamento prioritário',
-    // Sidebar
-    newOrder: 'Novo Pedido',
-    savedBudgets: 'Orçamentos Salvos',
-    myOrders: 'Meus Pedidos',
-    messages: 'Mensagens',
-    welcome: 'Bem-vindo(a),',
-    logout: 'Sair',
-    // New Order Page
-    createNewOrder: 'Criar Novo Pedido',
-    clientInfo: 'Informações do Cliente',
-    clientName: 'Nome do Cliente',
-    clientEmail: 'E-mail do Cliente',
-    serviceType: 'Tipo de Serviço',
-    certifiedTranslation: 'Tradução Juramentada',
-    certifiedDesc: 'Documentos oficiais, jurídicos, imigração',
-    professionalTranslation: 'Tradução Profissional',
-    professionalDesc: 'Negócios, marketing, conteúdo geral',
-    perPage: '/página',
-    translateFrom: 'Traduzir De',
-    translateTo: 'Traduzir Para',
-    uploadDocument: 'Enviar Documento',
-    uploadFiles: '+ Enviar Arquivo(s)',
-    fileTypes: 'PDF, DOCX, Imagens, TXT',
-    processing: 'Processando documento...',
-    processingNote: 'Pode demorar um pouco para arquivos grandes ou imagens',
-    pages: 'páginas',
-    page: 'página',
-    total: 'Total:',
-    urgency: 'Urgência',
-    standard: 'Padrão (2-3 dias)',
-    priority: 'Prioritário (24 horas)',
-    urgent: 'Urgente (12 horas)',
-    reference: 'Referência (opcional)',
-    referencePlaceholder: 'Nº do pedido, nome do projeto...',
-    notes: 'Observações (opcional)',
-    notesPlaceholder: 'Instruções especiais...',
-    saveBudget: 'Salvar Orçamento',
-    saving: 'Salvando...',
-    createOrder: 'Criar Pedido',
-    creatingOrder: 'Criando Pedido...',
-    // Quote Summary
-    quoteSummary: 'Resumo do Orçamento',
-    service: 'Serviço',
-    certified: 'Juramentada',
-    professional: 'Profissional',
-    basePrice: 'Preço Base',
-    urgencyFee: 'Taxa de Urgência',
-    totalPrice: 'Total',
-    paymentNote: '* Pagamento via fatura (30 dias)',
-    // Orders Page
-    noOrders: 'Nenhum pedido ainda',
-    noOrdersDesc: 'Crie seu primeiro pedido para começar',
-    all: 'Todos',
-    pending: 'Pendente',
-    paid: 'Pago',
-    overdue: 'Atrasado',
-    client: 'Cliente',
-    words: 'palavras',
-    due: 'Vencimento:',
-    created: 'Criado',
-    // Saved Budgets
-    noSavedBudgets: 'Nenhum orçamento salvo',
-    noSavedBudgetsDesc: 'Salve um orçamento na página Novo Pedido para vê-lo aqui',
-    convertToOrder: 'Converter em Pedido',
-    delete: 'Excluir',
-    expires: 'Expira:',
-    saved: 'Salvo:',
-    documents: 'Documentos:',
-    convertBudgetTitle: 'Converter Orçamento em Pedido',
-    convertBudgetDesc: 'Insira as informações do cliente para criar um pedido do orçamento',
-    cancel: 'Cancelar',
-    // Messages
-    noMessages: 'Nenhuma mensagem',
-    noMessagesDesc: 'Mensagens da Legacy Translations aparecerão aqui',
-    new: 'Nova',
-    markAsRead: 'Marcar como lida',
-    // Errors
-    uploadFirst: 'Por favor, envie um documento primeiro',
-    fillClientInfo: 'Por favor, preencha o nome e e-mail do cliente',
-    errorOccurred: 'Ocorreu um erro',
-    // Languages
-    langEnglish: 'Inglês (EUA)',
-    langSpanish: 'Espanhol',
-    langFrench: 'Francês',
-    langGerman: 'Alemão',
-    langPortuguese: 'Português (Brasil)',
-    langItalian: 'Italiano',
-    langChinese: 'Chinês',
-    langJapanese: 'Japonês',
-    langKorean: 'Coreano',
-    langArabic: 'Árabe',
-    langRussian: 'Russo',
-    langDutch: 'Holandês',
+    estimatedDelivery: 'Estimated Delivery',
+    submitOrder: 'Submit Order',
+    submitting: 'Submitting...',
+    orderSuccess: 'Order submitted successfully!',
+    signIn: 'Sign in to your account',
+    createAccount: 'Create a new account',
+    email: 'Email',
+    password: 'Password',
+    companyName: 'Company Name',
+    contactName: 'Contact Name',
+    phone: 'Phone',
+    login: 'Log In',
+    register: 'Register',
+    noAccount: "Don't have an account?",
+    haveAccount: 'Already have an account?'
   },
   es: {
-    // Login
-    businessPortal: 'Portal Empresarial (B2B)',
-    corporateOnly: 'Solo Clientes Corporativos',
-    companyEmail: 'Correo Corporativo',
-    password: 'Contraseña',
-    forgotPassword: '¿Olvidaste tu contraseña?',
-    accessPortal: 'Acceder al Portal Empresarial',
-    createAccount: 'Crear Cuenta Empresarial',
-    pleaseWait: 'Espere...',
-    noAccount: '¿No tienes cuenta? Regístrate',
-    hasAccount: '¿Ya tienes cuenta? Iniciar Sesión',
-    notB2B: '¿Aún no eres cliente B2B?',
-    contactUs: 'Contáctanos',
-    companyName: 'Nombre de la Empresa',
-    contactName: 'Nombre del Contacto',
-    phoneOptional: 'Teléfono (opcional)',
-    // Benefits
-    benefits: 'Beneficios de la Cuenta Empresarial:',
-    benefit1: 'Facturación mensual - Paga a fin de mes',
-    benefit2: 'Chat de soporte B2B dedicado',
-    benefit3: 'Procesamiento prioritario',
-    // Sidebar
     newOrder: 'Nuevo Pedido',
-    savedBudgets: 'Presupuestos Guardados',
+    createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
     messages: 'Mensajes',
-    welcome: 'Bienvenido(a),',
+    welcome: 'Bienvenido',
     logout: 'Cerrar Sesión',
-    // New Order Page
-    createNewOrder: 'Crear Nuevo Pedido',
-    clientInfo: 'Información del Cliente',
-    clientName: 'Nombre del Cliente',
-    clientEmail: 'Correo del Cliente',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
-    certifiedDesc: 'Documentos oficiales, legales, inmigración',
+    certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
     professionalTranslation: 'Traducción Profesional',
     professionalDesc: 'Negocios, marketing, contenido general',
-    perPage: '/página',
     translateFrom: 'Traducir De',
     translateTo: 'Traducir A',
     uploadDocument: 'Subir Documento',
     uploadFiles: '+ Subir Archivo(s)',
     fileTypes: 'PDF, DOCX, Imágenes, TXT',
     processing: 'Procesando documento...',
-    processingNote: 'Puede tomar un momento para archivos grandes o imágenes',
-    pages: 'páginas',
+    processingNote: 'Esto puede tardar un momento para archivos grandes',
     page: 'página',
-    total: 'Total:',
+    pages: 'páginas',
+    total: 'Total',
     urgency: 'Urgencia',
     standard: 'Estándar (2-3 días)',
-    priority: 'Prioritario (24 horas)',
+    priority: 'Prioridad (24 horas)',
     urgent: 'Urgente (12 horas)',
     reference: 'Referencia (opcional)',
-    referencePlaceholder: 'Nº de orden, nombre del proyecto...',
+    referencePlaceholder: 'Número de PO, nombre del proyecto...',
     notes: 'Notas (opcional)',
     notesPlaceholder: 'Instrucciones especiales...',
-    saveBudget: 'Guardar Presupuesto',
-    saving: 'Guardando...',
-    createOrder: 'Crear Pedido',
-    creatingOrder: 'Creando Pedido...',
-    // Quote Summary
-    quoteSummary: 'Resumen del Presupuesto',
-    service: 'Servicio',
-    certified: 'Certificada',
-    professional: 'Profesional',
+    getQuote: 'Obtener Cotización',
+    yourQuote: 'Su Cotización',
     basePrice: 'Precio Base',
     urgencyFee: 'Cargo por Urgencia',
     totalPrice: 'Total',
-    paymentNote: '* Pago mediante factura (30 días)',
-    // Orders Page
-    noOrders: 'Sin pedidos todavía',
-    noOrdersDesc: 'Crea tu primer pedido para comenzar',
-    all: 'Todos',
-    pending: 'Pendiente',
-    paid: 'Pagado',
-    overdue: 'Vencido',
-    client: 'Cliente',
-    words: 'palabras',
-    due: 'Vence:',
-    created: 'Creado',
-    // Saved Budgets
-    noSavedBudgets: 'Sin presupuestos guardados',
-    noSavedBudgetsDesc: 'Guarda un presupuesto en la página Nuevo Pedido para verlo aquí',
-    convertToOrder: 'Convertir en Pedido',
-    delete: 'Eliminar',
-    expires: 'Expira:',
-    saved: 'Guardado:',
-    documents: 'Documentos:',
-    convertBudgetTitle: 'Convertir Presupuesto en Pedido',
-    convertBudgetDesc: 'Ingresa la información del cliente para crear un pedido del presupuesto',
-    cancel: 'Cancelar',
-    // Messages
-    noMessages: 'Sin mensajes',
-    noMessagesDesc: 'Los mensajes de Legacy Translations aparecerán aquí',
-    new: 'Nuevo',
-    markAsRead: 'Marcar como leído',
-    // Errors
-    uploadFirst: 'Por favor, sube un documento primero',
-    fillClientInfo: 'Por favor, completa el nombre y correo del cliente',
-    errorOccurred: 'Ocurrió un error',
-    // Languages
-    langEnglish: 'Inglés (EUA)',
-    langSpanish: 'Español',
-    langFrench: 'Francés',
-    langGerman: 'Alemán',
-    langPortuguese: 'Portugués (Brasil)',
-    langItalian: 'Italiano',
-    langChinese: 'Chino',
-    langJapanese: 'Japonés',
-    langKorean: 'Coreano',
-    langArabic: 'Árabe',
-    langRussian: 'Ruso',
-    langDutch: 'Holandés',
+    estimatedDelivery: 'Entrega Estimada',
+    submitOrder: 'Enviar Pedido',
+    submitting: 'Enviando...',
+    orderSuccess: '¡Pedido enviado exitosamente!',
+    signIn: 'Iniciar sesión',
+    createAccount: 'Crear una cuenta nueva',
+    email: 'Correo Electrónico',
+    password: 'Contraseña',
+    companyName: 'Nombre de Empresa',
+    contactName: 'Nombre de Contacto',
+    phone: 'Teléfono',
+    login: 'Ingresar',
+    register: 'Registrar',
+    noAccount: '¿No tiene cuenta?',
+    haveAccount: '¿Ya tiene cuenta?'
+  },
+  pt: {
+    newOrder: 'Novo Pedido',
+    createNewOrder: 'Criar Novo Pedido',
+    myOrders: 'Meus Pedidos',
+    messages: 'Mensagens',
+    welcome: 'Bem-vindo',
+    logout: 'Sair',
+    serviceType: 'Tipo de Serviço',
+    certifiedTranslation: 'Tradução Certificada',
+    certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
+    professionalTranslation: 'Tradução Profissional',
+    professionalDesc: 'Negócios, marketing, conteúdo geral',
+    translateFrom: 'Traduzir De',
+    translateTo: 'Traduzir Para',
+    uploadDocument: 'Enviar Documento',
+    uploadFiles: '+ Enviar Arquivo(s)',
+    fileTypes: 'PDF, DOCX, Imagens, TXT',
+    processing: 'Processando documento...',
+    processingNote: 'Pode demorar um momento para arquivos grandes',
+    page: 'página',
+    pages: 'páginas',
+    total: 'Total',
+    urgency: 'Urgência',
+    standard: 'Padrão (2-3 dias)',
+    priority: 'Prioridade (24 horas)',
+    urgent: 'Urgente (12 horas)',
+    reference: 'Referência (opcional)',
+    referencePlaceholder: 'Número do PO, nome do projeto...',
+    notes: 'Notas (opcional)',
+    notesPlaceholder: 'Instruções especiais...',
+    getQuote: 'Obter Cotação',
+    yourQuote: 'Sua Cotação',
+    basePrice: 'Preço Base',
+    urgencyFee: 'Taxa de Urgência',
+    totalPrice: 'Total',
+    estimatedDelivery: 'Entrega Estimada',
+    submitOrder: 'Enviar Pedido',
+    submitting: 'Enviando...',
+    orderSuccess: 'Pedido enviado com sucesso!',
+    signIn: 'Entrar na sua conta',
+    createAccount: 'Criar uma nova conta',
+    email: 'Email',
+    password: 'Senha',
+    companyName: 'Nome da Empresa',
+    contactName: 'Nome do Contato',
+    phone: 'Telefone',
+    login: 'Entrar',
+    register: 'Registrar',
+    noAccount: 'Não tem conta?',
+    haveAccount: 'Já tem conta?'
   }
 };
 
-// Currency configuration
-const CURRENCIES = {
-  USD: { symbol: '$', code: 'USD', rate: 1, locale: 'en-US' },
-  BRL: { symbol: 'R$', code: 'BRL', rate: 6.10, locale: 'pt-BR' },
-  EUR: { symbol: '€', code: 'EUR', rate: 0.92, locale: 'es-ES' }
+// UI Languages with flags
+const UI_LANGUAGES = [
+  { code: 'en', flag: '🇺🇸' },
+  { code: 'es', flag: '🇪🇸' },
+  { code: 'pt', flag: '🇧🇷' }
+];
+
+// Detect user's preferred language
+const getInitialLanguage = () => {
+  const saved = localStorage.getItem('ui_language');
+  if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
+  const browserLang = navigator.language.split('-')[0];
+  if (['en', 'es', 'pt'].includes(browserLang)) return browserLang;
+  return 'en';
 };
 
-// Locale Context
-const LocaleContext = createContext();
+// Detect currency based on locale/timezone
+const getLocalCurrency = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locale = navigator.language;
 
-const useLocale = () => {
-  const context = useContext(LocaleContext);
-  if (!context) {
-    throw new Error('useLocale must be used within LocaleProvider');
+    // Brazil
+    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0 };
+    // Europe
+    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92 };
+    // UK
+    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79 };
+    // Mexico, Latin America (except Brazil)
+    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5 };
+    // Default USD
+    return { code: 'USD', symbol: '$', rate: 1 };
+  } catch {
+    return { code: 'USD', symbol: '$', rate: 1 };
   }
-  return context;
-};
-
-// Default locale - always English (user can change manually)
-const getDefaultLocale = () => {
-  return { lang: 'en', currency: 'USD' };
-};
-
-const LocaleProvider = ({ children }) => {
-  const [locale, setLocale] = useState(() => {
-    const saved = localStorage.getItem('locale');
-    if (saved) return JSON.parse(saved);
-    return getDefaultLocale();
-  });
-
-  useEffect(() => {
-    localStorage.setItem('locale', JSON.stringify(locale));
-  }, [locale]);
-
-  const t = (key) => {
-    return TRANSLATIONS[locale.lang]?.[key] || TRANSLATIONS.en[key] || key;
-  };
-
-  const formatPrice = (priceUSD) => {
-    const currency = CURRENCIES[locale.currency];
-    const convertedPrice = priceUSD * currency.rate;
-    return new Intl.NumberFormat(currency.locale, {
-      style: 'currency',
-      currency: currency.code
-    }).format(convertedPrice);
-  };
-
-  const formatPricePerPage = (priceUSD) => {
-    const currency = CURRENCIES[locale.currency];
-    const convertedPrice = priceUSD * currency.rate;
-    const formatted = new Intl.NumberFormat(currency.locale, {
-      style: 'currency',
-      currency: currency.code
-    }).format(convertedPrice);
-    return `${formatted}${t('perPage')}`;
-  };
-
-  const setLanguage = (lang) => {
-    setLocale(prev => ({ ...prev, lang }));
-  };
-
-  const setCurrency = (currency) => {
-    setLocale(prev => ({ ...prev, currency }));
-  };
-
-  return (
-    <LocaleContext.Provider value={{
-      locale,
-      setLocale,
-      setLanguage,
-      setCurrency,
-      t,
-      formatPrice,
-      formatPricePerPage,
-      availableLanguages: ['en', 'pt', 'es'],
-      availableCurrencies: Object.keys(CURRENCIES)
-    }}>
-      {children}
-    </LocaleContext.Provider>
-  );
-};
-
-// Language Selector Component (with currency - for internal pages)
-const LanguageSelector = () => {
-  const { locale, setLanguage, setCurrency } = useLocale();
-
-  const languages = [
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'pt', name: 'Português', flag: '🇧🇷' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' }
-  ];
-
-  const currencies = [
-    { code: 'USD', name: 'USD ($)' },
-    { code: 'BRL', name: 'BRL (R$)' },
-    { code: 'EUR', name: 'EUR (€)' }
-  ];
-
-  return (
-    <div className="flex items-center gap-2 text-sm">
-      <select
-        value={locale.lang}
-        onChange={(e) => setLanguage(e.target.value)}
-        className="bg-transparent border border-gray-300 rounded px-2 py-1 text-gray-700 focus:ring-2 focus:ring-teal-500 cursor-pointer"
-      >
-        {languages.map(lang => (
-          <option key={lang.code} value={lang.code}>
-            {lang.flag} {lang.name}
-          </option>
-        ))}
-      </select>
-      <select
-        value={locale.currency}
-        onChange={(e) => setCurrency(e.target.value)}
-        className="bg-transparent border border-gray-300 rounded px-2 py-1 text-gray-700 focus:ring-2 focus:ring-teal-500 cursor-pointer"
-      >
-        {currencies.map(curr => (
-          <option key={curr.code} value={curr.code}>
-            {curr.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-};
-
-// Simple Flag Selector for Login Page (small flags at top)
-const FlagSelector = () => {
-  const { locale, setLanguage } = useLocale();
-
-  const languages = [
-    { code: 'en', flag: '🇺🇸' },
-    { code: 'es', flag: '🇪🇸' },
-    { code: 'pt', flag: '🇧🇷' }
-  ];
-
-  return (
-    <div className="flex items-center gap-1">
-      {languages.map(lang => (
-        <button
-          key={lang.code}
-          onClick={() => setLanguage(lang.code)}
-          className={`text-base transition-opacity ${
-            locale.lang === lang.code ? 'opacity-100' : 'opacity-40 hover:opacity-70'
-          }`}
-        >
-          {lang.flag}
-        </button>
-      ))}
-    </div>
-  );
 };
 
 // Translation stages
@@ -544,8 +233,7 @@ const LANGUAGES = [
 ];
 
 // ==================== LOGIN PAGE ====================
-const LoginPage = ({ onLogin, onRegister }) => {
-  const { t } = useLocale();
+const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -580,39 +268,43 @@ const LoginPage = ({ onLogin, onRegister }) => {
         onLogin(response.data);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || t('errorOccurred'));
+      setError(err.response?.data?.detail || 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative">
-        {/* Language Flags - Top Right */}
-        <div className="absolute top-4 right-4">
-          <FlagSelector />
-        </div>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center relative">
+      {/* Language Flags - Top Right */}
+      <div className="absolute top-4 right-4 flex items-center space-x-2">
+        {UI_LANGUAGES.map((uiLang) => (
+          <button
+            key={uiLang.code}
+            onClick={() => changeLanguage(uiLang.code)}
+            className={`text-2xl hover:scale-110 transition-transform ${
+              lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+            }`}
+            title={uiLang.code.toUpperCase()}
+          >
+            {uiLang.flag}
+          </button>
+        ))}
+      </div>
 
-        {/* Logo */}
-        <div className="text-center mb-6">
+      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+        <div className="text-center mb-8">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4 h-16"
+            className="mx-auto mb-4"
           />
-        </div>
-
-        {/* Title and Badge */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">{t('businessPortal')}</h1>
-          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
-            {t('corporateOnly')}
-          </span>
+          <h1 className="text-2xl font-bold text-gray-800">Partner Portal</h1>
+          <p className="text-gray-600">{isLogin ? t.signIn : t.createAccount}</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
@@ -621,134 +313,87 @@ const LoginPage = ({ onLogin, onRegister }) => {
           {!isLogin && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('companyName')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.company_name}
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                  placeholder="Your Company Inc."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('contactName')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.contact_name}
                   onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                  placeholder="John Smith"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('phoneOptional')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  placeholder="+1 (555) 123-4567"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('companyEmail')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
             <input
               type="email"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
-              placeholder="you@company.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('password')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
             <input
               type="password"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
             />
           </div>
 
-          {isLogin && (
-            <div className="text-right">
-              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
-                {t('forgotPassword')}
-              </a>
-            </div>
-          )}
-
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
+            className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
           >
-            {loading ? t('pleaseWait') : (isLogin ? t('accessPortal') : t('createAccount'))}
+            {loading ? '...' : (isLogin ? t.login : t.register)}
           </button>
         </form>
 
-        {/* Business Account Benefits */}
-        {isLogin && (
-          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t('benefits')}</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t('benefit1')}</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t('benefit2')}</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t('benefit3')}</span>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        <div className="mt-6 text-center">
+        <div className="mt-4 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
+            className="text-teal-600 hover:underline"
           >
-            {isLogin ? t('noAccount') : t('hasAccount')}
+            {isLogin ? t.noAccount : t.haveAccount}
           </button>
         </div>
-
-        {/* Contact link for non-B2B clients */}
-        {isLogin && (
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-500">
-              {t('notB2B')}{' '}
-              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
-                {t('contactUs')}
-              </a>
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
 // ==================== SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
-  const { t } = useLocale();
+const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
-    { id: 'new-order', label: t('newOrder'), icon: '➕' },
-    { id: 'saved-budgets', label: t('savedBudgets'), icon: '💾' },
-    { id: 'orders', label: t('myOrders'), icon: '📋' },
-    { id: 'messages', label: t('messages'), icon: '✉️' }
+    { id: 'new-order', label: t.newOrder, icon: '➕' },
+    { id: 'orders', label: t.myOrders, icon: '📋' },
+    { id: 'messages', label: t.messages, icon: '✉️' }
   ];
 
   return (
@@ -759,7 +404,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
           alt="Legacy Translations"
           className="w-40 h-auto mb-4"
         />
-        <div className="text-sm text-gray-600 mb-2">{t('welcome')}</div>
+        <div className="text-sm text-gray-600 mb-2">{t.welcome},</div>
         <div className="font-semibold text-gray-800">{partner?.company_name}</div>
       </div>
 
@@ -785,7 +430,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
           onClick={onLogout}
           className="w-full py-2 text-red-600 hover:bg-red-50 rounded-md"
         >
-          {t('logout')}
+          {t.logout}
         </button>
       </div>
     </div>
@@ -793,8 +438,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
 };
 
 // ==================== NEW ORDER PAGE ====================
-const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
-  const { t, formatPrice, formatPricePerPage } = useLocale();
+const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
@@ -810,7 +454,6 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quote, setQuote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [savingBudget, setSavingBudget] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -829,7 +472,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;  // Certified Translation
     } else {
-      basePrice = pages * 19.99;  // Professional Translation
+      basePrice = pages * 19.50;  // Professional Translation
     }
 
     let urgencyFee = 0;
@@ -911,41 +554,6 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
     multiple: true
   });
 
-  const handleSaveBudget = async () => {
-    if (wordCount === 0) {
-      setError('Please upload a document first');
-      return;
-    }
-
-    setSavingBudget(true);
-    setError('');
-
-    try {
-      const budgetData = {
-        service_type: formData.service_type,
-        translate_from: formData.translate_from,
-        translate_to: formData.translate_to,
-        word_count: wordCount,
-        urgency: formData.urgency,
-        notes: formData.notes,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
-        files_info: uploadedFiles.map(f => ({ fileName: f.fileName, wordCount: f.wordCount }))
-      };
-
-      const response = await axios.post(`${API}/partner/budgets/save?token=${token}`, budgetData);
-
-      setSuccess(`Budget saved successfully! Reference: ${response.data.budget.reference}`);
-
-      if (onSaveBudget) {
-        onSaveBudget(response.data.budget);
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save budget');
-    } finally {
-      setSavingBudget(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -1002,7 +610,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t('createNewOrder')}</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.createNewOrder || 'Create New Order'}</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
@@ -1018,11 +626,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
             {/* Client Information */}
             <div className="border-b pb-4">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('clientInfo')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Client Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('clientName')} *
+                    Client Name *
                   </label>
                   <input
                     type="text"
@@ -1035,7 +643,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('clientEmail')} *
+                    Client Email *
                   </label>
                   <input
                     type="email"
@@ -1051,7 +659,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
             {/* Service Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('serviceType')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
               <div className="space-y-3">
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
                   formData.service_type === 'standard' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
@@ -1065,10 +673,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">{t('certifiedTranslation')}</div>
-                    <div className="text-sm text-gray-500">{t('certifiedDesc')}</div>
+                    <div className="font-medium">Certified Translation</div>
+                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPricePerPage(24.99)}</div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
                 </label>
 
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -1083,10 +691,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">{t('professionalTranslation')}</div>
-                    <div className="text-sm text-gray-500">{t('professionalDesc')}</div>
+                    <div className="font-medium">Professional Translation</div>
+                    <div className="text-sm text-gray-500">Business, marketing, general content</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPricePerPage(19.99)}</div>
+                  <div className="font-semibold text-teal-600">$19.50/page</div>
                 </label>
               </div>
             </div>
@@ -1094,7 +702,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
             {/* Languages */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('translateFrom')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Translate From</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_from}
@@ -1108,7 +716,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('translateTo')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_to}
@@ -1125,7 +733,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
             {/* Document Upload */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('uploadDocument')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
@@ -1134,15 +742,15 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
               >
                 <input {...getInputProps()} />
                 <div className="text-3xl mb-2">📁</div>
-                <div className="font-medium text-teal-600">{t('uploadFiles')}</div>
-                <div className="text-sm text-gray-500">{t('fileTypes')}</div>
+                <div className="font-medium text-teal-600">+ Upload File(s)</div>
+                <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
               </div>
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800 font-medium">{processingStatus || t('processing')}</div>
-                  <div className="text-xs text-blue-600 mt-1">{t('processingNote')}</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || 'Processing document...'}</div>
+                  <div className="text-xs text-blue-600 mt-1">This may take a moment for large or image-based files</div>
                 </div>
               )}
 
@@ -1155,7 +763,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                         <div className="flex items-center">
                           <span className="text-green-600 mr-2">✓</span>
                           <span>{item.fileName}</span>
-                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? t('page') : t('pages')})</span>
+                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
                         </div>
                         <button
                           type="button"
@@ -1177,7 +785,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                     );
                   })}
                   <div className="text-lg font-semibold text-teal-600">
-                    {t('total')} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? t('page') : t('pages')}
+                    Total: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? 'page' : 'pages'}
                   </div>
                 </div>
               )}
@@ -1185,12 +793,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
             {/* Urgency */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t('urgency')}</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Urgency</h2>
               <div className="space-y-2">
                 {[
-                  { id: 'no', labelKey: 'standard', fee: '' },
-                  { id: 'priority', labelKey: 'priority', fee: '+25%' },
-                  { id: 'urgent', labelKey: 'urgent', fee: '+100%' }
+                  { id: 'no', label: 'Standard (2-3 days)', fee: '' },
+                  { id: 'priority', label: 'Priority (24 hours)', fee: '+25%' },
+                  { id: 'urgent', label: 'Urgent (12 hours)', fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                     <input
@@ -1201,7 +809,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                       onChange={(e) => setFormData({...formData, urgency: e.target.value})}
                       className="mr-3"
                     />
-                    <span className="flex-1">{t(option.labelKey)}</span>
+                    <span className="flex-1">{option.label}</span>
                     {option.fee && <span className="text-orange-600 font-medium">{option.fee}</span>}
                   </label>
                 ))}
@@ -1211,85 +819,75 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('reference')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.reference}
                   onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder={t('referencePlaceholder')}
+                  placeholder="PO number, project name..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('notes')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder={t('notesPlaceholder')}
+                  placeholder="Special instructions..."
                 />
               </div>
             </div>
 
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleSaveBudget}
-                disabled={savingBudget || wordCount === 0}
-                className="flex-1 py-3 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:bg-gray-400 font-semibold"
-              >
-                {savingBudget ? t('saving') : `💾 ${t('saveBudget')}`}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || wordCount === 0}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
-              >
-                {submitting ? t('creatingOrder') : t('createOrder')}
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={submitting || wordCount === 0}
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+            >
+              {submitting ? 'Creating Order...' : 'Create Order'}
+            </button>
           </form>
         </div>
 
         {/* Quote Summary */}
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
-          <h2 className="text-xl font-bold text-teal-600 mb-4">{t('quoteSummary')}</h2>
+          <h2 className="text-xl font-bold text-teal-600 mb-4">Quote Summary</h2>
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">{t('service')}</span>
+              <span className="text-gray-600">Service</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' ? t('certified') : t('professional')}
+                {formData.service_type === 'standard' ? 'Certified' : 'Professional'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">{t('pages')}</span>
+              <span className="text-gray-600">Pages</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">{t('basePrice')}</span>
-                <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
+                <span className="text-gray-600">Base Price</span>
+                <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
-                  <span>{t('urgencyFee')}</span>
-                  <span>{formatPrice(quote.urgency_fee)}</span>
+                  <span>Urgency Fee</span>
+                  <span>${quote.urgency_fee.toFixed(2)}</span>
                 </div>
               )}
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
-                <span className="font-bold">{t('totalPrice')}</span>
-                <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
+                <span className="font-bold">Total</span>
+                <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
               </div>
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
-              {t('paymentNote')}
+              * Payment via invoice (Net 30)
             </div>
           </div>
         </div>
@@ -1556,244 +1154,22 @@ const MessagesPage = ({ token }) => {
   );
 };
 
-// ==================== SAVED BUDGETS PAGE ====================
-const SavedBudgetsPage = ({ token, onConvertToOrder }) => {
-  const [budgets, setBudgets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedBudget, setSelectedBudget] = useState(null);
-  const [convertModalBudget, setConvertModalBudget] = useState(null);
-  const [clientName, setClientName] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [converting, setConverting] = useState(false);
-
-  useEffect(() => {
-    fetchBudgets();
-  }, []);
-
-  const fetchBudgets = async () => {
-    try {
-      const response = await axios.get(`${API}/partner/budgets?token=${token}`);
-      setBudgets(response.data.budgets || []);
-    } catch (err) {
-      console.error('Failed to fetch budgets:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDelete = async (budgetId) => {
-    if (!window.confirm('Are you sure you want to delete this saved budget?')) return;
-
-    try {
-      await axios.delete(`${API}/partner/budgets/${budgetId}?token=${token}`);
-      setBudgets(budgets.filter(b => b.id !== budgetId));
-    } catch (err) {
-      console.error('Failed to delete budget:', err);
-    }
-  };
-
-  const handleConvertToOrder = async () => {
-    if (!clientName || !clientEmail) {
-      alert('Please fill in client name and email');
-      return;
-    }
-
-    setConverting(true);
-    try {
-      const response = await axios.post(
-        `${API}/partner/budgets/${convertModalBudget.id}/convert?token=${token}&client_name=${encodeURIComponent(clientName)}&client_email=${encodeURIComponent(clientEmail)}`
-      );
-      if (onConvertToOrder) {
-        onConvertToOrder(response.data.order);
-      }
-      setConvertModalBudget(null);
-      setClientName('');
-      setClientEmail('');
-      fetchBudgets();
-    } catch (err) {
-      console.error('Failed to convert budget to order:', err);
-      alert('Failed to convert budget to order');
-    } finally {
-      setConverting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading saved budgets...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Saved Budgets</h1>
-
-      {/* Convert Modal */}
-      {convertModalBudget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Convert Budget to Order</h2>
-            <p className="text-gray-600 mb-4">
-              Enter client information to create an order from budget <strong>#{convertModalBudget.reference}</strong>
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="John Smith"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Client Email *</label>
-                <input
-                  type="email"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  placeholder="client@email.com"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setConvertModalBudget(null);
-                  setClientName('');
-                  setClientEmail('');
-                }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConvertToOrder}
-                disabled={converting || !clientName || !clientEmail}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-medium"
-              >
-                {converting ? 'Converting...' : 'Create Order'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {budgets.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="text-4xl mb-4">💾</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No saved budgets</h2>
-          <p className="text-gray-600">Save a budget from the New Order page to see it here</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {budgets.map((budget) => (
-            <div key={budget.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div
-                className="p-6 cursor-pointer hover:bg-gray-50"
-                onClick={() => setSelectedBudget(selectedBudget === budget.id ? null : budget.id)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-teal-600">#{budget.reference}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        budget.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {budget.status || 'Active'}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {budget.translate_from} → {budget.translate_to}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {budget.word_count} words | {Math.ceil(budget.word_count / 250)} pages
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${budget.total_price?.toFixed(2)}</div>
-                    <div className="text-sm text-gray-500">
-                      Saved: {new Date(budget.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {selectedBudget === budget.id && (
-                <div className="border-t bg-gray-50 p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <div className="text-sm text-gray-500">Service</div>
-                      <div className="font-medium">{budget.service_type === 'standard' ? 'Certified' : 'Professional'}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency</div>
-                      <div className="font-medium capitalize">{budget.urgency === 'no' ? 'Standard' : budget.urgency}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${budget.base_price?.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${(budget.urgency_fee || 0).toFixed(2)}</div>
-                    </div>
-                  </div>
-
-                  {budget.files_info && budget.files_info.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-sm text-gray-500 mb-2">Documents:</div>
-                      {budget.files_info.map((file, i) => (
-                        <div key={i} className="text-sm text-gray-700">
-                          - {file.fileName} ({Math.ceil(file.wordCount / 250)} pages)
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {budget.expires_at && (
-                    <div className="mb-4 text-sm text-gray-500">
-                      Expires: {new Date(budget.expires_at).toLocaleDateString()}
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setConvertModalBudget(budget)}
-                      className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
-                    >
-                      Convert to Order
-                    </button>
-                    <button
-                      onClick={() => handleDelete(budget.id)}
-                      className="px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== MAIN APP CONTENT ====================
-function AppContent() {
-  const { t } = useLocale();
+// ==================== MAIN APP ====================
+function App() {
   const [partner, setPartner] = useState(null);
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
+  const [lang, setLang] = useState(getInitialLanguage);
+  const [currency] = useState(getLocalCurrency);
+
+  // Get translations for current language
+  const t = TRANSLATIONS[lang];
+
+  // Handle language change
+  const changeLanguage = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('ui_language', newLang);
+  };
 
   // Check for saved session
   useEffect(() => {
@@ -1824,40 +1200,21 @@ function AppContent() {
     localStorage.removeItem('token');
   };
 
-  const getTabTitle = (tab) => {
-    const titles = {
-      'new-order': t('newOrder'),
-      'saved-budgets': t('savedBudgets'),
-      'orders': t('myOrders'),
-      'messages': t('messages')
-    };
-    return titles[tab] || tab;
-  };
-
   const renderContent = () => {
     switch (activeTab) {
       case 'new-order':
-        return (
-          <NewOrderPage
-            partner={partner}
-            token={token}
-            onOrderCreated={() => setActiveTab('orders')}
-            onSaveBudget={() => setActiveTab('saved-budgets')}
-          />
-        );
-      case 'saved-budgets':
-        return <SavedBudgetsPage token={token} onConvertToOrder={() => setActiveTab('orders')} />;
+        return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
         return <OrdersPage token={token} />;
       case 'messages':
         return <MessagesPage token={token} />;
       default:
-        return <NewOrderPage partner={partner} token={token} />;
+        return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
   };
 
   if (!partner) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} t={t} lang={lang} changeLanguage={changeLanguage} />;
   }
 
   return (
@@ -1867,33 +1224,35 @@ function AppContent() {
         setActiveTab={setActiveTab}
         partner={partner}
         onLogout={handleLogout}
+        t={t}
       />
       <div className="flex-1">
         <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-semibold text-gray-800">
-              {getTabTitle(activeTab)}
-            </h1>
-            <div className="flex items-center gap-4">
-              <LanguageSelector />
-              <div className="text-sm text-gray-600">
-                {partner?.contact_name} | {partner?.company_name}
-              </div>
+          <div className="flex justify-end items-center">
+            {/* Language Flags */}
+            <div className="flex items-center space-x-2 mr-6">
+              {UI_LANGUAGES.map((uiLang) => (
+                <button
+                  key={uiLang.code}
+                  onClick={() => changeLanguage(uiLang.code)}
+                  className={`text-2xl hover:scale-110 transition-transform ${
+                    lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                  }`}
+                  title={uiLang.code.toUpperCase()}
+                >
+                  {uiLang.flag}
+                </button>
+              ))}
+            </div>
+            {/* User Info */}
+            <div className="text-sm text-gray-600">
+              {partner?.contact_name} | {partner?.company_name}
             </div>
           </div>
         </header>
         {renderContent()}
       </div>
     </div>
-  );
-}
-
-// ==================== MAIN APP WITH LOCALE PROVIDER ====================
-function App() {
-  return (
-    <LocaleProvider>
-      <AppContent />
-    </LocaleProvider>
   );
 }
 
