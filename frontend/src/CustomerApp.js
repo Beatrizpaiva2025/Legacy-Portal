@@ -867,6 +867,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               <span className="text-gray-600">Pages</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
+            <p className="text-xs text-gray-400 text-right">1 page = 250 words max</p>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
