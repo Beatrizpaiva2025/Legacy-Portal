@@ -4153,6 +4153,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [orderDocuments, setOrderDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
 
+  // Editing states for inline edits
+  const [editingTags, setEditingTags] = useState(null); // Order ID being edited
+  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited
+  const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
+  const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
+
+  // Send to Client modal state
+  const [sendingOrder, setSendingOrder] = useState(null); // Order being sent
+  const [translatedDocInfo, setTranslatedDocInfo] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [sendingToClient, setSendingToClient] = useState(false);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4309,6 +4321,129 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to delete:', err);
       alert('Erro ao deletar pedido');
+    }
+  };
+
+  // Edit tags
+  const startEditingTags = (order) => {
+    setEditingTags(order.id);
+    setTempTagValue({
+      type: order.translation_type || 'professional',
+      notes: order.internal_notes || ''
+    });
+  };
+
+  const saveTagsEdit = async (orderId) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translation_type: tempTagValue.type,
+        internal_notes: tempTagValue.notes
+      });
+      setEditingTags(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update tags:', err);
+    }
+  };
+
+  // Edit deadline
+  const startEditingDeadline = (order) => {
+    setEditingDeadline(order.id);
+    const deadlineDate = order.deadline ? new Date(order.deadline) : new Date();
+    setTempDeadlineValue({
+      date: deadlineDate.toISOString().split('T')[0],
+      time: deadlineDate.toTimeString().slice(0, 5)
+    });
+  };
+
+  const saveDeadlineEdit = async (orderId) => {
+    try {
+      const deadlineDateTime = `${tempDeadlineValue.date}T${tempDeadlineValue.time || '17:00'}:00`;
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        deadline: deadlineDateTime
+      });
+      setEditingDeadline(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update deadline:', err);
+    }
+  };
+
+  // Send email to client
+  const sendEmailToClient = (email, orderNumber) => {
+    window.location.href = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+  };
+
+  // Open "Send to Client" modal
+  const openSendToClientModal = async (order) => {
+    setSendingOrder(order);
+    setTranslatedDocInfo(null);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
+      setTranslatedDocInfo(response.data);
+    } catch (err) {
+      console.error('Failed to get translated document info:', err);
+      setTranslatedDocInfo({ has_translated_document: false });
+    }
+  };
+
+  // Download translated document
+  const downloadTranslatedDocument = async (orderId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/orders/${orderId}/download-translation?admin_key=${adminKey}`);
+      if (response.data.type === 'file' && response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type};base64,${response.data.file_data}`;
+        link.download = response.data.filename || filename || 'translation.pdf';
+        link.click();
+      } else if (response.data.type === 'html') {
+        // Open HTML in new tab for printing
+        const newWindow = window.open('', '_blank');
+        newWindow.document.write(response.data.html_content);
+        newWindow.document.close();
+      }
+    } catch (err) {
+      console.error('Failed to download translation:', err);
+      alert('Erro ao baixar tradução');
+    }
+  };
+
+  // Upload new translated document
+  const uploadTranslatedDocument = async (orderId, file) => {
+    setUploadingFile(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await axios.post(`${API}/admin/orders/${orderId}/upload-translation?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      // Refresh doc info
+      const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
+      setTranslatedDocInfo(response.data);
+      alert('Documento enviado com sucesso!');
+    } catch (err) {
+      console.error('Failed to upload translation:', err);
+      alert('Erro ao enviar documento');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  // Send translation to client (deliver)
+  const sendTranslationToClient = async (orderId) => {
+    setSendingToClient(true);
+    try {
+      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
+      alert(response.data.attachment_sent
+        ? 'Tradução enviada para o cliente com sucesso! (com anexo)'
+        : 'Pedido marcado como entregue! (email enviado sem anexo)');
+      setSendingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to deliver:', err);
+      alert('Erro ao enviar para cliente');
+    } finally {
+      setSendingToClient(false);
     }
   };
 
@@ -4529,23 +4664,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           )}
         </>
       ) : (
-        /* Admin sees: Total Orders, Revenue, Paid, Pending */
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        /* Admin sees: Only Total Orders - Financial data moved to Finances page */
+        <div className="grid grid-cols-1 gap-3 mb-4 max-w-xs">
           <div className="bg-white rounded shadow p-3">
             <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
             <div className="text-xl font-bold text-gray-800">{orders.length}</div>
-          </div>
-          <div className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Total Revenue</div>
-            <div className="text-xl font-bold">${totalReceive.toFixed(2)}</div>
-          </div>
-          <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Paid</div>
-            <div className="text-xl font-bold">${totalPaid.toFixed(2)}</div>
-          </div>
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded shadow p-3 text-white">
-            <div className="text-[10px] uppercase opacity-80">Pending</div>
-            <div className="text-xl font-bold">${totalPending.toFixed(2)}</div>
           </div>
         </div>
       )}
@@ -4784,6 +4907,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
+              <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
@@ -4798,10 +4922,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const deadline = new Date(created); deadline.setDate(deadline.getDate() + 5);
-              const daysUntil = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
+              const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
+              const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
               return (
                 <tr key={order.id} className="hover:bg-gray-50">
+                  {/* Code */}
                   <td className="px-2 py-2 font-medium">
                     <button
                       onClick={() => viewOrderDocuments(order)}
@@ -4811,7 +4936,40 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {order.order_number}
                     </button>
                   </td>
-                  <td className="px-2 py-2">{order.client_name}<span className="text-gray-400 text-[10px] block">{order.client_email}</span></td>
+                  {/* Order Date */}
+                  <td className="px-2 py-2 text-gray-600">
+                    {created.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    <span className="text-[10px] text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </td>
+                  {/* Client with email and send buttons */}
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1">
+                      <div>
+                        {order.client_name}
+                        <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => sendEmailToClient(order.client_email, order.order_number)}
+                          className="p-0.5 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
+                          title="Enviar email para cliente"
+                        >
+                          ✉️
+                        </button>
+                        {/* Send translation button - shows when ready or review */}
+                        {['ready', 'review'].includes(order.translation_status) && (isAdmin || isPM) && (
+                          <button
+                            onClick={() => openSendToClientModal(order)}
+                            className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
+                            title="Enviar tradução para cliente"
+                          >
+                            📤
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  {/* Translator */}
                   <td className="px-2 py-2">
                     {assigningTranslator === order.id ? (
                       <select
@@ -4838,21 +4996,83 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </button>
                     )}
                   </td>
-                  <td className="px-2 py-2">{deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {daysUntil > 0 && order.translation_status !== 'delivered' && <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>in {daysUntil}d</span>}
-                  </td>
-                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  {/* Deadline with date+time */}
                   <td className="px-2 py-2">
-                    <div className="flex items-center gap-1">
-                      <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
-                      <span>{FLAGS[order.translate_to] || '🌐'}</span>
-                      {order.internal_notes && (
-                        <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
-                      )}
-                      {order.notes && (
-                        <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
-                      )}
-                    </div>
+                    {editingDeadline === order.id && isAdmin ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="date"
+                          value={tempDeadlineValue.date}
+                          onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, date: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <input
+                          type="time"
+                          value={tempDeadlineValue.time}
+                          onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, time: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveDeadlineEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
+                          <button onClick={() => setEditingDeadline(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <div>
+                          {orderDeadline.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          <span className="text-[10px] text-gray-500 block">{orderDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {daysUntil > 0 && order.translation_status !== 'delivered' && (
+                            <span className={`text-[10px] ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar deadline">✏️</button>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  {/* Status */}
+                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  {/* Tags - Editable */}
+                  <td className="px-2 py-2">
+                    {editingTags === order.id && isAdmin ? (
+                      <div className="flex flex-col gap-1">
+                        <select
+                          value={tempTagValue.type}
+                          onChange={(e) => setTempTagValue({...tempTagValue, type: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded"
+                        >
+                          <option value="professional">PROF</option>
+                          <option value="certified">CERT</option>
+                        </select>
+                        <input
+                          type="text"
+                          placeholder="Nota interna..."
+                          value={tempTagValue.notes}
+                          onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveTagsEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
+                          <button onClick={() => setEditingTags(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
+                        <span>{FLAGS[order.translate_to] || '🌐'}</span>
+                        {order.internal_notes && (
+                          <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
+                        )}
+                        {order.notes && (
+                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
+                        )}
+                        {isAdmin && (
+                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar tags">✏️</button>
+                        )}
+                      </div>
+                    )}
                   </td>
                   {/* Total and Payment columns - Admin only */}
                   {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
@@ -4992,6 +5212,112 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="p-3 border-t bg-gray-50 flex justify-end">
               <button onClick={() => setViewingOrder(null)} className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send to Client Modal */}
+      {sendingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-teal-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📤 Enviar para Cliente</h3>
+                <p className="text-xs opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
+              </div>
+              <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4">
+              {/* Client Info */}
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs font-medium text-gray-600 mb-1">Cliente:</div>
+                <div className="text-sm font-medium">{sendingOrder.client_name}</div>
+                <div className="text-xs text-gray-500">{sendingOrder.client_email}</div>
+              </div>
+
+              {/* Translated Document Status */}
+              <div className="mb-4">
+                <div className="text-xs font-medium text-gray-600 mb-2">📄 Documento Traduzido:</div>
+                {!translatedDocInfo ? (
+                  <div className="text-center py-3 text-gray-500 text-xs">Carregando...</div>
+                ) : translatedDocInfo.has_translated_document ? (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <span className="text-green-600 text-lg mr-2">✅</span>
+                        <div>
+                          <div className="text-xs font-medium text-green-800">Tradução disponível</div>
+                          <div className="text-[10px] text-green-600">
+                            {translatedDocInfo.translated_filename || 'HTML gerado no workspace'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
+                        className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        ⬇️ Baixar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <div className="flex items-center">
+                      <span className="text-yellow-600 text-lg mr-2">⚠️</span>
+                      <div className="text-xs text-yellow-800">
+                        Nenhuma tradução anexada. Faça upload abaixo ou envie sem anexo.
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload new document */}
+              <div className="mb-4">
+                <div className="text-xs font-medium text-gray-600 mb-2">📎 Enviar novo documento:</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    id="translationFile"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files[0]) {
+                        uploadTranslatedDocument(sendingOrder.id, e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="translationFile"
+                    className={`flex-1 px-3 py-2 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-xs ${uploadingFile ? 'opacity-50' : ''}`}
+                  >
+                    {uploadingFile ? 'Enviando...' : '📁 Clique para selecionar arquivo (PDF, DOC)'}
+                  </label>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
+                💡 Ao clicar em "Enviar", o cliente receberá um email com a tradução anexada (se disponível).
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg">
+              <button
+                onClick={() => setSendingOrder(null)}
+                className="px-4 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => sendTranslationToClient(sendingOrder.id)}
+                disabled={sendingToClient}
+                className="px-4 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 disabled:bg-gray-400"
+              >
+                {sendingToClient ? 'Enviando...' : '📤 Enviar para Cliente'}
               </button>
             </div>
           </div>
