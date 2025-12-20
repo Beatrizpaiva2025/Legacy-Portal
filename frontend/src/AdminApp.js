@@ -4986,7 +4986,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ))}
                       </select>
                     ) : order.assigned_translator ? (
-                      <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                        {order.translator_assignment_status === 'pending' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Aguardando</span>
+                        )}
+                        {order.translator_assignment_status === 'accepted' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded mt-0.5 inline-block w-fit">✓ Aceito</span>
+                        )}
+                        {order.translator_assignment_status === 'declined' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded mt-0.5 inline-block w-fit">✕ Recusado</span>
+                        )}
+                      </div>
                     ) : (
                       <button
                         onClick={() => setAssigningTranslator(order.id)}

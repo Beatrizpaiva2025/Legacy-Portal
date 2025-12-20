@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -141,48 +141,15 @@ class EmailService:
             raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
 
     async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
-        """Send order confirmation email"""
+        """Send order confirmation email using professional template"""
         subject = f"Translation Order Confirmation - {order_details.get('reference', 'N/A')}"
-        
-        html_content = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #2c5aa0;">Translation Order Confirmation</h2>
-                    
-                    <p>{'Thank you for your order!' if is_partner else 'New translation order received.'}</p>
-                    
-                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
-                        <h3 style="margin-top: 0;">Order Details:</h3>
-                        <p><strong>Reference:</strong> {order_details.get('reference', 'N/A')}</p>
-                        <p><strong>Service Type:</strong> {order_details.get('service_type', 'N/A').title()}</p>
-                        <p><strong>Language Pair:</strong> {order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</p>
-                        <p><strong>Word Count:</strong> {order_details.get('word_count', 0)} words</p>
-                        <p><strong>Urgency:</strong> {order_details.get('urgency', 'standard').title()}</p>
-                        <p><strong>Estimated Delivery:</strong> {order_details.get('estimated_delivery', 'N/A')}</p>
-                    </div>
-                    
-                    <div style="background-color: #e8f5e8; padding: 20px; border-radius: 5px; margin: 20px 0;">
-                        <h3 style="margin-top: 0; color: #2c5aa0;">Pricing Summary:</h3>
-                        <p><strong>Base Price:</strong> ${order_details.get('base_price', 0):.2f}</p>
-                        {f"<p><strong>Urgency Fee:</strong> ${order_details.get('urgency_fee', 0):.2f}</p>" if order_details.get('urgency_fee', 0) > 0 else ""}
-                        <p style="font-size: 18px; font-weight: bold; color: #2c5aa0;"><strong>Total: ${order_details.get('total_price', 0):.2f}</strong></p>
-                    </div>
-                    
-                    <div style="margin: 30px 0;">
-                        <p>If you have any questions about your order, please don't hesitate to contact us at <a href="mailto:contact@legacytranslations.com">contact@legacytranslations.com</a></p>
-                        <p>Thank you for choosing Legacy Translations!</p>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; text-align: center; color: #666; font-size: 12px;">
-                        <p>Legacy Translations - Professional Translation Services</p>
-                        <p>This is an automated email. Please do not reply to this message.</p>
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
-        
+
+        # Get client name from order details
+        client_name = order_details.get('client_name', order_details.get('name', 'Valued Customer'))
+
+        # Use the professional template
+        html_content = get_order_confirmation_email_template(client_name, order_details)
+
         return await self.send_email(recipient_email, subject, html_content, "html")
 
 # Protemos integration
@@ -319,6 +286,268 @@ protemos_client = ProtemosAPIClient(protemos_config)
 
 # Initialize email service
 email_service = EmailService()
+
+def get_email_header() -> str:
+    """Generate professional email header"""
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy Translations</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                            <p style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 0;">Legacy Translations</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">'''
+
+def get_email_footer(include_review_button: bool = False) -> str:
+    """Generate professional email footer with signature"""
+    review_section = ""
+    if include_review_button:
+        review_section = '''
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin-bottom: 25px;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">
+                                            ⭐ Your feedback is very important!
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 20px 0;">
+                                            Help others learn about our work
+                                        </p>
+                                        <a href="https://www.trustpilot.com/review/legacytranslations.com" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            LEAVE A REVIEW
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>'''
+
+    return f'''{review_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 30px;">
+                                <tr>
+                                    <td style="border-top: 1px solid #e2e8f0;"></td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="padding-top: 15px;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
+                                            Eduarda Quadra
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 2px 0;">
+                                            Business Support Administrator
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
+                                            Legacy Translations Inc.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #1a2a4a; padding: 30px 40px; border-radius: 0 0 8px 8px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <p style="color: #a0aec0; font-size: 13px; margin: 0 0 15px 0;">
+                                            Follow us on social media
+                                        </p>
+                                        <a href="https://www.facebook.com/legacytranslationsusa/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 10px 25px; border-radius: 50px; font-size: 13px; font-weight: 600; margin-right: 10px;">
+                                            Facebook
+                                        </a>
+                                        <a href="https://www.instagram.com/legacytranslations/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 10px 25px; border-radius: 50px; font-size: 13px; font-weight: 600;">
+                                            Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            © 2024 Legacy Translations Inc. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>'''
+
+def get_delivery_email_template(client_name: str) -> str:
+    """Generate professional delivery email template"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Your translation has been completed. Attached is your digital translation.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 10px 0;">
+                                If you have any questions or comments regarding this translation please feel free to respond back directly to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 35px 0;">
+                                Thank you for trusting us with your translation needs and we look forward to assisting you again for your future document translation needs.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=True)
+
+def get_order_confirmation_email_template(client_name: str, order_details: dict) -> str:
+    """Generate professional order confirmation email template"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your order! We have received your translation request and our team is now working on it.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            📋 Order Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Reference:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'N/A').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Estimated Delivery:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('estimated_delivery', 'N/A')}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 10px 0;">
+                                            💰 Total: ${order_details.get('total_price', 0):.2f}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions about your order, please feel free to respond to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_simple_client_email_template(client_name: str, message_content: str) -> str:
+    """Generate a simple professional email template for general client communications"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                {message_content}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions, please feel free to respond to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_translator_assignment_email_template(translator_name: str, order_details: dict, accept_url: str, decline_url: str) -> str:
+    """Generate email template for translator assignment with accept/decline buttons"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {translator_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                You have been assigned a new translation project. Please review the details below and accept or decline this assignment.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            📋 Project Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('order_number', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Client:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('client_name', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Word Count:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('word_count', 0)} words</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Deadline:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('deadline', 'To be confirmed')}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{accept_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); margin: 5px;">
+                                            ✓ ACCEPT PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{decline_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); margin: 5px;">
+                                            ✗ DECLINE PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 20px 0; text-align: center;">
+                                Please respond as soon as possible so we can proceed with the project.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
 
 # Models
 class StatusCheck(BaseModel):
@@ -496,6 +725,9 @@ class TranslationOrder(BaseModel):
     assigned_pm_name: Optional[str] = None
     assigned_translator_id: Optional[str] = None  # Translator assigned
     assigned_translator_name: Optional[str] = None
+    translator_assignment_token: Optional[str] = None  # Token for accept/decline
+    translator_assignment_status: str = "none"  # none, pending, accepted, declined
+    translator_assignment_responded_at: Optional[datetime] = None
     deadline: Optional[datetime] = None  # Translation deadline
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
@@ -2876,9 +3108,17 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                 translator = await db.admin_users.find_one({"id": update_data.assigned_translator_id})
                 if translator:
                     update_dict["assigned_translator_name"] = translator.get("name", "")
-                    # Create notification for assigned translator
+
+                    # Generate assignment token for accept/decline
+                    assignment_token = str(uuid.uuid4())
+                    update_dict["translator_assignment_token"] = assignment_token
+                    update_dict["translator_assignment_status"] = "pending"
+                    update_dict["translator_assignment_responded_at"] = None
+
+                    # Get current order for email
                     current_order = await db.translation_orders.find_one({"id": order_id})
                     if current_order:
+                        # Create notification for assigned translator
                         await create_notification(
                             user_id=update_data.assigned_translator_id,
                             notif_type="project_assigned",
@@ -2887,8 +3127,52 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                             order_id=order_id,
                             order_number=current_order.get('order_number')
                         )
+
+                        # Send email to translator with accept/decline links
+                        if translator.get("email"):
+                            try:
+                                # Build accept/decline URLs
+                                base_url = os.environ.get("API_BASE_URL", "https://legacy-portal.onrender.com")
+                                accept_url = f"{base_url}/api/translator/assignment/{assignment_token}/accept"
+                                decline_url = f"{base_url}/api/translator/assignment/{assignment_token}/decline"
+
+                                # Prepare order details for email
+                                deadline_str = "To be confirmed"
+                                if current_order.get("deadline"):
+                                    deadline = current_order.get("deadline")
+                                    if isinstance(deadline, datetime):
+                                        deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
+                                    else:
+                                        deadline_str = str(deadline)
+
+                                order_details = {
+                                    "order_number": current_order.get("order_number", order_id),
+                                    "client_name": current_order.get("client_name", "N/A"),
+                                    "translate_from": current_order.get("translate_from", ""),
+                                    "translate_to": current_order.get("translate_to", ""),
+                                    "word_count": current_order.get("word_count", 0),
+                                    "deadline": deadline_str
+                                }
+
+                                # Send assignment email
+                                email_html = get_translator_assignment_email_template(
+                                    translator.get("name", "Translator"),
+                                    order_details,
+                                    accept_url,
+                                    decline_url
+                                )
+                                await email_service.send_email(
+                                    translator["email"],
+                                    f"New Translation Assignment - {order_details['order_number']}",
+                                    email_html
+                                )
+                                logger.info(f"Sent assignment email to translator {translator.get('name')} for order {order_id}")
+                            except Exception as e:
+                                logger.error(f"Failed to send assignment email: {str(e)}")
             else:
                 update_dict["assigned_translator_name"] = None
+                update_dict["translator_assignment_token"] = None
+                update_dict["translator_assignment_status"] = "none"
         if update_data.deadline:
             update_dict["deadline"] = update_data.deadline
         if update_data.internal_notes is not None:
@@ -2916,32 +3200,19 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                 # Get partner email
                 partner = await db.partners.find_one({"id": order["partner_id"]})
                 if partner:
-                    # Send delivery notification to partner
+                    # Send delivery notification to partner (simple notification)
+                    partner_message = f"Order {order['order_number']} for client {order['client_name']} has been delivered. The translation was sent to {order['client_email']}."
                     await email_service.send_email(
                         partner["email"],
                         f"Translation Delivered - {order['order_number']}",
-                        f"""
-                        <html><body>
-                        <h2>Your translation has been delivered!</h2>
-                        <p>Order: {order['order_number']}</p>
-                        <p>Client: {order['client_name']}</p>
-                        <p>The translation has been sent to your client at {order['client_email']}.</p>
-                        </body></html>
-                        """
+                        get_simple_client_email_template(partner.get("name", "Partner"), partner_message)
                     )
 
-                    # Send to client
+                    # Send to client with professional template
                     await email_service.send_email(
                         order["client_email"],
                         f"Your Translation is Ready - {order['order_number']}",
-                        f"""
-                        <html><body>
-                        <h2>Your translation is ready!</h2>
-                        <p>Dear {order['client_name']},</p>
-                        <p>Your translation order #{order['order_number']} has been completed and delivered.</p>
-                        <p>Thank you for choosing Legacy Translations!</p>
-                        </body></html>
-                        """
+                        get_delivery_email_template(order['client_name'])
                     )
             except Exception as e:
                 logger.error(f"Failed to send delivery notification: {str(e)}")
@@ -3108,22 +3379,15 @@ async def admin_deliver_order(order_id: str, admin_key: str):
         # Check if translated file exists
         has_attachment = order.get("translated_file") and order.get("translated_filename")
 
+        # Use professional email template
+        email_html = get_delivery_email_template(order['client_name'])
+
         if has_attachment:
             # Send to client WITH attachment
             await email_service.send_email_with_attachment(
                 order["client_email"],
                 f"Your Translation is Ready - {order['order_number']}",
-                f"""
-                <html><body>
-                <h2>Your translation is ready!</h2>
-                <p>Dear {order['client_name']},</p>
-                <p>Your translation order #{order['order_number']} has been completed.</p>
-                <p>Please find your translated document attached to this email.</p>
-                <p>Thank you for choosing Legacy Translations!</p>
-                <br>
-                <p>Best regards,<br>Legacy Translations Team</p>
-                </body></html>
-                """,
+                email_html,
                 order["translated_file"],
                 order["translated_filename"],
                 order.get("translated_file_type", "application/pdf")
@@ -3133,29 +3397,16 @@ async def admin_deliver_order(order_id: str, admin_key: str):
             await email_service.send_email(
                 order["client_email"],
                 f"Your Translation is Ready - {order['order_number']}",
-                f"""
-                <html><body>
-                <h2>Your translation is ready!</h2>
-                <p>Dear {order['client_name']},</p>
-                <p>Your translation order #{order['order_number']} has been completed and delivered.</p>
-                <p>Thank you for choosing Legacy Translations!</p>
-                </body></html>
-                """
+                email_html
             )
 
         # Send notification to partner
         if partner:
+            partner_message = f"Order {order['order_number']} for client {order['client_name']} has been delivered. The translation was sent to {order['client_email']}."
             await email_service.send_email(
                 partner["email"],
                 f"Translation Delivered - {order['order_number']}",
-                f"""
-                <html><body>
-                <h2>Translation has been delivered!</h2>
-                <p>Order: {order['order_number']}</p>
-                <p>Client: {order['client_name']}</p>
-                <p>The translation has been sent to your client at {order['client_email']}.</p>
-                </body></html>
-                """
+                get_simple_client_email_template(partner.get("name", "Partner"), partner_message)
             )
 
         # Create internal message for partner
@@ -3234,6 +3485,161 @@ async def download_translated_document(order_id: str, admin_key: str):
         }
     else:
         raise HTTPException(status_code=404, detail="No translated document found")
+
+# ==================== TRANSLATOR ASSIGNMENT RESPONSE ENDPOINTS ====================
+
+@api_router.get("/translator/assignment/{token}/accept")
+async def accept_translator_assignment(token: str):
+    """Accept a translator assignment via email link"""
+    # Find order by assignment token
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
+
+    # Check if already responded
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+
+    # Update assignment status
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "accepted",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    # Create notification for admin/PM
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_accepted",
+        title="Translator Accepted Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has ACCEPTED the assignment for project {order.get('order_number', order['id'])}.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return HTMLResponse(content=get_assignment_response_page("accepted", f"Thank you! You have accepted the assignment for project {order.get('order_number', '')}. You can now access it in your translator portal."))
+
+@api_router.get("/translator/assignment/{token}/decline")
+async def decline_translator_assignment(token: str):
+    """Decline a translator assignment via email link"""
+    # Find order by assignment token
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        return HTMLResponse(content=get_assignment_response_page("error", "Invalid or expired link. This assignment token was not found."), status_code=404)
+
+    # Check if already responded
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        return HTMLResponse(content=get_assignment_response_page("already_responded", f"You have already {status} this assignment."))
+
+    # Update assignment status - clear the translator assignment since they declined
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "declined",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    # Create notification for admin/PM
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_declined",
+        title="Translator Declined Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has DECLINED the assignment for project {order.get('order_number', order['id'])}. Please assign another translator.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return HTMLResponse(content=get_assignment_response_page("declined", f"You have declined the assignment for project {order.get('order_number', '')}. The team will be notified to assign another translator."))
+
+def get_assignment_response_page(status: str, message: str) -> str:
+    """Generate HTML page for assignment response"""
+    if status == "accepted":
+        icon = "✓"
+        color = "#28a745"
+        title = "Assignment Accepted"
+    elif status == "declined":
+        icon = "✗"
+        color = "#dc3545"
+        title = "Assignment Declined"
+    elif status == "already_responded":
+        icon = "ℹ"
+        color = "#6c757d"
+        title = "Already Responded"
+    else:
+        icon = "⚠"
+        color = "#ffc107"
+        title = "Error"
+
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - Legacy Translations</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }}
+        .container {{
+            background: white;
+            border-radius: 16px;
+            padding: 50px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }}
+        .icon {{
+            font-size: 80px;
+            color: {color};
+            margin-bottom: 20px;
+        }}
+        h1 {{
+            color: #1a2a4a;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }}
+        p {{
+            color: #4a5568;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }}
+        .logo {{
+            color: #1a2a4a;
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 30px;
+        }}
+        .gold-bar {{
+            height: 4px;
+            background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%);
+            margin-bottom: 30px;
+            border-radius: 2px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">Legacy Translations</div>
+        <div class="gold-bar"></div>
+        <div class="icon">{icon}</div>
+        <h1>{title}</h1>
+        <p>{message}</p>
+    </div>
+</body>
+</html>'''
 
 # ==================== MESSAGES ENDPOINTS ====================
 
