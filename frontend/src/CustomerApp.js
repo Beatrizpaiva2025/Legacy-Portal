@@ -1,7 +1,54 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
+import { QRCodeSVG } from 'qrcode.react';
 import './App.css';
+
+// PIX Payload Generator (EMV QR Code format)
+const generatePixPayload = (pixKey, merchantName, merchantCity, amount, txId = '***') => {
+  const formatField = (id, value) => {
+    const len = value.length.toString().padStart(2, '0');
+    return `${id}${len}${value}`;
+  };
+
+  // Merchant Account Information (ID 26)
+  const gui = formatField('00', 'br.gov.bcb.pix');
+  const key = formatField('01', pixKey);
+  const merchantAccountInfo = formatField('26', gui + key);
+
+  // Build payload without CRC
+  let payload = '';
+  payload += formatField('00', '01'); // Payload Format Indicator
+  payload += merchantAccountInfo;
+  payload += formatField('52', '0000'); // Merchant Category Code
+  payload += formatField('53', '986'); // Transaction Currency (BRL)
+  if (amount > 0) {
+    payload += formatField('54', amount.toFixed(2)); // Transaction Amount
+  }
+  payload += formatField('58', 'BR'); // Country Code
+  payload += formatField('59', merchantName.substring(0, 25)); // Merchant Name (max 25)
+  payload += formatField('60', merchantCity.substring(0, 15)); // Merchant City (max 15)
+  payload += formatField('62', formatField('05', txId)); // Additional Data Field Template
+  payload += '6304'; // CRC16 placeholder
+
+  // Calculate CRC16 (CCITT-FALSE)
+  const crc16 = (str) => {
+    let crc = 0xFFFF;
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (let j = 0; j < 8; j++) {
+        if (crc & 0x8000) {
+          crc = (crc << 1) ^ 0x1021;
+        } else {
+          crc <<= 1;
+        }
+      }
+    }
+    return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+  };
+
+  return payload + crc16(payload);
+};
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
@@ -269,8 +316,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const ZELLE_PHONE = "8572081139";
   const ZELLE_NAME = "Legacy Translations Inc";
   const PIX_KEY = "13380336000179";
-  const PIX_TYPE = "CNPJ";
   const PIX_NAME = "Legacy Translations";
+  const PIX_CITY = "Miami";
 
   // If logged in, pre-fill email/name
   useEffect(() => {
@@ -919,72 +966,92 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 {/* Zelle Instructions */}
                 {paymentMethod === 'zelle' && (
                   <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h3 className="font-semibold text-blue-800 mb-2">Zelle Payment Instructions</h3>
-                    <p className="text-sm text-blue-700 mb-2">
-                      Send <strong>${quote.total_price.toFixed(2)}</strong> to:
+                    <h3 className="font-semibold text-blue-800 mb-3 text-center">Zelle Payment</h3>
+                    <p className="text-sm text-blue-700 mb-4 text-center">
+                      Amount: <strong className="text-lg">${quote.total_price.toFixed(2)}</strong>
                     </p>
-                    <div className="bg-white p-3 rounded border border-blue-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">Phone:</span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-blue-900">{ZELLE_PHONE}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(ZELLE_PHONE);
-                              alert('Phone copied!');
-                            }}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Name:</span>
-                        <span className="font-medium text-blue-900">{ZELLE_NAME}</span>
+
+                    <div className="bg-white p-4 rounded-lg border border-blue-200 text-center">
+                      <p className="text-sm text-gray-600 mb-2">Send to:</p>
+                      <p className="text-xl font-bold text-blue-900 mb-1">{ZELLE_NAME}</p>
+                      <div className="flex items-center justify-center gap-2 mt-3">
+                        <span className="font-mono text-blue-800 bg-blue-100 px-3 py-1 rounded">{ZELLE_PHONE}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(ZELLE_PHONE);
+                            alert('Phone number copied!');
+                          }}
+                          className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                        >
+                          Copy
+                        </button>
                       </div>
                     </div>
-                    <p className="text-xs text-blue-600 mt-2">
-                      Include your name and email in the memo. We'll start your translation once payment is confirmed.
+
+                    <p className="text-xs text-blue-600 mt-3 text-center">
+                      Include your name and email in the memo.
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1 text-center">
+                      We'll start your translation once payment is confirmed.
                     </p>
                   </div>
                 )}
 
                 {/* PIX Instructions */}
-                {paymentMethod === 'pix' && (
-                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h3 className="font-semibold text-green-800 mb-2">Instruções de Pagamento PIX</h3>
-                    <p className="text-sm text-green-700 mb-2">
-                      Envie <strong>R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</strong> para:
-                    </p>
-                    <div className="bg-white p-3 rounded border border-green-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">{PIX_TYPE}:</span>
+                {paymentMethod === 'pix' && (() => {
+                  const pixAmount = quote.total_price * USD_TO_BRL;
+                  const pixPayload = generatePixPayload(PIX_KEY, PIX_NAME, PIX_CITY, pixAmount);
+                  return (
+                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <h3 className="font-semibold text-green-800 mb-3 text-center">Pagamento PIX</h3>
+                      <p className="text-sm text-green-700 mb-4 text-center">
+                        Valor: <strong className="text-lg">R$ {pixAmount.toFixed(2)}</strong>
+                      </p>
+
+                      {/* QR Code */}
+                      <div className="bg-white p-4 rounded-lg border border-green-200 flex flex-col items-center mb-4">
+                        <QRCodeSVG
+                          value={pixPayload}
+                          size={180}
+                          level="M"
+                          includeMargin={true}
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Escaneie com o app do seu banco</p>
+                      </div>
+
+                      {/* Copia e Cola */}
+                      <div className="bg-white p-3 rounded-lg border border-green-200">
+                        <p className="text-xs text-gray-600 mb-2 text-center">Ou copie o código PIX:</p>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-green-900">{PIX_KEY}</span>
+                          <input
+                            type="text"
+                            readOnly
+                            value={pixPayload}
+                            className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono text-gray-700 truncate"
+                          />
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard.writeText(PIX_KEY);
-                              alert('Chave PIX copiada!');
+                              navigator.clipboard.writeText(pixPayload);
+                              alert('Código PIX copiado!');
                             }}
-                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium whitespace-nowrap"
                           >
                             Copiar
                           </button>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Nome:</span>
-                        <span className="font-medium text-green-900">{PIX_NAME}</span>
-                      </div>
+
+                      <p className="text-xs text-green-600 mt-3 text-center">
+                        Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1 text-center">
+                        Beneficiário: {PIX_NAME}
+                      </p>
                     </div>
-                    <p className="text-xs text-green-600 mt-2">
-                      Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL. Inclua seu nome e email na descrição.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
