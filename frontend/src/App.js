@@ -817,8 +817,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
   // Payment method state and constants
   const [paymentMethod, setPaymentMethod] = useState('invoice');
   const USD_TO_BRL = 6.10;
-  const ZELLE_EMAIL = "accounting@legacytranslations.com";
-  const PIX_KEY = "accounting@legacytranslations.com";
+  const ZELLE_PHONE = "8572081139";
+  const ZELLE_NAME = "Legacy Translations Inc";
+  const PIX_KEY = "13380336000179";
+  const PIX_TYPE = "CNPJ";
+  const PIX_NAME = "Legacy Translations";
 
   // Calculate quote when relevant fields change
   useEffect(() => {
@@ -1332,18 +1335,27 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                     <p className="text-sm text-blue-700 mb-2">
                       Send <strong>{formatPrice(quote.total_price)}</strong> to:
                     </p>
-                    <div className="bg-white p-3 rounded border border-blue-200 flex items-center justify-between">
-                      <span className="font-mono text-blue-900">{ZELLE_EMAIL}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(ZELLE_EMAIL);
-                          alert('Email copied!');
-                        }}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Copy
-                      </button>
+                    <div className="bg-white p-3 rounded border border-blue-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Phone:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-blue-900">{ZELLE_PHONE}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(ZELLE_PHONE);
+                              alert('Phone copied!');
+                            }}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Name:</span>
+                        <span className="font-medium text-blue-900">{ZELLE_NAME}</span>
+                      </div>
                     </div>
                     <p className="text-xs text-blue-600 mt-2">
                       Include client name and your company in the memo.
@@ -1358,18 +1370,27 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                     <p className="text-sm text-green-700 mb-2">
                       Envie <strong>R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</strong> para:
                     </p>
-                    <div className="bg-white p-3 rounded border border-green-200 flex items-center justify-between">
-                      <span className="font-mono text-green-900">{PIX_KEY}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(PIX_KEY);
-                          alert('Chave PIX copiada!');
-                        }}
-                        className="text-green-600 hover:text-green-800 text-sm font-medium"
-                      >
-                        Copiar
-                      </button>
+                    <div className="bg-white p-3 rounded border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">{PIX_TYPE}:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-green-900">{PIX_KEY}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(PIX_KEY);
+                              alert('Chave PIX copiada!');
+                            }}
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Nome:</span>
+                        <span className="font-medium text-green-900">{PIX_NAME}</span>
+                      </div>
                     </div>
                     <p className="text-xs text-green-600 mt-2">
                       Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL

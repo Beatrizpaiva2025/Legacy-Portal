@@ -266,8 +266,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const USD_TO_BRL = 6.10;
 
   // Payment info
-  const ZELLE_EMAIL = "accounting@legacytranslations.com";
-  const PIX_KEY = "accounting@legacytranslations.com";
+  const ZELLE_PHONE = "8572081139";
+  const ZELLE_NAME = "Legacy Translations Inc";
+  const PIX_KEY = "13380336000179";
+  const PIX_TYPE = "CNPJ";
+  const PIX_NAME = "Legacy Translations";
 
   // If logged in, pre-fill email/name
   useEffect(() => {
@@ -521,13 +524,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       } else {
         // Zelle or PIX - create order with pending_payment status
         const paymentInfo = paymentMethod === 'pix'
-          ? `PIX: R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} para ${PIX_KEY}`
-          : `Zelle: $${quote.total_price.toFixed(2)} para ${ZELLE_EMAIL}`;
+          ? `PIX: R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} para CNPJ ${PIX_KEY}`
+          : `Zelle: $${quote.total_price.toFixed(2)} para ${ZELLE_PHONE}`;
 
         setSuccess(
           paymentMethod === 'pix'
-            ? `Pedido criado! Envie R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} via PIX para ${PIX_KEY}. Inclua seu email na descrição. Iniciaremos a tradução após confirmação do pagamento.`
-            : `Order created! Send $${quote.total_price.toFixed(2)} via Zelle to ${ZELLE_EMAIL}. Include your email in the memo. We'll start your translation once payment is confirmed.`
+            ? `Pedido criado! Envie R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} via PIX para CNPJ ${PIX_KEY} (${PIX_NAME}). Inclua seu email na descrição. Iniciaremos a tradução após confirmação do pagamento.`
+            : `Order created! Send $${quote.total_price.toFixed(2)} via Zelle to ${ZELLE_PHONE} (${ZELLE_NAME}). Include your email in the memo. We'll start your translation once payment is confirmed.`
         );
 
         // Reset form
@@ -920,18 +923,27 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     <p className="text-sm text-blue-700 mb-2">
                       Send <strong>${quote.total_price.toFixed(2)}</strong> to:
                     </p>
-                    <div className="bg-white p-3 rounded border border-blue-200 flex items-center justify-between">
-                      <span className="font-mono text-blue-900">{ZELLE_EMAIL}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(ZELLE_EMAIL);
-                          alert('Email copied!');
-                        }}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Copy
-                      </button>
+                    <div className="bg-white p-3 rounded border border-blue-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Phone:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-blue-900">{ZELLE_PHONE}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(ZELLE_PHONE);
+                              alert('Phone copied!');
+                            }}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Name:</span>
+                        <span className="font-medium text-blue-900">{ZELLE_NAME}</span>
+                      </div>
                     </div>
                     <p className="text-xs text-blue-600 mt-2">
                       Include your name and email in the memo. We'll start your translation once payment is confirmed.
@@ -946,18 +958,27 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     <p className="text-sm text-green-700 mb-2">
                       Envie <strong>R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</strong> para:
                     </p>
-                    <div className="bg-white p-3 rounded border border-green-200 flex items-center justify-between">
-                      <span className="font-mono text-green-900">{PIX_KEY}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(PIX_KEY);
-                          alert('Chave PIX copiada!');
-                        }}
-                        className="text-green-600 hover:text-green-800 text-sm font-medium"
-                      >
-                        Copiar
-                      </button>
+                    <div className="bg-white p-3 rounded border border-green-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">{PIX_TYPE}:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-green-900">{PIX_KEY}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(PIX_KEY);
+                              alert('Chave PIX copiada!');
+                            }}
+                            className="text-green-600 hover:text-green-800 text-sm font-medium"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Nome:</span>
+                        <span className="font-medium text-green-900">{PIX_NAME}</span>
+                      </div>
                     </div>
                     <p className="text-xs text-green-600 mt-2">
                       Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL. Inclua seu nome e email na descrição.
