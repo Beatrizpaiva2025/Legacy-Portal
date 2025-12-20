@@ -832,13 +832,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               />
             </div>
 
-            {/* Questions about pricing? - MIA Contact */}
+            {/* Questions about pricing? - Contact */}
             <div className="bg-gray-50 p-5 rounded-lg text-center">
               <p className="text-gray-600 mb-3">Questions about your pricing?</p>
               <a
-                href={MIA_WHATSAPP}
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:contact@legacytranslations.com?subject=Quote Request"
                 className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
               >
                 Request a quote instead
