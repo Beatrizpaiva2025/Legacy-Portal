@@ -1645,13 +1645,25 @@ async def get_current_partner_info(token: str):
 @api_router.post("/admin/auth/register")
 async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
     """Register a new admin user (only admin can create users)"""
-    # Verify admin key for initial setup, or verify caller is admin
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Verify admin key OR valid admin token
+    is_valid = False
+
+    # Check if it's the master admin key
+    if admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        is_valid = True
+    else:
+        # Check if it's a valid admin token
+        admin_user = await db.admin_users.find_one({"token": admin_key, "role": "admin", "is_active": True})
+        if admin_user:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Validate role
-    if user_data.role not in ['admin', 'pm', 'translator']:
-        raise HTTPException(status_code=400, detail="Invalid role. Must be: admin, pm, or translator")
+    valid_roles = ['admin', 'pm', 'translator', 'sales']
+    if user_data.role not in valid_roles:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(valid_roles)}")
 
     try:
         # Check if email already exists
