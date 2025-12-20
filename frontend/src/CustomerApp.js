@@ -226,9 +226,8 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
   );
 };
 
-// ==================== CUSTOMER NEW ORDER PAGE (Step-based with Auto-save) ====================
+// ==================== CUSTOMER NEW ORDER PAGE (Single page with inline email capture) ====================
 const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
-  const [step, setStep] = useState(1); // 1: Email, 2: Upload & Configure, 3: Review & Order
   const [guestEmail, setGuestEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   const [formData, setFormData] = useState({
@@ -251,12 +250,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
 
-  // If logged in, skip email step
+  // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
       setGuestEmail(customer.email);
       setGuestName(customer.full_name);
-      setStep(2);
     }
   }, [customer]);
 
@@ -277,14 +275,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   // Exit intent detection
   useEffect(() => {
     const handleMouseLeave = (e) => {
-      if (e.clientY <= 0 && quote && !success && step >= 2) {
+      if (e.clientY <= 0 && quote && !success && guestEmail) {
         setShowExitPopup(true);
       }
     };
 
     document.addEventListener('mouseleave', handleMouseLeave);
     return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, [quote, success, step]);
+  }, [quote, success, guestEmail]);
 
   const calculateQuote = () => {
     let basePrice = 0;
@@ -293,7 +291,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;
     } else {
-      basePrice = pages * 19.50;
+      basePrice = pages * 19.99;
     }
 
     let urgencyFee = 0;
@@ -425,15 +423,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     multiple: true
   });
 
-  const handleEmailSubmit = (e) => {
-    e.preventDefault();
-    if (guestEmail && guestName) {
-      setStep(2);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!guestName || !guestEmail) {
+      setError('Please enter your name and email');
+      return;
+    }
 
     if (wordCount === 0) {
       setError('Please upload a document first');
@@ -496,61 +492,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   };
 
-  // Step 1: Capture Email
-  if (step === 1) {
-    return (
-      <div className="p-8 max-w-xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <div className="text-4xl mb-4">📧</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Get Your Free Quote</h1>
-            <p className="text-gray-600">Enter your details to receive an instant price quote</p>
-          </div>
-
-          <form onSubmit={handleEmailSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
-              <input
-                type="text"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="John Smith"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Email *</label>
-              <input
-                type="email"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
-              <p className="text-xs text-gray-500 mt-1">We'll send your quote and order updates here</p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold"
-            >
-              Continue to Upload Document
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            Already have an account?{' '}
-            <a href="/customer" className="text-teal-600 hover:underline" onClick={() => window.location.reload()}>
-              Sign In
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-8">
       {/* Exit Intent Popup */}
@@ -598,23 +539,36 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
 
-            {/* Contact Info (read-only) */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
+            {/* Contact Info - Subtle at top */}
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-100">
+              <p className="text-sm text-gray-600 mb-3">Enter your details to receive your quote</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <div className="text-sm text-gray-500">Sending quote to:</div>
-                  <div className="font-medium">{guestName} ({guestEmail})</div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Name *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="John Smith"
+                    disabled={!!customer}
+                  />
                 </div>
-                {!customer && (
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="text-sm text-teal-600 hover:underline"
-                  >
-                    Change
-                  </button>
-                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Email *</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    disabled={!!customer}
+                  />
+                </div>
               </div>
+              <p className="text-xs text-gray-400 mt-2">We'll send your quote and order updates here</p>
             </div>
 
             {/* Service Type */}
@@ -654,7 +608,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     <div className="font-medium">Professional Translation</div>
                     <div className="text-sm text-gray-500">Business, marketing, general content</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.50/page</div>
+                  <div className="font-semibold text-teal-600">$19.99/page</div>
                 </label>
               </div>
             </div>
@@ -749,6 +703,19 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   </div>
                 </div>
               )}
+
+              {/* Contact support link - shown after upload section */}
+              <div className="mt-3 text-center">
+                <p className="text-xs text-gray-400">
+                  Having trouble uploading?{' '}
+                  <a
+                    href="mailto:info@legacytranslations.com?subject=Document Upload Issue"
+                    className="text-teal-600 hover:underline"
+                  >
+                    Contact us via email
+                  </a>
+                </p>
+              </div>
             </div>
 
             {/* Urgency */}
@@ -790,7 +757,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             <button
               type="submit"
-              disabled={submitting || wordCount === 0}
+              disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
               {submitting ? 'Creating Order...' : 'Place Order'}
