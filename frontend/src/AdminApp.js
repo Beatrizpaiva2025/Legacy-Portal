@@ -295,10 +295,9 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm'] },
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Production', icon: '📊', roles: ['admin'] },
-    { id: 'translators', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
@@ -311,7 +310,8 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const roleConfig = {
     admin: { label: 'Administrator', color: 'bg-red-500' },
     pm: { label: 'Project Manager', color: 'bg-blue-500' },
-    translator: { label: 'Translator', color: 'bg-green-500' }
+    translator: { label: 'Translator', color: 'bg-green-500' },
+    sales: { label: 'Sales', color: 'bg-purple-500' }
   };
 
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
@@ -4610,7 +4610,8 @@ const UsersPage = ({ adminKey }) => {
   const roleColors = {
     admin: 'bg-red-100 text-red-800',
     pm: 'bg-blue-100 text-blue-800',
-    translator: 'bg-green-100 text-green-800'
+    translator: 'bg-green-100 text-green-800',
+    sales: 'bg-purple-100 text-purple-800'
   };
 
   if (loading) return <div className="p-6 text-center">Loading users...</div>;
@@ -4663,6 +4664,7 @@ const UsersPage = ({ adminKey }) => {
             >
               <option value="translator">Translator</option>
               <option value="pm">Project Manager</option>
+              <option value="sales">Sales</option>
               <option value="admin">Admin</option>
             </select>
             <div className="col-span-4 flex justify-end gap-2">
@@ -5262,10 +5264,6 @@ function AdminApp() {
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'translation':
         return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
-      case 'translators':
-        return userRole === 'admin'
-          ? <TranslatorsPage adminKey={adminKey} />
-          : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'production':
         return userRole === 'admin'
           ? <ProductionPage adminKey={adminKey} />
