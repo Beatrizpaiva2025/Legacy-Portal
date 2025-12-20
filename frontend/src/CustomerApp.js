@@ -259,6 +259,16 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   // MIA WhatsApp number
   const MIA_WHATSAPP = "https://wa.me/17863109734?text=Hi%20MIA,%20I%20have%20questions%20about%20my%20translation%20quote";
 
+  // Payment method state
+  const [paymentMethod, setPaymentMethod] = useState('card');
+
+  // Currency conversion rate (USD to BRL)
+  const USD_TO_BRL = 6.10;
+
+  // Payment info
+  const ZELLE_EMAIL = "accounting@legacytranslations.com";
+  const PIX_KEY = "accounting@legacytranslations.com";
+
   // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
@@ -291,6 +301,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;
+    } else if (formData.service_type === 'sworn') {
+      basePrice = pages * 39.00;
     } else {
       basePrice = pages * 19.99;
     }
@@ -482,30 +494,60 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         reference: `WEB-${Date.now()}`,
         service_type: formData.service_type,
         translate_from: formData.translate_from,
-        translate_to: formData.translate_to,
+        translate_to: formData.service_type === 'sworn' ? 'portuguese' : formData.translate_to,
         word_count: wordCount,
-        urgency: formData.urgency
+        urgency: formData.urgency,
+        customer_name: guestName,
+        customer_email: guestEmail,
+        payment_method: paymentMethod
       };
 
       // Create quote
       const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
       const quoteId = quoteResponse.data.id;
 
-      // Step 2: Create Stripe checkout session
-      const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
-        quote_id: quoteId,
-        origin_url: window.location.origin + '/customer'
-      });
+      if (paymentMethod === 'card') {
+        // Stripe checkout flow
+        const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
+          quote_id: quoteId,
+          origin_url: window.location.origin + '/customer'
+        });
 
-      // Step 3: Redirect to Stripe checkout
-      if (checkoutResponse.data.checkout_url) {
-        window.location.href = checkoutResponse.data.checkout_url;
+        if (checkoutResponse.data.checkout_url) {
+          window.location.href = checkoutResponse.data.checkout_url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       } else {
-        throw new Error('No checkout URL received');
+        // Zelle or PIX - create order with pending_payment status
+        const paymentInfo = paymentMethod === 'pix'
+          ? `PIX: R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} para ${PIX_KEY}`
+          : `Zelle: $${quote.total_price.toFixed(2)} para ${ZELLE_EMAIL}`;
+
+        setSuccess(
+          paymentMethod === 'pix'
+            ? `Pedido criado! Envie R$ ${(quote.total_price * USD_TO_BRL).toFixed(2)} via PIX para ${PIX_KEY}. Inclua seu email na descrição. Iniciaremos a tradução após confirmação do pagamento.`
+            : `Order created! Send $${quote.total_price.toFixed(2)} via Zelle to ${ZELLE_EMAIL}. Include your email in the memo. We'll start your translation once payment is confirmed.`
+        );
+
+        // Reset form
+        setFormData({
+          service_type: 'standard',
+          translate_from: 'portuguese',
+          translate_to: 'english',
+          urgency: 'no',
+          reference: '',
+          notes: ''
+        });
+        setWordCount(0);
+        setUploadedFiles([]);
+        setQuote(null);
+        setPaymentMethod('card');
+        setSubmitting(false);
       }
 
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to process payment. Please try again.');
+      setError(err.response?.data?.detail || 'Failed to process order. Please try again.');
       setSubmitting(false);
     }
   };
@@ -606,9 +648,27 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium">Certified Translation</div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="text-sm text-gray-500">For use in the USA – USCIS, courts, universities</div>
                   </div>
                   <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="sworn"
+                    checked={formData.service_type === 'sworn'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value, translate_to: 'portuguese'})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium">Sworn Translation <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2">Brazil Only</span></div>
+                    <div className="text-sm text-gray-500">Tradução Juramentada – Official for use in Brazil</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$39.00/page</div>
                 </label>
 
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -649,17 +709,24 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                    🇧🇷 Portuguese (Brazil)
+                    <span className="text-xs text-gray-400 ml-2">– Sworn translations available for Brazil only</span>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -786,12 +853,126 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </a>
             </div>
 
+            {/* Payment Method Selection */}
+            {quote && quote.total_price > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h2>
+                <div className="space-y-3">
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="card"
+                      checked={paymentMethod === 'card'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">💳 Credit/Debit Card</div>
+                      <div className="text-sm text-gray-500">Secure payment via Stripe</div>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="zelle"
+                      checked={paymentMethod === 'zelle'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">🏦 Zelle</div>
+                      <div className="text-sm text-gray-500">Direct bank transfer (US only)</div>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'pix' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="pix"
+                      checked={paymentMethod === 'pix'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">🇧🇷 PIX</div>
+                      <div className="text-sm text-gray-500">Transferência instantânea (Brasil)</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Zelle Instructions */}
+                {paymentMethod === 'zelle' && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="font-semibold text-blue-800 mb-2">Zelle Payment Instructions</h3>
+                    <p className="text-sm text-blue-700 mb-2">
+                      Send <strong>${quote.total_price.toFixed(2)}</strong> to:
+                    </p>
+                    <div className="bg-white p-3 rounded border border-blue-200 flex items-center justify-between">
+                      <span className="font-mono text-blue-900">{ZELLE_EMAIL}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(ZELLE_EMAIL);
+                          alert('Email copied!');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      Include your name and email in the memo. We'll start your translation once payment is confirmed.
+                    </p>
+                  </div>
+                )}
+
+                {/* PIX Instructions */}
+                {paymentMethod === 'pix' && (
+                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h3 className="font-semibold text-green-800 mb-2">Instruções de Pagamento PIX</h3>
+                    <p className="text-sm text-green-700 mb-2">
+                      Envie <strong>R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</strong> para:
+                    </p>
+                    <div className="bg-white p-3 rounded border border-green-200 flex items-center justify-between">
+                      <span className="font-mono text-green-900">{PIX_KEY}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(PIX_KEY);
+                          alert('Chave PIX copiada!');
+                        }}
+                        className="text-green-600 hover:text-green-800 text-sm font-medium"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                    <p className="text-xs text-green-600 mt-2">
+                      Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL. Inclua seu nome e email na descrição.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
-              {submitting ? 'Processing...' : 'Continue to Payment'}
+              {submitting ? 'Processing...' : (paymentMethod === 'card' ? 'Continue to Payment' : 'Submit Order')}
             </button>
           </form>
         </div>
@@ -804,7 +985,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div className="flex justify-between">
               <span className="text-gray-600">Service</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' ? 'Certified' : 'Professional'}
+                {formData.service_type === 'standard' ? 'Certified' : formData.service_type === 'sworn' ? 'Sworn' : 'Professional'}
               </span>
             </div>
             <div className="flex justify-between">

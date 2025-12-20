@@ -814,6 +814,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Payment method state and constants
+  const [paymentMethod, setPaymentMethod] = useState('invoice');
+  const USD_TO_BRL = 6.10;
+  const ZELLE_EMAIL = "accounting@legacytranslations.com";
+  const PIX_KEY = "accounting@legacytranslations.com";
+
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
@@ -828,6 +834,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
 
     if (formData.service_type === 'standard') {
       basePrice = pages * 24.99;  // Certified Translation
+    } else if (formData.service_type === 'sworn') {
+      basePrice = pages * 39.00;  // Sworn Translation (Brazil)
     } else {
       basePrice = pages * 19.99;  // Professional Translation
     }
@@ -1066,9 +1074,27 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium">{t('certifiedTranslation')}</div>
-                    <div className="text-sm text-gray-500">{t('certifiedDesc')}</div>
+                    <div className="text-sm text-gray-500">For use in the USA – USCIS, courts, universities</div>
                   </div>
                   <div className="font-semibold text-teal-600">{formatPricePerPage(24.99)}</div>
+                </label>
+
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="sworn"
+                    checked={formData.service_type === 'sworn'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value, translate_to: 'portuguese'})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium">Sworn Translation <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full ml-2">Brazil Only</span></div>
+                    <div className="text-sm text-gray-500">Tradução Juramentada – Official for use in Brazil</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">{formatPricePerPage(39.00)}</div>
                 </label>
 
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -1109,17 +1135,24 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('translateTo')}</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                    🇧🇷 Portuguese (Brazil)
+                    <span className="text-xs text-gray-400 ml-2">– Sworn translations available for Brazil only</span>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -1232,6 +1265,120 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
               </div>
             </div>
 
+            {/* Payment Method Selection */}
+            {quote && quote.total_price > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h2>
+                <div className="space-y-3">
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="invoice"
+                      checked={paymentMethod === 'invoice'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">📄 Invoice (Net 30)</div>
+                      <div className="text-sm text-gray-500">Pay at end of month</div>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="zelle"
+                      checked={paymentMethod === 'zelle'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">🏦 Zelle</div>
+                      <div className="text-sm text-gray-500">Direct bank transfer (US only)</div>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    paymentMethod === 'pix' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="pix"
+                      checked={paymentMethod === 'pix'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">🇧🇷 PIX</div>
+                      <div className="text-sm text-gray-500">Transferência instantânea (Brasil)</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-gray-500">R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Zelle Instructions */}
+                {paymentMethod === 'zelle' && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="font-semibold text-blue-800 mb-2">Zelle Payment Instructions</h3>
+                    <p className="text-sm text-blue-700 mb-2">
+                      Send <strong>{formatPrice(quote.total_price)}</strong> to:
+                    </p>
+                    <div className="bg-white p-3 rounded border border-blue-200 flex items-center justify-between">
+                      <span className="font-mono text-blue-900">{ZELLE_EMAIL}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(ZELLE_EMAIL);
+                          alert('Email copied!');
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-600 mt-2">
+                      Include client name and your company in the memo.
+                    </p>
+                  </div>
+                )}
+
+                {/* PIX Instructions */}
+                {paymentMethod === 'pix' && (
+                  <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h3 className="font-semibold text-green-800 mb-2">Instruções de Pagamento PIX</h3>
+                    <p className="text-sm text-green-700 mb-2">
+                      Envie <strong>R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</strong> para:
+                    </p>
+                    <div className="bg-white p-3 rounded border border-green-200 flex items-center justify-between">
+                      <span className="font-mono text-green-900">{PIX_KEY}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(PIX_KEY);
+                          alert('Chave PIX copiada!');
+                        }}
+                        className="text-green-600 hover:text-green-800 text-sm font-medium"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                    <p className="text-xs text-green-600 mt-2">
+                      Cotação: $1 USD = R$ {USD_TO_BRL.toFixed(2)} BRL
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-4">
               <button
                 type="button"
@@ -1260,7 +1407,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
             <div className="flex justify-between">
               <span className="text-gray-600">{t('service')}</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' ? t('certified') : t('professional')}
+                {formData.service_type === 'standard' ? t('certified') : formData.service_type === 'sworn' ? 'Sworn' : t('professional')}
               </span>
             </div>
             <div className="flex justify-between">
