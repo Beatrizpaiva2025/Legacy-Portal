@@ -250,6 +250,15 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
 
+  // Certification options
+  const [certifications, setCertifications] = useState({
+    notarization: false,
+    eApostille: false
+  });
+
+  // MIA WhatsApp number
+  const MIA_WHATSAPP = "https://wa.me/17863109734?text=Hi%20MIA,%20I%20have%20questions%20about%20my%20translation%20quote";
+
   // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
@@ -263,7 +272,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications]);
 
   // Auto-save abandoned quote when user sees the price
   useEffect(() => {
@@ -301,7 +310,16 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       urgencyFee = basePrice * 1.0;
     }
 
-    let subtotal = basePrice + urgencyFee;
+    // Certification fees
+    let certificationFee = 0;
+    if (certifications.notarization) {
+      certificationFee += 19.95;
+    }
+    if (certifications.eApostille) {
+      certificationFee += 79.95;
+    }
+
+    let subtotal = basePrice + urgencyFee + certificationFee;
     let discountAmount = 0;
 
     if (appliedDiscount) {
@@ -315,6 +333,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
+      certification_fee: certificationFee,
       discount: discountAmount,
       total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
@@ -453,7 +472,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
         discount_code: appliedDiscount ? discountCode : null,
-        abandoned_quote_id: abandonedQuoteId
+        abandoned_quote_id: abandonedQuoteId,
+        // Certification options
+        notarization: certifications.notarization,
+        e_apostille: certifications.eApostille,
+        certification_fee: quote?.certification_fee || 0
       };
 
       let response;
@@ -480,6 +503,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       setAbandonedQuoteId(null);
       setAppliedDiscount(null);
       setDiscountCode('');
+      setCertifications({ notarization: false, eApostille: false });
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -743,6 +767,58 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
             </div>
 
+            {/* Certification Options */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Certification options</h2>
+              <div className="space-y-3">
+                {/* Notarization */}
+                <label className={`block p-4 border rounded-lg cursor-pointer transition-colors ${
+                  certifications.notarization ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                }`}>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={certifications.notarization}
+                      onChange={(e) => setCertifications({...certifications, notarization: e.target.checked})}
+                      className="mt-1 mr-3 h-4 w-4 text-teal-600 rounded"
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-gray-800">Notarization</span>
+                        <span className="font-semibold text-gray-700">+$19.95</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Stamp, signature, and tamper-evident digital certificate verifying the translation certification, valid in all 50 states.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+
+                {/* E-Apostille */}
+                <label className={`block p-4 border rounded-lg cursor-pointer transition-colors ${
+                  certifications.eApostille ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                }`}>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={certifications.eApostille}
+                      onChange={(e) => setCertifications({...certifications, eApostille: e.target.checked})}
+                      className="mt-1 mr-3 h-4 w-4 text-teal-600 rounded"
+                    />
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-gray-800">E-Apostille</span>
+                        <span className="font-semibold text-gray-700">+$79.95</span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        An e-apostille verifies the notarization's authenticity for use in Hague Convention member countries around the world.
+                      </p>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
@@ -755,12 +831,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               />
             </div>
 
+            {/* Questions about pricing? - MIA Contact */}
+            <div className="bg-gray-50 p-5 rounded-lg text-center">
+              <p className="text-gray-600 mb-3">Questions about your pricing?</p>
+              <a
+                href={MIA_WHATSAPP}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
+              >
+                Request a quote instead
+              </a>
+            </div>
+
             <button
               type="submit"
               disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
-              {submitting ? 'Creating Order...' : 'Place Order'}
+              {submitting ? 'Processing...' : 'Continue to Payment'}
             </button>
           </form>
         </div>
@@ -790,6 +879,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 <div className="flex justify-between text-orange-600">
                   <span>Urgency Fee</span>
                   <span>${quote.urgency_fee.toFixed(2)}</span>
+                </div>
+              )}
+              {quote?.certification_fee > 0 && (
+                <div className="flex justify-between text-purple-600">
+                  <span>Certification</span>
+                  <span>${quote.certification_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
