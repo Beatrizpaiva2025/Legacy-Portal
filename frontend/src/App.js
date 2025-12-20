@@ -1455,6 +1455,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, onSaveBudget }) => {
                       <p className="text-xs text-gray-500 mt-1 text-center">
                         Beneficiário: {PIX_NAME}
                       </p>
+                      <p className="text-xs text-amber-600 mt-2 text-center bg-amber-50 py-1 px-2 rounded">
+                        Pagamento disponível apenas para contas bancárias no Brasil
+                      </p>
                     </div>
                   );
                 })()}
