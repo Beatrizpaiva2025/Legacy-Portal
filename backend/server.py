@@ -150,7 +150,7 @@ class EmailService:
                 <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                     <h2 style="color: #2c5aa0;">Translation Order Confirmation</h2>
                     
-                    <p>{'Thank you for your order!' if is_partner else 'New order received from partner portal.'}</p>
+                    <p>{'Thank you for your order!' if is_partner else 'New translation order received.'}</p>
                     
                     <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
                         <h3 style="margin-top: 0;">Order Details:</h3>
@@ -3935,6 +3935,1169 @@ async def delete_glossary(glossary_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Glossary not found")
 
     return {"status": "success"}
+
+
+# ==================== CUSTOMER MODELS ====================
+
+class Customer(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    full_name: str
+    email: EmailStr
+    password_hash: str
+    phone: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CustomerCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    password: str
+    phone: Optional[str] = None
+
+class CustomerLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class CustomerResponse(BaseModel):
+    id: str
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    token: str
+
+# Budget (Saved Quote) Models
+class SavedBudget(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    reference: str = Field(default_factory=lambda: f"BUD-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    owner_id: str  # Can be partner_id or customer_id
+    owner_type: str  # 'partner' or 'customer'
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    base_price: float
+    urgency_fee: float
+    total_price: float
+    notes: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+    status: str = "active"  # active, converted, expired
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+
+class SavedBudgetCreate(BaseModel):
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+
+# Customer Order Model
+class CustomerOrder(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_number: str = Field(default_factory=lambda: f"CUST-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    customer_id: str
+    customer_name: str
+    customer_email: EmailStr
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    page_count: int
+    urgency: str
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    base_price: float
+    urgency_fee: float
+    total_price: float
+    translation_status: str = "received"
+    payment_status: str = "pending"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_date: Optional[datetime] = None
+    document_filename: Optional[str] = None
+
+class CustomerOrderCreate(BaseModel):
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    document_filename: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+
+# In-memory token storage for customers
+customer_tokens: Dict[str, str] = {}  # token -> customer_id
+
+async def get_current_customer(token: str = None) -> Optional[dict]:
+    """Get current customer from token"""
+    if not token or token not in customer_tokens:
+        return None
+    customer_id = customer_tokens[token]
+    customer = await db.customers.find_one({"id": customer_id})
+    return customer
+
+# ==================== CUSTOMER AUTHENTICATION ====================
+
+@api_router.post("/customer/auth/register")
+async def register_customer(customer_data: CustomerCreate):
+    """Register a new customer"""
+    try:
+        # Check if email already exists
+        existing = await db.customers.find_one({"email": customer_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create customer
+        customer = Customer(
+            full_name=customer_data.full_name,
+            email=customer_data.email,
+            password_hash=hash_password(customer_data.password),
+            phone=customer_data.phone
+        )
+
+        await db.customers.insert_one(customer.dict())
+
+        # Generate token
+        token = generate_token()
+        customer_tokens[token] = customer.id
+
+        return CustomerResponse(
+            id=customer.id,
+            full_name=customer.full_name,
+            email=customer.email,
+            phone=customer.phone,
+            token=token
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering customer: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register customer")
+
+@api_router.post("/customer/auth/login")
+async def login_customer(login_data: CustomerLogin):
+    """Login customer and return token"""
+    try:
+        # Find customer by email
+        customer = await db.customers.find_one({"email": login_data.email})
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Verify password
+        if not verify_password(login_data.password, customer["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if active
+        if not customer.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is deactivated")
+
+        # Generate token
+        token = generate_token()
+        customer_tokens[token] = customer["id"]
+
+        return CustomerResponse(
+            id=customer["id"],
+            full_name=customer["full_name"],
+            email=customer["email"],
+            phone=customer.get("phone"),
+            token=token
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error logging in customer: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to login")
+
+@api_router.post("/customer/auth/logout")
+async def logout_customer(token: str):
+    """Logout customer"""
+    if token in customer_tokens:
+        del customer_tokens[token]
+    return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.get("/customer/auth/me")
+async def get_current_customer_info(token: str):
+    """Get current customer info from token"""
+    customer = await get_current_customer(token)
+    if not customer:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return {
+        "id": customer["id"],
+        "full_name": customer["full_name"],
+        "email": customer["email"],
+        "phone": customer.get("phone")
+    }
+
+# ==================== CUSTOMER ORDERS ====================
+
+@api_router.post("/customer/orders/create")
+async def create_customer_order(order_data: CustomerOrderCreate, token: str):
+    """Create a new customer order"""
+    try:
+        # Verify customer
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            order_data.word_count,
+            order_data.service_type,
+            order_data.urgency
+        )
+
+        # Calculate page count
+        page_count = max(1, math.ceil(order_data.word_count / 250))
+
+        # Set due date
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        # Create order
+        order = CustomerOrder(
+            customer_id=customer["id"],
+            customer_name=customer["full_name"],
+            customer_email=customer["email"],
+            service_type=order_data.service_type,
+            translate_from=order_data.translate_from,
+            translate_to=order_data.translate_to,
+            word_count=order_data.word_count,
+            page_count=page_count,
+            urgency=order_data.urgency,
+            reference=order_data.reference,
+            notes=order_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            due_date=due_date,
+            document_filename=order_data.document_filename
+        )
+
+        await db.customer_orders.insert_one(order.dict())
+
+        # Associate uploaded documents with this order
+        if order_data.document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": order_data.document_ids}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
+        # Send email notifications
+        try:
+            order_details = {
+                "reference": order.order_number,
+                "service_type": order.service_type,
+                "translate_from": order.translate_from,
+                "translate_to": order.translate_to,
+                "word_count": order.word_count,
+                "urgency": order.urgency,
+                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "base_price": order.base_price,
+                "urgency_fee": order.urgency_fee,
+                "total_price": order.total_price
+            }
+
+            # Send to customer
+            await email_service.send_order_confirmation_email(
+                customer["email"],
+                order_details,
+                is_partner=True
+            )
+
+            # Send to company
+            await email_service.send_order_confirmation_email(
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False
+            )
+        except Exception as e:
+            logger.error(f"Failed to send order emails: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Order created successfully",
+            "order": order.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating customer order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+@api_router.get("/customer/orders")
+async def get_customer_orders(token: str, status: Optional[str] = None):
+    """Get customer orders"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        query = {"customer_id": customer["id"]}
+        if status and status != 'all':
+            query["payment_status"] = status
+
+        orders = await db.customer_orders.find(query).sort("created_at", -1).to_list(100)
+
+        # Clean up MongoDB ObjectId
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+            # Convert datetime objects to ISO strings
+            if order.get("created_at"):
+                order["created_at"] = order["created_at"].isoformat()
+            if order.get("due_date"):
+                order["due_date"] = order["due_date"].isoformat()
+
+        return {"orders": orders}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching customer orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
+# ==================== CUSTOMER MESSAGES ====================
+
+@api_router.get("/customer/messages")
+async def get_customer_messages(token: str):
+    """Get customer messages"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        messages = await db.customer_messages.find({"customer_id": customer["id"]}).sort("created_at", -1).to_list(100)
+
+        for msg in messages:
+            if '_id' in msg:
+                del msg['_id']
+            if msg.get("created_at"):
+                msg["created_at"] = msg["created_at"].isoformat()
+
+        return {"messages": messages}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching customer messages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch messages")
+
+@api_router.put("/customer/messages/{message_id}/read")
+async def mark_customer_message_read(message_id: str, token: str):
+    """Mark a customer message as read"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        result = await db.customer_messages.update_one(
+            {"id": message_id, "customer_id": customer["id"]},
+            {"$set": {"read": True}}
+        )
+
+        return {"status": "success"}
+
+    except Exception as e:
+        logger.error(f"Error marking message as read: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to mark message as read")
+
+# ==================== BUDGET (SAVED QUOTES) ENDPOINTS ====================
+
+@api_router.post("/customer/budgets/save")
+async def save_customer_budget(budget_data: SavedBudgetCreate, token: str):
+    """Save a budget/quote for a customer"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            budget_data.word_count,
+            budget_data.service_type,
+            budget_data.urgency
+        )
+
+        # Create budget
+        budget = SavedBudget(
+            owner_id=customer["id"],
+            owner_type="customer",
+            service_type=budget_data.service_type,
+            translate_from=budget_data.translate_from,
+            translate_to=budget_data.translate_to,
+            word_count=budget_data.word_count,
+            urgency=budget_data.urgency,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            notes=budget_data.notes,
+            document_ids=budget_data.document_ids,
+            files_info=budget_data.files_info,
+            expires_at=datetime.utcnow() + timedelta(days=30)  # Budget valid for 30 days
+        )
+
+        await db.saved_budgets.insert_one(budget.dict())
+
+        return {
+            "status": "success",
+            "message": "Budget saved successfully",
+            "budget": budget.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving customer budget: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save budget")
+
+@api_router.get("/customer/budgets")
+async def get_customer_budgets(token: str):
+    """Get all saved budgets for a customer"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        budgets = await db.saved_budgets.find({
+            "owner_id": customer["id"],
+            "owner_type": "customer",
+            "status": "active"
+        }).sort("created_at", -1).to_list(100)
+
+        for budget in budgets:
+            if '_id' in budget:
+                del budget['_id']
+            if budget.get("created_at"):
+                budget["created_at"] = budget["created_at"].isoformat()
+            if budget.get("expires_at"):
+                budget["expires_at"] = budget["expires_at"].isoformat()
+
+        return {"budgets": budgets}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching customer budgets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch budgets")
+
+@api_router.delete("/customer/budgets/{budget_id}")
+async def delete_customer_budget(budget_id: str, token: str):
+    """Delete a saved budget"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        result = await db.saved_budgets.delete_one({
+            "id": budget_id,
+            "owner_id": customer["id"],
+            "owner_type": "customer"
+        })
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Budget not found")
+
+        return {"status": "success", "message": "Budget deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting budget: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete budget")
+
+@api_router.post("/customer/budgets/{budget_id}/convert")
+async def convert_customer_budget_to_order(budget_id: str, token: str):
+    """Convert a saved budget to an order"""
+    try:
+        customer = await get_current_customer(token)
+        if not customer:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Get budget
+        budget = await db.saved_budgets.find_one({
+            "id": budget_id,
+            "owner_id": customer["id"],
+            "owner_type": "customer"
+        })
+
+        if not budget:
+            raise HTTPException(status_code=404, detail="Budget not found")
+
+        # Create order from budget
+        page_count = max(1, math.ceil(budget["word_count"] / 250))
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        order = CustomerOrder(
+            customer_id=customer["id"],
+            customer_name=customer["full_name"],
+            customer_email=customer["email"],
+            service_type=budget["service_type"],
+            translate_from=budget["translate_from"],
+            translate_to=budget["translate_to"],
+            word_count=budget["word_count"],
+            page_count=page_count,
+            urgency=budget["urgency"],
+            notes=budget.get("notes"),
+            base_price=budget["base_price"],
+            urgency_fee=budget["urgency_fee"],
+            total_price=budget["total_price"],
+            due_date=due_date
+        )
+
+        await db.customer_orders.insert_one(order.dict())
+
+        # Mark budget as converted
+        await db.saved_budgets.update_one(
+            {"id": budget_id},
+            {"$set": {"status": "converted"}}
+        )
+
+        # Associate documents if any
+        if budget.get("document_ids"):
+            await db.documents.update_many(
+                {"id": {"$in": budget["document_ids"]}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
+        return {
+            "status": "success",
+            "message": "Budget converted to order",
+            "order": order.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error converting budget to order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert budget")
+
+# ==================== PARTNER BUDGET ENDPOINTS ====================
+
+@api_router.post("/partner/budgets/save")
+async def save_partner_budget(budget_data: SavedBudgetCreate, token: str):
+    """Save a budget/quote for a partner"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            budget_data.word_count,
+            budget_data.service_type,
+            budget_data.urgency
+        )
+
+        # Create budget
+        budget = SavedBudget(
+            owner_id=partner["id"],
+            owner_type="partner",
+            service_type=budget_data.service_type,
+            translate_from=budget_data.translate_from,
+            translate_to=budget_data.translate_to,
+            word_count=budget_data.word_count,
+            urgency=budget_data.urgency,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            notes=budget_data.notes,
+            document_ids=budget_data.document_ids,
+            files_info=budget_data.files_info,
+            expires_at=datetime.utcnow() + timedelta(days=30)
+        )
+
+        await db.saved_budgets.insert_one(budget.dict())
+
+        return {
+            "status": "success",
+            "message": "Budget saved successfully",
+            "budget": budget.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving partner budget: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save budget")
+
+@api_router.get("/partner/budgets")
+async def get_partner_budgets(token: str):
+    """Get all saved budgets for a partner"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        budgets = await db.saved_budgets.find({
+            "owner_id": partner["id"],
+            "owner_type": "partner",
+            "status": "active"
+        }).sort("created_at", -1).to_list(100)
+
+        for budget in budgets:
+            if '_id' in budget:
+                del budget['_id']
+            if budget.get("created_at"):
+                budget["created_at"] = budget["created_at"].isoformat()
+            if budget.get("expires_at"):
+                budget["expires_at"] = budget["expires_at"].isoformat()
+
+        return {"budgets": budgets}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching partner budgets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch budgets")
+
+@api_router.delete("/partner/budgets/{budget_id}")
+async def delete_partner_budget(budget_id: str, token: str):
+    """Delete a saved partner budget"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        result = await db.saved_budgets.delete_one({
+            "id": budget_id,
+            "owner_id": partner["id"],
+            "owner_type": "partner"
+        })
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Budget not found")
+
+        return {"status": "success", "message": "Budget deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting budget: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete budget")
+
+@api_router.post("/partner/budgets/{budget_id}/convert")
+async def convert_partner_budget_to_order(budget_id: str, token: str, client_name: str, client_email: str):
+    """Convert a saved partner budget to an order"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        # Get budget
+        budget = await db.saved_budgets.find_one({
+            "id": budget_id,
+            "owner_id": partner["id"],
+            "owner_type": "partner"
+        })
+
+        if not budget:
+            raise HTTPException(status_code=404, detail="Budget not found")
+
+        # Create order from budget
+        page_count = max(1, math.ceil(budget["word_count"] / 250))
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        order = TranslationOrder(
+            partner_id=partner["id"],
+            partner_company=partner["company_name"],
+            client_name=client_name,
+            client_email=client_email,
+            service_type=budget["service_type"],
+            translate_from=budget["translate_from"],
+            translate_to=budget["translate_to"],
+            word_count=budget["word_count"],
+            page_count=page_count,
+            urgency=budget["urgency"],
+            notes=budget.get("notes"),
+            base_price=budget["base_price"],
+            urgency_fee=budget["urgency_fee"],
+            total_price=budget["total_price"],
+            due_date=due_date
+        )
+
+        await db.translation_orders.insert_one(order.dict())
+
+        # Mark budget as converted
+        await db.saved_budgets.update_one(
+            {"id": budget_id},
+            {"$set": {"status": "converted"}}
+        )
+
+        # Associate documents if any
+        if budget.get("document_ids"):
+            await db.documents.update_many(
+                {"id": {"$in": budget["document_ids"]}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
+        return {
+            "status": "success",
+            "message": "Budget converted to order",
+            "order": order.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error converting budget to order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert budget")
+
+
+# ==================== ABANDONED QUOTES (Cart Abandonment Recovery) ====================
+
+class AbandonedQuote(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    total_price: float
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+    status: str = "abandoned"  # abandoned, recovered, expired
+    reminder_sent: int = 0  # Number of reminder emails sent
+    discount_code: Optional[str] = None  # Generated discount code for recovery
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_reminder_at: Optional[datetime] = None
+
+class AbandonedQuoteCreate(BaseModel):
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    total_price: float
+    document_ids: Optional[List[str]] = None
+    files_info: Optional[List[dict]] = None
+
+@api_router.post("/abandoned-quotes/save")
+async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
+    """Auto-save an abandoned quote when customer sees the price"""
+    try:
+        # Check if there's already an abandoned quote for this email
+        existing = await db.abandoned_quotes.find_one({
+            "email": quote_data.email,
+            "status": "abandoned"
+        })
+
+        if existing:
+            # Update existing abandoned quote
+            await db.abandoned_quotes.update_one(
+                {"id": existing["id"]},
+                {"$set": {
+                    "service_type": quote_data.service_type,
+                    "translate_from": quote_data.translate_from,
+                    "translate_to": quote_data.translate_to,
+                    "word_count": quote_data.word_count,
+                    "urgency": quote_data.urgency,
+                    "total_price": quote_data.total_price,
+                    "document_ids": quote_data.document_ids,
+                    "files_info": quote_data.files_info,
+                    "created_at": datetime.utcnow()
+                }}
+            )
+            return {"status": "updated", "quote_id": existing["id"]}
+
+        # Create new abandoned quote
+        quote = AbandonedQuote(
+            email=quote_data.email,
+            name=quote_data.name,
+            service_type=quote_data.service_type,
+            translate_from=quote_data.translate_from,
+            translate_to=quote_data.translate_to,
+            word_count=quote_data.word_count,
+            urgency=quote_data.urgency,
+            total_price=quote_data.total_price,
+            document_ids=quote_data.document_ids,
+            files_info=quote_data.files_info
+        )
+
+        await db.abandoned_quotes.insert_one(quote.dict())
+
+        return {"status": "created", "quote_id": quote.id}
+
+    except Exception as e:
+        logger.error(f"Error saving abandoned quote: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save quote")
+
+@api_router.get("/admin/abandoned-quotes")
+async def get_abandoned_quotes(admin_key: str, status: Optional[str] = None):
+    """Get all abandoned quotes for admin dashboard"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if status:
+        query["status"] = status
+
+    quotes = await db.abandoned_quotes.find(query).sort("created_at", -1).to_list(500)
+
+    for quote in quotes:
+        if '_id' in quote:
+            del quote['_id']
+        if quote.get("created_at"):
+            quote["created_at"] = quote["created_at"].isoformat()
+        if quote.get("last_reminder_at"):
+            quote["last_reminder_at"] = quote["last_reminder_at"].isoformat()
+
+    return {"quotes": quotes}
+
+@api_router.post("/admin/abandoned-quotes/{quote_id}/send-reminder")
+async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_discount: bool = False, discount_percent: int = 10):
+    """Send reminder email for abandoned quote with optional discount"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        quote = await db.abandoned_quotes.find_one({"id": quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Abandoned quote not found")
+
+        discount_code = None
+        if include_discount:
+            # Generate unique discount code
+            discount_code = f"COMEBACK{discount_percent}-{str(uuid.uuid4())[:6].upper()}"
+
+            # Save discount code to database
+            await db.discount_codes.insert_one({
+                "id": str(uuid.uuid4()),
+                "code": discount_code,
+                "type": "percentage",
+                "value": discount_percent,
+                "max_uses": 1,
+                "uses": 0,
+                "abandoned_quote_id": quote_id,
+                "expires_at": datetime.utcnow() + timedelta(days=7),
+                "created_at": datetime.utcnow()
+            })
+
+            # Update abandoned quote with discount code
+            await db.abandoned_quotes.update_one(
+                {"id": quote_id},
+                {"$set": {"discount_code": discount_code}}
+            )
+
+        # Send reminder email
+        try:
+            reminder_number = quote.get("reminder_sent", 0) + 1
+            await email_service.send_abandoned_quote_reminder(
+                quote["email"],
+                quote["name"],
+                {
+                    "service_type": quote["service_type"],
+                    "translate_from": quote["translate_from"],
+                    "translate_to": quote["translate_to"],
+                    "word_count": quote["word_count"],
+                    "total_price": quote["total_price"],
+                    "files_info": quote.get("files_info", [])
+                },
+                discount_code=discount_code,
+                discount_percent=discount_percent if include_discount else 0,
+                reminder_number=reminder_number
+            )
+        except Exception as e:
+            logger.error(f"Failed to send reminder email: {str(e)}")
+            # Continue even if email fails
+
+        # Update quote reminder count
+        await db.abandoned_quotes.update_one(
+            {"id": quote_id},
+            {
+                "$set": {"last_reminder_at": datetime.utcnow()},
+                "$inc": {"reminder_sent": 1}
+            }
+        )
+
+        return {
+            "status": "success",
+            "message": "Reminder sent",
+            "discount_code": discount_code
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error sending reminder: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send reminder")
+
+# ==================== DISCOUNT CODES ====================
+
+class DiscountCode(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str
+    type: str  # 'percentage' or 'fixed'
+    value: float  # percentage (e.g., 10 for 10%) or fixed amount
+    max_uses: Optional[int] = None  # None means unlimited
+    uses: int = 0
+    abandoned_quote_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class DiscountCodeCreate(BaseModel):
+    code: str
+    type: str = "percentage"
+    value: float
+    max_uses: Optional[int] = None
+    expires_in_days: Optional[int] = 30
+
+@api_router.get("/discount-codes/validate")
+async def validate_discount_code(code: str):
+    """Validate a discount code"""
+    try:
+        discount = await db.discount_codes.find_one({
+            "code": code.upper(),
+            "is_active": True
+        })
+
+        if not discount:
+            return {"valid": False, "message": "Invalid discount code"}
+
+        # Check if expired
+        if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+            return {"valid": False, "message": "Discount code has expired"}
+
+        # Check max uses
+        if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+            return {"valid": False, "message": "Discount code has reached maximum uses"}
+
+        return {
+            "valid": True,
+            "discount": {
+                "type": discount["type"],
+                "value": discount["value"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error validating discount code: {str(e)}")
+        return {"valid": False, "message": "Error validating code"}
+
+@api_router.post("/admin/discount-codes")
+async def create_discount_code(data: DiscountCodeCreate, admin_key: str):
+    """Create a new discount code"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check if code already exists
+        existing = await db.discount_codes.find_one({"code": data.code.upper()})
+        if existing:
+            raise HTTPException(status_code=400, detail="Discount code already exists")
+
+        expires_at = None
+        if data.expires_in_days:
+            expires_at = datetime.utcnow() + timedelta(days=data.expires_in_days)
+
+        discount = DiscountCode(
+            code=data.code.upper(),
+            type=data.type,
+            value=data.value,
+            max_uses=data.max_uses,
+            expires_at=expires_at
+        )
+
+        await db.discount_codes.insert_one(discount.dict())
+
+        return {"status": "success", "discount": discount.dict()}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating discount code: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create discount code")
+
+@api_router.get("/admin/discount-codes")
+async def get_discount_codes(admin_key: str):
+    """Get all discount codes"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    codes = await db.discount_codes.find().sort("created_at", -1).to_list(500)
+
+    for code in codes:
+        if '_id' in code:
+            del code['_id']
+        if code.get("created_at"):
+            code["created_at"] = code["created_at"].isoformat()
+        if code.get("expires_at"):
+            code["expires_at"] = code["expires_at"].isoformat()
+
+    return {"codes": codes}
+
+@api_router.delete("/admin/discount-codes/{code_id}")
+async def delete_discount_code(code_id: str, admin_key: str):
+    """Delete/deactivate a discount code"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.discount_codes.update_one(
+        {"id": code_id},
+        {"$set": {"is_active": False}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Discount code not found")
+
+    return {"status": "success"}
+
+# ==================== GUEST ORDERS (No authentication required) ====================
+
+class GuestOrderCreate(BaseModel):
+    email: EmailStr
+    name: str
+    service_type: str
+    translate_from: str
+    translate_to: str
+    word_count: int
+    urgency: str = "no"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    document_filename: Optional[str] = None
+    document_ids: Optional[List[str]] = None
+    discount_code: Optional[str] = None
+    abandoned_quote_id: Optional[str] = None
+
+@api_router.post("/guest/orders/create")
+async def create_guest_order(order_data: GuestOrderCreate):
+    """Create a new order without authentication (for website customers)"""
+    try:
+        # Calculate pricing
+        base_price, urgency_fee, total_price = calculate_price(
+            order_data.word_count,
+            order_data.service_type,
+            order_data.urgency
+        )
+
+        # Apply discount if provided
+        discount_amount = 0
+        if order_data.discount_code:
+            discount = await db.discount_codes.find_one({
+                "code": order_data.discount_code.upper(),
+                "is_active": True
+            })
+
+            if discount:
+                # Check validity
+                valid = True
+                if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+                    valid = False
+                if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+                    valid = False
+
+                if valid:
+                    if discount["type"] == "percentage":
+                        discount_amount = total_price * (discount["value"] / 100)
+                    else:
+                        discount_amount = discount["value"]
+
+                    total_price = max(0, total_price - discount_amount)
+
+                    # Increment uses
+                    await db.discount_codes.update_one(
+                        {"code": order_data.discount_code.upper()},
+                        {"$inc": {"uses": 1}}
+                    )
+
+        # Calculate page count
+        page_count = max(1, math.ceil(order_data.word_count / 250))
+
+        # Set due date
+        due_date = datetime.utcnow() + timedelta(days=30)
+
+        # Create order
+        order = CustomerOrder(
+            customer_id="guest",
+            customer_name=order_data.name,
+            customer_email=order_data.email,
+            service_type=order_data.service_type,
+            translate_from=order_data.translate_from,
+            translate_to=order_data.translate_to,
+            word_count=order_data.word_count,
+            page_count=page_count,
+            urgency=order_data.urgency,
+            reference=order_data.reference,
+            notes=order_data.notes,
+            base_price=base_price,
+            urgency_fee=urgency_fee,
+            total_price=total_price,
+            due_date=due_date,
+            document_filename=order_data.document_filename
+        )
+
+        await db.customer_orders.insert_one(order.dict())
+
+        # Associate uploaded documents
+        if order_data.document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": order_data.document_ids}},
+                {"$set": {"order_id": order.id, "order_number": order.order_number}}
+            )
+
+        # Mark abandoned quote as recovered
+        if order_data.abandoned_quote_id:
+            await db.abandoned_quotes.update_one(
+                {"id": order_data.abandoned_quote_id},
+                {"$set": {"status": "recovered"}}
+            )
+
+        # Send confirmation email
+        try:
+            order_details = {
+                "reference": order.order_number,
+                "service_type": order.service_type,
+                "translate_from": order.translate_from,
+                "translate_to": order.translate_to,
+                "word_count": order.word_count,
+                "urgency": order.urgency,
+                "estimated_delivery": get_estimated_delivery(order.urgency),
+                "base_price": order.base_price,
+                "urgency_fee": order.urgency_fee,
+                "total_price": order.total_price
+            }
+
+            # Send confirmation to customer (friendly message)
+            await email_service.send_order_confirmation_email(
+                order_data.email,
+                order_details,
+                is_partner=True  # Customer gets "Thank you for your order!"
+            )
+
+            # Also notify company (internal notification)
+            await email_service.send_order_confirmation_email(
+                "contact@legacytranslations.com",
+                order_details,
+                is_partner=False  # Company gets "New translation order received."
+            )
+        except Exception as e:
+            logger.error(f"Failed to send order emails: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Order created successfully",
+            "order": order.dict()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating guest order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
 
 
 # Include the router in the main app
