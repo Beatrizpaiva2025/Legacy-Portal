@@ -2810,6 +2810,25 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
         logger.error(f"Error updating order: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update order")
 
+@api_router.delete("/admin/orders/{order_id}")
+async def admin_delete_order(order_id: str, admin_key: str):
+    """Delete an order (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Find order first to check it exists
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Delete the order
+    result = await db.translation_orders.delete_one({"id": order_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    return {"status": "success", "message": f"Order {order.get('order_number', order_id)} deleted"}
+
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):
     """Mark order as paid (admin only)"""

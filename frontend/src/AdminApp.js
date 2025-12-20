@@ -4034,6 +4034,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  const deleteOrder = async (orderId, orderNumber) => {
+    if (!window.confirm(`Tem certeza que deseja deletar o pedido ${orderNumber}?\n\nEsta ação não pode ser desfeita.`)) return;
+    try {
+      await axios.delete(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      alert('Erro ao deletar pedido');
+    }
+  };
+
   // Assign translator to order
   const assignTranslator = async (orderId, translatorName) => {
     try {
@@ -4398,11 +4409,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           ✍️
                         </button>
                       )}
-                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]">▶</button>}
-                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]">👁</button>}
-                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>}
-                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]">📤</button>}
-                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]">$</button>}
+                      {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
+                      {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
+                      {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
+                      {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
+                      {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
+                      {/* Delete button - always visible */}
+                      <button
+                        onClick={() => deleteOrder(order.id, order.order_number)}
+                        className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
+                        title="Delete Order"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
