@@ -334,14 +334,14 @@ def get_email_footer(include_review_button: bool = False) -> str:
                             </table>'''
 
     return f'''{review_section}
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 30px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
                                 <tr>
                                     <td style="border-top: 1px solid #e2e8f0;"></td>
                                 </tr>
                             </table>
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
-                                    <td style="padding-top: 15px;">
+                                    <td style="padding-top: 15px; border-top: 1px solid #e2e8f0;">
                                         <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
                                             Eduarda Quadra
                                         </p>
@@ -372,10 +372,31 @@ def get_email_footer(include_review_button: bool = False) -> str:
                                         </a>
                                     </td>
                                 </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
+                                            867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                                            <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px;">
                                 <tr>
                                     <td align="center">
                                         <p style="color: #64748b; font-size: 11px; margin: 0;">
-                                            © 2024 Legacy Translations Inc. All rights reserved.
+                                            ATA Member #275993 &nbsp;•&nbsp; BBB A+ Rating &nbsp;•&nbsp; USCIS Accepted
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px; border-top: 1px solid #2c3e5c; padding-top: 20px;">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            © 2025 Legacy Translations Inc. All rights reserved.
                                         </p>
                                     </td>
                                 </tr>

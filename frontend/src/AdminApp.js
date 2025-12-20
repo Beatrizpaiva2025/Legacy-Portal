@@ -4371,7 +4371,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Send email to client
   const sendEmailToClient = (email, orderNumber) => {
-    window.location.href = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+    const mailtoLink = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+    window.open(mailtoLink, '_blank');
   };
 
   // Open "Send to Client" modal
@@ -5089,26 +5090,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
                   {isAdmin && <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
                   <td className="px-2 py-1 text-center">
-                    <div className="flex items-center justify-center space-x-1">
+                    <div className="flex items-center justify-center gap-1">
+                      {/* View Documents - Always visible */}
+                      <button
+                        onClick={() => viewOrderDocuments(order)}
+                        className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-500 rounded hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="View Documents"
+                      >
+                        <span className="text-xs">📄</span>
+                      </button>
+
                       {/* PM Actions */}
                       {isPM && (
                         <>
-                          {/* Send to Review (when translation is done) */}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">
-                              📋 Review
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                              <span className="text-xs">👁</span>
                             </button>
                           )}
-                          {/* Mark ready (after review) */}
                           {order.translation_status === 'review' && (
-                            <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark as Ready">
-                              ✓ Ready
+                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Ready">
+                              <span className="text-xs">✓</span>
                             </button>
                           )}
-                          {/* Deliver to client */}
                           {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Send to Client">
-                              📤 Send
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Send to Client">
+                              <span className="text-xs">📤</span>
                             </button>
                           )}
                         </>
@@ -5117,28 +5124,46 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Admin Actions */}
                       {isAdmin && (
                         <>
-                          {/* Translate button - show for received or in_translation */}
                           {['received', 'in_translation'].includes(order.translation_status) && (
                             <button
                               onClick={() => startTranslation(order)}
-                              className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]"
+                              className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                               title="Open Translation Tool"
                             >
-                              ✍️
+                              <span className="text-xs">✍️</span>
                             </button>
                           )}
-                          {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
-                          {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
-                          {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
-                          {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
-                          {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
-                          {/* Delete button - Admin only */}
+                          {order.translation_status === 'received' && (
+                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start">
+                              <span className="text-xs">▶</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'in_translation' && (
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                              <span className="text-xs">👁</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'review' && (
+                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark Ready">
+                              <span className="text-xs">✓</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'ready' && (
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver">
+                              <span className="text-xs">📤</span>
+                            </button>
+                          )}
+                          {order.payment_status === 'pending' && (
+                            <button onClick={() => markPaid(order.id)} className="w-6 h-6 flex items-center justify-center border border-emerald-300 text-emerald-600 rounded hover:bg-emerald-50 transition-colors" title="Mark Paid">
+                              <span className="text-xs font-medium">$</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => deleteOrder(order.id, order.order_number)}
-                            className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
+                            className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                             title="Delete Order"
                           >
-                            🗑️
+                            <span className="text-xs">🗑</span>
                           </button>
                         </>
                       )}
