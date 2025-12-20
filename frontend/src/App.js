@@ -446,7 +446,7 @@ const LocaleProvider = ({ children }) => {
   );
 };
 
-// Language Selector Component
+// Language Selector Component (with currency - for internal pages)
 const LanguageSelector = () => {
   const { locale, setLanguage, setCurrency } = useLocale();
 
@@ -486,6 +486,33 @@ const LanguageSelector = () => {
           </option>
         ))}
       </select>
+    </div>
+  );
+};
+
+// Simple Flag Selector for Login Page (small flags at top)
+const FlagSelector = () => {
+  const { locale, setLanguage } = useLocale();
+
+  const languages = [
+    { code: 'en', flag: '🇺🇸' },
+    { code: 'es', flag: '🇪🇸' },
+    { code: 'pt', flag: '🇧🇷' }
+  ];
+
+  return (
+    <div className="flex items-center gap-1">
+      {languages.map(lang => (
+        <button
+          key={lang.code}
+          onClick={() => setLanguage(lang.code)}
+          className={`text-base transition-opacity ${
+            locale.lang === lang.code ? 'opacity-100' : 'opacity-40 hover:opacity-70'
+          }`}
+        >
+          {lang.flag}
+        </button>
+      ))}
     </div>
   );
 };
@@ -567,10 +594,10 @@ const LoginPage = ({ onLogin, onRegister }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        {/* Language Selector */}
-        <div className="flex justify-end mb-4">
-          <LanguageSelector />
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative">
+        {/* Language Flags - Top Right */}
+        <div className="absolute top-4 right-4">
+          <FlagSelector />
         </div>
 
         {/* Logo */}
