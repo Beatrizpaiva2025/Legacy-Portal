@@ -4007,6 +4007,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [translatorList, setTranslatorList] = useState([]);
   const [creatingProject, setCreatingProject] = useState(false);
   const [documentFile, setDocumentFile] = useState(null);
+
+  // Document viewer state
+  const [viewingOrder, setViewingOrder] = useState(null);
+  const [orderDocuments, setOrderDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4126,6 +4132,39 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to delete:', err);
       alert('Erro ao deletar pedido');
+    }
+  };
+
+  // View order documents
+  const viewOrderDocuments = async (order) => {
+    setViewingOrder(order);
+    setLoadingDocuments(true);
+    setOrderDocuments([]);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      setOrderDocuments(response.data.documents || []);
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  // Download document
+  const downloadDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      } else {
+        alert('Documento não encontrado');
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Erro ao baixar documento');
     }
   };
 
@@ -4495,7 +4534,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               const daysUntil = Math.ceil((deadline - new Date()) / (1000 * 60 * 60 * 24));
               return (
                 <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-2 font-medium text-blue-600">{order.order_number}</td>
+                  <td className="px-2 py-2 font-medium">
+                    <button
+                      onClick={() => viewOrderDocuments(order)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      title="Ver documento original"
+                    >
+                      {order.order_number}
+                    </button>
+                  </td>
                   <td className="px-2 py-2">{order.client_name}<span className="text-gray-400 text-[10px] block">{order.client_email}</span></td>
                   <td className="px-2 py-2">
                     {assigningTranslator === order.id ? (
@@ -4527,7 +4574,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     {daysUntil > 0 && order.translation_status !== 'delivered' && <span className={`text-[10px] block ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>in {daysUntil}d</span>}
                   </td>
                   <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
-                  <td className="px-2 py-2"><span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span><span className="ml-1">{FLAGS[order.translate_to] || '🌐'}</span></td>
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1">
+                      <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
+                      <span>{FLAGS[order.translate_to] || '🌐'}</span>
+                      {order.internal_notes && (
+                        <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
+                      )}
+                      {order.notes && (
+                        <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>
                   <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>
                   <td className="px-2 py-1 text-center">
@@ -4564,6 +4622,83 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </table>
         {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
       </div>
+
+      {/* Document Viewer Modal */}
+      {viewingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
+            <div className="p-4 border-b flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-gray-800">📄 {viewingOrder.order_number}</h3>
+                <p className="text-xs text-gray-500">{viewingOrder.client_name} - {viewingOrder.translate_from} → {viewingOrder.translate_to}</p>
+              </div>
+              <button onClick={() => setViewingOrder(null)} className="text-gray-500 hover:text-gray-700 text-xl">×</button>
+            </div>
+
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {/* Order Notes */}
+              {(viewingOrder.notes || viewingOrder.internal_notes) && (
+                <div className="mb-4 space-y-2">
+                  {viewingOrder.notes && (
+                    <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                      <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Mensagem do Cliente:</div>
+                      <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
+                    </div>
+                  )}
+                  {viewingOrder.internal_notes && (
+                    <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
+                      <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Nota Interna:</div>
+                      <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Documents */}
+              <div className="text-xs font-medium text-gray-600 mb-2">📁 Documentos Originais:</div>
+              {loadingDocuments ? (
+                <div className="text-center py-4 text-gray-500 text-xs">Carregando documentos...</div>
+              ) : orderDocuments.length > 0 ? (
+                <div className="space-y-2">
+                  {orderDocuments.map((doc, idx) => (
+                    <div key={doc.id || idx} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                      <div className="flex items-center">
+                        <span className="text-lg mr-2">📄</span>
+                        <div>
+                          <div className="text-xs font-medium">{doc.filename || 'Documento'}</div>
+                          <div className="text-[10px] text-gray-500">{doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}</div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => downloadDocument(doc.id, doc.filename)}
+                        className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      >
+                        ⬇️ Baixar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  <div className="text-2xl mb-1">📭</div>
+                  Nenhum documento encontrado para este pedido.
+                  {viewingOrder.document_filename && (
+                    <div className="mt-2 text-gray-500">
+                      Arquivo registrado: {viewingOrder.document_filename}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end">
+              <button onClick={() => setViewingOrder(null)} className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
