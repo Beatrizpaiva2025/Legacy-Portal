@@ -1642,6 +1642,21 @@ async def get_current_partner_info(token: str):
 
 # ==================== ADMIN USER AUTHENTICATION ====================
 
+@api_router.get("/admin/auth/verify")
+async def verify_admin_key(admin_key: str):
+    """Verify if admin key is valid - for debugging"""
+    expected_key = os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    is_valid = admin_key == expected_key
+
+    # Log for debugging
+    logger.info(f"Admin key verification: provided_len={len(admin_key)}, expected_len={len(expected_key)}, valid={is_valid}")
+
+    if is_valid:
+        return {"status": "valid", "message": "Admin key is correct"}
+    else:
+        # Show hint about what's expected (masked)
+        raise HTTPException(status_code=401, detail=f"Invalid admin key. Expected key starts with: {expected_key[:3]}...")
+
 @api_router.post("/admin/auth/register")
 async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
     """Register a new admin user (only admin can create users)"""
@@ -1995,8 +2010,27 @@ async def get_order(order_id: str, token: str):
 @api_router.get("/admin/orders")
 async def admin_get_all_orders(admin_key: str):
     """Get all orders (admin only)"""
-    # Simple admin key check (in production, use proper admin auth)
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Check if it's master admin key OR a valid user token
+    is_valid = False
+    expected_key = os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+
+    # Check master admin key
+    if admin_key == expected_key:
+        is_valid = True
+    else:
+        # Check if it's a valid user token (from login)
+        if admin_key in active_admin_tokens:
+            is_valid = True
+        else:
+            # Check database for valid token
+            user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+            if user:
+                is_valid = True
+                # Cache the token
+                active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
+
+    if not is_valid:
+        logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
