@@ -6,6 +6,200 @@ import './App.css';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
+// ==================== INTERNATIONALIZATION ====================
+const TRANSLATIONS = {
+  en: {
+    newOrder: 'New Order',
+    createNewOrder: 'Create New Order',
+    myOrders: 'My Orders',
+    messages: 'Messages',
+    welcome: 'Welcome',
+    logout: 'Logout',
+    serviceType: 'Service Type',
+    certifiedTranslation: 'Certified Translation',
+    certifiedDesc: 'Official documents, USCIS, legal purposes',
+    professionalTranslation: 'Professional Translation',
+    professionalDesc: 'Business, marketing, general content',
+    translateFrom: 'Translate From',
+    translateTo: 'Translate To',
+    uploadDocument: 'Upload Document',
+    uploadFiles: '+ Upload File(s)',
+    fileTypes: 'PDF, DOCX, Images, TXT',
+    processing: 'Processing document...',
+    processingNote: 'This may take a moment for large or image-based files',
+    page: 'page',
+    pages: 'pages',
+    total: 'Total',
+    urgency: 'Urgency',
+    standard: 'Standard (2-3 days)',
+    priority: 'Priority (24 hours)',
+    urgent: 'Urgent (12 hours)',
+    reference: 'Reference (optional)',
+    referencePlaceholder: 'PO number, project name...',
+    notes: 'Notes (optional)',
+    notesPlaceholder: 'Special instructions...',
+    getQuote: 'Get Quote',
+    yourQuote: 'Your Quote',
+    basePrice: 'Base Price',
+    urgencyFee: 'Urgency Fee',
+    totalPrice: 'Total',
+    estimatedDelivery: 'Estimated Delivery',
+    submitOrder: 'Submit Order',
+    submitting: 'Submitting...',
+    orderSuccess: 'Order submitted successfully!',
+    signIn: 'Sign in to your account',
+    createAccount: 'Create a new account',
+    email: 'Email',
+    password: 'Password',
+    companyName: 'Company Name',
+    contactName: 'Contact Name',
+    phone: 'Phone',
+    login: 'Log In',
+    register: 'Register',
+    noAccount: "Don't have an account?",
+    haveAccount: 'Already have an account?'
+  },
+  es: {
+    newOrder: 'Nuevo Pedido',
+    createNewOrder: 'Crear Nuevo Pedido',
+    myOrders: 'Mis Pedidos',
+    messages: 'Mensajes',
+    welcome: 'Bienvenido',
+    logout: 'Cerrar Sesión',
+    serviceType: 'Tipo de Servicio',
+    certifiedTranslation: 'Traducción Certificada',
+    certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
+    professionalTranslation: 'Traducción Profesional',
+    professionalDesc: 'Negocios, marketing, contenido general',
+    translateFrom: 'Traducir De',
+    translateTo: 'Traducir A',
+    uploadDocument: 'Subir Documento',
+    uploadFiles: '+ Subir Archivo(s)',
+    fileTypes: 'PDF, DOCX, Imágenes, TXT',
+    processing: 'Procesando documento...',
+    processingNote: 'Esto puede tardar un momento para archivos grandes',
+    page: 'página',
+    pages: 'páginas',
+    total: 'Total',
+    urgency: 'Urgencia',
+    standard: 'Estándar (2-3 días)',
+    priority: 'Prioridad (24 horas)',
+    urgent: 'Urgente (12 horas)',
+    reference: 'Referencia (opcional)',
+    referencePlaceholder: 'Número de PO, nombre del proyecto...',
+    notes: 'Notas (opcional)',
+    notesPlaceholder: 'Instrucciones especiales...',
+    getQuote: 'Obtener Cotización',
+    yourQuote: 'Su Cotización',
+    basePrice: 'Precio Base',
+    urgencyFee: 'Cargo por Urgencia',
+    totalPrice: 'Total',
+    estimatedDelivery: 'Entrega Estimada',
+    submitOrder: 'Enviar Pedido',
+    submitting: 'Enviando...',
+    orderSuccess: '¡Pedido enviado exitosamente!',
+    signIn: 'Iniciar sesión',
+    createAccount: 'Crear una cuenta nueva',
+    email: 'Correo Electrónico',
+    password: 'Contraseña',
+    companyName: 'Nombre de Empresa',
+    contactName: 'Nombre de Contacto',
+    phone: 'Teléfono',
+    login: 'Ingresar',
+    register: 'Registrar',
+    noAccount: '¿No tiene cuenta?',
+    haveAccount: '¿Ya tiene cuenta?'
+  },
+  pt: {
+    newOrder: 'Novo Pedido',
+    createNewOrder: 'Criar Novo Pedido',
+    myOrders: 'Meus Pedidos',
+    messages: 'Mensagens',
+    welcome: 'Bem-vindo',
+    logout: 'Sair',
+    serviceType: 'Tipo de Serviço',
+    certifiedTranslation: 'Tradução Certificada',
+    certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
+    professionalTranslation: 'Tradução Profissional',
+    professionalDesc: 'Negócios, marketing, conteúdo geral',
+    translateFrom: 'Traduzir De',
+    translateTo: 'Traduzir Para',
+    uploadDocument: 'Enviar Documento',
+    uploadFiles: '+ Enviar Arquivo(s)',
+    fileTypes: 'PDF, DOCX, Imagens, TXT',
+    processing: 'Processando documento...',
+    processingNote: 'Pode demorar um momento para arquivos grandes',
+    page: 'página',
+    pages: 'páginas',
+    total: 'Total',
+    urgency: 'Urgência',
+    standard: 'Padrão (2-3 dias)',
+    priority: 'Prioridade (24 horas)',
+    urgent: 'Urgente (12 horas)',
+    reference: 'Referência (opcional)',
+    referencePlaceholder: 'Número do PO, nome do projeto...',
+    notes: 'Notas (opcional)',
+    notesPlaceholder: 'Instruções especiais...',
+    getQuote: 'Obter Cotação',
+    yourQuote: 'Sua Cotação',
+    basePrice: 'Preço Base',
+    urgencyFee: 'Taxa de Urgência',
+    totalPrice: 'Total',
+    estimatedDelivery: 'Entrega Estimada',
+    submitOrder: 'Enviar Pedido',
+    submitting: 'Enviando...',
+    orderSuccess: 'Pedido enviado com sucesso!',
+    signIn: 'Entrar na sua conta',
+    createAccount: 'Criar uma nova conta',
+    email: 'Email',
+    password: 'Senha',
+    companyName: 'Nome da Empresa',
+    contactName: 'Nome do Contato',
+    phone: 'Telefone',
+    login: 'Entrar',
+    register: 'Registrar',
+    noAccount: 'Não tem conta?',
+    haveAccount: 'Já tem conta?'
+  }
+};
+
+// UI Languages with flags
+const UI_LANGUAGES = [
+  { code: 'en', flag: '🇺🇸' },
+  { code: 'es', flag: '🇪🇸' },
+  { code: 'pt', flag: '🇧🇷' }
+];
+
+// Detect user's preferred language
+const getInitialLanguage = () => {
+  const saved = localStorage.getItem('ui_language');
+  if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
+  const browserLang = navigator.language.split('-')[0];
+  if (['en', 'es', 'pt'].includes(browserLang)) return browserLang;
+  return 'en';
+};
+
+// Detect currency based on locale/timezone
+const getLocalCurrency = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locale = navigator.language;
+
+    // Brazil
+    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0 };
+    // Europe
+    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92 };
+    // UK
+    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79 };
+    // Mexico, Latin America (except Brazil)
+    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5 };
+    // Default USD
+    return { code: 'USD', symbol: '$', rate: 1 };
+  } catch {
+    return { code: 'USD', symbol: '$', rate: 1 };
+  }
+};
+
 // Translation stages
 const TRANSLATION_STAGES = {
   'received': { id: 1, name: 'Received', icon: '📥' },
@@ -39,7 +233,7 @@ const LANGUAGES = [
 ];
 
 // ==================== LOGIN PAGE ====================
-const LoginPage = ({ onLogin, onRegister }) => {
+const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -81,7 +275,23 @@ const LoginPage = ({ onLogin, onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center relative">
+      {/* Language Flags - Top Right */}
+      <div className="absolute top-4 right-4 flex items-center space-x-2">
+        {UI_LANGUAGES.map((uiLang) => (
+          <button
+            key={uiLang.code}
+            onClick={() => changeLanguage(uiLang.code)}
+            className={`text-2xl hover:scale-110 transition-transform ${
+              lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+            }`}
+            title={uiLang.code.toUpperCase()}
+          >
+            {uiLang.flag}
+          </button>
+        ))}
+      </div>
+
       <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div className="text-center mb-8">
           <img
@@ -90,7 +300,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
             className="mx-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-gray-800">Partner Portal</h1>
-          <p className="text-gray-600">{isLogin ? 'Sign in to your account' : 'Create a new account'}</p>
+          <p className="text-gray-600">{isLogin ? t.signIn : t.createAccount}</p>
         </div>
 
         {error && (
@@ -103,7 +313,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
           {!isLogin && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
                 <input
                   type="text"
                   required
@@ -113,7 +323,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
                 <input
                   type="text"
                   required
@@ -123,7 +333,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
                 <input
                   type="tel"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
@@ -135,7 +345,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
             <input
               type="email"
               required
@@ -146,7 +356,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
             <input
               type="password"
               required
@@ -161,7 +371,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
             disabled={loading}
             className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
           >
-            {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading ? '...' : (isLogin ? t.login : t.register)}
           </button>
         </form>
 
@@ -170,7 +380,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
             onClick={() => setIsLogin(!isLogin)}
             className="text-teal-600 hover:underline"
           >
-            {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
+            {isLogin ? t.noAccount : t.haveAccount}
           </button>
         </div>
       </div>
@@ -179,11 +389,11 @@ const LoginPage = ({ onLogin, onRegister }) => {
 };
 
 // ==================== SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
+const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
-    { id: 'new-order', label: 'New Order', icon: '➕' },
-    { id: 'orders', label: 'My Orders', icon: '📋' },
-    { id: 'messages', label: 'Messages', icon: '✉️' }
+    { id: 'new-order', label: t.newOrder, icon: '➕' },
+    { id: 'orders', label: t.myOrders, icon: '📋' },
+    { id: 'messages', label: t.messages, icon: '✉️' }
   ];
 
   return (
@@ -194,7 +404,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
           alt="Legacy Translations"
           className="w-40 h-auto mb-4"
         />
-        <div className="text-sm text-gray-600 mb-2">Welcome,</div>
+        <div className="text-sm text-gray-600 mb-2">{t.welcome},</div>
         <div className="font-semibold text-gray-800">{partner?.company_name}</div>
       </div>
 
@@ -220,7 +430,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
           onClick={onLogout}
           className="w-full py-2 text-red-600 hover:bg-red-50 rounded-md"
         >
-          Logout
+          {t.logout}
         </button>
       </div>
     </div>
@@ -228,7 +438,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout }) => {
 };
 
 // ==================== NEW ORDER PAGE ====================
-const NewOrderPage = ({ partner, token, onOrderCreated }) => {
+const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
@@ -400,7 +610,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated }) => {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Create New Order</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.createNewOrder || 'Create New Order'}</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
@@ -949,6 +1159,17 @@ function App() {
   const [partner, setPartner] = useState(null);
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
+  const [lang, setLang] = useState(getInitialLanguage);
+  const [currency] = useState(getLocalCurrency);
+
+  // Get translations for current language
+  const t = TRANSLATIONS[lang];
+
+  // Handle language change
+  const changeLanguage = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('ui_language', newLang);
+  };
 
   // Check for saved session
   useEffect(() => {
@@ -982,18 +1203,18 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'new-order':
-        return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} />;
+        return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
         return <OrdersPage token={token} />;
       case 'messages':
         return <MessagesPage token={token} />;
       default:
-        return <NewOrderPage partner={partner} token={token} />;
+        return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
   };
 
   if (!partner) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} t={t} lang={lang} changeLanguage={changeLanguage} />;
   }
 
   return (
@@ -1003,13 +1224,27 @@ function App() {
         setActiveTab={setActiveTab}
         partner={partner}
         onLogout={handleLogout}
+        t={t}
       />
       <div className="flex-1">
         <header className="bg-white border-b border-gray-200 px-8 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-semibold text-gray-800 capitalize">
-              {activeTab === 'new-order' ? 'New Order' : activeTab}
-            </h1>
+          <div className="flex justify-end items-center">
+            {/* Language Flags */}
+            <div className="flex items-center space-x-2 mr-6">
+              {UI_LANGUAGES.map((uiLang) => (
+                <button
+                  key={uiLang.code}
+                  onClick={() => changeLanguage(uiLang.code)}
+                  className={`text-2xl hover:scale-110 transition-transform ${
+                    lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                  }`}
+                  title={uiLang.code.toUpperCase()}
+                >
+                  {uiLang.flag}
+                </button>
+              ))}
+            </div>
+            {/* User Info */}
             <div className="text-sm text-gray-600">
               {partner?.contact_name} | {partner?.company_name}
             </div>
