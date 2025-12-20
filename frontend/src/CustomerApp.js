@@ -925,42 +925,50 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     </div>
                   </label>
 
-                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="payment_method"
-                      value="zelle"
-                      checked={paymentMethod === 'zelle'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mr-3"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium">🏦 Zelle</div>
-                      <div className="text-sm text-gray-500">Direct bank transfer (US only)</div>
+                  {/* Direct Payments Section */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
+                      <span className="text-sm font-medium text-gray-700">💸 Direct Payments / Pagamentos Diretos</span>
                     </div>
-                  </label>
+                    <div className="divide-y divide-gray-100">
+                      <label className={`flex items-center p-4 cursor-pointer ${
+                        paymentMethod === 'zelle' ? 'bg-teal-50' : 'hover:bg-gray-50'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="zelle"
+                          checked={paymentMethod === 'zelle'}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="mr-3"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium">🏦 Zelle <span className="text-xs text-gray-500 font-normal">(USA)</span></div>
+                          <div className="text-sm text-gray-500">Bank transfer for US accounts</div>
+                        </div>
+                      </label>
 
-                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                    paymentMethod === 'pix' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="payment_method"
-                      value="pix"
-                      checked={paymentMethod === 'pix'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="mr-3"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium">🇧🇷 PIX</div>
-                      <div className="text-sm text-gray-500">Transferência instantânea (Brasil)</div>
+                      <label className={`flex items-center p-4 cursor-pointer ${
+                        paymentMethod === 'pix' ? 'bg-teal-50' : 'hover:bg-gray-50'
+                      }`}>
+                        <input
+                          type="radio"
+                          name="payment_method"
+                          value="pix"
+                          checked={paymentMethod === 'pix'}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="mr-3"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium">🇧🇷 PIX <span className="text-xs text-gray-500 font-normal">(Brasil)</span></div>
+                          <div className="text-sm text-gray-500">Transferência instantânea</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-green-600">R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</div>
+                        </div>
+                      </label>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-gray-500">R$ {(quote.total_price * USD_TO_BRL).toFixed(2)}</div>
-                    </div>
-                  </label>
+                  </div>
                 </div>
 
                 {/* Zelle Instructions */}
