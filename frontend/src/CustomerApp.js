@@ -761,54 +761,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
             </div>
 
-            {/* Certification Options */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Certification options</h2>
-              <div className="space-y-3">
-                {/* Notarization */}
-                <label className="block p-4 border rounded-lg border-gray-200 bg-gray-50 cursor-not-allowed opacity-75">
-                  <div className="flex items-start">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      disabled
-                      className="mt-1 mr-3 h-4 w-4 text-gray-400 rounded cursor-not-allowed"
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <span className="font-medium text-gray-600">Notarization</span>
-                        <span className="font-semibold text-teal-600 text-sm">Coming soon</span>
-                      </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        Stamp, signature, and tamper-evident digital certificate verifying the translation certification, valid in all 50 states.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-
-                {/* E-Apostille */}
-                <label className="block p-4 border rounded-lg border-gray-200 bg-gray-50 cursor-not-allowed opacity-75">
-                  <div className="flex items-start">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      disabled
-                      className="mt-1 mr-3 h-4 w-4 text-gray-400 rounded cursor-not-allowed"
-                    />
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start">
-                        <span className="font-medium text-gray-600">E-Apostille</span>
-                        <span className="font-semibold text-teal-600 text-sm">Coming soon</span>
-                      </div>
-                      <p className="text-sm text-gray-400 mt-1">
-                        An e-apostille verifies the notarization's authenticity for use in Hague Convention member countries around the world.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-              </div>
-            </div>
-
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
