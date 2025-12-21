@@ -10,11 +10,12 @@ const STATUS_COLORS = {
   'Confirmed': 'bg-blue-100 text-blue-700',
   'In progress': 'bg-yellow-100 text-yellow-700',
   'Completed': 'bg-green-100 text-green-700',
-  'Client Review': 'bg-purple-100 text-purple-700',
+  'Client Review': 'bg-orange-100 text-orange-700',
   'Delivered': 'bg-teal-100 text-teal-700',
   'received': 'bg-gray-100 text-gray-700',
   'in_translation': 'bg-yellow-100 text-yellow-700',
   'review': 'bg-purple-100 text-purple-700',
+  'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-teal-100 text-teal-700'
 };
@@ -4568,7 +4569,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const totalPending = filtered.filter(o => o.payment_status === 'pending').reduce((sum, o) => sum + (o.total_price || 0), 0);
 
   const getStatusLabel = (status) => {
-    const labels = { 'received': 'Quote', 'in_translation': 'In progress', 'review': 'Client Review', 'ready': 'Completed', 'delivered': 'Delivered' };
+    const labels = {
+      'received': 'Quote',
+      'in_translation': 'In progress',
+      'review': 'PM Review',
+      'client_review': 'Client Review',
+      'ready': 'Completed',
+      'delivered': 'Delivered'
+    };
     return labels[status] || status;
   };
 
@@ -4685,7 +4693,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'ready', 'delivered'].map((s) => (
+            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -5015,16 +5023,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded mt-0.5 inline-block w-fit">✓ Accepted</span>
                         )}
                         {order.translator_assignment_status === 'declined' && (
-                          <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded mt-0.5 inline-block w-fit">✕ Declined</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded inline-block w-fit">✕ Declined</span>
+                            {(isAdmin || isPM) && (
+                              <button
+                                onClick={() => setAssigningTranslator(order.id)}
+                                className="text-[9px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                              >
+                                🔄 Reassign
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
-                    ) : (
+                    ) : (isAdmin || isPM) ? (
                       <button
                         onClick={() => setAssigningTranslator(order.id)}
                         className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
                       >
                         Assign
                       </button>
+                    ) : (
+                      <span className="text-[10px] text-gray-400">-</span>
                     )}
                   </td>
                   {/* Deadline with date+time */}
@@ -5115,18 +5135,53 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* PM Actions */}
                       {isPM && (
                         <>
+                          {/* Open Translation Tool for review */}
+                          {['in_translation', 'review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => startTranslation(order)}
+                              className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                              title="Open Translation / Review"
+                            >
+                              <span className="text-xs">✍️</span>
+                            </button>
+                          )}
+                          {/* Mark as In Translation (start work) */}
+                          {order.translation_status === 'received' && order.translator_assignment_status === 'accepted' && (
+                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start Translation">
+                              <span className="text-xs">▶</span>
+                            </button>
+                          )}
+                          {/* Send to PM Review */}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to PM Review">
                               <span className="text-xs">👁</span>
                             </button>
                           )}
+                          {/* From Review: Send to Client Review OR Mark as Final */}
                           {order.translation_status === 'review' && (
-                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Ready">
-                              <span className="text-xs">✓</span>
-                            </button>
+                            <>
+                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-orange-300 text-orange-600 rounded hover:bg-orange-50 transition-colors" title="Send to Client Review">
+                                <span className="text-xs">📧</span>
+                              </button>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <span className="text-xs">✓</span>
+                              </button>
+                            </>
                           )}
+                          {/* Client Review: Back to revision or Mark as Final */}
+                          {order.translation_status === 'client_review' && (
+                            <>
+                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-yellow-300 text-yellow-600 rounded hover:bg-yellow-50 transition-colors" title="Back to Revision">
+                                <span className="text-xs">🔄</span>
+                              </button>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <span className="text-xs">✓</span>
+                              </button>
+                            </>
+                          )}
+                          {/* Ready: Deliver to client */}
                           {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Send to Client">
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver to Client">
                               <span className="text-xs">📤</span>
                             </button>
                           )}
@@ -5136,7 +5191,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Admin Actions */}
                       {isAdmin && (
                         <>
-                          {['received', 'in_translation'].includes(order.translation_status) && (
+                          {['received', 'in_translation', 'review'].includes(order.translation_status) && (
                             <button
                               onClick={() => startTranslation(order)}
                               className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
@@ -5151,14 +5206,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to PM Review">
                               <span className="text-xs">👁</span>
                             </button>
                           )}
                           {order.translation_status === 'review' && (
-                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark Ready">
-                              <span className="text-xs">✓</span>
-                            </button>
+                            <>
+                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-orange-300 text-orange-600 rounded hover:bg-orange-50 transition-colors" title="Send to Client Review">
+                                <span className="text-xs">📧</span>
+                              </button>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <span className="text-xs">✓</span>
+                              </button>
+                            </>
+                          )}
+                          {order.translation_status === 'client_review' && (
+                            <>
+                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-yellow-300 text-yellow-600 rounded hover:bg-yellow-50 transition-colors" title="Back to Revision">
+                                <span className="text-xs">🔄</span>
+                              </button>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <span className="text-xs">✓</span>
+                              </button>
+                            </>
                           )}
                           {order.translation_status === 'ready' && (
                             <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver">
