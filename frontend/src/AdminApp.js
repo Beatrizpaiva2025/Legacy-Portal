@@ -614,7 +614,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const docs = response.data.documents || [];
 
       if (docs.length === 0) {
-        setProcessingStatus(`⚠️ Nenhum documento encontrado para ${order.order_number}`);
+        setProcessingStatus(`⚠️ No document found for ${order.order_number}`);
         return;
       }
 
@@ -2086,7 +2086,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="bg-white rounded shadow">
               <div className="p-3 border-b bg-gradient-to-r from-teal-500 to-teal-600">
                 <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 Meus Pedidos Atribuídos
+                  📋 My Assigned Orders
                   {assignedOrders.length > 0 && (
                     <span className="ml-2 bg-white text-teal-600 px-2 py-0.5 rounded-full text-xs">{assignedOrders.length}</span>
                   )}
@@ -2120,7 +2120,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ) : (
                   <div className="text-center py-4 text-gray-400 text-xs">
                     <div className="text-2xl mb-1">📭</div>
-                    Nenhum pedido atribuído no momento.
+                    No orders assigned at the moment.
                   </div>
                 )}
                 <button
@@ -4189,9 +4189,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     { value: 'website', label: 'Website' },
     { value: 'whatsapp', label: 'WhatsApp' },
     { value: 'social_media', label: 'Social Media' },
-    { value: 'referral', label: 'Indicação' },
-    { value: 'partner', label: 'Parceiro' },
-    { value: 'other', label: 'Outros' }
+    { value: 'referral', label: 'Referral' },
+    { value: 'partner', label: 'Partner' },
+    { value: 'other', label: 'Other' }
   ];
 
   const PAYMENT_METHODS = [
@@ -4314,7 +4314,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   };
 
   const deleteOrder = async (orderId, orderNumber) => {
-    if (!window.confirm(`Tem certeza que deseja deletar o pedido ${orderNumber}?\n\nEsta ação não pode ser desfeita.`)) return;
+    if (!window.confirm(`Are you sure you want to delete order ${orderNumber}?\n\nThis action cannot be undone.`)) return;
     try {
       await axios.delete(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`);
       fetchOrders();
@@ -4371,7 +4371,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Send email to client
   const sendEmailToClient = (email, orderNumber) => {
-    window.location.href = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+    const mailtoLink = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
+    window.open(mailtoLink, '_blank');
   };
 
   // Open "Send to Client" modal
@@ -4404,7 +4405,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download translation:', err);
-      alert('Erro ao baixar tradução');
+      alert('Error downloading translation');
     }
   };
 
@@ -4420,10 +4421,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Refresh doc info
       const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
-      alert('Documento enviado com sucesso!');
+      alert('Document uploaded successfully!');
     } catch (err) {
       console.error('Failed to upload translation:', err);
-      alert('Erro ao enviar documento');
+      alert('Error uploading document');
     } finally {
       setUploadingFile(false);
     }
@@ -4435,13 +4436,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     try {
       const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
       alert(response.data.attachment_sent
-        ? 'Tradução enviada para o cliente com sucesso! (com anexo)'
-        : 'Pedido marcado como entregue! (email enviado sem anexo)');
+        ? 'Translation sent to client successfully! (with attachment)'
+        : 'Order marked as delivered! (email sent without attachment)');
       setSendingOrder(null);
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Erro ao enviar para cliente');
+      alert('Error sending to client');
     } finally {
       setSendingToClient(false);
     }
@@ -4472,11 +4473,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         link.download = filename || 'document.pdf';
         link.click();
       } else {
-        alert('Documento não encontrado');
+        alert('Document not found');
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Erro ao baixar documento');
+      alert('Error downloading document');
     }
   };
 
@@ -4592,17 +4593,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               onClick={() => setShowTranslatorsList(!showTranslatorsList)}
               className="bg-gradient-to-r from-green-500 to-green-600 rounded shadow p-3 text-white cursor-pointer hover:from-green-600 hover:to-green-700 transition-all"
             >
-              <div className="text-[10px] uppercase opacity-80">Tradutores Disponíveis</div>
+              <div className="text-[10px] uppercase opacity-80">Available Translators</div>
               <div className="text-xl font-bold">{translatorStats.available}</div>
-              <div className="text-[9px] opacity-70 mt-1">Clique para ver lista</div>
+              <div className="text-[9px] opacity-70 mt-1">Click to view list</div>
             </div>
             <div
               onClick={() => setShowTranslatorsList(!showTranslatorsList)}
               className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded shadow p-3 text-white cursor-pointer hover:from-yellow-600 hover:to-yellow-700 transition-all"
             >
-              <div className="text-[10px] uppercase opacity-80">Tradutores Ocupados</div>
+              <div className="text-[10px] uppercase opacity-80">Busy Translators</div>
               <div className="text-xl font-bold">{translatorStats.busy}</div>
-              <div className="text-[9px] opacity-70 mt-1">Clique para ver lista</div>
+              <div className="text-[9px] opacity-70 mt-1">Click to view list</div>
             </div>
           </div>
 
@@ -4610,11 +4611,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           {showTranslatorsList && (
             <div className="bg-white rounded-lg shadow mb-4 p-4">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-bold text-gray-800">👥 Lista de Tradutores</h3>
+                <h3 className="text-sm font-bold text-gray-800">👥 Translators List</h3>
                 <button onClick={() => setShowTranslatorsList(false)} className="text-gray-500 hover:text-gray-700 text-xl">×</button>
               </div>
               {translatorsWithStatus.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-xs">Nenhum tradutor cadastrado</div>
+                <div className="text-center py-4 text-gray-500 text-xs">No translators registered</div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {translatorsWithStatus.map((translator) => (
@@ -4636,7 +4637,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             ? 'bg-green-500 text-white'
                             : 'bg-yellow-500 text-white'
                         }`}>
-                          {translator.status === 'available' ? 'Disponível' : 'Ocupado'}
+                          {translator.status === 'available' ? 'Available' : 'Busy'}
                         </span>
                       </div>
                       <div className="text-[10px] text-gray-500 mb-1">{translator.email}</div>
@@ -4952,7 +4953,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <button
                           onClick={() => sendEmailToClient(order.client_email, order.order_number)}
                           className="p-0.5 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
-                          title="Enviar email para cliente"
+                          title="Send email to client"
                         >
                           ✉️
                         </button>
@@ -4961,7 +4962,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <button
                             onClick={() => openSendToClientModal(order)}
                             className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
-                            title="Enviar tradução para cliente"
+                            title="Send translation to client"
                           >
                             📤
                           </button>
@@ -4986,7 +4987,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ))}
                       </select>
                     ) : order.assigned_translator ? (
-                      <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                        {order.translator_assignment_status === 'pending' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
+                        )}
+                        {order.translator_assignment_status === 'accepted' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded mt-0.5 inline-block w-fit">✓ Accepted</span>
+                        )}
+                        {order.translator_assignment_status === 'declined' && (
+                          <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded mt-0.5 inline-block w-fit">✕ Declined</span>
+                        )}
+                      </div>
                     ) : (
                       <button
                         onClick={() => setAssigningTranslator(order.id)}
@@ -5027,7 +5039,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
                         </div>
                         {isAdmin && (
-                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar deadline">✏️</button>
+                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit deadline">✏️</button>
                         )}
                       </div>
                     )}
@@ -5048,7 +5060,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </select>
                         <input
                           type="text"
-                          placeholder="Nota interna..."
+                          placeholder="Internal note..."
                           value={tempTagValue.notes}
                           onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
                           className="px-1 py-0.5 text-[10px] border rounded w-24"
@@ -5063,13 +5075,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
                         <span>{FLAGS[order.translate_to] || '🌐'}</span>
                         {order.internal_notes && (
-                          <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Nota interna: ${order.internal_notes}`}>📝</span>
+                          <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Internal note: ${order.internal_notes}`}>📝</span>
                         )}
                         {order.notes && (
-                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Mensagem do cliente: ${order.notes}`}>💬</span>
+                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Client message: ${order.notes}`}>💬</span>
                         )}
                         {isAdmin && (
-                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Editar tags">✏️</button>
+                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit tags">✏️</button>
                         )}
                       </div>
                     )}
@@ -5078,26 +5090,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
                   {isAdmin && <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
                   <td className="px-2 py-1 text-center">
-                    <div className="flex items-center justify-center space-x-1">
+                    <div className="flex items-center justify-center gap-1">
+                      {/* View Documents - Always visible */}
+                      <button
+                        onClick={() => viewOrderDocuments(order)}
+                        className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-500 rounded hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="View Documents"
+                      >
+                        <span className="text-xs">📄</span>
+                      </button>
+
                       {/* PM Actions */}
                       {isPM && (
                         <>
-                          {/* Send to Review (when translation is done) */}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Enviar para Revisão">
-                              📋 Revisão
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                              <span className="text-xs">👁</span>
                             </button>
                           )}
-                          {/* Mark ready (after review) */}
                           {order.translation_status === 'review' && (
-                            <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Marcar Pronto">
-                              ✓ Pronto
+                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Ready">
+                              <span className="text-xs">✓</span>
                             </button>
                           )}
-                          {/* Deliver to client */}
                           {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Enviar para Cliente">
-                              📤 Enviar
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Send to Client">
+                              <span className="text-xs">📤</span>
                             </button>
                           )}
                         </>
@@ -5106,28 +5124,46 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Admin Actions */}
                       {isAdmin && (
                         <>
-                          {/* Translate button - show for received or in_translation */}
                           {['received', 'in_translation'].includes(order.translation_status) && (
                             <button
                               onClick={() => startTranslation(order)}
-                              className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]"
+                              className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
                               title="Open Translation Tool"
                             >
-                              ✍️
+                              <span className="text-xs">✍️</span>
                             </button>
                           )}
-                          {order.translation_status === 'received' && <button onClick={() => updateStatus(order.id, 'in_translation')} className="px-1.5 py-0.5 bg-yellow-500 text-white rounded text-[10px]" title="Start">▶</button>}
-                          {order.translation_status === 'in_translation' && <button onClick={() => updateStatus(order.id, 'review')} className="px-1.5 py-0.5 bg-purple-500 text-white rounded text-[10px]" title="Send to Review">👁</button>}
-                          {order.translation_status === 'review' && <button onClick={() => updateStatus(order.id, 'ready')} className="px-1.5 py-0.5 bg-green-500 text-white rounded text-[10px]" title="Mark Ready">✓</button>}
-                          {order.translation_status === 'ready' && <button onClick={() => deliverOrder(order.id)} className="px-1.5 py-0.5 bg-teal-500 text-white rounded text-[10px]" title="Deliver">📤</button>}
-                          {order.payment_status === 'pending' && <button onClick={() => markPaid(order.id)} className="px-1.5 py-0.5 bg-green-600 text-white rounded text-[10px]" title="Mark Paid">$</button>}
-                          {/* Delete button - Admin only */}
+                          {order.translation_status === 'received' && (
+                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start">
+                              <span className="text-xs">▶</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'in_translation' && (
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to Review">
+                              <span className="text-xs">👁</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'review' && (
+                            <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark Ready">
+                              <span className="text-xs">✓</span>
+                            </button>
+                          )}
+                          {order.translation_status === 'ready' && (
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver">
+                              <span className="text-xs">📤</span>
+                            </button>
+                          )}
+                          {order.payment_status === 'pending' && (
+                            <button onClick={() => markPaid(order.id)} className="w-6 h-6 flex items-center justify-center border border-emerald-300 text-emerald-600 rounded hover:bg-emerald-50 transition-colors" title="Mark Paid">
+                              <span className="text-xs font-medium">$</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => deleteOrder(order.id, order.order_number)}
-                            className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px]"
+                            className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                             title="Delete Order"
                           >
-                            🗑️
+                            <span className="text-xs">🗑</span>
                           </button>
                         </>
                       )}
@@ -5159,13 +5195,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="mb-4 space-y-2">
                   {viewingOrder.notes && (
                     <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Mensagem do Cliente:</div>
+                      <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Client Message:</div>
                       <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
                     </div>
                   )}
                   {viewingOrder.internal_notes && (
                     <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                      <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Nota Interna:</div>
+                      <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>
                       <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
                     </div>
                   )}
@@ -5183,15 +5219,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="flex items-center">
                         <span className="text-lg mr-2">📄</span>
                         <div>
-                          <div className="text-xs font-medium">{doc.filename || 'Documento'}</div>
-                          <div className="text-[10px] text-gray-500">{doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}</div>
+                          <div className="text-xs font-medium">{doc.filename || 'Document'}</div>
+                          <div className="text-[10px] text-gray-500">{doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}</div>
                         </div>
                       </div>
                       <button
                         onClick={() => downloadDocument(doc.id, doc.filename)}
                         className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                       >
-                        ⬇️ Baixar
+                        ⬇️ Download
                       </button>
                     </div>
                   ))}
@@ -5199,10 +5235,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               ) : (
                 <div className="text-center py-4 text-gray-400 text-xs">
                   <div className="text-2xl mb-1">📭</div>
-                  Nenhum documento encontrado para este pedido.
+                  No documents found for this order.
                   {viewingOrder.document_filename && (
                     <div className="mt-2 text-gray-500">
-                      Arquivo registrado: {viewingOrder.document_filename}
+                      Registered file: {viewingOrder.document_filename}
                     </div>
                   )}
                 </div>
@@ -5211,7 +5247,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
             <div className="p-3 border-t bg-gray-50 flex justify-end">
               <button onClick={() => setViewingOrder(null)} className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
-                Fechar
+                Close
               </button>
             </div>
           </div>
@@ -5224,7 +5260,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="p-4 border-b flex justify-between items-center bg-teal-600 text-white rounded-t-lg">
               <div>
-                <h3 className="font-bold">📤 Enviar para Cliente</h3>
+                <h3 className="font-bold">📤 Send to Client</h3>
                 <p className="text-xs opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
               </div>
               <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
@@ -5233,25 +5269,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             <div className="p-4">
               {/* Client Info */}
               <div className="mb-4 p-3 bg-gray-50 rounded border">
-                <div className="text-xs font-medium text-gray-600 mb-1">Cliente:</div>
+                <div className="text-xs font-medium text-gray-600 mb-1">Client:</div>
                 <div className="text-sm font-medium">{sendingOrder.client_name}</div>
                 <div className="text-xs text-gray-500">{sendingOrder.client_email}</div>
               </div>
 
               {/* Translated Document Status */}
               <div className="mb-4">
-                <div className="text-xs font-medium text-gray-600 mb-2">📄 Documento Traduzido:</div>
+                <div className="text-xs font-medium text-gray-600 mb-2">📄 Translated Document:</div>
                 {!translatedDocInfo ? (
-                  <div className="text-center py-3 text-gray-500 text-xs">Carregando...</div>
+                  <div className="text-center py-3 text-gray-500 text-xs">Loading...</div>
                 ) : translatedDocInfo.has_translated_document ? (
                   <div className="p-3 bg-green-50 border border-green-200 rounded">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <span className="text-green-600 text-lg mr-2">✅</span>
                         <div>
-                          <div className="text-xs font-medium text-green-800">Tradução disponível</div>
+                          <div className="text-xs font-medium text-green-800">Translation available</div>
                           <div className="text-[10px] text-green-600">
-                            {translatedDocInfo.translated_filename || 'HTML gerado no workspace'}
+                            {translatedDocInfo.translated_filename || 'HTML generated in workspace'}
                           </div>
                         </div>
                       </div>
@@ -5259,7 +5295,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
                         className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                       >
-                        ⬇️ Baixar
+                        ⬇️ Download
                       </button>
                     </div>
                   </div>
@@ -5268,7 +5304,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     <div className="flex items-center">
                       <span className="text-yellow-600 text-lg mr-2">⚠️</span>
                       <div className="text-xs text-yellow-800">
-                        Nenhuma tradução anexada. Faça upload abaixo ou envie sem anexo.
+                        No translation attached. Upload below or send without attachment.
                       </div>
                     </div>
                   </div>
@@ -5277,7 +5313,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Upload new document */}
               <div className="mb-4">
-                <div className="text-xs font-medium text-gray-600 mb-2">📎 Enviar novo documento:</div>
+                <div className="text-xs font-medium text-gray-600 mb-2">📎 Upload new document:</div>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -5294,14 +5330,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     htmlFor="translationFile"
                     className={`flex-1 px-3 py-2 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-xs ${uploadingFile ? 'opacity-50' : ''}`}
                   >
-                    {uploadingFile ? 'Enviando...' : '📁 Clique para selecionar arquivo (PDF, DOC)'}
+                    {uploadingFile ? 'Uploading...' : '📁 Click to select file (PDF, DOC)'}
                   </label>
                 </div>
               </div>
 
               {/* Warning */}
               <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
-                💡 Ao clicar em "Enviar", o cliente receberá um email com a tradução anexada (se disponível).
+                💡 By clicking "Send", the client will receive an email with the translation attached (if available).
               </div>
             </div>
 
@@ -5310,14 +5346,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 onClick={() => setSendingOrder(null)}
                 className="px-4 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 onClick={() => sendTranslationToClient(sendingOrder.id)}
                 disabled={sendingToClient}
                 className="px-4 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 disabled:bg-gray-400"
               >
-                {sendingToClient ? 'Enviando...' : '📤 Enviar para Cliente'}
+                {sendingToClient ? 'Sending...' : '📤 Send to Client'}
               </button>
             </div>
           </div>
@@ -5769,13 +5805,13 @@ const ProductionPage = ({ adminKey }) => {
   };
 
   const handleDeletePayment = async (paymentId) => {
-    if (!window.confirm('Excluir este registro de pagamento?')) return;
+    if (!window.confirm('Delete this payment record?')) return;
     try {
       await axios.delete(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`);
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Erro ao excluir pagamento');
+      alert('Error deleting payment');
     }
   };
 
@@ -5788,24 +5824,24 @@ const ProductionPage = ({ adminKey }) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
   };
 
-  if (loading) return <div className="p-6 text-center">Carregando estatísticas...</div>;
+  if (loading) return <div className="p-6 text-center">Loading statistics...</div>;
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-gray-800">📊 Produção & Pagamentos</h1>
+        <h1 className="text-xl font-bold text-gray-800">📊 Production & Payments</h1>
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveView('stats')}
             className={`px-4 py-2 rounded text-sm ${activeView === 'stats' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
-            Estatísticas
+            Statistics
           </button>
           <button
             onClick={() => setActiveView('payments')}
             className={`px-4 py-2 rounded text-sm ${activeView === 'payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
-            Histórico de Pagamentos
+            Payment History
           </button>
         </div>
       </div>
@@ -5815,11 +5851,11 @@ const ProductionPage = ({ adminKey }) => {
           {/* Translator Stats Cards */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b">
-              <h2 className="text-sm font-bold text-gray-800">Tradutores</h2>
+              <h2 className="text-sm font-bold text-gray-800">Translators</h2>
             </div>
             <div className="p-4 space-y-3">
               {stats.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">Nenhum tradutor encontrado</div>
+                <div className="text-center text-gray-500 py-4">No translators found</div>
               ) : (
                 stats.map((translator) => (
                   <div
@@ -5851,20 +5887,20 @@ const ProductionPage = ({ adminKey }) => {
                         <div className="font-bold text-gray-800">{translator.total_pages}</div>
                       </div>
                       <div className="bg-green-100 rounded p-2">
-                        <div className="text-green-600">Concluídas</div>
+                        <div className="text-green-600">Completed</div>
                         <div className="font-bold text-green-700">{translator.completed_pages}</div>
                       </div>
                       <div className="bg-blue-100 rounded p-2">
-                        <div className="text-blue-600">Pagas</div>
+                        <div className="text-blue-600">Paid</div>
                         <div className="font-bold text-blue-700">{translator.paid_pages}</div>
                       </div>
                       <div className="bg-yellow-100 rounded p-2">
-                        <div className="text-yellow-600">A Pagar</div>
+                        <div className="text-yellow-600">To Pay</div>
                         <div className="font-bold text-yellow-700">{translator.pending_payment_pages}</div>
                       </div>
                     </div>
                     <div className="mt-2 text-xs text-gray-500">
-                      {translator.completed_orders} de {translator.orders_count} projetos concluídos
+                      {translator.completed_orders} of {translator.orders_count} projects completed
                     </div>
                   </div>
                 ))
@@ -5876,16 +5912,16 @@ const ProductionPage = ({ adminKey }) => {
           <div className="bg-white rounded-lg shadow">
             <div className="p-4 border-b">
               <h2 className="text-sm font-bold text-gray-800">
-                {selectedTranslator ? `Projetos de ${selectedTranslator.translator_name}` : 'Selecione um tradutor'}
+                {selectedTranslator ? `${selectedTranslator.translator_name}'s Projects` : 'Select a translator'}
               </h2>
             </div>
             <div className="p-4">
               {!selectedTranslator ? (
                 <div className="text-center text-gray-500 py-8">
-                  Clique em um tradutor para ver seus projetos
+                  Click on a translator to view their projects
                 </div>
               ) : translatorOrders.length === 0 ? (
-                <div className="text-center text-gray-500 py-4">Nenhum projeto concluído</div>
+                <div className="text-center text-gray-500 py-4">No completed projects</div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {translatorOrders.map((order) => (
@@ -5896,7 +5932,7 @@ const ProductionPage = ({ adminKey }) => {
                           <div className="text-gray-500">{order.client_name}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-teal-600">{order.page_count || 0} pág.</div>
+                          <div className="font-bold text-teal-600">{order.page_count || 0} pages</div>
                           <div className="text-gray-500">{formatDate(order.created_at)}</div>
                         </div>
                       </div>
@@ -5912,26 +5948,26 @@ const ProductionPage = ({ adminKey }) => {
       {activeView === 'payments' && (
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b">
-            <h2 className="text-sm font-bold text-gray-800">Histórico de Pagamentos</h2>
+            <h2 className="text-sm font-bold text-gray-800">Payment History</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Tradutor</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Período</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Páginas</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Valor</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Translator</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Period</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Pages</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Amount</th>
                   <th className="px-4 py-3 text-center font-medium text-gray-600">Status</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Data Pag.</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Payment Date</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {payments.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                      Nenhum pagamento registrado
+                      No payments registered
                     </td>
                   </tr>
                 ) : (
@@ -5970,7 +6006,7 @@ const ProductionPage = ({ adminKey }) => {
                           onClick={() => handleDeletePayment(payment.id)}
                           className="text-red-600 hover:text-red-800"
                         >
-                          Excluir
+                          Delete
                         </button>
                       </td>
                     </tr>
@@ -6066,7 +6102,7 @@ const ProductionPage = ({ adminKey }) => {
                   onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
-                  <option value="">Selecione...</option>
+                  <option value="">Select...</option>
                   <option value="bank_transfer">Transferência Bancária</option>
                   <option value="paypal">PayPal</option>
                   <option value="pix">PIX</option>
@@ -6100,13 +6136,13 @@ const ProductionPage = ({ adminKey }) => {
                   onClick={() => setShowPaymentModal(false)}
                   className="px-4 py-2 border rounded text-sm text-gray-600 hover:bg-gray-50"
                 >
-                  Cancelar
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
                 >
-                  Registrar Pagamento
+                  Register Payment
                 </button>
               </div>
             </form>
@@ -6141,22 +6177,22 @@ const FinancesPage = ({ adminKey }) => {
   });
 
   const EXPENSE_CATEGORIES = {
-    fixed: { label: 'Despesas Fixas', color: '#3B82F6' },
-    translators: { label: 'Tradutores', color: '#10B981' },
-    ai: { label: 'AI & Tecnologia', color: '#8B5CF6' },
+    fixed: { label: 'Fixed Expenses', color: '#3B82F6' },
+    translators: { label: 'Translators', color: '#10B981' },
+    ai: { label: 'AI & Technology', color: '#8B5CF6' },
     marketing: { label: 'Marketing', color: '#F59E0B' },
-    office: { label: 'Escritório', color: '#EF4444' },
-    utilities: { label: 'Utilidades', color: '#06B6D4' },
-    other: { label: 'Outros', color: '#6B7280' }
+    office: { label: 'Office', color: '#EF4444' },
+    utilities: { label: 'Utilities', color: '#06B6D4' },
+    other: { label: 'Other', color: '#6B7280' }
   };
 
   const REVENUE_SOURCES = {
     website: { label: 'Website', color: '#3B82F6' },
     whatsapp: { label: 'WhatsApp', color: '#22C55E' },
     social_media: { label: 'Social Media', color: '#A855F7' },
-    referral: { label: 'Indicação', color: '#F59E0B' },
-    partner: { label: 'Parceiro', color: '#06B6D4' },
-    other: { label: 'Outros', color: '#6B7280' }
+    referral: { label: 'Referral', color: '#F59E0B' },
+    partner: { label: 'Partner', color: '#06B6D4' },
+    other: { label: 'Other', color: '#6B7280' }
   };
 
   const fetchSummary = async () => {
@@ -6238,18 +6274,18 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Erro ao criar despesa');
+      alert('Error creating expense');
     }
   };
 
   const handleDeleteExpense = async (expenseId) => {
-    if (!window.confirm('Excluir esta despesa?')) return;
+    if (!window.confirm('Delete this expense?')) return;
     try {
       await axios.delete(`${API}/admin/expenses/${expenseId}?admin_key=${adminKey}`);
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Erro ao excluir despesa');
+      alert('Error deleting expense');
     }
   };
 
@@ -6325,30 +6361,30 @@ const FinancesPage = ({ adminKey }) => {
     <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-gray-800">💰 Finanças</h1>
+        <h1 className="text-xl font-bold text-gray-800">💰 Finances</h1>
         <div className="flex items-center space-x-4">
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
             className="px-3 py-2 border rounded text-sm"
           >
-            <option value="month">Este Mês</option>
-            <option value="last30">Últimos 30 dias</option>
-            <option value="year">Este Ano</option>
-            <option value="last365">Últimos 365 dias</option>
+            <option value="month">This Month</option>
+            <option value="last30">Last 30 days</option>
+            <option value="year">This Year</option>
+            <option value="last365">Last 365 days</option>
           </select>
           <div className="flex space-x-2">
             <button
               onClick={() => setActiveView('overview')}
               className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              Visão Geral
+              Overview
             </button>
             <button
               onClick={() => setActiveView('expenses')}
               className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              Despesas
+              Expenses
             </button>
             <button
               onClick={() => setActiveView('payment-proofs')}
@@ -6372,21 +6408,21 @@ const FinancesPage = ({ adminKey }) => {
             {/* Profit & Loss */}
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-gray-500 uppercase">Lucro & Prejuízo</h3>
+                <h3 className="text-sm font-medium text-gray-500 uppercase">Profit & Loss</h3>
               </div>
               <div className={`text-2xl font-bold ${summary.profit_loss.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {formatCurrency(summary.profit_loss.net_profit)}
               </div>
               <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Receitas</span>
+                  <span className="text-gray-500">Revenue</span>
                   <span className="font-medium text-green-600">{formatCurrency(summary.profit_loss.total_revenue)}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className="bg-green-500 h-2 rounded-full" style={{ width: `${Math.min(100, (summary.profit_loss.total_revenue / (summary.profit_loss.total_revenue + summary.profit_loss.total_expenses)) * 100)}%` }}></div>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Despesas</span>
+                  <span className="text-gray-500">Expenses</span>
                   <span className="font-medium text-red-600">{formatCurrency(summary.profit_loss.total_expenses)}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -6395,7 +6431,7 @@ const FinancesPage = ({ adminKey }) => {
               </div>
               {summary.profit_loss.revenue_change_percent !== 0 && (
                 <div className={`mt-3 text-xs ${summary.profit_loss.revenue_change_percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {summary.profit_loss.revenue_change_percent >= 0 ? '↑' : '↓'} {Math.abs(summary.profit_loss.revenue_change_percent)}% vs período anterior
+                  {summary.profit_loss.revenue_change_percent >= 0 ? '↑' : '↓'} {Math.abs(summary.profit_loss.revenue_change_percent)}% vs previous period
                 </div>
               )}
             </div>
@@ -6403,7 +6439,7 @@ const FinancesPage = ({ adminKey }) => {
             {/* Expenses Breakdown */}
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex justify-between items-center mb-2">
-                <h3 className="text-sm font-medium text-gray-500 uppercase">Despesas</h3>
+                <h3 className="text-sm font-medium text-gray-500 uppercase">Expenses</h3>
                 <span className="text-lg font-bold text-gray-800">{formatCurrency(summary.expenses.total)}</span>
               </div>
               <DonutChart data={summary.expenses.by_category} total={summary.expenses.total} />
@@ -6411,19 +6447,19 @@ const FinancesPage = ({ adminKey }) => {
 
             {/* Invoices */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-medium text-gray-500 uppercase mb-2">Faturas</h3>
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-2">Invoices</h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Pendentes</span>
+                  <span className="text-sm text-gray-600">Pending</span>
                   <span className="font-bold text-yellow-600">{formatCurrency(summary.invoices.pending)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Atrasadas</span>
+                  <span className="text-sm text-gray-600">Overdue</span>
                   <span className="font-bold text-red-600">{formatCurrency(summary.invoices.overdue)}</span>
                 </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Pagas (período)</span>
+                    <span className="text-sm text-gray-600">Paid (period)</span>
                     <span className="font-bold text-green-600">{formatCurrency(summary.invoices.paid)}</span>
                   </div>
                 </div>
@@ -6440,7 +6476,7 @@ const FinancesPage = ({ adminKey }) => {
           <div className="grid grid-cols-2 gap-6">
             {/* Revenue by Source */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Receitas por Fonte</h3>
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Revenue by Source</h3>
               <div className="space-y-3">
                 {Object.entries(summary.revenue.by_source).map(([key, value]) => {
                   const sourceInfo = REVENUE_SOURCES[key] || { label: key, color: '#6B7280' };
@@ -6462,7 +6498,7 @@ const FinancesPage = ({ adminKey }) => {
 
             {/* Revenue by Language */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Receitas por Idioma</h3>
+              <h3 className="text-sm font-medium text-gray-500 uppercase mb-4">Revenue by Language</h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {Object.entries(summary.revenue.by_language).map(([langPair, value]) => {
                   const percentage = summary.revenue.total > 0 ? (value.amount / summary.revenue.total) * 100 : 0;
@@ -6487,12 +6523,12 @@ const FinancesPage = ({ adminKey }) => {
       {activeView === 'expenses' && (
         <div className="bg-white rounded-lg shadow">
           <div className="p-4 border-b flex justify-between items-center">
-            <h3 className="font-bold text-gray-800">Lista de Despesas</h3>
+            <h3 className="font-bold text-gray-800">Expenses List</h3>
             <button
               onClick={() => setShowExpenseModal(true)}
               className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
             >
-              + Nova Despesa
+              + New Expense
             </button>
           </div>
           <div className="overflow-x-auto">
@@ -6509,7 +6545,7 @@ const FinancesPage = ({ adminKey }) => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {expenses.length === 0 ? (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">Nenhuma despesa registrada</td></tr>
+                  <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No expenses registered</td></tr>
                 ) : (
                   expenses.map((expense) => (
                     <tr key={expense.id} className="hover:bg-gray-50">
@@ -6526,7 +6562,7 @@ const FinancesPage = ({ adminKey }) => {
                       <td className="px-4 py-3 text-gray-500">{expense.vendor || '-'}</td>
                       <td className="px-4 py-3 text-right font-medium text-red-600">{formatCurrency(expense.amount)}</td>
                       <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Excluir</button>
+                        <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-600 hover:text-red-800">Delete</button>
                       </td>
                     </tr>
                   ))
@@ -6542,7 +6578,7 @@ const FinancesPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-bold text-gray-800">Nova Despesa</h3>
+              <h3 className="font-bold text-gray-800">New Expense</h3>
               <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
             <form onSubmit={handleCreateExpense} className="p-4 space-y-4">
@@ -6608,25 +6644,25 @@ const FinancesPage = ({ adminKey }) => {
                   onChange={(e) => setExpenseForm({...expenseForm, is_recurring: e.target.checked})}
                   className="mr-2"
                 />
-                <label className="text-sm text-gray-600">Despesa recorrente</label>
+                <label className="text-sm text-gray-600">Recurring expense</label>
               </div>
               {expenseForm.is_recurring && (
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Período</label>
+                  <label className="block text-xs text-gray-600 mb-1">Period</label>
                   <select
                     value={expenseForm.recurring_period}
                     onChange={(e) => setExpenseForm({...expenseForm, recurring_period: e.target.value})}
                     className="w-full px-3 py-2 border rounded text-sm"
                   >
-                    <option value="">Selecione...</option>
-                    <option value="monthly">Mensal</option>
-                    <option value="yearly">Anual</option>
+                    <option value="">Select...</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
                   </select>
                 </div>
               )}
               <div className="flex justify-end space-x-2 pt-2">
-                <button type="button" onClick={() => setShowExpenseModal(false)} className="px-4 py-2 border rounded text-sm text-gray-600">Cancelar</button>
-                <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700">Salvar</button>
+                <button type="button" onClick={() => setShowExpenseModal(false)} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700">Save</button>
               </div>
             </form>
           </div>
