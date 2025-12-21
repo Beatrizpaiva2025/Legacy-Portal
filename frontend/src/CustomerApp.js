@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './App.css';
@@ -230,6 +230,15 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
 const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [guestEmail, setGuestEmail] = useState('');
   const [guestName, setGuestName] = useState('');
+
+  // Refs for scrolling to errors
+  const nameRef = useRef(null);
+  const emailRef = useRef(null);
+  const fileUploadRef = useRef(null);
+  const shippingRef = useRef(null);
+
+  // Field error states
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
     service_type: 'standard',
     translate_from: 'portuguese',
@@ -448,6 +457,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
     setIsProcessing(true);
     setError('');
+    setFieldErrors(prev => ({...prev, files: null}));
     setProcessingStatus('Connecting to server...');
 
     try {
@@ -506,18 +516,46 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!guestName || !guestEmail) {
-      setError('Please enter your name and email');
-      return;
+    // Clear previous errors
+    setFieldErrors({});
+    setError('');
+
+    // Validate fields and collect errors
+    const errors = {};
+
+    if (!guestName) {
+      errors.name = 'Please enter your name';
+    }
+    if (!guestEmail) {
+      errors.email = 'Please enter your email';
+    }
+    if (wordCount === 0) {
+      errors.files = 'Please upload a document';
+    }
+    if ((needsPhysicalCopy || formData.service_type === 'rmv') &&
+        (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) {
+      errors.shipping = 'Please complete the shipping address';
     }
 
-    if (wordCount === 0) {
-      setError('Please upload a document first');
+    // If there are errors, scroll to the first one
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+
+      // Scroll to first error
+      if (errors.name && nameRef.current) {
+        nameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (errors.email && emailRef.current) {
+        emailRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (errors.files && fileUploadRef.current) {
+        fileUploadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (errors.shipping && shippingRef.current) {
+        shippingRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
       return;
     }
 
     setSubmitting(true);
-    setError('');
 
     try {
       // Step 1: Create a quote first
@@ -604,29 +642,31 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-100">
               <p className="text-sm text-gray-600 mb-3">Enter your details to receive your quote</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
+                <div ref={nameRef}>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Your Name *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-teal-500 text-sm ${fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={guestName}
-                    onChange={(e) => setGuestName(e.target.value)}
+                    onChange={(e) => { setGuestName(e.target.value); setFieldErrors(prev => ({...prev, name: null})); }}
                     placeholder="John Smith"
                     disabled={!!customer}
                   />
+                  {fieldErrors.name && <p className="text-red-500 text-xs mt-1">{fieldErrors.name}</p>}
                 </div>
-                <div>
+                <div ref={emailRef}>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Your Email *</label>
                   <input
                     type="email"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 text-sm"
+                    className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-teal-500 text-sm ${fieldErrors.email ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                     value={guestEmail}
-                    onChange={(e) => setGuestEmail(e.target.value)}
+                    onChange={(e) => { setGuestEmail(e.target.value); setFieldErrors(prev => ({...prev, email: null})); }}
                     placeholder="your@email.com"
                     disabled={!!customer}
                   />
+                  {fieldErrors.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>}
                 </div>
               </div>
               <p className="text-xs text-gray-400 mt-2">We'll send your quote and order updates here</p>
@@ -780,12 +820,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             </div>
 
             {/* Document Upload */}
-            <div>
+            <div ref={fileUploadRef}>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive ? 'border-teal-500 bg-teal-50' : 'border-gray-300 hover:border-teal-500'
+                  fieldErrors.files ? 'border-red-500 bg-red-50' : isDragActive ? 'border-teal-500 bg-teal-50' : 'border-gray-300 hover:border-teal-500'
                 }`}
               >
                 <input {...getInputProps()} />
@@ -793,6 +833,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 <div className="font-medium text-teal-600">+ Upload File(s)</div>
                 <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
               </div>
+              {fieldErrors.files && <p className="text-red-500 text-sm mt-2">{fieldErrors.files}</p>}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
@@ -920,17 +961,18 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 )}
 
                 {(needsPhysicalCopy || formData.service_type === 'rmv') && (
-                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div ref={shippingRef} className={`p-4 rounded-lg space-y-3 ${fieldErrors.shipping ? 'bg-red-50 border border-red-300' : 'bg-gray-50'}`}>
                     <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                    {fieldErrors.shipping && <p className="text-red-500 text-sm">{fieldErrors.shipping}</p>}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="md:col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
                         <input
                           type="text"
                           required={needsPhysicalCopy}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.street ? 'border-red-500' : 'border-gray-300'}`}
                           value={shippingAddress.street}
-                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                          onChange={(e) => { setShippingAddress({...shippingAddress, street: e.target.value}); setFieldErrors(prev => ({...prev, shipping: null})); }}
                           placeholder="123 Main Street, Apt 4B"
                         />
                       </div>
@@ -939,9 +981,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         <input
                           type="text"
                           required={needsPhysicalCopy}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.city ? 'border-red-500' : 'border-gray-300'}`}
                           value={shippingAddress.city}
-                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                          onChange={(e) => { setShippingAddress({...shippingAddress, city: e.target.value}); setFieldErrors(prev => ({...prev, shipping: null})); }}
                           placeholder="Boston"
                         />
                       </div>
@@ -950,9 +992,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         <input
                           type="text"
                           required={needsPhysicalCopy}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.state ? 'border-red-500' : 'border-gray-300'}`}
                           value={shippingAddress.state}
-                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                          onChange={(e) => { setShippingAddress({...shippingAddress, state: e.target.value}); setFieldErrors(prev => ({...prev, shipping: null})); }}
                           placeholder="MA"
                         />
                       </div>
@@ -961,9 +1003,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         <input
                           type="text"
                           required={needsPhysicalCopy}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.zipCode ? 'border-red-500' : 'border-gray-300'}`}
                           value={shippingAddress.zipCode}
-                          onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                          onChange={(e) => { setShippingAddress({...shippingAddress, zipCode: e.target.value}); setFieldErrors(prev => ({...prev, shipping: null})); }}
                           placeholder="02101"
                         />
                       </div>
