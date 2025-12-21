@@ -250,19 +250,23 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
 
-  // Payment proof states
-  const [showDirectPayment, setShowDirectPayment] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('pix');
-  const [proofFile, setProofFile] = useState(null);
-  const [uploadingProof, setUploadingProof] = useState(false);
-  const [proofUploaded, setProofUploaded] = useState(false);
-  const [pixCopied, setPixCopied] = useState(false);
 
   // Certification options
   const [certifications, setCertifications] = useState({
     notarization: false,
     eApostille: false
   });
+
+  // Physical copy / shipping options
+  const [needsPhysicalCopy, setNeedsPhysicalCopy] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA'
+  });
+  const USPS_PRIORITY_MAIL = 18.99;
 
   // MIA WhatsApp number
   const MIA_WHATSAPP = "https://wa.me/17863109734?text=Hi%20MIA,%20I%20have%20questions%20about%20my%20translation%20quote";
@@ -297,10 +301,22 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     let basePrice = 0;
     const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
 
-    if (formData.service_type === 'standard') {
-      basePrice = pages * 24.99;
-    } else {
-      basePrice = pages * 19.99;
+    // Price per page based on service type
+    switch (formData.service_type) {
+      case 'standard':
+        basePrice = pages * 19.99;
+        break;
+      case 'certified':
+        basePrice = pages * 24.99;
+        break;
+      case 'rmv':
+        basePrice = pages * 24.99;
+        break;
+      case 'sworn':
+        basePrice = pages * 55.00;
+        break;
+      default:
+        basePrice = pages * 19.99;
     }
 
     let urgencyFee = 0;
@@ -319,7 +335,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       certificationFee += 79.95;
     }
 
-    let subtotal = basePrice + urgencyFee + certificationFee;
+    // Shipping fee
+    let shippingFee = 0;
+    if (needsPhysicalCopy || formData.service_type === 'rmv') {
+      shippingFee = USPS_PRIORITY_MAIL;
+    }
+
+    let subtotal = basePrice + urgencyFee + certificationFee + shippingFee;
     let discountAmount = 0;
 
     if (appliedDiscount) {
@@ -334,18 +356,26 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       base_price: basePrice,
       urgency_fee: urgencyFee,
       certification_fee: certificationFee,
+      shipping_fee: shippingFee,
       discount: discountAmount,
       total_price: Math.max(0, subtotal - discountAmount),
       pages: pages
     });
-  }, [uploadedFiles, formData.service_type, formData.urgency, certifications, appliedDiscount]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, certifications, appliedDiscount, needsPhysicalCopy]);
 
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications, calculateQuote]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, appliedDiscount, certifications, needsPhysicalCopy, calculateQuote]);
+
+  // Auto-enable physical copy for RMV service
+  useEffect(() => {
+    if (formData.service_type === 'rmv') {
+      setNeedsPhysicalCopy(true);
+    }
+  }, [formData.service_type]);
 
   // Auto-save abandoned quote when user sees the price
   useEffect(() => {
@@ -406,56 +436,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   };
 
-  // PIX/Zelle payment info
-  const PIX_KEY = "13380336000179"; // CNPJ Legacy Translations
-  const PIX_NAME = "Legacy Translations";
-  const ZELLE_NUMBER = "8572081139";
-  const ZELLE_NAME = "Legacy Translations Inc";
-  const USD_TO_BRL_RATE = 6.10;
-
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setPixCopied(true);
-    setTimeout(() => setPixCopied(false), 2000);
-  };
-
-  // Calculate PIX amount in BRL
-  const pixAmountBRL = quote ? (quote.total_price * USD_TO_BRL_RATE).toFixed(2) : 0;
-
-  // Upload payment proof
-  const handleUploadProof = async () => {
-    if (!proofFile || !guestName || !guestEmail) {
-      setError('Please fill in your name and email, and select a proof file');
-      return;
-    }
-
-    setUploadingProof(true);
-    setError('');
-
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('customer_name', guestName);
-      formDataUpload.append('customer_email', guestEmail);
-      formDataUpload.append('payment_method', paymentMethod);
-      formDataUpload.append('amount', quote?.total_price || 0);
-      formDataUpload.append('currency', paymentMethod === 'pix' ? 'BRL' : 'USD');
-      formDataUpload.append('file', proofFile);
-
-      const response = await axios.post(`${API}/payment-proofs/upload`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (response.data.success) {
-        setProofUploaded(true);
-        setSuccess('Payment proof uploaded successfully! Our team will review it and confirm your payment shortly. You will receive an email confirmation.');
-        setShowDirectPayment(false);
-      }
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to upload payment proof. Please try again.');
-    } finally {
-      setUploadingProof(false);
-    }
-  };
 
   const [processingStatus, setProcessingStatus] = useState('');
 
@@ -652,6 +632,29 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
               <div className="space-y-3">
+                {/* Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'certified' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="certified"
+                    checked={formData.service_type === 'certified'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+
+                {/* Standard Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
                   formData.service_type === 'standard' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
                 }`}>
@@ -664,29 +667,66 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">Certified Translation</div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="font-medium flex items-center gap-1">
+                      Standard Translation
+                      <span className="text-gray-400 cursor-help" title="Accurate translation for general use; does not include certification.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">General use, no certification</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">$19.99/page</div>
                 </label>
 
+                {/* Sworn Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'professional' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
                 }`}>
                   <input
                     type="radio"
                     name="service_type"
-                    value="professional"
-                    checked={formData.service_type === 'professional'}
+                    value="sworn"
+                    checked={formData.service_type === 'sworn'}
                     onChange={(e) => setFormData({...formData, service_type: e.target.value})}
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">Professional Translation</div>
-                    <div className="text-sm text-gray-500">Business, marketing, general content</div>
+                    <div className="font-medium flex items-center gap-1">
+                      Sworn Translation
+                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99/page</div>
+                  <div className="font-semibold text-teal-600">$55.00/page</div>
                 </label>
+
+                {/* RMV Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="rmv"
+                    checked={formData.service_type === 'rmv'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      RMV Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+              </div>
+
+              {/* Service Type Descriptions */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
+                <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
+                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
+                <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
+                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
               </div>
             </div>
 
@@ -820,6 +860,114 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
             </div>
 
+            {/* Physical Copy / Shipping */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Do you require the physical copy of the translation?</h2>
+              <div className="space-y-3">
+                <div className="flex gap-4">
+                  <label className={`flex-1 p-4 border rounded-lg cursor-pointer text-center ${
+                    !needsPhysicalCopy && formData.service_type !== 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="physical_copy"
+                      checked={!needsPhysicalCopy && formData.service_type !== 'rmv'}
+                      onChange={() => setNeedsPhysicalCopy(false)}
+                      disabled={formData.service_type === 'rmv'}
+                      className="sr-only"
+                    />
+                    <span className="font-medium">No</span>
+                    <p className="text-xs text-gray-500 mt-1">Digital copy only</p>
+                  </label>
+                  <label className={`flex-1 p-4 border rounded-lg cursor-pointer text-center ${
+                    needsPhysicalCopy || formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="physical_copy"
+                      checked={needsPhysicalCopy || formData.service_type === 'rmv'}
+                      onChange={() => setNeedsPhysicalCopy(true)}
+                      className="sr-only"
+                    />
+                    <span className="font-medium">Yes</span>
+                    <p className="text-xs text-gray-500 mt-1">+ ${USPS_PRIORITY_MAIL} Priority Mail</p>
+                  </label>
+                </div>
+
+                {formData.service_type === 'rmv' && (
+                  <div className="p-3 bg-amber-50 rounded-md border border-amber-200">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> RMV requires a physical copy. Shipping is automatically included.
+                    </p>
+                  </div>
+                )}
+
+                {(needsPhysicalCopy || formData.service_type === 'rmv') && (
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                        <input
+                          type="text"
+                          required={needsPhysicalCopy}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.street}
+                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                          placeholder="123 Main Street, Apt 4B"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City *</label>
+                        <input
+                          type="text"
+                          required={needsPhysicalCopy}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.city}
+                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                          placeholder="Boston"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">State *</label>
+                        <input
+                          type="text"
+                          required={needsPhysicalCopy}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.state}
+                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                          placeholder="MA"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                        <input
+                          type="text"
+                          required={needsPhysicalCopy}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.zipCode}
+                          onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                          placeholder="02101"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
+                          value="USA"
+                          disabled
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      USPS Priority Mail - Estimated delivery: 1-3 business days
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
@@ -832,225 +980,40 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               />
             </div>
 
-            {/* Questions about pricing? - MIA Contact */}
+            {/* Questions about pricing? - Contact */}
             <div className="bg-gray-50 p-5 rounded-lg text-center">
               <p className="text-gray-600 mb-3">Questions about your pricing?</p>
               <a
-                href={MIA_WHATSAPP}
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:contact@legacytranslations.com?subject=Quote Request"
                 className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
               >
                 Request a quote instead
               </a>
             </div>
 
-            {/* Direct Payment Section (PIX/Zelle) */}
-            {quote && quote.total_price > 0 && (
-              <div className="border-t pt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-800">Payment Options</h2>
-                </div>
-
-                {/* Payment Method Toggle */}
-                <div className="space-y-3">
-                  {/* Stripe (Card) Option */}
-                  <div className={`p-4 border rounded-lg ${!showDirectPayment ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={!showDirectPayment}
-                        onChange={() => setShowDirectPayment(false)}
-                        className="mr-3"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium flex items-center gap-2">
-                          <span>Pay with Card</span>
-                        </div>
-                        <p className="text-sm text-gray-500">Secure payment via Stripe</p>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* Direct Payment (PIX/Zelle) Option */}
-                  <div className={`p-4 border rounded-lg ${showDirectPayment ? 'border-teal-500 bg-teal-50' : 'border-gray-200'}`}>
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={showDirectPayment}
-                        onChange={() => setShowDirectPayment(true)}
-                        className="mr-3"
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium flex items-center gap-2">
-                          <span>Direct Payment (PIX / Zelle)</span>
-                        </div>
-                        <p className="text-sm text-gray-500">Pay via bank transfer and upload receipt</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Direct Payment Details */}
-                {showDirectPayment && (
-                  <div className="mt-4 p-4 bg-gradient-to-br from-green-50 to-teal-50 rounded-lg border border-green-200">
-                    <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      Direct Payments / Pagamentos Diretos
-                    </h3>
-
-                    {/* Payment Method Tabs */}
-                    <div className="flex gap-2 mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('pix')}
-                        className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                          paymentMethod === 'pix'
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-white text-gray-700 border hover:bg-gray-50'
-                        }`}
-                      >
-                        PIX (Brazil)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod('zelle')}
-                        className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-colors ${
-                          paymentMethod === 'zelle'
-                            ? 'bg-teal-600 text-white'
-                            : 'bg-white text-gray-700 border hover:bg-gray-50'
-                        }`}
-                      >
-                        Zelle (USA)
-                      </button>
-                    </div>
-
-                    {/* PIX Info */}
-                    {paymentMethod === 'pix' && (
-                      <div className="space-y-3">
-                        <div className="bg-white p-3 rounded-md">
-                          <p className="text-xs text-gray-500 mb-1">PIX Key (CNPJ)</p>
-                          <div className="flex items-center justify-between">
-                            <code className="font-mono text-sm">{PIX_KEY}</code>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(PIX_KEY)}
-                              className="text-teal-600 hover:text-teal-700 text-sm font-medium"
-                            >
-                              {pixCopied ? 'Copied!' : 'Copy'}
-                            </button>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{PIX_NAME}</p>
-                        </div>
-                        <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
-                          <p className="text-sm text-yellow-800">
-                            <strong>Amount in BRL:</strong> R$ {pixAmountBRL}
-                          </p>
-                          <p className="text-xs text-yellow-600 mt-1">
-                            Rate: 1 USD = {USD_TO_BRL_RATE} BRL
-                          </p>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          * PIX available only for Brazilian bank accounts
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Zelle Info */}
-                    {paymentMethod === 'zelle' && (
-                      <div className="space-y-3">
-                        <div className="bg-white p-3 rounded-md">
-                          <p className="text-xs text-gray-500 mb-1">Zelle Number</p>
-                          <div className="flex items-center justify-between">
-                            <code className="font-mono text-sm">{ZELLE_NUMBER}</code>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(ZELLE_NUMBER)}
-                              className="text-teal-600 hover:text-teal-700 text-sm font-medium"
-                            >
-                              {pixCopied ? 'Copied!' : 'Copy'}
-                            </button>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{ZELLE_NAME}</p>
-                        </div>
-                        <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
-                          <p className="text-sm text-blue-800">
-                            <strong>Amount:</strong> ${quote?.total_price?.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Upload Proof Section */}
-                    <div className="mt-4 pt-4 border-t border-green-200">
-                      <h4 className="font-medium text-gray-800 mb-2">
-                        Upload Payment Proof / Enviar Comprovante
-                      </h4>
-                      <p className="text-xs text-gray-500 mb-3">
-                        After making the payment, upload a screenshot or PDF of your receipt
-                      </p>
-
-                      <div className="space-y-3">
-                        <div
-                          className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                            proofFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-teal-400'
-                          }`}
-                          onClick={() => document.getElementById('proof-file-input').click()}
-                        >
-                          <input
-                            id="proof-file-input"
-                            type="file"
-                            accept="image/*,application/pdf"
-                            className="hidden"
-                            onChange={(e) => setProofFile(e.target.files[0])}
-                          />
-                          {proofFile ? (
-                            <div className="flex items-center justify-center gap-2 text-green-600">
-                              <span className="text-xl">✓</span>
-                              <span className="font-medium">{proofFile.name}</span>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="text-2xl mb-1">📄</div>
-                              <p className="text-sm text-gray-600">Click to select file</p>
-                              <p className="text-xs text-gray-400">PNG, JPG, PDF</p>
-                            </>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleUploadProof}
-                          disabled={!proofFile || uploadingProof || !guestName || !guestEmail}
-                          className="w-full py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 font-semibold flex items-center justify-center gap-2"
-                        >
-                          {uploadingProof ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              Upload Proof & Complete Order
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Card Payment Button */}
-            {!showDirectPayment && (
-              <button
-                type="submit"
-                disabled={submitting || wordCount === 0 || !guestName || !guestEmail}
-                className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+            {/* Direct Payment Option */}
+            <div className="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-lg border border-green-200 text-center">
+              <p className="text-gray-700 mb-2">
+                If you prefer direct payment via <strong>Zelle</strong> or <strong>PIX (Brazil)</strong>:
+              </p>
+              <a
+                href={MIA_WHATSAPP}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors font-medium"
               >
-                {submitting ? 'Processing...' : 'Continue to Payment'}
-              </button>
-            )}
+                <span>Contact Us</span>
+              </a>
+            </div>
+
+            {/* Continue to Payment Button */}
+            <button
+              type="submit"
+              disabled={submitting || wordCount === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
+              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+            >
+              {submitting ? 'Processing...' : 'Continue to Payment'}
+            </button>
           </form>
         </div>
 
@@ -1062,7 +1025,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div className="flex justify-between">
               <span className="text-gray-600">Service</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' ? 'Certified' : 'Professional'}
+                {formData.service_type === 'standard' && 'Standard'}
+                {formData.service_type === 'certified' && 'Certified'}
+                {formData.service_type === 'rmv' && 'RMV Certified'}
+                {formData.service_type === 'sworn' && 'Sworn'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -1086,6 +1052,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 <div className="flex justify-between text-purple-600">
                   <span>Certification</span>
                   <span>${quote.certification_fee.toFixed(2)}</span>
+                </div>
+              )}
+              {quote?.shipping_fee > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>USPS Priority Mail</span>
+                  <span>${quote.shipping_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
