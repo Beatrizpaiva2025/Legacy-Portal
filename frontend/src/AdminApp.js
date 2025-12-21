@@ -5207,6 +5207,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               );
             })}
           </tbody>
+          {/* Summary Footer */}
+          {filtered.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-100 border-t-2 border-slate-300">
+                <td colSpan={isAdmin ? 11 : 10} className="px-4 py-3">
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span className="text-slate-700">
+                      📊 Total Orders: <span className="text-blue-600 font-bold">{filtered.length}</span>
+                    </span>
+                    {isAdmin && (
+                      <span className="text-slate-700">
+                        💰 Total Revenue: <span className="text-green-600 font-bold">${filtered.reduce((sum, order) => sum + (order.total_price || 0), 0).toFixed(2)}</span>
+                      </span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
         {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
       </div>
