@@ -9,12 +9,36 @@ const API = `${BACKEND_URL}/api`;
 // ==================== INTERNATIONALIZATION ====================
 const TRANSLATIONS = {
   en: {
+    // Login
+    businessPortal: 'Business Portal (B2B)',
+    corporateOnly: 'Corporate Clients Only',
+    companyEmail: 'Company Email',
+    password: 'Password',
+    forgotPassword: 'Forgot password?',
+    accessPortal: 'Access Business Portal',
+    createAccount: 'Create Business Account',
+    pleaseWait: 'Please wait...',
+    noAccount: "Don't have an account? Register",
+    haveAccount: 'Already have an account? Sign In',
+    notB2B: 'Not a B2B client yet?',
+    contactUs: 'Contact us',
+    companyName: 'Company Name',
+    contactName: 'Contact Name',
+    phoneOptional: 'Phone (optional)',
+    errorOccurred: 'An error occurred',
+    // Benefits
+    benefits: 'Business Account Benefits:',
+    benefit1: 'Monthly invoicing - Pay at end of month',
+    benefit2: 'Dedicated B2B support chat',
+    benefit3: 'Priority processing',
+    // Navigation
     newOrder: 'New Order',
     createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
     certifiedDesc: 'Official documents, USCIS, legal purposes',
@@ -48,18 +72,34 @@ const TRANSLATIONS = {
     submitting: 'Submitting...',
     orderSuccess: 'Order submitted successfully!',
     signIn: 'Sign in to your account',
-    createAccount: 'Create a new account',
     email: 'Email',
-    password: 'Password',
-    companyName: 'Company Name',
-    contactName: 'Contact Name',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register',
-    noAccount: "Don't have an account?",
-    haveAccount: 'Already have an account?'
+    register: 'Register'
   },
   es: {
+    // Login
+    businessPortal: 'Portal Empresarial (B2B)',
+    corporateOnly: 'Solo Clientes Corporativos',
+    companyEmail: 'Correo Corporativo',
+    password: 'Contraseña',
+    forgotPassword: '¿Olvidó su contraseña?',
+    accessPortal: 'Acceder al Portal',
+    createAccount: 'Crear Cuenta Empresarial',
+    pleaseWait: 'Espere...',
+    noAccount: '¿No tiene cuenta? Regístrese',
+    haveAccount: '¿Ya tiene cuenta? Inicie sesión',
+    notB2B: '¿Aún no es cliente B2B?',
+    contactUs: 'Contáctenos',
+    companyName: 'Nombre de Empresa',
+    contactName: 'Nombre de Contacto',
+    phoneOptional: 'Teléfono (opcional)',
+    errorOccurred: 'Ocurrió un error',
+    benefits: 'Beneficios de la Cuenta Empresarial:',
+    benefit1: 'Facturación mensual - Pague a fin de mes',
+    benefit2: 'Chat de soporte B2B dedicado',
+    benefit3: 'Procesamiento prioritario',
+    // Navigation
     newOrder: 'Nuevo Pedido',
     createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
@@ -99,18 +139,34 @@ const TRANSLATIONS = {
     submitting: 'Enviando...',
     orderSuccess: '¡Pedido enviado exitosamente!',
     signIn: 'Iniciar sesión',
-    createAccount: 'Crear una cuenta nueva',
     email: 'Correo Electrónico',
-    password: 'Contraseña',
-    companyName: 'Nombre de Empresa',
-    contactName: 'Nombre de Contacto',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar',
-    noAccount: '¿No tiene cuenta?',
-    haveAccount: '¿Ya tiene cuenta?'
+    register: 'Registrar'
   },
   pt: {
+    // Login
+    businessPortal: 'Portal Empresarial (B2B)',
+    corporateOnly: 'Apenas Clientes Corporativos',
+    companyEmail: 'E-mail Corporativo',
+    password: 'Senha',
+    forgotPassword: 'Esqueceu a senha?',
+    accessPortal: 'Acessar Portal Empresarial',
+    createAccount: 'Criar Conta Empresarial',
+    pleaseWait: 'Aguarde...',
+    noAccount: 'Não tem conta? Cadastre-se',
+    haveAccount: 'Já tem conta? Entrar',
+    notB2B: 'Ainda não é cliente B2B?',
+    contactUs: 'Fale conosco',
+    companyName: 'Nome da Empresa',
+    contactName: 'Nome do Contato',
+    phoneOptional: 'Telefone (opcional)',
+    errorOccurred: 'Ocorreu um erro',
+    benefits: 'Benefícios da Conta Empresarial:',
+    benefit1: 'Faturamento mensal - Pague no final do mês',
+    benefit2: 'Chat de suporte B2B dedicado',
+    benefit3: 'Processamento prioritário',
+    // Navigation
     newOrder: 'Novo Pedido',
     createNewOrder: 'Criar Novo Pedido',
     myOrders: 'Meus Pedidos',
@@ -150,16 +206,10 @@ const TRANSLATIONS = {
     submitting: 'Enviando...',
     orderSuccess: 'Pedido enviado com sucesso!',
     signIn: 'Entrar na sua conta',
-    createAccount: 'Criar uma nova conta',
     email: 'Email',
-    password: 'Senha',
-    companyName: 'Nome da Empresa',
-    contactName: 'Nome do Contato',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar',
-    noAccount: 'Não tem conta?',
-    haveAccount: 'Já tem conta?'
+    register: 'Registrar'
   }
 };
 
@@ -170,13 +220,11 @@ const UI_LANGUAGES = [
   { code: 'pt', flag: '🇧🇷' }
 ];
 
-// Detect user's preferred language
+// Get user's language preference (English is default)
 const getInitialLanguage = () => {
   const saved = localStorage.getItem('ui_language');
   if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
-  const browserLang = navigator.language.split('-')[0];
-  if (['en', 'es', 'pt'].includes(browserLang)) return browserLang;
-  return 'en';
+  return 'en'; // Always default to English
 };
 
 // Detect currency based on locale/timezone
@@ -268,43 +316,52 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
         onLogin(response.data);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'An error occurred');
+      setError(err.response?.data?.detail || t.errorOccurred);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center relative">
-      {/* Language Flags - Top Right */}
-      <div className="absolute top-4 right-4 flex items-center space-x-2">
-        {UI_LANGUAGES.map((uiLang) => (
-          <button
-            key={uiLang.code}
-            onClick={() => changeLanguage(uiLang.code)}
-            className={`text-2xl hover:scale-110 transition-transform ${
-              lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
-            }`}
-            title={uiLang.code.toUpperCase()}
-          >
-            {uiLang.flag}
-          </button>
-        ))}
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        {/* Language Selector - Top Right */}
+        <div className="flex justify-end mb-4">
+          <div className="flex items-center gap-2">
+            {UI_LANGUAGES.map((uiLang) => (
+              <button
+                key={uiLang.code}
+                onClick={() => changeLanguage(uiLang.code)}
+                className={`text-xl hover:scale-110 transition-transform ${
+                  lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                }`}
+                title={uiLang.code.toUpperCase()}
+              >
+                {uiLang.flag}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <div className="text-center mb-8">
+        {/* Logo */}
+        <div className="text-center mb-6">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4"
+            className="mx-auto mb-4 h-16"
           />
-          <h1 className="text-2xl font-bold text-gray-800">Partner Portal</h1>
-          <p className="text-gray-600">{isLogin ? t.signIn : t.createAccount}</p>
+        </div>
+
+        {/* Title and Badge */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">{t.businessPortal}</h1>
+          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
+            {t.corporateOnly}
+          </span>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -317,9 +374,10 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.company_name}
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                  placeholder="Your Company Inc."
                 />
               </div>
               <div>
@@ -327,31 +385,34 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.contact_name}
                   onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                  placeholder="John Smith"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
             <input
               type="email"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
+              placeholder="you@company.com"
             />
           </div>
 
@@ -360,29 +421,70 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             <input
               type="password"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
             />
           </div>
 
+          {isLogin && (
+            <div className="text-right">
+              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
+                {t.forgotPassword}
+              </a>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
+            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
           >
-            {loading ? '...' : (isLogin ? t.login : t.register)}
+            {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        {/* Business Account Benefits */}
+        {isLogin && (
+          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit1}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit2}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit3}</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:underline"
+            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
           >
             {isLogin ? t.noAccount : t.haveAccount}
           </button>
         </div>
+
+        {/* Contact link for non-B2B clients */}
+        {isLogin && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">
+              {t.notB2B}{' '}
+              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
+                {t.contactUs}
+              </a>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
