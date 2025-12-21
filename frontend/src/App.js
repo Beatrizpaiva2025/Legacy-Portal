@@ -28,7 +28,7 @@ const TRANSLATIONS = {
     errorOccurred: 'An error occurred',
     // Benefits
     benefits: 'Business Account Benefits:',
-    benefit1: 'Monthly invoicing - Pay at end of month',
+    benefit1: 'Monthly invoicing',
     benefit2: 'Dedicated B2B support chat',
     benefit3: 'Priority processing',
     // Navigation
@@ -96,7 +96,7 @@ const TRANSLATIONS = {
     phoneOptional: 'Teléfono (opcional)',
     errorOccurred: 'Ocurrió un error',
     benefits: 'Beneficios de la Cuenta Empresarial:',
-    benefit1: 'Facturación mensual - Pague a fin de mes',
+    benefit1: 'Facturación mensual',
     benefit2: 'Chat de soporte B2B dedicado',
     benefit3: 'Procesamiento prioritario',
     // Navigation
@@ -163,7 +163,7 @@ const TRANSLATIONS = {
     phoneOptional: 'Telefone (opcional)',
     errorOccurred: 'Ocorreu um erro',
     benefits: 'Benefícios da Conta Empresarial:',
-    benefit1: 'Faturamento mensal - Pague no final do mês',
+    benefit1: 'Faturamento mensal',
     benefit2: 'Chat de suporte B2B dedicado',
     benefit3: 'Processamento prioritário',
     // Navigation
