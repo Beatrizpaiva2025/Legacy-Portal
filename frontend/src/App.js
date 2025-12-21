@@ -186,17 +186,17 @@ const getLocalCurrency = () => {
     const locale = navigator.language;
 
     // Brazil
-    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0 };
+    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
     // Europe
-    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92 };
+    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92, isUSA: false };
     // UK
-    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79 };
+    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79, isUSA: false };
     // Mexico, Latin America (except Brazil)
-    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5 };
-    // Default USD
-    return { code: 'USD', symbol: '$', rate: 1 };
+    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5, isUSA: false };
+    // Default USD (USA)
+    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
   } catch {
-    return { code: 'USD', symbol: '$', rate: 1 };
+    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
   }
 };
 
@@ -525,7 +525,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       urgencyFee = basePrice * 1.0;
     }
 
-    const shippingFee = (needsPhysicalCopy || formData.service_type === 'rmv') ? USPS_PRIORITY_MAIL : 0;
+    // Shipping only available in USA
+    const shippingFee = currency.isUSA && (needsPhysicalCopy || formData.service_type === 'rmv') ? USPS_PRIORITY_MAIL : 0;
 
     setQuote({
       base_price: basePrice,
@@ -773,27 +774,29 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
                 </label>
 
-                {/* RMV Certified Translation */}
-                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                }`}>
-                  <input
-                    type="radio"
-                    name="service_type"
-                    value="rmv"
-                    checked={formData.service_type === 'rmv'}
-                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
-                    className="mr-3"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium flex items-center gap-1">
-                      RMV Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                {/* RMV Certified Translation - USA Only */}
+                {currency.isUSA && (
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="service_type"
+                      value="rmv"
+                      checked={formData.service_type === 'rmv'}
+                      onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium flex items-center gap-1">
+                        RMV Certified Translation
+                        <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                      </div>
+                      <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
                     </div>
-                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
-                  </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
-                </label>
+                    <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  </label>
+                )}
               </div>
 
               {/* Service Type Descriptions */}
@@ -801,7 +804,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
                 <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
                 <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                {currency.isUSA && <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>}
               </div>
             </div>
 
@@ -935,91 +938,93 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
-            {/* Physical Copy / Shipping */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
-              <div className="space-y-3">
-                <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={needsPhysicalCopy || formData.service_type === 'rmv'}
-                    onChange={(e) => setNeedsPhysicalCopy(e.target.checked)}
-                    disabled={formData.service_type === 'rmv'}
-                    className="mr-3 h-4 w-4 text-teal-600"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">Physical copy required</div>
-                    <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
-                  </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
-                </label>
+            {/* Physical Copy / Shipping - USA Only */}
+            {currency.isUSA && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
+                <div className="space-y-3">
+                  <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={needsPhysicalCopy || formData.service_type === 'rmv'}
+                      onChange={(e) => setNeedsPhysicalCopy(e.target.checked)}
+                      disabled={formData.service_type === 'rmv'}
+                      className="mr-3 h-4 w-4 text-teal-600"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">Physical copy required</div>
+                      <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
+                    </div>
+                    <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
+                  </label>
 
-                {formData.service_type === 'rmv' && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-sm text-amber-800">
-                      <strong>Note:</strong> RMV Certified translations require physical delivery.
-                    </p>
-                  </div>
-                )}
+                  {formData.service_type === 'rmv' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800">
+                        <strong>Note:</strong> RMV Certified translations require physical delivery.
+                      </p>
+                    </div>
+                  )}
 
-                {(needsPhysicalCopy || formData.service_type === 'rmv') && (
-                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          value={shippingAddress.street}
-                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
-                          placeholder="123 Main Street, Apt 4B"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">City *</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          value={shippingAddress.city}
-                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                          placeholder="Boston"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">State *</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          value={shippingAddress.state}
-                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
-                          placeholder="MA"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                          value={shippingAddress.zipCode}
-                          onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
-                          placeholder="02101"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Country</label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
-                          value="USA"
-                          disabled
-                        />
+                  {(needsPhysicalCopy || formData.service_type === 'rmv') && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.street}
+                            onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                            placeholder="123 Main Street, Apt 4B"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">City *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.city}
+                            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                            placeholder="Boston"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">State *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.state}
+                            onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                            placeholder="MA"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.zipCode}
+                            onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                            placeholder="02101"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Country</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
+                            value="USA"
+                            disabled
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
