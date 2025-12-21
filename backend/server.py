@@ -773,9 +773,12 @@ class TranslationOrderUpdate(BaseModel):
     payment_date: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     notes: Optional[str] = None
-    # Assignment updates
+    # Assignment updates (by ID)
     assigned_pm_id: Optional[str] = None
     assigned_translator_id: Optional[str] = None
+    # Assignment updates (by name - for direct assignment from dropdown)
+    assigned_pm: Optional[str] = None
+    assigned_translator: Optional[str] = None
     deadline: Optional[datetime] = None
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
@@ -3113,6 +3116,7 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
         if update_data.notes:
             update_dict["notes"] = update_data.notes
         # NEW: Assignment fields
+        # Handle PM assignment by ID
         if update_data.assigned_pm_id is not None:
             update_dict["assigned_pm_id"] = update_data.assigned_pm_id
             # Get PM name
@@ -3122,6 +3126,21 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                     update_dict["assigned_pm_name"] = pm.get("name", "")
             else:
                 update_dict["assigned_pm_name"] = None
+        # Handle PM assignment by name (from dropdown)
+        if update_data.assigned_pm is not None:
+            update_dict["assigned_pm_name"] = update_data.assigned_pm
+            # Try to find PM by name to get ID
+            pm = await db.admin_users.find_one({"name": update_data.assigned_pm, "role": "pm"})
+            if pm:
+                update_dict["assigned_pm_id"] = pm.get("id", "")
+        # Handle Translator assignment by name (from dropdown)
+        if update_data.assigned_translator is not None:
+            update_dict["assigned_translator_name"] = update_data.assigned_translator
+            # Try to find translator by name to get ID
+            translator = await db.admin_users.find_one({"name": update_data.assigned_translator, "role": "translator"})
+            if translator:
+                update_dict["assigned_translator_id"] = translator.get("id", "")
+        # Handle Translator assignment by ID
         if update_data.assigned_translator_id is not None:
             update_dict["assigned_translator_id"] = update_data.assigned_translator_id
             # Get translator name
