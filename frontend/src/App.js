@@ -15,6 +15,16 @@ const TRANSLATIONS = {
     companyEmail: 'Company Email',
     password: 'Password',
     forgotPassword: 'Forgot password?',
+    resetPassword: 'Reset Password',
+    resetPasswordDesc: 'Enter your email and we will send you a link to reset your password.',
+    sendResetLink: 'Send Reset Link',
+    resetEmailSent: 'If an account exists with this email, you will receive a password reset link.',
+    backToLogin: 'Back to Login',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm Password',
+    passwordChanged: 'Password changed successfully! You can now log in.',
+    passwordMismatch: 'Passwords do not match',
+    invalidResetLink: 'Invalid or expired reset link',
     accessPortal: 'Access Business Portal',
     createAccount: 'Create Business Account',
     pleaseWait: 'Please wait...',
@@ -84,6 +94,16 @@ const TRANSLATIONS = {
     companyEmail: 'Correo Corporativo',
     password: 'Contraseña',
     forgotPassword: '¿Olvidó su contraseña?',
+    resetPassword: 'Restablecer Contraseña',
+    resetPasswordDesc: 'Ingrese su correo y le enviaremos un enlace para restablecer su contraseña.',
+    sendResetLink: 'Enviar Enlace',
+    resetEmailSent: 'Si existe una cuenta con este correo, recibirá un enlace para restablecer su contraseña.',
+    backToLogin: 'Volver al Inicio',
+    newPassword: 'Nueva Contraseña',
+    confirmPassword: 'Confirmar Contraseña',
+    passwordChanged: '¡Contraseña cambiada con éxito! Ya puede iniciar sesión.',
+    passwordMismatch: 'Las contraseñas no coinciden',
+    invalidResetLink: 'Enlace de restablecimiento inválido o expirado',
     accessPortal: 'Acceder al Portal',
     createAccount: 'Crear Cuenta Empresarial',
     pleaseWait: 'Espere...',
@@ -151,6 +171,16 @@ const TRANSLATIONS = {
     companyEmail: 'E-mail Corporativo',
     password: 'Senha',
     forgotPassword: 'Esqueceu a senha?',
+    resetPassword: 'Redefinir Senha',
+    resetPasswordDesc: 'Digite seu e-mail e enviaremos um link para redefinir sua senha.',
+    sendResetLink: 'Enviar Link',
+    resetEmailSent: 'Se existir uma conta com este e-mail, você receberá um link para redefinir sua senha.',
+    backToLogin: 'Voltar ao Login',
+    newPassword: 'Nova Senha',
+    confirmPassword: 'Confirmar Senha',
+    passwordChanged: 'Senha alterada com sucesso! Você já pode fazer login.',
+    passwordMismatch: 'As senhas não coincidem',
+    invalidResetLink: 'Link de redefinição inválido ou expirado',
     accessPortal: 'Acessar Portal Empresarial',
     createAccount: 'Criar Conta Empresarial',
     pleaseWait: 'Aguarde...',
@@ -283,6 +313,10 @@ const LANGUAGES = [
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -292,6 +326,20 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      await axios.post(`${API}/auth/forgot-password`, { email: resetEmail });
+      setResetSent(true);
+    } catch (err) {
+      // Always show success message for security (don't reveal if email exists)
+      setResetSent(true);
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -429,9 +477,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
           {isLogin && (
             <div className="text-right">
-              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
+              <button
+                type="button"
+                onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
+                className="text-sm text-teal-600 hover:text-teal-700 hover:underline"
+              >
                 {t.forgotPassword}
-              </a>
+              </button>
             </div>
           )}
 
@@ -479,13 +531,70 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-500">
               {t.notB2B}{' '}
-              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
-                {t.contactUs}
+              <a href="mailto:contact@legacytranslations.com" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
+                contact@legacytranslations.com
               </a>
             </p>
           </div>
         )}
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-2">{t.resetPassword}</h2>
+
+            {!resetSent ? (
+              <>
+                <p className="text-gray-600 text-sm mb-4">{t.resetPasswordDesc}</p>
+                <form onSubmit={handleForgotPassword}>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
+                    <input
+                      type="email"
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@company.com"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                    >
+                      {t.backToLogin}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-medium"
+                    >
+                      {resetLoading ? t.pleaseWait : t.sendResetLink}
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="text-center py-4">
+                  <div className="text-4xl mb-3">✉️</div>
+                  <p className="text-gray-600">{t.resetEmailSent}</p>
+                </div>
+                <button
+                  onClick={() => setShowForgotPassword(false)}
+                  className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 font-medium"
+                >
+                  {t.backToLogin}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1533,6 +1642,116 @@ const MessagesPage = ({ token }) => {
   );
 };
 
+// ==================== RESET PASSWORD PAGE ====================
+const ResetPasswordPage = ({ resetToken, onSuccess, onCancel, t }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmPassword) {
+      setError(t.passwordMismatch);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.post(`${API}/auth/reset-password`, {
+        token: resetToken,
+        new_password: newPassword
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || t.invalidResetLink);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <div className="text-center mb-6">
+          <img
+            src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+            alt="Legacy Translations"
+            className="h-12 mx-auto mb-4"
+          />
+          <h2 className="text-xl font-bold text-gray-800">{t.resetPassword}</h2>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>
+        )}
+
+        {!success ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.newPassword}</label>
+              <input
+                type="password"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.confirmPassword}</label>
+              <input
+                type="password"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                {t.backToLogin}
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-medium"
+              >
+                {loading ? t.pleaseWait : t.resetPassword}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="text-center py-4">
+            <div className="text-4xl mb-3">✅</div>
+            <p className="text-gray-600 mb-4">{t.passwordChanged}</p>
+            <button
+              onClick={onSuccess}
+              className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 font-medium"
+            >
+              {t.backToLogin}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function App() {
   const [partner, setPartner] = useState(null);
@@ -1540,6 +1759,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('new-order');
   const [lang, setLang] = useState(getInitialLanguage);
   const [currency] = useState(getLocalCurrency);
+  const [resetToken, setResetToken] = useState(null);
 
   // Get translations for current language
   const t = TRANSLATIONS[lang];
@@ -1549,6 +1769,15 @@ function App() {
     setLang(newLang);
     localStorage.setItem('ui_language', newLang);
   };
+
+  // Check for reset token in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('reset_token');
+    if (token) {
+      setResetToken(token);
+    }
+  }, []);
 
   // Check for saved session
   useEffect(() => {
@@ -1591,6 +1820,24 @@ function App() {
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
   };
+
+  // Show reset password page if reset token is present
+  if (resetToken) {
+    return (
+      <ResetPasswordPage
+        resetToken={resetToken}
+        t={t}
+        onSuccess={() => {
+          setResetToken(null);
+          window.history.replaceState({}, '', window.location.pathname);
+        }}
+        onCancel={() => {
+          setResetToken(null);
+          window.history.replaceState({}, '', window.location.pathname);
+        }}
+      />
+    );
+  }
 
   if (!partner) {
     return <LoginPage onLogin={handleLogin} t={t} lang={lang} changeLanguage={changeLanguage} />;
