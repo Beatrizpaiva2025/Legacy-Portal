@@ -1475,13 +1475,6 @@ function CustomerApp() {
               alt="Legacy Translations"
               className="h-12"
             />
-            <a
-              href="/customer"
-              onClick={(e) => { e.preventDefault(); window.location.reload(); }}
-              className="text-teal-600 hover:underline"
-            >
-              Sign In
-            </a>
           </div>
         </header>
         <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} />
