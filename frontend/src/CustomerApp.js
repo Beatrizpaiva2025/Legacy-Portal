@@ -374,6 +374,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   }, [formData.service_type]);
 
+  // Force Portuguese (Brasil) as target language for Sworn Translation
+  useEffect(() => {
+    if (formData.service_type === 'sworn') {
+      setFormData(prev => ({...prev, translate_to: 'pt-br'}));
+    }
+  }, [formData.service_type]);
+
   // Auto-save abandoned quote when user sees the price
   useEffect(() => {
     if (quote && guestEmail && uploadedFiles.length > 0 && !abandonedQuoteId) {
@@ -745,17 +752,30 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+                      value="pt-br"
+                      disabled
+                    >
+                      <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
+                    </select>
+                    <p className="text-xs text-amber-600 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
