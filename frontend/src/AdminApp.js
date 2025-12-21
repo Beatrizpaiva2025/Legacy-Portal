@@ -68,6 +68,11 @@ const TRANSLATORS = [
   { name: "Noemi Santos", title: "Senior Translator" }
 ];
 
+const PROJECT_MANAGERS = [
+  { name: "Ana Clara", title: "Project Manager" },
+  { name: "Beatriz Paiva", title: "Managing Director" }
+];
+
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -4131,6 +4136,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
+  const [assigningPM, setAssigningPM] = useState(null); // Order ID being assigned PM
 
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
@@ -4492,6 +4498,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to assign translator:', err);
+    }
+  };
+
+  // Assign PM to order
+  const assignPM = async (orderId, pmName) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        assigned_pm: pmName
+      });
+      setAssigningPM(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to assign PM:', err);
     }
   };
 
@@ -4910,6 +4929,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
+              <th className="px-2 py-2 text-left font-medium">PM</th>
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
@@ -4969,6 +4989,35 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         )}
                       </div>
                     </div>
+                  </td>
+                  {/* PM */}
+                  <td className="px-2 py-2">
+                    {assigningPM === order.id ? (
+                      <select
+                        autoFocus
+                        className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        onChange={(e) => {
+                          if (e.target.value) assignPM(order.id, e.target.value);
+                        }}
+                        onBlur={() => setAssigningPM(null)}
+                      >
+                        <option value="">Select...</option>
+                        {PROJECT_MANAGERS.map(pm => (
+                          <option key={pm.name} value={pm.name}>{pm.name}</option>
+                        ))}
+                      </select>
+                    ) : order.assigned_pm ? (
+                      <span className="text-[10px] text-gray-700">{order.assigned_pm}</span>
+                    ) : isAdmin ? (
+                      <button
+                        onClick={() => setAssigningPM(order.id)}
+                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                      >
+                        + Assign
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-gray-400">-</span>
+                    )}
                   </td>
                   {/* Translator */}
                   <td className="px-2 py-2">
