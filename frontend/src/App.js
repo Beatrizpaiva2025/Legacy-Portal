@@ -457,12 +457,37 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Physical copy / shipping options
+  const [needsPhysicalCopy, setNeedsPhysicalCopy] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA'
+  });
+  const USPS_PRIORITY_MAIL = 18.99;
+
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, needsPhysicalCopy]);
+
+  // Force Portuguese (Brasil) as target language for Sworn Translation
+  useEffect(() => {
+    if (formData.service_type === 'sworn') {
+      setFormData(prev => ({...prev, translate_to: 'pt-br'}));
+    }
+  }, [formData.service_type]);
+
+  // Force physical copy for RMV Certified
+  useEffect(() => {
+    if (formData.service_type === 'rmv') {
+      setNeedsPhysicalCopy(true);
+    }
+  }, [formData.service_type]);
 
   const calculateQuote = () => {
     let basePrice = 0;
@@ -494,10 +519,13 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       urgencyFee = basePrice * 1.0;
     }
 
+    const shippingFee = (needsPhysicalCopy || formData.service_type === 'rmv') ? USPS_PRIORITY_MAIL : 0;
+
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
-      total_price: basePrice + urgencyFee,
+      shipping_fee: shippingFee,
+      total_price: basePrice + urgencyFee + shippingFee,
       pages: pages
     });
   };
@@ -789,17 +817,30 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+                      value="pt-br"
+                      disabled
+                    >
+                      <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -888,6 +929,92 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
+            {/* Physical Copy / Shipping */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
+              <div className="space-y-3">
+                <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={needsPhysicalCopy || formData.service_type === 'rmv'}
+                    onChange={(e) => setNeedsPhysicalCopy(e.target.checked)}
+                    disabled={formData.service_type === 'rmv'}
+                    className="mr-3 h-4 w-4 text-teal-600"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium">Physical copy required</div>
+                    <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$18.99</div>
+                </label>
+
+                {formData.service_type === 'rmv' && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-800">
+                      <strong>Note:</strong> RMV Certified translations require physical delivery.
+                    </p>
+                  </div>
+                )}
+
+                {(needsPhysicalCopy || formData.service_type === 'rmv') && (
+                  <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.street}
+                          onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                          placeholder="123 Main Street, Apt 4B"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.city}
+                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                          placeholder="Boston"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">State *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.state}
+                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                          placeholder="MA"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          value={shippingAddress.zipCode}
+                          onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                          placeholder="02101"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
+                          value="USA"
+                          disabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -950,6 +1077,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 <div className="flex justify-between text-orange-600">
                   <span>Urgency Fee</span>
                   <span>${quote.urgency_fee.toFixed(2)}</span>
+                </div>
+              )}
+              {quote?.shipping_fee > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>Shipping (USPS Priority)</span>
+                  <span>${quote.shipping_fee.toFixed(2)}</span>
                 </div>
               )}
             </div>
