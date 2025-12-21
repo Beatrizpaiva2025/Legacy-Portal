@@ -4471,8 +4471,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const assignTranslator = async (orderId, translatorName) => {
     try {
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
-        assigned_translator: translatorName,
-        translation_status: 'in_translation'
+        assigned_translator: translatorName
       });
       setAssigningTranslator(null);
       fetchOrders();
@@ -4670,15 +4669,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </div>
           )}
         </>
-      ) : (
-        /* Admin sees: Only Total Orders - Financial data moved to Finances page */
-        <div className="grid grid-cols-1 gap-3 mb-4 max-w-xs">
-          <div className="bg-white rounded shadow p-3">
-            <div className="text-[10px] text-gray-500 uppercase">Total Orders</div>
-            <div className="text-xl font-bold text-gray-800">{orders.length}</div>
-          </div>
-        </div>
-      )}
+      ) : null}
 
       <div className="flex justify-between items-center mb-3">
         <div className="flex items-center space-x-3">
