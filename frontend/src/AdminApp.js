@@ -297,12 +297,12 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 };
 
 // ==================== HORIZONTAL TOP BAR ====================
-const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey, orderCount }) => {
+const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'], showCount: true },
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'production', label: 'Report', icon: '📊', roles: ['admin'] },
+    { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
@@ -321,12 +321,6 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey, orderCount 
   };
 
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
-
-  const handleNotificationClick = (notif) => {
-    if (notif.order_id && (notif.type === 'project_assigned' || notif.type === 'revision_requested')) {
-      setActiveTab('translation');
-    }
-  };
 
   return (
     <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
@@ -353,9 +347,6 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey, orderCount 
             }`}
           >
             <span className="mr-1.5">{item.icon}</span>
-            {item.showCount && orderCount !== undefined && (
-              <span className="mr-1 bg-teal-500 text-white px-1.5 py-0.5 rounded-full text-[10px] font-medium">{orderCount}</span>
-            )}
             <span>{item.label}</span>
           </button>
         ))}
@@ -364,14 +355,8 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey, orderCount 
       {/* User Info and Actions */}
       <div className="flex items-center space-x-3">
         {user && (
-          <div className="flex items-center space-x-2">
-            <NotificationBell adminKey={adminKey} user={user} onNotificationClick={handleNotificationClick} />
-            <div className="text-right">
-              <div className="text-xs font-medium text-white">{user.name}</div>
-              <div className={`inline-block px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
-                {roleInfo.label}
-              </div>
-            </div>
+          <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
+            {roleInfo.label}
           </div>
         )}
         <button
@@ -4927,7 +4912,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
-              <th className="px-2 py-2 text-left font-medium">Tags</th>
+              <th className="px-2 py-2 text-left font-medium">Notes</th>
               {/* Total and Payment columns - Admin only */}
               {isAdmin && <th className="px-2 py-2 text-right font-medium">Total</th>}
               {isAdmin && <th className="px-2 py-2 text-center font-medium">Payment</th>}
@@ -5080,24 +5065,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Status */}
                   <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
-                  {/* Tags - Editable */}
+                  {/* Notes */}
                   <td className="px-2 py-2">
                     {editingTags === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
-                        <select
-                          value={tempTagValue.type}
-                          onChange={(e) => setTempTagValue({...tempTagValue, type: e.target.value})}
-                          className="px-1 py-0.5 text-[10px] border rounded"
-                        >
-                          <option value="professional">PROF</option>
-                          <option value="certified">CERT</option>
-                        </select>
                         <input
                           type="text"
                           placeholder="Internal note..."
                           value={tempTagValue.notes}
                           onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
-                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          className="px-1 py-0.5 text-[10px] border rounded w-28"
                         />
                         <div className="flex gap-1">
                           <button onClick={() => saveTagsEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
@@ -5106,16 +5083,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
-                        <span className="px-1 py-0.5 bg-gray-100 border rounded text-[10px]">{order.translation_type === 'certified' ? 'CERT' : 'PROF'}</span>
-                        <span>{FLAGS[order.translate_to] || '🌐'}</span>
-                        {order.internal_notes && (
-                          <span className="px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Internal note: ${order.internal_notes}`}>📝</span>
-                        )}
                         {order.notes && (
-                          <span className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Client message: ${order.notes}`}>💬</span>
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Client message: ${order.notes}`}>💬</span>
+                        )}
+                        {order.internal_notes && (
+                          <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Internal note: ${order.internal_notes}`}>📝</span>
                         )}
                         {isAdmin && (
-                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit tags">✏️</button>
+                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit notes">✏️</button>
+                        )}
+                        {!order.notes && !order.internal_notes && !isAdmin && (
+                          <span className="text-gray-300 text-[10px]">-</span>
                         )}
                       </div>
                     )}
@@ -6777,26 +6755,6 @@ function AdminApp() {
     }
   };
 
-  // State for order count
-  const [orderCount, setOrderCount] = useState(0);
-
-  // Fetch order count for top bar
-  useEffect(() => {
-    const fetchOrderCount = async () => {
-      if (!adminKey) return;
-      try {
-        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-        setOrderCount(response.data.length || 0);
-      } catch (err) {
-        console.error('Error fetching order count:', err);
-      }
-    };
-    fetchOrderCount();
-    // Refresh count every 30 seconds
-    const interval = setInterval(fetchOrderCount, 30000);
-    return () => clearInterval(interval);
-  }, [adminKey]);
-
   if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
 
   // If translation-tool route, render standalone page
@@ -6806,7 +6764,7 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} orderCount={orderCount} />
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );
