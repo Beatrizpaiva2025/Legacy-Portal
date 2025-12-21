@@ -457,6 +457,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Format price with currency conversion
+  const formatPrice = (usdPrice) => {
+    const converted = usdPrice * currency.rate;
+    return `${currency.symbol}${converted.toFixed(2)}`;
+  };
+
   // Physical copy / shipping options
   const [needsPhysicalCopy, setNeedsPhysicalCopy] = useState(false);
   const [shippingAddress, setShippingAddress] = useState({
@@ -720,7 +726,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -742,7 +748,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">General use, no certification</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/page</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -764,7 +770,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$55.00/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -786,7 +792,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
                 </label>
               </div>
 
@@ -945,7 +951,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     <div className="font-medium">Physical copy required</div>
                     <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$18.99</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
                 </label>
 
                 {formData.service_type === 'rmv' && (
@@ -1071,18 +1077,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Base Price</span>
-                <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
+                <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>Urgency Fee</span>
-                  <span>${quote.urgency_fee.toFixed(2)}</span>
+                  <span>{formatPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
                   <span>Shipping (USPS Priority)</span>
-                  <span>${quote.shipping_fee.toFixed(2)}</span>
+                  <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
             </div>
@@ -1090,7 +1096,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">Total</span>
-                <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
+                <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
               </div>
             </div>
 
