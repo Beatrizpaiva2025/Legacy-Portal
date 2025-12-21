@@ -4378,7 +4378,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Send email to client
   const sendEmailToClient = (email, orderNumber) => {
     const mailtoLink = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
-    window.open(mailtoLink, '_blank');
+    // Create temporary anchor element to properly trigger mailto:
+    const link = document.createElement('a');
+    link.href = mailtoLink;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Open "Send to Client" modal
@@ -4991,7 +4996,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                   </td>
                   {/* PM */}
-                  <td className="px-2 py-2">
+                  <td className={`px-2 py-2 ${order.assigned_pm ? 'bg-green-50' : ''}`}>
                     {assigningPM === order.id ? (
                       <select
                         autoFocus
@@ -5007,7 +5012,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ))}
                       </select>
                     ) : order.assigned_pm ? (
-                      <span className="text-[10px] text-gray-700">{order.assigned_pm}</span>
+                      <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm}</span>
                     ) : isAdmin ? (
                       <button
                         onClick={() => setAssigningPM(order.id)}
@@ -5020,7 +5025,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     )}
                   </td>
                   {/* Translator */}
-                  <td className="px-2 py-2">
+                  <td className={`px-2 py-2 ${order.assigned_translator ? 'bg-green-50' : ''}`}>
                     {assigningTranslator === order.id ? (
                       <select
                         autoFocus
@@ -5037,7 +5042,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </select>
                     ) : order.assigned_translator ? (
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-700">{order.assigned_translator}</span>
+                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator}</span>
                         {order.translator_assignment_status === 'pending' && (
                           <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
                         )}
