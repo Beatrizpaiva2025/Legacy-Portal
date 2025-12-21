@@ -1531,6 +1531,11 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         # Create Stripe checkout session
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
+            payment_method_options={
+                'card': {
+                    'request_three_d_secure': 'automatic'
+                }
+            },
             line_items=[{
                 'price_data': {
                     'currency': 'usd',
@@ -1543,6 +1548,9 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 'quantity': 1,
             }],
             mode='payment',
+            saved_payment_method_options={
+                'payment_method_save': 'disabled'
+            },
             success_url=f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{request.origin_url}?payment_cancelled=true",
             metadata={
