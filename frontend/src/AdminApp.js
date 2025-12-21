@@ -4171,10 +4171,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     assigned_pm_id: '',
     assigned_translator_id: '',
     deadline: '',
+    deadline_time: '17:00',
     base_price: '',
     total_price: '',
     revenue_source: 'website',
-    payment_method: ''
+    payment_method: '',
+    payment_received: false,
+    payment_tag: '',
+    create_invoice: false,
+    invoice_terms: '30_days',
+    invoice_custom_date: ''
   });
 
   const REVENUE_SOURCES = [
@@ -4524,6 +4530,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         projectData.document_filename = documentFile.name;
       }
 
+      // Set payment status based on received flag
+      if (newProject.payment_received) {
+        projectData.payment_status = 'paid';
+      } else {
+        projectData.payment_status = 'pending';
+      }
+
+      // Combine deadline date and time
+      if (projectData.deadline && projectData.deadline_time) {
+        projectData.deadline = `${projectData.deadline}T${projectData.deadline_time}`;
+      }
+
       await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, projectData);
       setShowNewProjectForm(false);
       setNewProject({
@@ -4540,10 +4558,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         assigned_pm_id: '',
         assigned_translator_id: '',
         deadline: '',
+        deadline_time: '17:00',
         base_price: '',
         total_price: '',
         revenue_source: 'website',
-        payment_method: ''
+        payment_method: '',
+        payment_received: false,
+        payment_tag: '',
+        create_invoice: false,
+        invoice_terms: '30_days',
+        invoice_custom_date: ''
       });
       setDocumentFile(null);
       fetchOrders();
@@ -4782,12 +4806,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Deadline</label>
-                <input
-                  type="date"
-                  value={newProject.deadline}
-                  onChange={(e) => setNewProject({...newProject, deadline: e.target.value})}
-                  className="w-full px-2 py-1.5 text-xs border rounded"
-                />
+                <div className="flex gap-1">
+                  <input
+                    type="date"
+                    value={newProject.deadline}
+                    onChange={(e) => setNewProject({...newProject, deadline: e.target.value})}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  />
+                  <input
+                    type="time"
+                    value={newProject.deadline_time}
+                    onChange={(e) => setNewProject({...newProject, deadline_time: e.target.value})}
+                    className="w-20 px-1 py-1.5 text-xs border rounded"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Price ($)</label>
@@ -4811,6 +4843,93 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {PAYMENT_METHODS.map(pm => <option key={pm.value} value={pm.value}>{pm.label}</option>)}
                 </select>
               </div>
+            </div>
+
+            {/* Payment Status Section */}
+            <div className="mb-3 p-3 bg-gray-50 rounded border">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] font-medium text-gray-700">Payment Status</label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newProject.payment_received}
+                    onChange={(e) => setNewProject({...newProject, payment_received: e.target.checked, payment_tag: e.target.checked ? '' : newProject.payment_tag})}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <span className={`text-xs font-medium ${newProject.payment_received ? 'text-green-600' : 'text-gray-600'}`}>
+                    {newProject.payment_received ? '✓ Payment Received' : 'Payment Received'}
+                  </span>
+                </label>
+              </div>
+
+              {!newProject.payment_received && (
+                <div className="space-y-2">
+                  <div className="text-[10px] text-gray-500 mb-1">Payment Tag:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: '', label: 'Awaiting Payment' },
+                      { value: 'bonus', label: '🎁 Bonus' },
+                      { value: 'no_charge', label: '🚫 No Charge' },
+                      { value: 'partner', label: '🤝 Partner' }
+                    ].map(tag => (
+                      <label key={tag.value} className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="payment_tag"
+                          value={tag.value}
+                          checked={newProject.payment_tag === tag.value}
+                          onChange={(e) => setNewProject({...newProject, payment_tag: e.target.value})}
+                          className="w-3 h-3"
+                        />
+                        <span className="text-[10px] text-gray-600">{tag.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Invoice Options */}
+                  <div className="mt-3 pt-2 border-t">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={newProject.create_invoice}
+                        onChange={(e) => setNewProject({...newProject, create_invoice: e.target.checked})}
+                        className="w-4 h-4 rounded border-gray-300"
+                      />
+                      <span className="text-[10px] font-medium text-gray-700">📄 Create Invoice</span>
+                    </label>
+
+                    {newProject.create_invoice && (
+                      <div className="ml-6 flex flex-wrap gap-2">
+                        {[
+                          { value: '15_days', label: '15 Days' },
+                          { value: '30_days', label: '30 Days' },
+                          { value: 'custom', label: 'Custom Date' }
+                        ].map(term => (
+                          <label key={term.value} className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="invoice_terms"
+                              value={term.value}
+                              checked={newProject.invoice_terms === term.value}
+                              onChange={(e) => setNewProject({...newProject, invoice_terms: e.target.value})}
+                              className="w-3 h-3"
+                            />
+                            <span className="text-[10px] text-gray-600">{term.label}</span>
+                          </label>
+                        ))}
+                        {newProject.invoice_terms === 'custom' && (
+                          <input
+                            type="date"
+                            value={newProject.invoice_custom_date}
+                            onChange={(e) => setNewProject({...newProject, invoice_custom_date: e.target.value})}
+                            className="px-2 py-1 text-xs border rounded"
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Document Upload */}
