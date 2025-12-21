@@ -3156,8 +3156,15 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
 
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
-    """Update order status (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    """Update order status (admin or PM)"""
+    # Validate admin key OR valid token from admin/PM
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
@@ -4289,7 +4296,15 @@ class TranslateRequest(BaseModel):
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
     """Perform OCR on uploaded document (admin translation workspace)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Validate admin key OR valid token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        # Check if it's a valid user token
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
@@ -4479,7 +4494,15 @@ CRITICAL INSTRUCTIONS:
 @api_router.post("/admin/translate")
 async def admin_translate(request: TranslateRequest, admin_key: str):
     """Translate text using Claude API (admin translation workspace)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Validate admin key OR valid token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        # Check if it's a valid user token
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     if not request.claude_api_key:
