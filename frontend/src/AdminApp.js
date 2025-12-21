@@ -296,13 +296,13 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
   );
 };
 
-// ==================== COMPACT SIDEBAR ====================
-const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
+// ==================== HORIZONTAL TOP BAR ====================
+const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey, orderCount }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'], showCount: true },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'production', label: 'Production', icon: '📊', roles: ['admin'] },
+    { id: 'production', label: 'Report', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
@@ -323,60 +323,60 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
 
   const handleNotificationClick = (notif) => {
-    // Navigate to the relevant project if it's a project notification
     if (notif.order_id && (notif.type === 'project_assigned' || notif.type === 'revision_requested')) {
       setActiveTab('translation');
     }
   };
 
   return (
-    <div className="w-48 bg-slate-800 text-white min-h-screen flex flex-col text-xs">
-      <div className="p-3 border-b border-slate-700">
+    <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
+      {/* Logo and Brand */}
+      <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
           <div>
             <div className="font-bold text-sm">Legacy Admin</div>
-            <div className="text-[10px] text-slate-400">Management</div>
           </div>
         </div>
-        {/* User info */}
-        {user && (
-          <div className="mt-3 pt-2 border-t border-slate-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs font-medium text-white truncate">{user.name}</div>
-                <div className={`inline-block mt-1 px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
-                  {roleInfo.label}
-                </div>
-              </div>
-              <NotificationBell adminKey={adminKey} user={user} onNotificationClick={handleNotificationClick} />
-            </div>
-          </div>
-        )}
       </div>
 
-      <nav className="flex-1 py-2">
+      {/* Navigation Menu */}
+      <nav className="flex items-center space-x-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center px-3 py-2 text-left transition-colors ${
+            className={`flex items-center px-3 py-1.5 rounded transition-colors ${
               activeTab === item.id
                 ? 'bg-teal-600 text-white'
                 : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <span className="mr-2">{item.icon}</span>
+            <span className="mr-1.5">{item.icon}</span>
+            {item.showCount && orderCount !== undefined && (
+              <span className="mr-1 bg-teal-500 text-white px-1.5 py-0.5 rounded-full text-[10px] font-medium">{orderCount}</span>
+            )}
             <span>{item.label}</span>
           </button>
         ))}
-
       </nav>
 
-      <div className="p-2 border-t border-slate-700">
+      {/* User Info and Actions */}
+      <div className="flex items-center space-x-3">
+        {user && (
+          <div className="flex items-center space-x-2">
+            <NotificationBell adminKey={adminKey} user={user} onNotificationClick={handleNotificationClick} />
+            <div className="text-right">
+              <div className="text-xs font-medium text-white">{user.name}</div>
+              <div className={`inline-block px-2 py-0.5 ${roleInfo.color} rounded text-[9px] font-medium`}>
+                {roleInfo.label}
+              </div>
+            </div>
+          </div>
+        )}
         <button
           onClick={onLogout}
-          className="w-full py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
+          className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
         >
           Logout
         </button>
@@ -4375,17 +4375,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Send email to client
-  const sendEmailToClient = (email, orderNumber) => {
-    const mailtoLink = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
-    // Create temporary anchor element to properly trigger mailto:
-    const link = document.createElement('a');
-    link.href = mailtoLink;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // Open "Send to Client" modal
   const openSendToClientModal = async (order) => {
     setSendingOrder(order);
@@ -4974,29 +4963,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {order.client_name}
                         <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
                       </div>
-                      <div className="flex flex-col gap-0.5">
+                      {/* Send translation button - shows when ready or review */}
+                      {['ready', 'review'].includes(order.translation_status) && (isAdmin || isPM) && (
                         <button
-                          onClick={() => sendEmailToClient(order.client_email, order.order_number)}
-                          className="p-0.5 hover:bg-gray-100 rounded text-gray-500 hover:text-blue-600"
-                          title="Send email to client"
+                          onClick={() => openSendToClientModal(order)}
+                          className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
+                          title="Send translation to client"
                         >
-                          ✉️
+                          📤
                         </button>
-                        {/* Send translation button - shows when ready or review */}
-                        {['ready', 'review'].includes(order.translation_status) && (isAdmin || isPM) && (
-                          <button
-                            onClick={() => openSendToClientModal(order)}
-                            className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
-                            title="Send translation to client"
-                          >
-                            📤
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </td>
                   {/* PM */}
-                  <td className={`px-2 py-2 ${order.assigned_pm ? 'bg-green-50' : ''}`}>
+                  <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
                     {assigningPM === order.id ? (
                       <select
                         autoFocus
@@ -5011,21 +4991,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <option key={pm.name} value={pm.name}>{pm.name}</option>
                         ))}
                       </select>
-                    ) : order.assigned_pm ? (
-                      <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm}</span>
+                    ) : (order.assigned_pm_name || order.assigned_pm) ? (
+                      <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
                     ) : isAdmin ? (
                       <button
                         onClick={() => setAssigningPM(order.id)}
                         className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
                       >
-                        + Assign
+                        Assign
                       </button>
                     ) : (
                       <span className="text-[10px] text-gray-400">-</span>
                     )}
                   </td>
                   {/* Translator */}
-                  <td className={`px-2 py-2 ${order.assigned_translator ? 'bg-green-50' : ''}`}>
+                  <td className={`px-2 py-2 ${(order.assigned_translator_name || order.assigned_translator) ? 'bg-green-50' : ''}`}>
                     {assigningTranslator === order.id ? (
                       <select
                         autoFocus
@@ -5040,9 +5020,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <option key={t.name} value={t.name}>{t.name}</option>
                         ))}
                       </select>
-                    ) : order.assigned_translator ? (
+                    ) : (order.assigned_translator_name || order.assigned_translator) ? (
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator}</span>
+                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
                         {order.translator_assignment_status === 'pending' && (
                           <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
                         )}
@@ -5058,7 +5038,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onClick={() => setAssigningTranslator(order.id)}
                         className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
                       >
-                        + Assign
+                        Assign
                       </button>
                     )}
                   </td>
@@ -6778,6 +6758,26 @@ function AdminApp() {
     }
   };
 
+  // State for order count
+  const [orderCount, setOrderCount] = useState(0);
+
+  // Fetch order count for top bar
+  useEffect(() => {
+    const fetchOrderCount = async () => {
+      if (!adminKey) return;
+      try {
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        setOrderCount(response.data.length || 0);
+      } catch (err) {
+        console.error('Error fetching order count:', err);
+      }
+    };
+    fetchOrderCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchOrderCount, 30000);
+    return () => clearInterval(interval);
+  }, [adminKey]);
+
   if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
 
   // If translation-tool route, render standalone page
@@ -6786,8 +6786,8 @@ function AdminApp() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} orderCount={orderCount} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
     </div>
   );
