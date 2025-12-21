@@ -4378,7 +4378,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Send email to client
   const sendEmailToClient = (email, orderNumber) => {
     const mailtoLink = `mailto:${email}?subject=Regarding your order ${orderNumber}`;
-    window.open(mailtoLink, '_blank');
+    // Create temporary anchor element to properly trigger mailto:
+    const link = document.createElement('a');
+    link.href = mailtoLink;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Open "Send to Client" modal
