@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './App.css';
@@ -558,6 +558,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Refs for scroll-to-error
+  const clientNameRef = useRef(null);
+  const clientEmailRef = useRef(null);
+  const fileUploadRef = useRef(null);
 
   // Format price with currency conversion
   const formatPrice = (usdPrice) => {
@@ -678,6 +684,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       // Add new files to existing files (accumulate) - store with word counts and document IDs
       setUploadedFiles(prev => [...prev, ...newFiles]);
       setWordCount(prev => prev + newWords);
+      // Clear file upload error when files are added
+      if (fieldErrors.file_upload) setFieldErrors(prev => ({...prev, file_upload: false}));
       setProcessingStatus('');
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
@@ -706,13 +714,36 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.client_name || !formData.client_email) {
-      setError('Please fill in client name and email');
-      return;
+    // Clear previous errors
+    setFieldErrors({});
+    const newFieldErrors = {};
+
+    // Validate required fields
+    if (!formData.client_name?.trim()) {
+      newFieldErrors.client_name = true;
+    }
+    if (!formData.client_email?.trim()) {
+      newFieldErrors.client_email = true;
+    }
+    if (wordCount === 0) {
+      newFieldErrors.file_upload = true;
     }
 
-    if (wordCount === 0) {
-      setError('Please upload a document first');
+    // If there are errors, scroll to the first one
+    if (Object.keys(newFieldErrors).length > 0) {
+      setFieldErrors(newFieldErrors);
+
+      // Scroll to first error
+      if (newFieldErrors.client_name && clientNameRef.current) {
+        clientNameRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setError('Please fill in client name');
+      } else if (newFieldErrors.client_email && clientEmailRef.current) {
+        clientEmailRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setError('Please fill in client email');
+      } else if (newFieldErrors.file_upload && fileUploadRef.current) {
+        fileUploadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setError('Please upload a document first');
+      }
       return;
     }
 
@@ -774,7 +805,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
           <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm p-6 space-y-6">
 
             {/* Client Information */}
-            <div className="border-b pb-4">
+            <div className="border-b pb-4" ref={clientNameRef}>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Client Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -784,24 +815,40 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   <input
                     type="text"
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-teal-500 ${
+                      fieldErrors.client_name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                     value={formData.client_name}
-                    onChange={(e) => setFormData({...formData, client_name: e.target.value})}
+                    onChange={(e) => {
+                      setFormData({...formData, client_name: e.target.value});
+                      if (fieldErrors.client_name) setFieldErrors({...fieldErrors, client_name: false});
+                    }}
                     placeholder="John Smith"
                   />
+                  {fieldErrors.client_name && (
+                    <p className="text-red-500 text-sm mt-1">Client name is required</p>
+                  )}
                 </div>
-                <div>
+                <div ref={clientEmailRef}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Client Email *
                   </label>
                   <input
                     type="email"
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    className={`w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-teal-500 ${
+                      fieldErrors.client_email ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                    }`}
                     value={formData.client_email}
-                    onChange={(e) => setFormData({...formData, client_email: e.target.value})}
+                    onChange={(e) => {
+                      setFormData({...formData, client_email: e.target.value});
+                      if (fieldErrors.client_email) setFieldErrors({...fieldErrors, client_email: false});
+                    }}
                     placeholder="client@email.com"
                   />
+                  {fieldErrors.client_email && (
+                    <p className="text-red-500 text-sm mt-1">Client email is required</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -956,12 +1003,16 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             </div>
 
             {/* Document Upload */}
-            <div>
+            <div ref={fileUploadRef}>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDragActive ? 'border-teal-500 bg-teal-50' : 'border-gray-300 hover:border-teal-500'
+                  fieldErrors.file_upload
+                    ? 'border-red-500 bg-red-50'
+                    : isDragActive
+                      ? 'border-teal-500 bg-teal-50'
+                      : 'border-gray-300 hover:border-teal-500'
                 }`}
               >
                 <input {...getInputProps()} />
@@ -969,6 +1020,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 <div className="font-medium text-teal-600">+ Upload File(s)</div>
                 <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
               </div>
+              {fieldErrors.file_upload && (
+                <p className="text-red-500 text-sm mt-2">Please upload a document</p>
+              )}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
