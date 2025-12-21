@@ -923,29 +923,27 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
                 </label>
 
-                {/* RMV Certified Translation - USA Only */}
-                {currency.isUSA && (
-                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                    formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                  }`}>
-                    <input
-                      type="radio"
-                      name="service_type"
-                      value="rmv"
-                      checked={formData.service_type === 'rmv'}
-                      onChange={(e) => setFormData({...formData, service_type: e.target.value})}
-                      className="mr-3"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium flex items-center gap-1">
-                        RMV Certified Translation
-                        <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
-                      </div>
-                      <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                {/* RMV Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="rmv"
+                    checked={formData.service_type === 'rmv'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      RMV Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
                     </div>
-                    <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
-                  </label>
-                )}
+                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                </label>
               </div>
 
               {/* Service Type Descriptions */}
@@ -953,7 +951,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
                 <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
                 <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                {currency.isUSA && <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>}
+                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
               </div>
             </div>
 
