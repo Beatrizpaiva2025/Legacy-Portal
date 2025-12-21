@@ -313,7 +313,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         basePrice = pages * 24.99;
         break;
       case 'sworn':
-        basePrice = pages * 45.00;
+        basePrice = pages * 55.00;
         break;
       default:
         basePrice = pages * 19.99;
@@ -632,6 +632,28 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
               <div className="space-y-3">
+                {/* Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'certified' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="certified"
+                    checked={formData.service_type === 'certified'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+
                 {/* Standard Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
                   formData.service_type === 'standard' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
@@ -654,26 +676,26 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   <div className="font-semibold text-teal-600">$19.99/page</div>
                 </label>
 
-                {/* Certified Translation */}
+                {/* Sworn Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'certified' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
                 }`}>
                   <input
                     type="radio"
                     name="service_type"
-                    value="certified"
-                    checked={formData.service_type === 'certified'}
+                    value="sworn"
+                    checked={formData.service_type === 'sworn'}
                     onChange={(e) => setFormData({...formData, service_type: e.target.value})}
                     className="mr-3"
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                      Sworn Translation
+                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">$55.00/page</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -697,36 +719,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   </div>
                   <div className="font-semibold text-teal-600">$24.99/page</div>
                 </label>
-
-                {/* Sworn Translation */}
-                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                }`}>
-                  <input
-                    type="radio"
-                    name="service_type"
-                    value="sworn"
-                    checked={formData.service_type === 'sworn'}
-                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
-                    className="mr-3"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium flex items-center gap-1">
-                      Sworn Translation
-                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
-                    </div>
-                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
-                  </div>
-                  <div className="font-semibold text-teal-600">$45.00/page</div>
-                </label>
               </div>
 
               {/* Service Type Descriptions */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
-                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
                 <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
                 <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
+                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
               </div>
             </div>
 

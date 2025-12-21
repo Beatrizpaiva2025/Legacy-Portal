@@ -442,7 +442,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [formData, setFormData] = useState({
     client_name: '',
     client_email: '',
-    service_type: 'standard',
+    service_type: 'certified',
     translate_from: 'portuguese',
     translate_to: 'english',
     urgency: 'no',
@@ -469,10 +469,22 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     // Sum individual file pages instead of calculating from total words
     const pages = uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0);
 
-    if (formData.service_type === 'standard') {
-      basePrice = pages * 24.99;  // Certified Translation
-    } else {
-      basePrice = pages * 19.50;  // Professional Translation
+    // Price per page based on service type
+    switch (formData.service_type) {
+      case 'certified':
+        basePrice = pages * 24.99;
+        break;
+      case 'standard':
+        basePrice = pages * 19.99;
+        break;
+      case 'sworn':
+        basePrice = pages * 55.00;
+        break;
+      case 'rmv':
+        basePrice = pages * 24.99;
+        break;
+      default:
+        basePrice = pages * 24.99;
     }
 
     let urgencyFee = 0;
@@ -586,7 +598,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       setFormData({
         client_name: '',
         client_email: '',
-        service_type: 'standard',
+        service_type: 'certified',
         translate_from: 'portuguese',
         translate_to: 'english',
         urgency: 'no',
@@ -661,6 +673,29 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
               <div className="space-y-3">
+                {/* Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'certified' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="certified"
+                    checked={formData.service_type === 'certified'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+
+                {/* Standard Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
                   formData.service_type === 'standard' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
                 }`}>
@@ -673,29 +708,66 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">Certified Translation</div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="font-medium flex items-center gap-1">
+                      Standard Translation
+                      <span className="text-gray-400 cursor-help" title="Accurate translation for general use; does not include certification.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">General use, no certification</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">$19.99/page</div>
                 </label>
 
+                {/* Sworn Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'professional' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  formData.service_type === 'sworn' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
                 }`}>
                   <input
                     type="radio"
                     name="service_type"
-                    value="professional"
-                    checked={formData.service_type === 'professional'}
+                    value="sworn"
+                    checked={formData.service_type === 'sworn'}
                     onChange={(e) => setFormData({...formData, service_type: e.target.value})}
                     className="mr-3"
                   />
                   <div className="flex-1">
-                    <div className="font-medium">Professional Translation</div>
-                    <div className="text-sm text-gray-500">Business, marketing, general content</div>
+                    <div className="font-medium flex items-center gap-1">
+                      Sworn Translation
+                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.50/page</div>
+                  <div className="font-semibold text-teal-600">$55.00/page</div>
                 </label>
+
+                {/* RMV Certified Translation */}
+                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                  formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                }`}>
+                  <input
+                    type="radio"
+                    name="service_type"
+                    value="rmv"
+                    checked={formData.service_type === 'rmv'}
+                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                    className="mr-3"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium flex items-center gap-1">
+                      RMV Certified Translation
+                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                    </div>
+                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                  </div>
+                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                </label>
+              </div>
+
+              {/* Service Type Descriptions */}
+              <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
+                <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
+                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
+                <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
+                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
               </div>
             </div>
 
@@ -858,7 +930,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="flex justify-between">
               <span className="text-gray-600">Service</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' ? 'Certified' : 'Professional'}
+                {formData.service_type === 'certified' && 'Certified'}
+                {formData.service_type === 'standard' && 'Standard'}
+                {formData.service_type === 'sworn' && 'Sworn'}
+                {formData.service_type === 'rmv' && 'RMV Certified'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -1011,7 +1086,13 @@ const OrdersPage = ({ token }) => {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <div className="text-sm text-gray-500">Service</div>
-                      <div className="font-medium">{order.service_type === 'standard' ? 'Certified' : 'Professional'}</div>
+                      <div className="font-medium">
+                        {order.service_type === 'certified' && 'Certified'}
+                        {order.service_type === 'standard' && 'Standard'}
+                        {order.service_type === 'sworn' && 'Sworn'}
+                        {order.service_type === 'rmv' && 'RMV Certified'}
+                        {!['certified', 'standard', 'sworn', 'rmv'].includes(order.service_type) && order.service_type}
+                      </div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Created</div>
