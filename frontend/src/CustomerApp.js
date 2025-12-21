@@ -258,6 +258,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   const [discountCode, setDiscountCode] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(null);
   const [showExitPopup, setShowExitPopup] = useState(false);
+  const [exitPopupShown, setExitPopupShown] = useState(() => {
+    return sessionStorage.getItem('exitPopupShown') === 'true';
+  });
 
 
   // Certification options
@@ -390,17 +393,19 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
     }
   }, [quote, guestEmail]);
 
-  // Exit intent detection
+  // Exit intent detection - only show once per session
   useEffect(() => {
     const handleMouseLeave = (e) => {
-      if (e.clientY <= 0 && quote && !success && guestEmail) {
+      if (e.clientY <= 0 && quote && !success && guestEmail && !exitPopupShown) {
         setShowExitPopup(true);
+        setExitPopupShown(true);
+        sessionStorage.setItem('exitPopupShown', 'true');
       }
     };
 
     document.addEventListener('mouseleave', handleMouseLeave);
     return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, [quote, success, guestEmail]);
+  }, [quote, success, guestEmail, exitPopupShown]);
 
   const autoSaveAbandonedQuote = async () => {
     try {
