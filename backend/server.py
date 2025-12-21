@@ -809,9 +809,78 @@ class ManualProjectCreate(BaseModel):
     deadline: Optional[str] = None  # ISO date string
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
+    # Payment status
+    payment_status: Optional[str] = "pending"  # pending, paid
+    payment_received: Optional[bool] = False
+    payment_tag: Optional[str] = None  # '', 'bonus', 'no_charge', 'partner'
+    # Invoice options
+    create_invoice: Optional[bool] = False
+    invoice_terms: Optional[str] = "30_days"  # '15_days', '30_days', 'custom'
+    invoice_custom_date: Optional[str] = None
     # Files (base64)
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
+
+# Make.com Webhook URL for QuickBooks integration
+MAKE_WEBHOOK_URL = "https://hook.us2.make.com/9qd4rfzl5re2u2t24lr94qwcqahrpt1i"
+
+async def send_to_make_webhook(order_data: dict, invoice_data: dict):
+    """Send invoice data to Make.com webhook for QuickBooks integration"""
+    try:
+        import httpx
+
+        # Calculate due date based on invoice terms
+        due_date = datetime.utcnow()
+        if invoice_data.get("invoice_terms") == "15_days":
+            due_date = due_date + timedelta(days=15)
+        elif invoice_data.get("invoice_terms") == "30_days":
+            due_date = due_date + timedelta(days=30)
+        elif invoice_data.get("invoice_terms") == "custom" and invoice_data.get("invoice_custom_date"):
+            try:
+                due_date = datetime.fromisoformat(invoice_data["invoice_custom_date"])
+            except:
+                due_date = due_date + timedelta(days=30)
+
+        # Build webhook payload
+        payload = {
+            "action": "create_invoice",
+            "timestamp": datetime.utcnow().isoformat(),
+            "client": {
+                "name": order_data.get("client_name", ""),
+                "email": order_data.get("client_email", "")
+            },
+            "invoice": {
+                "order_number": order_data.get("order_number", ""),
+                "amount": float(order_data.get("total_price", 0)),
+                "currency": "USD",
+                "due_date": due_date.strftime("%Y-%m-%d"),
+                "payment_terms": invoice_data.get("invoice_terms", "30_days"),
+                "payment_method": order_data.get("payment_method", ""),
+                "description": f"Translation Services - {order_data.get('translate_from', '')} to {order_data.get('translate_to', '')}"
+            },
+            "service": {
+                "type": order_data.get("service_type", "standard"),
+                "pages": order_data.get("page_count", 1),
+                "language_from": order_data.get("translate_from", ""),
+                "language_to": order_data.get("translate_to", ""),
+                "urgency": order_data.get("urgency", "no")
+            },
+            "payment_tag": invoice_data.get("payment_tag", ""),
+            "notes": order_data.get("notes", ""),
+            "internal_notes": order_data.get("internal_notes", "")
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                MAKE_WEBHOOK_URL,
+                json=payload,
+                timeout=30.0
+            )
+            logger.info(f"Make webhook response: {response.status_code}")
+            return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Error sending to Make webhook: {str(e)}")
+        return False
 
 # Notification Model
 class Notification(BaseModel):
@@ -2479,6 +2548,9 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         urgency_fee = project_data.urgency_fee or 0.0
         total_price = project_data.total_price or (base_price + urgency_fee)
 
+        # Determine payment status
+        payment_status = "paid" if project_data.payment_received else "pending"
+
         # Create the order
         order = TranslationOrder(
             order_number=order_number,
@@ -2498,7 +2570,7 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             urgency_fee=urgency_fee,
             total_price=total_price,
             translation_status="received",
-            payment_status="pending",
+            payment_status=payment_status,
             due_date=datetime.utcnow() + timedelta(days=30),
             document_filename=project_data.document_filename,
             # New fields
@@ -2513,7 +2585,13 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             payment_method=project_data.payment_method
         )
 
-        await db.translation_orders.insert_one(order.dict())
+        # Store additional fields in order dict
+        order_dict = order.dict()
+        order_dict["payment_tag"] = project_data.payment_tag
+        order_dict["create_invoice"] = project_data.create_invoice
+        order_dict["invoice_terms"] = project_data.invoice_terms
+
+        await db.translation_orders.insert_one(order_dict)
         logger.info(f"Manual order created: {order.order_number}")
 
         # If document data provided, save it
@@ -2527,10 +2605,22 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             }
             await db.order_documents.insert_one(doc_record)
 
+        # Send to Make webhook for QuickBooks invoice if requested
+        if project_data.create_invoice and not project_data.payment_received:
+            invoice_data = {
+                "invoice_terms": project_data.invoice_terms,
+                "invoice_custom_date": project_data.invoice_custom_date,
+                "payment_tag": project_data.payment_tag
+            }
+            webhook_success = await send_to_make_webhook(order_dict, invoice_data)
+            if webhook_success:
+                logger.info(f"Invoice sent to QuickBooks via Make for order {order.order_number}")
+
         return {
             "status": "success",
             "message": f"Project {order.order_number} created successfully",
-            "order": order.dict()
+            "order": order_dict,
+            "invoice_created": project_data.create_invoice and not project_data.payment_received
         }
 
     except Exception as e:
