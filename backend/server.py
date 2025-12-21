@@ -654,6 +654,13 @@ class PartnerLogin(BaseModel):
     email: EmailStr
     password: str
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
 class PartnerResponse(BaseModel):
     id: str
     company_name: str
@@ -1956,6 +1963,101 @@ async def logout_partner(token: str):
     if token in active_tokens:
         del active_tokens[token]
     return {"status": "success", "message": "Logged out successfully"}
+
+# Store for password reset tokens (token -> {email, expires})
+password_reset_tokens = {}
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset email"""
+    try:
+        # Find partner by email
+        partner = await db.partners.find_one({"email": request.email})
+
+        # Always return success for security (don't reveal if email exists)
+        if partner:
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            expires = datetime.utcnow() + timedelta(hours=1)
+
+            # Store token
+            password_reset_tokens[reset_token] = {
+                "email": request.email,
+                "expires": expires
+            }
+
+            # Get frontend URL
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+            reset_link = f"{frontend_url}?reset_token={reset_token}"
+
+            # Send email
+            subject = "Reset Your Password - Legacy Translations"
+            content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
+                <h2 style="color: #0d9488;">Password Reset Request</h2>
+                <p>Hello,</p>
+                <p>We received a request to reset your password for your Legacy Translations Business Portal account.</p>
+                <p>Click the button below to reset your password:</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_link}" style="background: linear-gradient(to right, #0d9488, #0891b2); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
+                </p>
+                <p style="color: #666; font-size: 14px;">This link will expire in 1 hour.</p>
+                <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #999; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+            </div>
+            """
+
+            try:
+                await email_service.send_email(request.email, subject, content)
+                logger.info(f"Password reset email sent to {request.email}")
+            except Exception as e:
+                logger.error(f"Failed to send password reset email: {str(e)}")
+
+        return {"status": "success", "message": "If an account exists with this email, a reset link has been sent"}
+
+    except Exception as e:
+        logger.error(f"Error in forgot password: {str(e)}")
+        return {"status": "success", "message": "If an account exists with this email, a reset link has been sent"}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using token"""
+    try:
+        # Check if token exists and is valid
+        token_data = password_reset_tokens.get(request.token)
+
+        if not token_data:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+        if datetime.utcnow() > token_data["expires"]:
+            del password_reset_tokens[request.token]
+            raise HTTPException(status_code=400, detail="Reset link has expired")
+
+        # Update password
+        email = token_data["email"]
+        new_hash = hash_password(request.new_password)
+
+        result = await db.partners.update_one(
+            {"email": email},
+            {"$set": {"password_hash": new_hash}}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="Failed to update password")
+
+        # Remove used token
+        del password_reset_tokens[request.token]
+
+        logger.info(f"Password reset successful for {email}")
+        return {"status": "success", "message": "Password has been reset successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting password: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reset password")
 
 @api_router.get("/auth/me")
 async def get_current_partner_info(token: str):
