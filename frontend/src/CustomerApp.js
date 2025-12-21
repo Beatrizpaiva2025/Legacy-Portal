@@ -268,9 +268,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   });
   const USPS_PRIORITY_MAIL = 18.99;
 
-  // MIA WhatsApp number
-  const MIA_WHATSAPP = "https://wa.me/17863109734?text=Hi%20MIA,%20I%20have%20questions%20about%20my%20translation%20quote";
-
   // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
@@ -374,6 +371,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
   useEffect(() => {
     if (formData.service_type === 'rmv') {
       setNeedsPhysicalCopy(true);
+    }
+  }, [formData.service_type]);
+
+  // Force Portuguese (Brasil) as target language for Sworn Translation
+  useEffect(() => {
+    if (formData.service_type === 'sworn') {
+      setFormData(prev => ({...prev, translate_to: 'pt-br'}));
     }
   }, [formData.service_type]);
 
@@ -748,17 +752,30 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+                      value="pt-br"
+                      disabled
+                    >
+                      <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
+                    </select>
+                    <p className="text-xs text-amber-600 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -988,21 +1005,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
               >
                 Request a quote instead
-              </a>
-            </div>
-
-            {/* Direct Payment Option */}
-            <div className="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-lg border border-green-200 text-center">
-              <p className="text-gray-700 mb-2">
-                If you prefer direct payment via <strong>Zelle</strong> or <strong>PIX (Brazil)</strong>:
-              </p>
-              <a
-                href={MIA_WHATSAPP}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors font-medium"
-              >
-                <span>Contact Us</span>
               </a>
             </div>
 
