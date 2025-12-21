@@ -51,7 +51,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 # Configure Stripe
-stripe.api_key = "sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C"
+stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -1534,6 +1534,11 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
         # Create Stripe checkout session
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=['card'],
+            payment_method_options={
+                'card': {
+                    'request_three_d_secure': 'automatic'
+                }
+            },
             line_items=[{
                 'price_data': {
                     'currency': 'usd',
@@ -1546,6 +1551,9 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 'quantity': 1,
             }],
             mode='payment',
+            saved_payment_method_options={
+                'payment_method_save': 'disabled'
+            },
             success_url=f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{request.origin_url}?payment_cancelled=true",
             metadata={
@@ -5069,6 +5077,52 @@ async def register_customer(customer_data: CustomerCreate):
         # Generate token
         token = generate_token()
         customer_tokens[token] = customer.id
+
+        # Send welcome email
+        try:
+            welcome_subject = "Welcome to Legacy Translations! 🎉"
+            welcome_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #0d9488, #14b8a6); border-radius: 10px 10px 0 0;">
+                    <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 180px;">
+                </div>
+                <div style="padding: 30px; background: #ffffff; border: 1px solid #e5e7eb;">
+                    <h1 style="color: #0d9488; margin-bottom: 20px;">Welcome, {customer.full_name}! 👋</h1>
+                    <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                        Thank you for creating an account with Legacy Translations. We're excited to have you!
+                    </p>
+                    <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                        With your account, you can:
+                    </p>
+                    <ul style="color: #374151; font-size: 16px; line-height: 1.8;">
+                        <li>📄 Request translation quotes instantly</li>
+                        <li>📊 Track your orders in real-time</li>
+                        <li>💬 Communicate directly with our team</li>
+                        <li>📁 Access all your translated documents</li>
+                    </ul>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="https://legacytranslations.com/customer"
+                           style="background: #0d9488; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                            Start Your First Translation
+                        </a>
+                    </div>
+                    <p style="color: #6b7280; font-size: 14px;">
+                        If you have any questions, feel free to reply to this email or contact us at
+                        <a href="mailto:contact@legacytranslations.com" style="color: #0d9488;">contact@legacytranslations.com</a>
+                    </p>
+                </div>
+                <div style="padding: 20px; background: #f9fafb; text-align: center; border-radius: 0 0 10px 10px;">
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                        © 2024 Legacy Translations. All rights reserved.
+                    </p>
+                </div>
+            </div>
+            """
+            await email_service.send_email(customer.email, welcome_subject, welcome_content)
+            logger.info(f"Welcome email sent to {customer.email}")
+        except Exception as email_error:
+            logger.error(f"Failed to send welcome email: {str(email_error)}")
+            # Don't fail registration if email fails
 
         return CustomerResponse(
             id=customer.id,

@@ -9,12 +9,36 @@ const API = `${BACKEND_URL}/api`;
 // ==================== INTERNATIONALIZATION ====================
 const TRANSLATIONS = {
   en: {
+    // Login
+    businessPortal: 'Business Portal (B2B)',
+    corporateOnly: 'Corporate Clients Only',
+    companyEmail: 'Company Email',
+    password: 'Password',
+    forgotPassword: 'Forgot password?',
+    accessPortal: 'Access Business Portal',
+    createAccount: 'Create Business Account',
+    pleaseWait: 'Please wait...',
+    noAccount: "Don't have an account? Register",
+    haveAccount: 'Already have an account? Sign In',
+    notB2B: 'Not a B2B client yet?',
+    contactUs: 'Contact us',
+    companyName: 'Company Name',
+    contactName: 'Contact Name',
+    phoneOptional: 'Phone (optional)',
+    errorOccurred: 'An error occurred',
+    // Benefits
+    benefits: 'Business Account Benefits:',
+    benefit1: 'Monthly invoicing - Pay at end of month',
+    benefit2: 'Dedicated B2B support chat',
+    benefit3: 'Priority processing',
+    // Navigation
     newOrder: 'New Order',
     createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
     certifiedDesc: 'Official documents, USCIS, legal purposes',
@@ -48,18 +72,34 @@ const TRANSLATIONS = {
     submitting: 'Submitting...',
     orderSuccess: 'Order submitted successfully!',
     signIn: 'Sign in to your account',
-    createAccount: 'Create a new account',
     email: 'Email',
-    password: 'Password',
-    companyName: 'Company Name',
-    contactName: 'Contact Name',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register',
-    noAccount: "Don't have an account?",
-    haveAccount: 'Already have an account?'
+    register: 'Register'
   },
   es: {
+    // Login
+    businessPortal: 'Portal Empresarial (B2B)',
+    corporateOnly: 'Solo Clientes Corporativos',
+    companyEmail: 'Correo Corporativo',
+    password: 'Contraseña',
+    forgotPassword: '¿Olvidó su contraseña?',
+    accessPortal: 'Acceder al Portal',
+    createAccount: 'Crear Cuenta Empresarial',
+    pleaseWait: 'Espere...',
+    noAccount: '¿No tiene cuenta? Regístrese',
+    haveAccount: '¿Ya tiene cuenta? Inicie sesión',
+    notB2B: '¿Aún no es cliente B2B?',
+    contactUs: 'Contáctenos',
+    companyName: 'Nombre de Empresa',
+    contactName: 'Nombre de Contacto',
+    phoneOptional: 'Teléfono (opcional)',
+    errorOccurred: 'Ocurrió un error',
+    benefits: 'Beneficios de la Cuenta Empresarial:',
+    benefit1: 'Facturación mensual - Pague a fin de mes',
+    benefit2: 'Chat de soporte B2B dedicado',
+    benefit3: 'Procesamiento prioritario',
+    // Navigation
     newOrder: 'Nuevo Pedido',
     createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
@@ -99,18 +139,34 @@ const TRANSLATIONS = {
     submitting: 'Enviando...',
     orderSuccess: '¡Pedido enviado exitosamente!',
     signIn: 'Iniciar sesión',
-    createAccount: 'Crear una cuenta nueva',
     email: 'Correo Electrónico',
-    password: 'Contraseña',
-    companyName: 'Nombre de Empresa',
-    contactName: 'Nombre de Contacto',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar',
-    noAccount: '¿No tiene cuenta?',
-    haveAccount: '¿Ya tiene cuenta?'
+    register: 'Registrar'
   },
   pt: {
+    // Login
+    businessPortal: 'Portal Empresarial (B2B)',
+    corporateOnly: 'Apenas Clientes Corporativos',
+    companyEmail: 'E-mail Corporativo',
+    password: 'Senha',
+    forgotPassword: 'Esqueceu a senha?',
+    accessPortal: 'Acessar Portal Empresarial',
+    createAccount: 'Criar Conta Empresarial',
+    pleaseWait: 'Aguarde...',
+    noAccount: 'Não tem conta? Cadastre-se',
+    haveAccount: 'Já tem conta? Entrar',
+    notB2B: 'Ainda não é cliente B2B?',
+    contactUs: 'Fale conosco',
+    companyName: 'Nome da Empresa',
+    contactName: 'Nome do Contato',
+    phoneOptional: 'Telefone (opcional)',
+    errorOccurred: 'Ocorreu um erro',
+    benefits: 'Benefícios da Conta Empresarial:',
+    benefit1: 'Faturamento mensal - Pague no final do mês',
+    benefit2: 'Chat de suporte B2B dedicado',
+    benefit3: 'Processamento prioritário',
+    // Navigation
     newOrder: 'Novo Pedido',
     createNewOrder: 'Criar Novo Pedido',
     myOrders: 'Meus Pedidos',
@@ -150,16 +206,10 @@ const TRANSLATIONS = {
     submitting: 'Enviando...',
     orderSuccess: 'Pedido enviado com sucesso!',
     signIn: 'Entrar na sua conta',
-    createAccount: 'Criar uma nova conta',
     email: 'Email',
-    password: 'Senha',
-    companyName: 'Nome da Empresa',
-    contactName: 'Nome do Contato',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar',
-    noAccount: 'Não tem conta?',
-    haveAccount: 'Já tem conta?'
+    register: 'Registrar'
   }
 };
 
@@ -170,13 +220,11 @@ const UI_LANGUAGES = [
   { code: 'pt', flag: '🇧🇷' }
 ];
 
-// Detect user's preferred language
+// Get user's language preference (English is default)
 const getInitialLanguage = () => {
   const saved = localStorage.getItem('ui_language');
   if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
-  const browserLang = navigator.language.split('-')[0];
-  if (['en', 'es', 'pt'].includes(browserLang)) return browserLang;
-  return 'en';
+  return 'en'; // Always default to English
 };
 
 // Detect currency based on locale/timezone
@@ -186,17 +234,17 @@ const getLocalCurrency = () => {
     const locale = navigator.language;
 
     // Brazil
-    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0 };
+    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
     // Europe
-    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92 };
+    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92, isUSA: false };
     // UK
-    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79 };
+    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79, isUSA: false };
     // Mexico, Latin America (except Brazil)
-    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5 };
-    // Default USD
-    return { code: 'USD', symbol: '$', rate: 1 };
+    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5, isUSA: false };
+    // Default USD (USA)
+    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
   } catch {
-    return { code: 'USD', symbol: '$', rate: 1 };
+    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
   }
 };
 
@@ -268,43 +316,52 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
         onLogin(response.data);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'An error occurred');
+      setError(err.response?.data?.detail || t.errorOccurred);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center relative">
-      {/* Language Flags - Top Right */}
-      <div className="absolute top-4 right-4 flex items-center space-x-2">
-        {UI_LANGUAGES.map((uiLang) => (
-          <button
-            key={uiLang.code}
-            onClick={() => changeLanguage(uiLang.code)}
-            className={`text-2xl hover:scale-110 transition-transform ${
-              lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
-            }`}
-            title={uiLang.code.toUpperCase()}
-          >
-            {uiLang.flag}
-          </button>
-        ))}
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        {/* Language Selector - Top Right */}
+        <div className="flex justify-end mb-4">
+          <div className="flex items-center gap-2">
+            {UI_LANGUAGES.map((uiLang) => (
+              <button
+                key={uiLang.code}
+                onClick={() => changeLanguage(uiLang.code)}
+                className={`text-xl hover:scale-110 transition-transform ${
+                  lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                }`}
+                title={uiLang.code.toUpperCase()}
+              >
+                {uiLang.flag}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <div className="text-center mb-8">
+        {/* Logo */}
+        <div className="text-center mb-6">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4"
+            className="mx-auto mb-4 h-16"
           />
-          <h1 className="text-2xl font-bold text-gray-800">Partner Portal</h1>
-          <p className="text-gray-600">{isLogin ? t.signIn : t.createAccount}</p>
+        </div>
+
+        {/* Title and Badge */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">{t.businessPortal}</h1>
+          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
+            {t.corporateOnly}
+          </span>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -317,9 +374,10 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.company_name}
                   onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                  placeholder="Your Company Inc."
                 />
               </div>
               <div>
@@ -327,31 +385,34 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <input
                   type="text"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.contact_name}
                   onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                  placeholder="John Smith"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phone}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
                 <input
                   type="tel"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
             <input
               type="email"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
+              placeholder="you@company.com"
             />
           </div>
 
@@ -360,29 +421,70 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             <input
               type="password"
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
             />
           </div>
 
+          {isLogin && (
+            <div className="text-right">
+              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 hover:underline">
+                {t.forgotPassword}
+              </a>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
+            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
           >
-            {loading ? '...' : (isLogin ? t.login : t.register)}
+            {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        {/* Business Account Benefits */}
+        {isLogin && (
+          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit1}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit2}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-teal-500 mr-2">*</span>
+                <span>{t.benefit3}</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:underline"
+            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
           >
             {isLogin ? t.noAccount : t.haveAccount}
           </button>
         </div>
+
+        {/* Contact link for non-B2B clients */}
+        {isLogin && (
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">
+              {t.notB2B}{' '}
+              <a href="https://legacytranslations.com/contact" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
+                {t.contactUs}
+              </a>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -457,12 +559,43 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Format price with currency conversion
+  const formatPrice = (usdPrice) => {
+    const converted = usdPrice * currency.rate;
+    return `${currency.symbol}${converted.toFixed(2)}`;
+  };
+
+  // Physical copy / shipping options
+  const [needsPhysicalCopy, setNeedsPhysicalCopy] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: 'USA'
+  });
+  const USPS_PRIORITY_MAIL = 18.99;
+
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
       calculateQuote();
     }
-  }, [uploadedFiles, formData.service_type, formData.urgency]);
+  }, [uploadedFiles, formData.service_type, formData.urgency, needsPhysicalCopy]);
+
+  // Force Portuguese (Brasil) as target language for Sworn Translation
+  useEffect(() => {
+    if (formData.service_type === 'sworn') {
+      setFormData(prev => ({...prev, translate_to: 'pt-br'}));
+    }
+  }, [formData.service_type]);
+
+  // Force physical copy for RMV Certified
+  useEffect(() => {
+    if (formData.service_type === 'rmv') {
+      setNeedsPhysicalCopy(true);
+    }
+  }, [formData.service_type]);
 
   const calculateQuote = () => {
     let basePrice = 0;
@@ -494,10 +627,14 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       urgencyFee = basePrice * 1.0;
     }
 
+    // Shipping only available in USA
+    const shippingFee = currency.isUSA && (needsPhysicalCopy || formData.service_type === 'rmv') ? USPS_PRIORITY_MAIL : 0;
+
     setQuote({
       base_price: basePrice,
       urgency_fee: urgencyFee,
-      total_price: basePrice + urgencyFee,
+      shipping_fee: shippingFee,
+      total_price: basePrice + urgencyFee + shippingFee,
       pages: pages
     });
   };
@@ -692,7 +829,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -714,7 +851,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">General use, no certification</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/page</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -736,30 +873,32 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     </div>
                     <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$55.00/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
                 </label>
 
-                {/* RMV Certified Translation */}
-                <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
-                  formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
-                }`}>
-                  <input
-                    type="radio"
-                    name="service_type"
-                    value="rmv"
-                    checked={formData.service_type === 'rmv'}
-                    onChange={(e) => setFormData({...formData, service_type: e.target.value})}
-                    className="mr-3"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium flex items-center gap-1">
-                      RMV Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                {/* RMV Certified Translation - USA Only */}
+                {currency.isUSA && (
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
+                    formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="service_type"
+                      value="rmv"
+                      checked={formData.service_type === 'rmv'}
+                      onChange={(e) => setFormData({...formData, service_type: e.target.value})}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium flex items-center gap-1">
+                        RMV Certified Translation
+                        <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                      </div>
+                      <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
                     </div>
-                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
-                  </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
-                </label>
+                    <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  </label>
+                )}
               </div>
 
               {/* Service Type Descriptions */}
@@ -767,7 +906,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
                 <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
                 <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                {currency.isUSA && <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>}
               </div>
             </div>
 
@@ -789,17 +928,30 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
-                <select
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
-                  value={formData.translate_to}
-                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
-                    </option>
-                  ))}
-                </select>
+                {formData.service_type === 'sworn' ? (
+                  <div>
+                    <select
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+                      value="pt-br"
+                      disabled
+                    >
+                      <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                  </div>
+                ) : (
+                  <select
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
+                    value={formData.translate_to}
+                    onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                  >
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -888,6 +1040,94 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
+            {/* Physical Copy / Shipping - USA Only */}
+            {currency.isUSA && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
+                <div className="space-y-3">
+                  <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={needsPhysicalCopy || formData.service_type === 'rmv'}
+                      onChange={(e) => setNeedsPhysicalCopy(e.target.checked)}
+                      disabled={formData.service_type === 'rmv'}
+                      className="mr-3 h-4 w-4 text-teal-600"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">Physical copy required</div>
+                      <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
+                    </div>
+                    <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
+                  </label>
+
+                  {formData.service_type === 'rmv' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800">
+                        <strong>Note:</strong> RMV Certified translations require physical delivery.
+                      </p>
+                    </div>
+                  )}
+
+                  {(needsPhysicalCopy || formData.service_type === 'rmv') && (
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.street}
+                            onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                            placeholder="123 Main Street, Apt 4B"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">City *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.city}
+                            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                            placeholder="Boston"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">State *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.state}
+                            onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                            placeholder="MA"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            value={shippingAddress.zipCode}
+                            onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                            placeholder="02101"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Country</label>
+                          <input
+                            type="text"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
+                            value="USA"
+                            disabled
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -944,12 +1184,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Base Price</span>
-                <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
+                <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
                   <span>Urgency Fee</span>
-                  <span>${quote.urgency_fee.toFixed(2)}</span>
+                  <span>{formatPrice(quote.urgency_fee)}</span>
+                </div>
+              )}
+              {quote?.shipping_fee > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>Shipping (USPS Priority)</span>
+                  <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
             </div>
@@ -957,7 +1203,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">Total</span>
-                <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
+                <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
               </div>
             </div>
 
