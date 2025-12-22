@@ -594,7 +594,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   };
 
   useEffect(() => {
-    if (user?.role === 'translator' || user?.role === 'pm') {
+    // Fetch assigned orders for all roles (admin, pm, translator)
+    if (user?.role) {
       fetchAssignedOrders();
     }
   }, [user]);
@@ -2106,12 +2107,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
-          {/* Assigned Orders for Translator/PM */}
-          {(user?.role === 'translator' || user?.role === 'pm') && (
+          {/* Assigned Orders for all users */}
+          {(user?.role === 'admin' || user?.role === 'translator' || user?.role === 'pm') && (
             <div className="bg-white rounded shadow">
               <div className="p-3 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 Meus Projetos
+                  📋 Projetos
                   {assignedOrders.length > 0 && (
                     <span className="ml-2 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-bold">{assignedOrders.length}</span>
                   )}
