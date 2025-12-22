@@ -40,9 +40,9 @@ const LANGUAGES = [
 
 // UI Languages (for interface translation)
 const UI_LANGUAGES = [
-  { code: 'en', flag: '🇺🇸', name: 'English' },
-  { code: 'es', flag: '🇪🇸', name: 'Español' },
-  { code: 'pt', flag: '🇧🇷', name: 'Português' }
+  { code: 'en', flag: 'EN', name: 'English' },
+  { code: 'es', flag: 'ES', name: 'Español' },
+  { code: 'pt', flag: 'PT', name: 'Português' }
 ];
 
 // Customer Portal Translations
@@ -1024,17 +1024,17 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     const errors = {};
 
     if (!guestName) {
-      errors.name = 'Please enter your name';
+      errors.name = t.pleaseEnterName;
     }
     if (!guestEmail) {
-      errors.email = 'Please enter your email';
+      errors.email = t.pleaseEnterEmail;
     }
     if (wordCount === 0) {
-      errors.files = 'Please upload a document';
+      errors.files = t.pleaseUploadDocument;
     }
     if ((needsPhysicalCopy || formData.service_type === 'rmv') &&
         (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) {
-      errors.shipping = 'Please complete the shipping address';
+      errors.shipping = t.pleaseCompleteShipping;
     }
 
     // If there are errors, scroll to the first one
@@ -1069,7 +1069,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         customer_email: guestEmail,
         customer_name: guestName,
         notes: formData.notes,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        shipping_fee: quote?.shipping_fee || 0,
+        discount_amount: quote?.discount || 0,
+        discount_code: appliedDiscount ? discountCode : null
       };
 
       // Create quote
@@ -1092,7 +1095,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       }
 
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to process payment. Please try again.');
+      setError(err.response?.data?.detail || t.failedToProcess);
       setSubmitting(false);
     }
   };
@@ -2009,13 +2012,15 @@ function CustomerApp() {
               className="h-12"
             />
             {/* Language Selector */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {UI_LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}
                   onClick={() => changeUILanguage(lang.code)}
-                  className={`text-xl hover:scale-110 transition-transform ${
-                    uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                  className={`px-2 py-1 text-sm font-semibold rounded transition-all ${
+                    uiLang === lang.code
+                      ? 'bg-teal-600 text-white'
+                      : 'text-gray-500 hover:text-teal-600 hover:bg-teal-50'
                   }`}
                   title={lang.name}
                 >
@@ -2057,13 +2062,15 @@ function CustomerApp() {
             </h1>
             <div className="flex items-center gap-4">
               {/* Language Selector */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 {UI_LANGUAGES.map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => changeUILanguage(lang.code)}
-                    className={`text-lg hover:scale-110 transition-transform ${
-                      uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                    className={`px-2 py-1 text-sm font-semibold rounded transition-all ${
+                      uiLang === lang.code
+                        ? 'bg-teal-600 text-white'
+                        : 'text-gray-500 hover:text-teal-600 hover:bg-teal-50'
                     }`}
                     title={lang.name}
                   >

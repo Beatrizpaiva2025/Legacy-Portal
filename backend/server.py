@@ -604,6 +604,9 @@ class TranslationQuote(BaseModel):
     urgency: str  # no, priority, urgent
     base_price: float
     urgency_fee: float
+    shipping_fee: float = 0.0
+    discount_amount: float = 0.0
+    discount_code: Optional[str] = None
     total_price: float
     estimated_delivery: str
     customer_email: Optional[str] = None
@@ -623,6 +626,9 @@ class TranslationQuoteCreate(BaseModel):
     customer_name: Optional[str] = None
     notes: Optional[str] = None
     document_ids: Optional[List[str]] = None
+    shipping_fee: Optional[float] = 0.0
+    discount_amount: Optional[float] = 0.0
+    discount_code: Optional[str] = None
 
 class DocumentUploadResponse(BaseModel):
     filename: str
@@ -1581,18 +1587,23 @@ async def upload_document(file: UploadFile = File(...), token: Optional[str] = N
 @api_router.post("/calculate-quote", response_model=TranslationQuote)
 async def calculate_quote(quote_data: TranslationQuoteCreate):
     """Calculate translation quote based on provided data"""
-    
+
     try:
         # Calculate pricing
-        base_price, urgency_fee, total_price = calculate_price(
-            quote_data.word_count, 
-            quote_data.service_type, 
+        base_price, urgency_fee, subtotal = calculate_price(
+            quote_data.word_count,
+            quote_data.service_type,
             quote_data.urgency
         )
-        
+
+        # Add shipping fee and apply discount
+        shipping_fee = quote_data.shipping_fee or 0.0
+        discount_amount = quote_data.discount_amount or 0.0
+        total_price = max(0, subtotal + shipping_fee - discount_amount)
+
         # Get estimated delivery
         estimated_delivery = get_estimated_delivery(quote_data.urgency)
-        
+
         # Create quote object
         quote = TranslationQuote(
             reference=quote_data.reference,
@@ -1603,6 +1614,9 @@ async def calculate_quote(quote_data: TranslationQuoteCreate):
             urgency=quote_data.urgency,
             base_price=base_price,
             urgency_fee=urgency_fee,
+            shipping_fee=shipping_fee,
+            discount_amount=discount_amount,
+            discount_code=quote_data.discount_code,
             total_price=total_price,
             estimated_delivery=estimated_delivery,
             customer_email=quote_data.customer_email,
@@ -1610,12 +1624,12 @@ async def calculate_quote(quote_data: TranslationQuoteCreate):
             notes=quote_data.notes,
             document_ids=quote_data.document_ids
         )
-        
+
         # Save quote to database
         await db.translation_quotes.insert_one(quote.dict())
-        
+
         return quote
-        
+
     except Exception as e:
         logger.error(f"Error calculating quote: {str(e)}")
         raise HTTPException(status_code=500, detail="Error calculating quote")
