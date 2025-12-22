@@ -1946,9 +1946,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // If we have HTML content (from Word/HTML/TXT)
     if (quickTranslationHtml) {
+      // For HTML content, use a running header that appears on every printed page
       translationPagesHTML = `
-    <div class="translation-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+    <div class="translation-text-page">
+        ${includeLetterhead ? `
+        <!-- Running header that repeats on each printed page -->
+        <div class="running-header">
+            ${letterheadHTML}
+        </div>
+        <div class="running-header-spacer"></div>
+        ` : ''}
         <div class="translation-content translation-text">
             ${quickTranslationHtml}
         </div>
@@ -2074,6 +2081,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            /* Running header for HTML content pages */
+            .running-header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 20px 50px 10px;
+            }
+            .running-header-spacer {
+                height: 100px;
+            }
+            .translation-text-page {
+                page-break-before: always;
+            }
+            .translation-text-page:first-child {
+                page-break-before: auto;
+            }
         }
     </style>
 </head>
