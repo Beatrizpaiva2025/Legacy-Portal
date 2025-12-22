@@ -601,6 +601,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [quickPackageMode, setQuickPackageMode] = useState(false);
   const [quickTranslationFiles, setQuickTranslationFiles] = useState([]); // Ready translation files
   const [quickOriginalFiles, setQuickOriginalFiles] = useState([]); // Original document files
+  const [quickPackageLoading, setQuickPackageLoading] = useState(false); // Loading state for uploads
+  const [quickPackageProgress, setQuickPackageProgress] = useState(''); // Progress message
 
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
@@ -1628,39 +1630,73 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(saveSelection, 0);
   };
 
-  // Quick Package file handlers
+  // Quick Package file handlers - with progress feedback for large uploads
   const handleQuickTranslationUpload = async (e) => {
     const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setQuickPackageLoading(true);
+    setQuickPackageProgress(`Processing ${files.length} translation file(s)...`);
     const processedFiles = [];
 
-    for (const file of files) {
-      const base64 = await fileToBase64(file);
-      processedFiles.push({
-        filename: file.name,
-        data: base64,
-        type: file.type
-      });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
+      try {
+        const base64 = await fileToBase64(file);
+        processedFiles.push({
+          filename: file.name,
+          data: base64,
+          type: file.type
+        });
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+      }
     }
+
     setQuickTranslationFiles(prev => [...prev, ...processedFiles]);
+    setQuickPackageLoading(false);
+    setQuickPackageProgress(`✅ ${processedFiles.length} translation file(s) ready`);
+    setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
   const handleQuickOriginalUpload = async (e) => {
     const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setQuickPackageLoading(true);
+    setQuickPackageProgress(`Processing ${files.length} original file(s)...`);
     const processedFiles = [];
 
-    for (const file of files) {
-      const base64 = await fileToBase64(file);
-      processedFiles.push({
-        filename: file.name,
-        data: base64,
-        type: file.type
-      });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setQuickPackageProgress(`Processing original ${i + 1}/${files.length}: ${file.name}`);
+      try {
+        const base64 = await fileToBase64(file);
+        processedFiles.push({
+          filename: file.name,
+          data: base64,
+          type: file.type
+        });
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+      }
     }
+
     setQuickOriginalFiles(prev => [...prev, ...processedFiles]);
+    setQuickPackageLoading(false);
+    setQuickPackageProgress(`✅ ${processedFiles.length} original file(s) ready`);
+    setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
   // Quick Package Download - generates complete certified translation package (same layout as normal flow)
-  const handleQuickPackageDownload = () => {
+  const handleQuickPackageDownload = async () => {
+    setQuickPackageLoading(true);
+    setQuickPackageProgress('Generating package...');
+
+    // Small delay to let UI update
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
@@ -1866,13 +1902,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 </body>
 </html>`;
 
-    // Open in new window for printing
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(fullHTML);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.print();
-    };
+    // Open in new window for printing - with proper handling for large documents
+    setQuickPackageProgress(`Opening print preview (${quickTranslationFiles.length} translations + ${quickOriginalFiles.length} originals)...`);
+
+    try {
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('Pop-up blocked! Please allow pop-ups for this site.');
+        setQuickPackageLoading(false);
+        setQuickPackageProgress('');
+        return;
+      }
+
+      // Write document in chunks for better browser handling
+      printWindow.document.open();
+      printWindow.document.write(fullHTML);
+      printWindow.document.close();
+
+      // Wait for all images to load before printing
+      printWindow.onload = () => {
+        setQuickPackageProgress('Package ready! Print dialog opening...');
+        setTimeout(() => {
+          printWindow.print();
+          setQuickPackageLoading(false);
+          setQuickPackageProgress('');
+        }, 500);
+      };
+
+      // Fallback if onload doesn't fire (for some browsers)
+      setTimeout(() => {
+        if (quickPackageLoading) {
+          setQuickPackageLoading(false);
+          setQuickPackageProgress('');
+        }
+      }, 10000);
+    } catch (err) {
+      console.error('Error generating package:', err);
+      alert('Error generating package. Please try with fewer files.');
+      setQuickPackageLoading(false);
+      setQuickPackageProgress('');
+    }
   };
 
   // Save Translation Memory
@@ -3938,7 +4007,7 @@ tradução juramentada | certified translation`}
                 <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
                 <p className="text-[10px] text-green-600 mb-3">Upload translation pages (will be adjusted with letterhead)</p>
 
-                <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center cursor-pointer hover:border-green-500 transition-colors mb-2">
+                <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                   <input
                     type="file"
                     multiple
@@ -3946,30 +4015,34 @@ tradução juramentada | certified translation`}
                     onChange={handleQuickTranslationUpload}
                     className="hidden"
                     id="quick-translation-upload"
+                    disabled={quickPackageLoading}
                   />
-                  <label htmlFor="quick-translation-upload" className="cursor-pointer">
-                    <div className="text-2xl mb-1">📤</div>
+                  <label htmlFor="quick-translation-upload" className={quickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
+                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-green-600" />
                     <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                       Upload Translation
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed (images)</p>
                   </label>
                 </div>
 
                 {quickTranslationFiles.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} arquivo(s):</p>
-                    {quickTranslationFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
-                        <span className="truncate">{file.filename}</span>
-                        <button
-                          onClick={() => setQuickTranslationFiles(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-red-500 hover:text-red-700 ml-2"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))}
+                    <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} page(s) uploaded:</p>
+                    <div className="max-h-32 overflow-y-auto">
+                      {quickTranslationFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
+                          <span className="truncate flex-1">{idx + 1}. {file.filename}</span>
+                          <button
+                            onClick={() => setQuickTranslationFiles(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-gray-400 hover:text-red-500 ml-2 p-1"
+                            disabled={quickPackageLoading}
+                          >
+                            <TrashIcon className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -3979,7 +4052,7 @@ tradução juramentada | certified translation`}
                 <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Original Documents</h3>
                 <p className="text-[10px] text-orange-600 mb-3">Upload original document pages</p>
 
-                <div className="border-2 border-dashed border-orange-300 rounded-lg p-4 text-center cursor-pointer hover:border-orange-500 transition-colors mb-2">
+                <div className={`border-2 border-dashed border-orange-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-orange-500'}`}>
                   <input
                     type="file"
                     multiple
@@ -3987,30 +4060,34 @@ tradução juramentada | certified translation`}
                     onChange={handleQuickOriginalUpload}
                     className="hidden"
                     id="quick-original-upload"
+                    disabled={quickPackageLoading}
                   />
-                  <label htmlFor="quick-original-upload" className="cursor-pointer">
-                    <div className="text-2xl mb-1">📤</div>
+                  <label htmlFor="quick-original-upload" className={quickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
+                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-orange-600" />
                     <span className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded hover:bg-orange-700">
-                      Upload Originais
+                      Upload Originals
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed (images)</p>
                   </label>
                 </div>
 
                 {quickOriginalFiles.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-orange-700">{quickOriginalFiles.length} arquivo(s):</p>
-                    {quickOriginalFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
-                        <span className="truncate">{file.filename}</span>
-                        <button
-                          onClick={() => setQuickOriginalFiles(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-red-500 hover:text-red-700 ml-2"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))}
+                    <p className="text-xs font-medium text-orange-700">{quickOriginalFiles.length} page(s) uploaded:</p>
+                    <div className="max-h-32 overflow-y-auto">
+                      {quickOriginalFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
+                          <span className="truncate flex-1">{idx + 1}. {file.filename}</span>
+                          <button
+                            onClick={() => setQuickOriginalFiles(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-gray-400 hover:text-red-500 ml-2 p-1"
+                            disabled={quickPackageLoading}
+                          >
+                            <TrashIcon className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -4069,16 +4146,35 @@ tradução juramentada | certified translation`}
                 </div>
               </div>
 
+              {/* Loading/Progress Indicator */}
+              {quickPackageProgress && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {quickPackageLoading && (
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    <span className="text-sm text-blue-700 font-medium">{quickPackageProgress}</span>
+                  </div>
+                </div>
+              )}
+
               {/* Download Button */}
               <button
                 onClick={handleQuickPackageDownload}
-                disabled={quickTranslationFiles.length === 0}
+                disabled={quickTranslationFiles.length === 0 || quickPackageLoading}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                📦 Generate Complete Package (Print/PDF)
+                {quickPackageLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </>
+                ) : (
+                  '📦 Generate Complete Package (Print/PDF)'
+                )}
               </button>
               <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Opens print window - save as PDF
+                Opens print window - save as PDF (supports large documents)
               </p>
             </>
           )}
