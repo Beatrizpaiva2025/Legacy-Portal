@@ -45,6 +45,487 @@ const UI_LANGUAGES = [
   { code: 'pt', flag: '🇧🇷', name: 'Português' }
 ];
 
+// Customer Portal Translations
+const CUSTOMER_TRANSLATIONS = {
+  en: {
+    // Header & Navigation
+    customerPortal: 'Customer Portal',
+    signIn: 'Sign in to your account',
+    createAccount: 'Create a new account',
+    newOrder: 'New Order',
+    myOrders: 'My Orders',
+    messages: 'Messages',
+    logout: 'Logout',
+    welcome: 'Welcome,',
+
+    // Login/Register
+    fullName: 'Full Name',
+    phoneOptional: 'Phone (optional)',
+    email: 'Email',
+    password: 'Password',
+    signInBtn: 'Sign In',
+    createAccountBtn: 'Create Account',
+    pleaseWait: 'Please wait...',
+    noAccount: "Don't have an account? Register",
+    hasAccount: 'Already have an account? Sign In',
+    areYouPartner: 'Are you a partner?',
+    goToPartnerPortal: 'Go to Partner Portal',
+
+    // New Order Page
+    requestTranslation: 'Request Translation',
+    enterDetails: 'Enter your details to receive your quote',
+    yourName: 'Your Name *',
+    yourEmail: 'Your Email *',
+    sendQuoteHere: "We'll send your quote and order updates here",
+
+    // Service Types
+    serviceType: 'Service Type',
+    certifiedTranslation: 'Certified Translation',
+    certifiedDesc: 'Official documents, legal, immigration',
+    standardTranslation: 'Standard Translation',
+    standardDesc: 'General use, no certification',
+    swornTranslation: 'Sworn Translation',
+    swornDesc: 'For use outside USA - official sworn translator',
+    rmvTranslation: 'RMV Certified Translation',
+    rmvDesc: 'Massachusetts Motor Vehicle - requires physical copy',
+    perPage: '/page',
+
+    // Service Descriptions
+    certifiedInfo: 'Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.',
+    standardInfo: 'Accurate translation for general use; does not include certification.',
+    swornInfo: 'Completed by a sworn translator registered in the country of use; required for specific countries.',
+    rmvInfo: 'Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.',
+
+    // Languages
+    translateFrom: 'Translate From',
+    translateTo: 'Translate To',
+    swornOnlyPortuguese: 'Sworn translations are only available for Portuguese (Brasil)',
+
+    // Upload
+    uploadDocument: 'Upload Document',
+    uploadFiles: '+ Upload File(s)',
+    acceptedFormats: 'PDF, DOCX, Images, TXT',
+    connectingServer: 'Connecting to server...',
+    processing: 'Processing',
+    processingDocument: 'Processing document...',
+    processingLargeFile: 'This may take a moment for large or image-based files',
+    uploadTrouble: 'Having trouble uploading?',
+    contactEmail: 'Contact us via email',
+    page: 'page',
+    pages: 'pages',
+    total: 'Total',
+
+    // Urgency
+    urgency: 'Urgency',
+    standard23Days: 'Standard (2-3 days)',
+    priority24Hours: 'Priority (24 hours)',
+    urgent12Hours: 'Urgent (12 hours)',
+
+    // Physical Copy
+    requirePhysicalCopy: 'Do you require the physical copy of the translation?',
+    no: 'No',
+    yes: 'Yes',
+    digitalOnly: 'Digital copy only',
+    priorityMail: 'Priority Mail',
+    rmvRequiresPhysical: 'RMV requires a physical copy. Shipping is automatically included.',
+    shippingAddressUSA: 'Shipping Address (USA)',
+    streetAddress: 'Street Address *',
+    city: 'City *',
+    state: 'State *',
+    zipCode: 'ZIP Code *',
+    country: 'Country',
+    estimatedDelivery: 'USPS Priority Mail - Estimated delivery: 1-3 business days',
+
+    // Notes
+    specialInstructions: 'Special Instructions (optional)',
+    instructionsPlaceholder: 'Any special instructions for our translators...',
+
+    // Quote Summary
+    quoteSummary: 'Quote Summary',
+    service: 'Service',
+    basePrice: 'Base Price',
+    urgencyFee: 'Urgency Fee',
+    certification: 'Certification',
+    uspsPriorityMail: 'USPS Priority Mail',
+    discount: 'Discount',
+    discountCode: 'Discount Code',
+    enterCode: 'Enter code',
+    apply: 'Apply',
+    off: 'off',
+    applied: 'applied!',
+    paymentRequired: '* Payment required to start translation',
+
+    // Buttons
+    continueToPayment: 'Continue to Payment',
+    processingBtn: 'Processing...',
+
+    // Contact
+    questionsAboutPricing: 'Questions about your pricing?',
+    requestQuoteInstead: 'Request a quote instead',
+
+    // Exit Popup
+    waitSpecialOffer: 'Wait! Special Offer!',
+    completeOrderNow: 'Complete your order now and get',
+    offDiscount: 'OFF',
+    useCodeAtCheckout: 'Use this code at checkout',
+    yesApplyDiscount: 'Yes, Apply My 5% Discount!',
+    noPayFullPrice: 'No thanks, I\'ll pay full price',
+
+    // Validation Errors
+    pleaseEnterName: 'Please enter your name',
+    pleaseEnterEmail: 'Please enter your email',
+    pleaseUploadDocument: 'Please upload a document',
+    pleaseCompleteShipping: 'Please complete the shipping address',
+
+    // Success/Error Messages
+    paymentSuccessful: 'Payment successful! Your order has been confirmed. Check your email for details.',
+    paymentCanceled: 'Payment was canceled. Your order has been saved - you can complete payment later.',
+    invalidDiscountCode: 'Invalid or expired discount code',
+    failedToProcess: 'Failed to process payment. Please try again.',
+    processingTimedOut: 'Processing timed out. The file might be too large or complex. Please try a smaller file.',
+    errorProcessingDocument: 'Error processing document. Please try again.',
+
+    // Orders Page
+    noOrdersYet: 'No orders yet',
+    createFirstOrder: 'Create your first order to get started',
+    all: 'All',
+    pending: 'Pending',
+    paid: 'Paid',
+    loadingOrders: 'Loading orders...',
+    created: 'Created',
+    reference: 'Reference',
+    words: 'words',
+
+    // Messages Page
+    noMessages: 'No messages',
+    messagesWillAppear: 'Messages from Legacy Translations will appear here',
+    loadingMessages: 'Loading messages...',
+    markAsRead: 'Mark as read',
+    new: 'New',
+
+    // Page size info
+    pageInfo: '1 page = 250 words max'
+  },
+  es: {
+    // Header & Navigation
+    customerPortal: 'Portal del Cliente',
+    signIn: 'Inicia sesión en tu cuenta',
+    createAccount: 'Crear una nueva cuenta',
+    newOrder: 'Nuevo Pedido',
+    myOrders: 'Mis Pedidos',
+    messages: 'Mensajes',
+    logout: 'Cerrar Sesión',
+    welcome: 'Bienvenido,',
+
+    // Login/Register
+    fullName: 'Nombre Completo',
+    phoneOptional: 'Teléfono (opcional)',
+    email: 'Correo Electrónico',
+    password: 'Contraseña',
+    signInBtn: 'Iniciar Sesión',
+    createAccountBtn: 'Crear Cuenta',
+    pleaseWait: 'Por favor espere...',
+    noAccount: '¿No tienes cuenta? Regístrate',
+    hasAccount: '¿Ya tienes cuenta? Inicia Sesión',
+    areYouPartner: '¿Eres un socio?',
+    goToPartnerPortal: 'Ir al Portal de Socios',
+
+    // New Order Page
+    requestTranslation: 'Solicitar Traducción',
+    enterDetails: 'Ingresa tus datos para recibir tu cotización',
+    yourName: 'Tu Nombre *',
+    yourEmail: 'Tu Correo *',
+    sendQuoteHere: 'Enviaremos tu cotización y actualizaciones aquí',
+
+    // Service Types
+    serviceType: 'Tipo de Servicio',
+    certifiedTranslation: 'Traducción Certificada',
+    certifiedDesc: 'Documentos oficiales, legal, inmigración',
+    standardTranslation: 'Traducción Estándar',
+    standardDesc: 'Uso general, sin certificación',
+    swornTranslation: 'Traducción Jurada',
+    swornDesc: 'Para uso fuera de EE.UU. - traductor jurado oficial',
+    rmvTranslation: 'Traducción Certificada RMV',
+    rmvDesc: 'Vehículos Motorizados de Massachusetts - requiere copia física',
+    perPage: '/página',
+
+    // Service Descriptions
+    certifiedInfo: 'Incluye una Declaración de Precisión firmada, sello y firma; aceptada por la mayoría de instituciones.',
+    standardInfo: 'Traducción precisa para uso general; no incluye certificación.',
+    swornInfo: 'Realizada por un traductor jurado registrado en el país de uso; requerida para países específicos.',
+    rmvInfo: 'Certificada en membrete oficial con todos los elementos requeridos; aceptada por el RMV para licencias, IDs y propósitos relacionados.',
+
+    // Languages
+    translateFrom: 'Traducir Desde',
+    translateTo: 'Traducir A',
+    swornOnlyPortuguese: 'Las traducciones juradas solo están disponibles para Portugués (Brasil)',
+
+    // Upload
+    uploadDocument: 'Subir Documento',
+    uploadFiles: '+ Subir Archivo(s)',
+    acceptedFormats: 'PDF, DOCX, Imágenes, TXT',
+    connectingServer: 'Conectando al servidor...',
+    processing: 'Procesando',
+    processingDocument: 'Procesando documento...',
+    processingLargeFile: 'Esto puede tomar un momento para archivos grandes o basados en imágenes',
+    uploadTrouble: '¿Tienes problemas para subir?',
+    contactEmail: 'Contáctanos por correo',
+    page: 'página',
+    pages: 'páginas',
+    total: 'Total',
+
+    // Urgency
+    urgency: 'Urgencia',
+    standard23Days: 'Estándar (2-3 días)',
+    priority24Hours: 'Prioritario (24 horas)',
+    urgent12Hours: 'Urgente (12 horas)',
+
+    // Physical Copy
+    requirePhysicalCopy: '¿Necesitas la copia física de la traducción?',
+    no: 'No',
+    yes: 'Sí',
+    digitalOnly: 'Solo copia digital',
+    priorityMail: 'Correo Prioritario',
+    rmvRequiresPhysical: 'RMV requiere una copia física. El envío está incluido automáticamente.',
+    shippingAddressUSA: 'Dirección de Envío (EE.UU.)',
+    streetAddress: 'Dirección *',
+    city: 'Ciudad *',
+    state: 'Estado *',
+    zipCode: 'Código Postal *',
+    country: 'País',
+    estimatedDelivery: 'USPS Priority Mail - Entrega estimada: 1-3 días hábiles',
+
+    // Notes
+    specialInstructions: 'Instrucciones Especiales (opcional)',
+    instructionsPlaceholder: 'Cualquier instrucción especial para nuestros traductores...',
+
+    // Quote Summary
+    quoteSummary: 'Resumen de Cotización',
+    service: 'Servicio',
+    basePrice: 'Precio Base',
+    urgencyFee: 'Cargo por Urgencia',
+    certification: 'Certificación',
+    uspsPriorityMail: 'USPS Priority Mail',
+    discount: 'Descuento',
+    discountCode: 'Código de Descuento',
+    enterCode: 'Ingresar código',
+    apply: 'Aplicar',
+    off: 'de descuento',
+    applied: '¡aplicado!',
+    paymentRequired: '* Se requiere pago para iniciar la traducción',
+
+    // Buttons
+    continueToPayment: 'Continuar al Pago',
+    processingBtn: 'Procesando...',
+
+    // Contact
+    questionsAboutPricing: '¿Preguntas sobre tu precio?',
+    requestQuoteInstead: 'Solicitar una cotización en su lugar',
+
+    // Exit Popup
+    waitSpecialOffer: '¡Espera! ¡Oferta Especial!',
+    completeOrderNow: 'Completa tu pedido ahora y obtén',
+    offDiscount: 'DE DESCUENTO',
+    useCodeAtCheckout: 'Usa este código al pagar',
+    yesApplyDiscount: '¡Sí, Aplicar Mi 5% de Descuento!',
+    noPayFullPrice: 'No gracias, pagaré el precio completo',
+
+    // Validation Errors
+    pleaseEnterName: 'Por favor ingresa tu nombre',
+    pleaseEnterEmail: 'Por favor ingresa tu correo',
+    pleaseUploadDocument: 'Por favor sube un documento',
+    pleaseCompleteShipping: 'Por favor completa la dirección de envío',
+
+    // Success/Error Messages
+    paymentSuccessful: '¡Pago exitoso! Tu pedido ha sido confirmado. Revisa tu correo para más detalles.',
+    paymentCanceled: 'El pago fue cancelado. Tu pedido ha sido guardado - puedes completar el pago después.',
+    invalidDiscountCode: 'Código de descuento inválido o expirado',
+    failedToProcess: 'Error al procesar el pago. Por favor intenta de nuevo.',
+    processingTimedOut: 'El procesamiento expiró. El archivo puede ser muy grande o complejo. Por favor intenta con un archivo más pequeño.',
+    errorProcessingDocument: 'Error al procesar el documento. Por favor intenta de nuevo.',
+
+    // Orders Page
+    noOrdersYet: 'Aún no hay pedidos',
+    createFirstOrder: 'Crea tu primer pedido para comenzar',
+    all: 'Todos',
+    pending: 'Pendiente',
+    paid: 'Pagado',
+    loadingOrders: 'Cargando pedidos...',
+    created: 'Creado',
+    reference: 'Referencia',
+    words: 'palabras',
+
+    // Messages Page
+    noMessages: 'Sin mensajes',
+    messagesWillAppear: 'Los mensajes de Legacy Translations aparecerán aquí',
+    loadingMessages: 'Cargando mensajes...',
+    markAsRead: 'Marcar como leído',
+    new: 'Nuevo',
+
+    // Page size info
+    pageInfo: '1 página = 250 palabras máx.'
+  },
+  pt: {
+    // Header & Navigation
+    customerPortal: 'Portal do Cliente',
+    signIn: 'Entre na sua conta',
+    createAccount: 'Criar uma nova conta',
+    newOrder: 'Novo Pedido',
+    myOrders: 'Meus Pedidos',
+    messages: 'Mensagens',
+    logout: 'Sair',
+    welcome: 'Bem-vindo,',
+
+    // Login/Register
+    fullName: 'Nome Completo',
+    phoneOptional: 'Telefone (opcional)',
+    email: 'E-mail',
+    password: 'Senha',
+    signInBtn: 'Entrar',
+    createAccountBtn: 'Criar Conta',
+    pleaseWait: 'Por favor aguarde...',
+    noAccount: 'Não tem conta? Cadastre-se',
+    hasAccount: 'Já tem conta? Entre',
+    areYouPartner: 'Você é um parceiro?',
+    goToPartnerPortal: 'Ir para o Portal de Parceiros',
+
+    // New Order Page
+    requestTranslation: 'Solicitar Tradução',
+    enterDetails: 'Insira seus dados para receber seu orçamento',
+    yourName: 'Seu Nome *',
+    yourEmail: 'Seu E-mail *',
+    sendQuoteHere: 'Enviaremos seu orçamento e atualizações aqui',
+
+    // Service Types
+    serviceType: 'Tipo de Serviço',
+    certifiedTranslation: 'Tradução Certificada',
+    certifiedDesc: 'Documentos oficiais, jurídico, imigração',
+    standardTranslation: 'Tradução Padrão',
+    standardDesc: 'Uso geral, sem certificação',
+    swornTranslation: 'Tradução Juramentada',
+    swornDesc: 'Para uso fora dos EUA - tradutor juramentado oficial',
+    rmvTranslation: 'Tradução Certificada RMV',
+    rmvDesc: 'Departamento de Veículos de Massachusetts - requer cópia física',
+    perPage: '/página',
+
+    // Service Descriptions
+    certifiedInfo: 'Inclui uma Declaração de Precisão assinada, carimbo e assinatura; aceita pela maioria das instituições.',
+    standardInfo: 'Tradução precisa para uso geral; não inclui certificação.',
+    swornInfo: 'Realizada por um tradutor juramentado registrado no país de uso; exigida para países específicos.',
+    rmvInfo: 'Certificada em papel timbrado oficial com todos os elementos exigidos; aceita pelo RMV para carteiras, IDs e fins relacionados.',
+
+    // Languages
+    translateFrom: 'Traduzir De',
+    translateTo: 'Traduzir Para',
+    swornOnlyPortuguese: 'Traduções juramentadas só estão disponíveis para Português (Brasil)',
+
+    // Upload
+    uploadDocument: 'Enviar Documento',
+    uploadFiles: '+ Enviar Arquivo(s)',
+    acceptedFormats: 'PDF, DOCX, Imagens, TXT',
+    connectingServer: 'Conectando ao servidor...',
+    processing: 'Processando',
+    processingDocument: 'Processando documento...',
+    processingLargeFile: 'Isso pode levar um momento para arquivos grandes ou baseados em imagens',
+    uploadTrouble: 'Problemas para enviar?',
+    contactEmail: 'Entre em contato por e-mail',
+    page: 'página',
+    pages: 'páginas',
+    total: 'Total',
+
+    // Urgency
+    urgency: 'Urgência',
+    standard23Days: 'Padrão (2-3 dias)',
+    priority24Hours: 'Prioritário (24 horas)',
+    urgent12Hours: 'Urgente (12 horas)',
+
+    // Physical Copy
+    requirePhysicalCopy: 'Você precisa da cópia física da tradução?',
+    no: 'Não',
+    yes: 'Sim',
+    digitalOnly: 'Apenas cópia digital',
+    priorityMail: 'Correio Prioritário',
+    rmvRequiresPhysical: 'RMV exige uma cópia física. O frete está incluído automaticamente.',
+    shippingAddressUSA: 'Endereço de Envio (EUA)',
+    streetAddress: 'Endereço *',
+    city: 'Cidade *',
+    state: 'Estado *',
+    zipCode: 'CEP *',
+    country: 'País',
+    estimatedDelivery: 'USPS Priority Mail - Entrega estimada: 1-3 dias úteis',
+
+    // Notes
+    specialInstructions: 'Instruções Especiais (opcional)',
+    instructionsPlaceholder: 'Qualquer instrução especial para nossos tradutores...',
+
+    // Quote Summary
+    quoteSummary: 'Resumo do Orçamento',
+    service: 'Serviço',
+    basePrice: 'Preço Base',
+    urgencyFee: 'Taxa de Urgência',
+    certification: 'Certificação',
+    uspsPriorityMail: 'USPS Priority Mail',
+    discount: 'Desconto',
+    discountCode: 'Código de Desconto',
+    enterCode: 'Inserir código',
+    apply: 'Aplicar',
+    off: 'de desconto',
+    applied: 'aplicado!',
+    paymentRequired: '* Pagamento necessário para iniciar a tradução',
+
+    // Buttons
+    continueToPayment: 'Continuar para Pagamento',
+    processingBtn: 'Processando...',
+
+    // Contact
+    questionsAboutPricing: 'Dúvidas sobre seu preço?',
+    requestQuoteInstead: 'Solicitar um orçamento em vez disso',
+
+    // Exit Popup
+    waitSpecialOffer: 'Espere! Oferta Especial!',
+    completeOrderNow: 'Complete seu pedido agora e ganhe',
+    offDiscount: 'DE DESCONTO',
+    useCodeAtCheckout: 'Use este código no pagamento',
+    yesApplyDiscount: 'Sim, Aplicar Meu Desconto de 5%!',
+    noPayFullPrice: 'Não obrigado, pagarei o preço cheio',
+
+    // Validation Errors
+    pleaseEnterName: 'Por favor insira seu nome',
+    pleaseEnterEmail: 'Por favor insira seu e-mail',
+    pleaseUploadDocument: 'Por favor envie um documento',
+    pleaseCompleteShipping: 'Por favor complete o endereço de envio',
+
+    // Success/Error Messages
+    paymentSuccessful: 'Pagamento realizado! Seu pedido foi confirmado. Verifique seu e-mail para detalhes.',
+    paymentCanceled: 'Pagamento cancelado. Seu pedido foi salvo - você pode completar o pagamento depois.',
+    invalidDiscountCode: 'Código de desconto inválido ou expirado',
+    failedToProcess: 'Falha ao processar o pagamento. Por favor tente novamente.',
+    processingTimedOut: 'O processamento expirou. O arquivo pode ser muito grande ou complexo. Por favor tente um arquivo menor.',
+    errorProcessingDocument: 'Erro ao processar o documento. Por favor tente novamente.',
+
+    // Orders Page
+    noOrdersYet: 'Nenhum pedido ainda',
+    createFirstOrder: 'Crie seu primeiro pedido para começar',
+    all: 'Todos',
+    pending: 'Pendente',
+    paid: 'Pago',
+    loadingOrders: 'Carregando pedidos...',
+    created: 'Criado',
+    reference: 'Referência',
+    words: 'palavras',
+
+    // Messages Page
+    noMessages: 'Sem mensagens',
+    messagesWillAppear: 'Mensagens da Legacy Translations aparecerão aqui',
+    loadingMessages: 'Carregando mensagens...',
+    markAsRead: 'Marcar como lido',
+    new: 'Novo',
+
+    // Page size info
+    pageInfo: '1 página = 250 palavras máx.'
+  }
+};
+
 // Get saved UI language or default to English
 const getSavedUILanguage = () => {
   const saved = localStorage.getItem('customer_ui_language');
@@ -53,7 +534,7 @@ const getSavedUILanguage = () => {
 };
 
 // ==================== LOGIN PAGE (Customer) ====================
-const CustomerLoginPage = ({ onLogin }) => {
+const CustomerLoginPage = ({ onLogin, t }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -101,8 +582,8 @@ const CustomerLoginPage = ({ onLogin }) => {
             alt="Legacy Translations"
             className="mx-auto mb-4"
           />
-          <h1 className="text-2xl font-bold text-gray-800">Customer Portal</h1>
-          <p className="text-gray-600">{isLogin ? 'Sign in to your account' : 'Create a new account'}</p>
+          <h1 className="text-2xl font-bold text-gray-800">{t.customerPortal}</h1>
+          <p className="text-gray-600">{isLogin ? t.signIn : t.createAccount}</p>
         </div>
 
         {error && (
@@ -115,7 +596,7 @@ const CustomerLoginPage = ({ onLogin }) => {
           {!isLogin && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.fullName}</label>
                 <input
                   type="text"
                   required
@@ -126,7 +607,7 @@ const CustomerLoginPage = ({ onLogin }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
                 <input
                   type="tel"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
@@ -139,7 +620,7 @@ const CustomerLoginPage = ({ onLogin }) => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.email}</label>
             <input
               type="email"
               required
@@ -150,7 +631,7 @@ const CustomerLoginPage = ({ onLogin }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
             <input
               type="password"
               required
@@ -165,7 +646,7 @@ const CustomerLoginPage = ({ onLogin }) => {
             disabled={loading}
             className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400"
           >
-            {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+            {loading ? t.pleaseWait : (isLogin ? t.signInBtn : t.createAccountBtn)}
           </button>
         </form>
 
@@ -174,15 +655,15 @@ const CustomerLoginPage = ({ onLogin }) => {
             onClick={() => setIsLogin(!isLogin)}
             className="text-teal-600 hover:underline"
           >
-            {isLogin ? "Don't have an account? Register" : 'Already have an account? Sign In'}
+            {isLogin ? t.noAccount : t.hasAccount}
           </button>
         </div>
 
         <div className="mt-6 pt-6 border-t text-center">
           <p className="text-sm text-gray-500">
-            Are you a partner?{' '}
+            {t.areYouPartner}{' '}
             <a href="/partner" className="text-teal-600 hover:underline">
-              Go to Partner Portal
+              {t.goToPartnerPortal}
             </a>
           </p>
         </div>
@@ -192,11 +673,11 @@ const CustomerLoginPage = ({ onLogin }) => {
 };
 
 // ==================== CUSTOMER SIDEBAR ====================
-const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
+const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout, t }) => {
   const menuItems = [
-    { id: 'new-order', label: 'New Order', icon: '➕' },
-    { id: 'orders', label: 'My Orders', icon: '📋' },
-    { id: 'messages', label: 'Messages', icon: '✉️' }
+    { id: 'new-order', label: t.newOrder, icon: '➕' },
+    { id: 'orders', label: t.myOrders, icon: '📋' },
+    { id: 'messages', label: t.messages, icon: '✉️' }
   ];
 
   return (
@@ -207,7 +688,7 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
           alt="Legacy Translations"
           className="w-40 h-auto mb-4"
         />
-        <div className="text-sm text-gray-600 mb-2">Welcome,</div>
+        <div className="text-sm text-gray-600 mb-2">{t.welcome}</div>
         <div className="font-semibold text-gray-800">{customer?.full_name}</div>
       </div>
 
@@ -233,7 +714,7 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
           onClick={onLogout}
           className="w-full py-2 text-red-600 hover:bg-red-50 rounded-md"
         >
-          Logout
+          {t.logout}
         </button>
       </div>
     </div>
@@ -241,7 +722,7 @@ const CustomerSidebar = ({ activeTab, setActiveTab, customer, onLogout }) => {
 };
 
 // ==================== CUSTOMER NEW ORDER PAGE (Single page with inline email capture) ====================
-const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
+const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [guestEmail, setGuestEmail] = useState('');
   const [guestName, setGuestName] = useState('');
 
@@ -629,13 +1110,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               &times;
             </button>
             <div className="text-5xl mb-4">🎁</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Special Offer!</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.waitSpecialOffer}</h2>
             <p className="text-gray-600 mb-4">
-              Complete your order now and get <span className="text-teal-600 font-bold">5% OFF</span>!
+              {t.completeOrderNow} <span className="text-teal-600 font-bold">5% {t.offDiscount}</span>!
             </p>
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg mb-4 border border-teal-200">
               <p className="text-2xl font-bold text-teal-600 mb-1">SAVE5</p>
-              <p className="text-sm text-gray-600">Use this code at checkout</p>
+              <p className="text-sm text-gray-600">{t.useCodeAtCheckout}</p>
             </div>
             <div className="flex flex-col gap-3">
               <button
@@ -646,20 +1127,20 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 }}
                 className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold text-lg"
               >
-                Yes, Apply My 5% Discount!
+                {t.yesApplyDiscount}
               </button>
               <button
                 onClick={() => setShowExitPopup(false)}
                 className="w-full py-2 text-gray-500 hover:text-gray-700 font-medium text-sm"
               >
-                No thanks, I'll pay full price
+                {t.noPayFullPrice}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Request Translation</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t.requestTranslation}</h1>
 
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>
@@ -675,10 +1156,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             {/* Contact Info - Subtle at top */}
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg border border-teal-100">
-              <p className="text-sm text-gray-600 mb-3">Enter your details to receive your quote</p>
+              <p className="text-sm text-gray-600 mb-3">{t.enterDetails}</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div ref={nameRef}>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Name *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t.yourName}</label>
                   <input
                     type="text"
                     required
@@ -691,7 +1172,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   {fieldErrors.name && <p className="text-red-500 text-xs mt-1">{fieldErrors.name}</p>}
                 </div>
                 <div ref={emailRef}>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Your Email *</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">{t.yourEmail}</label>
                   <input
                     type="email"
                     required
@@ -704,12 +1185,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   {fieldErrors.email && <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>}
                 </div>
               </div>
-              <p className="text-xs text-gray-400 mt-2">We'll send your quote and order updates here</p>
+              <p className="text-xs text-gray-400 mt-2">{t.sendQuoteHere}</p>
             </div>
 
             {/* Service Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.serviceType}</h2>
               <div className="space-y-3">
                 {/* Certified Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -725,12 +1206,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                      {t.certifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.certifiedInfo}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -747,12 +1228,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Standard Translation
-                      <span className="text-gray-400 cursor-help" title="Accurate translation for general use; does not include certification.">&#9432;</span>
+                      {t.standardTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.standardInfo}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">General use, no certification</div>
+                    <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$19.99/page</div>
+                  <div className="font-semibold text-teal-600">$19.99{t.perPage}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -769,12 +1250,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Sworn Translation
-                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
+                      {t.swornTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.swornInfo}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
+                    <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$55.00/page</div>
+                  <div className="font-semibold text-teal-600">$55.00{t.perPage}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -791,28 +1272,28 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      RMV Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                      {t.rmvTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.rmvInfo}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                    <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">$24.99/page</div>
+                  <div className="font-semibold text-teal-600">$24.99{t.perPage}</div>
                 </label>
               </div>
 
               {/* Service Type Descriptions */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
-                <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
-                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
-                <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                <p><strong>{t.certifiedTranslation}:</strong> {t.certifiedInfo}</p>
+                <p><strong>{t.standardTranslation}:</strong> {t.standardInfo}</p>
+                <p><strong>{t.swornTranslation}:</strong> {t.swornInfo}</p>
+                <p><strong>{t.rmvTranslation}:</strong> {t.rmvInfo}</p>
               </div>
             </div>
 
             {/* Languages */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate From</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateFrom}</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_from}
@@ -826,7 +1307,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateTo}</label>
                 {formData.service_type === 'sworn' ? (
                   <div>
                     <select
@@ -836,7 +1317,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     >
                       <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
                     </select>
-                    <p className="text-xs text-amber-600 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                    <p className="text-xs text-amber-600 mt-1">{t.swornOnlyPortuguese}</p>
                   </div>
                 ) : (
                   <select
@@ -856,7 +1337,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             {/* Document Upload */}
             <div ref={fileUploadRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.uploadDocument}</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
@@ -865,16 +1346,16 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               >
                 <input {...getInputProps()} />
                 <div className="text-3xl mb-2">📁</div>
-                <div className="font-medium text-teal-600">+ Upload File(s)</div>
-                <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
+                <div className="font-medium text-teal-600">{t.uploadFiles}</div>
+                <div className="text-sm text-gray-500">{t.acceptedFormats}</div>
               </div>
               {fieldErrors.files && <p className="text-red-500 text-sm mt-2">{fieldErrors.files}</p>}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800 font-medium">{processingStatus || 'Processing document...'}</div>
-                  <div className="text-xs text-blue-600 mt-1">This may take a moment for large or image-based files</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || t.processingDocument}</div>
+                  <div className="text-xs text-blue-600 mt-1">{t.processingLargeFile}</div>
                 </div>
               )}
 
@@ -887,7 +1368,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         <div className="flex items-center">
                           <span className="text-green-600 mr-2">✓</span>
                           <span>{item.fileName}</span>
-                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
+                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? t.page : t.pages})</span>
                         </div>
                         <button
                           type="button"
@@ -909,7 +1390,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                     );
                   })}
                   <div className="text-lg font-semibold text-teal-600">
-                    Total: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? 'page' : 'pages'}
+                    {t.total}: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? t.page : t.pages}
                   </div>
                 </div>
               )}
@@ -917,12 +1398,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               {/* Contact support link - shown after upload section */}
               <div className="mt-3 text-center">
                 <p className="text-xs text-gray-400">
-                  Having trouble uploading?{' '}
+                  {t.uploadTrouble}{' '}
                   <a
                     href="mailto:info@legacytranslations.com?subject=Document Upload Issue"
                     className="text-teal-600 hover:underline"
                   >
-                    Contact us via email
+                    {t.contactEmail}
                   </a>
                 </p>
               </div>
@@ -930,12 +1411,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             {/* Urgency */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Urgency</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.urgency}</h2>
               <div className="space-y-2">
                 {[
-                  { id: 'no', label: 'Standard (2-3 days)', fee: '' },
-                  { id: 'priority', label: 'Priority (24 hours)', fee: '+25%' },
-                  { id: 'urgent', label: 'Urgent (12 hours)', fee: '+100%' }
+                  { id: 'no', label: t.standard23Days, fee: '' },
+                  { id: 'priority', label: t.priority24Hours, fee: '+25%' },
+                  { id: 'urgent', label: t.urgent12Hours, fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                     <input
@@ -955,7 +1436,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             {/* Physical Copy / Shipping */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Do you require the physical copy of the translation?</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.requirePhysicalCopy}</h2>
               <div className="space-y-3">
                 <div className="flex gap-4">
                   <label className={`flex-1 p-4 border rounded-lg cursor-pointer text-center ${
@@ -969,8 +1450,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                       disabled={formData.service_type === 'rmv'}
                       className="sr-only"
                     />
-                    <span className="font-medium">No</span>
-                    <p className="text-xs text-gray-500 mt-1">Digital copy only</p>
+                    <span className="font-medium">{t.no}</span>
+                    <p className="text-xs text-gray-500 mt-1">{t.digitalOnly}</p>
                   </label>
                   <label className={`flex-1 p-4 border rounded-lg cursor-pointer text-center ${
                     needsPhysicalCopy || formData.service_type === 'rmv' ? 'border-teal-500 bg-teal-50' : 'border-gray-200'
@@ -982,26 +1463,26 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                       onChange={() => setNeedsPhysicalCopy(true)}
                       className="sr-only"
                     />
-                    <span className="font-medium">Yes</span>
-                    <p className="text-xs text-gray-500 mt-1">+ ${USPS_PRIORITY_MAIL} Priority Mail</p>
+                    <span className="font-medium">{t.yes}</span>
+                    <p className="text-xs text-gray-500 mt-1">+ ${USPS_PRIORITY_MAIL} {t.priorityMail}</p>
                   </label>
                 </div>
 
                 {formData.service_type === 'rmv' && (
                   <div className="p-3 bg-amber-50 rounded-md border border-amber-200">
                     <p className="text-sm text-amber-800">
-                      <strong>Note:</strong> RMV requires a physical copy. Shipping is automatically included.
+                      <strong>Note:</strong> {t.rmvRequiresPhysical}
                     </p>
                   </div>
                 )}
 
                 {(needsPhysicalCopy || formData.service_type === 'rmv') && (
                   <div ref={shippingRef} className={`p-4 rounded-lg space-y-3 ${fieldErrors.shipping ? 'bg-red-50 border border-red-300' : 'bg-gray-50'}`}>
-                    <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                    <p className="text-sm font-medium text-gray-700">{t.shippingAddressUSA}</p>
                     {fieldErrors.shipping && <p className="text-red-500 text-sm">{fieldErrors.shipping}</p>}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="md:col-span-2">
-                        <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                        <label className="block text-xs text-gray-500 mb-1">{t.streetAddress}</label>
                         <input
                           type="text"
                           required={needsPhysicalCopy}
@@ -1012,7 +1493,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">City *</label>
+                        <label className="block text-xs text-gray-500 mb-1">{t.city}</label>
                         <input
                           type="text"
                           required={needsPhysicalCopy}
@@ -1023,7 +1504,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">State *</label>
+                        <label className="block text-xs text-gray-500 mb-1">{t.state}</label>
                         <input
                           type="text"
                           required={needsPhysicalCopy}
@@ -1034,7 +1515,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                        <label className="block text-xs text-gray-500 mb-1">{t.zipCode}</label>
                         <input
                           type="text"
                           required={needsPhysicalCopy}
@@ -1045,7 +1526,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <label className="block text-xs text-gray-500 mb-1">{t.country}</label>
                         <input
                           type="text"
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
@@ -1055,7 +1536,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-500">
-                      USPS Priority Mail - Estimated delivery: 1-3 business days
+                      {t.estimatedDelivery}
                     </p>
                   </div>
                 )}
@@ -1064,24 +1545,24 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.specialInstructions}</label>
               <textarea
                 className="w-full px-4 py-2 border border-gray-300 rounded-md"
                 rows="3"
                 value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                placeholder="Any special instructions for our translators..."
+                placeholder={t.instructionsPlaceholder}
               />
             </div>
 
             {/* Questions about pricing? - Contact */}
             <div className="bg-gray-50 p-5 rounded-lg text-center">
-              <p className="text-gray-600 mb-3">Questions about your pricing?</p>
+              <p className="text-gray-600 mb-3">{t.questionsAboutPricing}</p>
               <a
                 href="mailto:contact@legacytranslations.com?subject=Quote Request"
                 className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
               >
-                Request a quote instead
+                {t.requestQuoteInstead}
               </a>
             </div>
 
@@ -1091,57 +1572,57 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
               disabled={submitting || wordCount === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
-              {submitting ? 'Processing...' : 'Continue to Payment'}
+              {submitting ? t.processingBtn : t.continueToPayment}
             </button>
           </form>
         </div>
 
         {/* Quote Summary */}
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
-          <h2 className="text-xl font-bold text-teal-600 mb-4">Quote Summary</h2>
+          <h2 className="text-xl font-bold text-teal-600 mb-4">{t.quoteSummary}</h2>
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">Service</span>
+              <span className="text-gray-600">{t.service}</span>
               <span className="font-medium">
-                {formData.service_type === 'standard' && 'Standard'}
-                {formData.service_type === 'certified' && 'Certified'}
-                {formData.service_type === 'rmv' && 'RMV Certified'}
-                {formData.service_type === 'sworn' && 'Sworn'}
+                {formData.service_type === 'standard' && t.standardTranslation}
+                {formData.service_type === 'certified' && t.certifiedTranslation}
+                {formData.service_type === 'rmv' && t.rmvTranslation}
+                {formData.service_type === 'sworn' && t.swornTranslation}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Pages</span>
+              <span className="text-gray-600">{t.pages}</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
-            <p className="text-xs text-gray-400 text-right">1 page = 250 words max</p>
+            <p className="text-xs text-gray-400 text-right">{t.pageInfo}</p>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Base Price</span>
+                <span className="text-gray-600">{t.basePrice}</span>
                 <span className="font-medium">${(quote?.base_price || 0).toFixed(2)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
-                  <span>Urgency Fee</span>
+                  <span>{t.urgencyFee}</span>
                   <span>${quote.urgency_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.certification_fee > 0 && (
                 <div className="flex justify-between text-purple-600">
-                  <span>Certification</span>
+                  <span>{t.certification}</span>
                   <span>${quote.certification_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
-                  <span>USPS Priority Mail</span>
+                  <span>{t.uspsPriorityMail}</span>
                   <span>${quote.shipping_fee.toFixed(2)}</span>
                 </div>
               )}
               {quote?.discount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Discount</span>
+                  <span>{t.discount}</span>
                   <span>-${quote.discount.toFixed(2)}</span>
                 </div>
               )}
@@ -1149,39 +1630,39 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
-                <span className="font-bold">Total</span>
+                <span className="font-bold">{t.total}</span>
                 <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
               </div>
             </div>
 
             {/* Discount Code */}
             <div className="border-t pt-3 mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Discount Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.discountCode}</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
                   value={discountCode}
                   onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                  placeholder="Enter code"
+                  placeholder={t.enterCode}
                 />
                 <button
                   type="button"
                   onClick={applyDiscountCode}
                   className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md text-sm hover:bg-gray-300"
                 >
-                  Apply
+                  {t.apply}
                 </button>
               </div>
               {appliedDiscount && (
                 <p className="text-green-600 text-xs mt-1">
-                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% off` : `$${appliedDiscount.value} off`} applied!
+                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% ${t.off}` : `$${appliedDiscount.value} ${t.off}`} {t.applied}
                 </p>
               )}
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
-              * Payment required to start translation
+              {t.paymentRequired}
             </div>
           </div>
         </div>
@@ -1191,7 +1672,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 };
 
 // ==================== CUSTOMER ORDERS PAGE ====================
-const CustomerOrdersPage = ({ token }) => {
+const CustomerOrdersPage = ({ token, t }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -1231,11 +1712,17 @@ const CustomerOrdersPage = ({ token }) => {
     );
   };
 
+  const filterLabels = {
+    'all': t.all,
+    'pending': t.pending,
+    'paid': t.paid
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading orders...</p>
+        <p className="mt-4 text-gray-600">{t.loadingOrders}</p>
       </div>
     );
   }
@@ -1243,7 +1730,7 @@ const CustomerOrdersPage = ({ token }) => {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.myOrders}</h1>
         <div className="flex gap-2">
           {['all', 'pending', 'paid'].map((f) => (
             <button
@@ -1255,7 +1742,7 @@ const CustomerOrdersPage = ({ token }) => {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -1264,8 +1751,8 @@ const CustomerOrdersPage = ({ token }) => {
       {orders.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="text-4xl mb-4">📋</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h2>
-          <p className="text-gray-600">Create your first order to get started</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.noOrdersYet}</h2>
+          <p className="text-gray-600">{t.createFirstOrder}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1284,7 +1771,7 @@ const CustomerOrdersPage = ({ token }) => {
                         {getStatusBadge(order.payment_status)}
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
-                        {order.translate_from} → {order.translate_to} | {order.word_count} words
+                        {order.translate_from} → {order.translate_to} | {order.word_count} {t.words}
                       </div>
                     </div>
                   </div>
@@ -1301,25 +1788,25 @@ const CustomerOrdersPage = ({ token }) => {
                 <div className="border-t bg-gray-50 p-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <div className="text-sm text-gray-500">Service</div>
-                      <div className="font-medium">{order.service_type === 'standard' ? 'Certified' : 'Professional'}</div>
+                      <div className="text-sm text-gray-500">{t.service}</div>
+                      <div className="font-medium">{order.service_type === 'standard' ? t.standardTranslation : t.certifiedTranslation}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Created</div>
+                      <div className="text-sm text-gray-500">{t.created}</div>
                       <div className="font-medium">{new Date(order.created_at).toLocaleDateString()}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
+                      <div className="text-sm text-gray-500">{t.basePrice}</div>
                       <div className="font-medium">${order.base_price?.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
+                      <div className="text-sm text-gray-500">{t.urgencyFee}</div>
                       <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
                     </div>
                   </div>
                   {order.reference && (
                     <div className="mt-4">
-                      <div className="text-sm text-gray-500">Reference</div>
+                      <div className="text-sm text-gray-500">{t.reference}</div>
                       <div className="font-medium">{order.reference}</div>
                     </div>
                   )}
@@ -1334,7 +1821,7 @@ const CustomerOrdersPage = ({ token }) => {
 };
 
 // ==================== CUSTOMER MESSAGES PAGE ====================
-const CustomerMessagesPage = ({ token }) => {
+const CustomerMessagesPage = ({ token, t }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -1388,20 +1875,20 @@ const CustomerMessagesPage = ({ token }) => {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading messages...</p>
+        <p className="mt-4 text-gray-600">{t.loadingMessages}</p>
       </div>
     );
   }
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t.messages}</h1>
 
       {messages.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="text-4xl mb-4">✉️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No messages</h2>
-          <p className="text-gray-600">Messages from Legacy Translations will appear here</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.noMessages}</h2>
+          <p className="text-gray-600">{t.messagesWillAppear}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1421,7 +1908,7 @@ const CustomerMessagesPage = ({ token }) => {
                         {message.title}
                       </h3>
                       {!message.read && (
-                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
+                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">{t.new}</span>
                       )}
                     </div>
                     <p className="text-gray-600 mt-1">{message.content}</p>
@@ -1433,7 +1920,7 @@ const CustomerMessagesPage = ({ token }) => {
                     onClick={() => markAsRead(message.id)}
                     className="text-sm text-teal-600 hover:text-teal-800"
                   >
-                    Mark as read
+                    {t.markAsRead}
                   </button>
                 )}
               </div>
@@ -1451,6 +1938,9 @@ function CustomerApp() {
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
   const [uiLang, setUiLang] = useState(getSavedUILanguage);
+
+  // Get current translations
+  const t = CUSTOMER_TRANSLATIONS[uiLang] || CUSTOMER_TRANSLATIONS.en;
 
   // Handle UI language change
   const changeUILanguage = (newLang) => {
@@ -1495,14 +1985,15 @@ function CustomerApp() {
             customer={customer}
             token={token}
             onOrderCreated={() => setActiveTab('orders')}
+            t={t}
           />
         );
       case 'orders':
-        return <CustomerOrdersPage token={token} />;
+        return <CustomerOrdersPage token={token} t={t} />;
       case 'messages':
-        return <CustomerMessagesPage token={token} />;
+        return <CustomerMessagesPage token={token} t={t} />;
       default:
-        return <CustomerNewOrderPage customer={customer} token={token} />;
+        return <CustomerNewOrderPage customer={customer} token={token} t={t} />;
     }
   };
 
@@ -1534,10 +2025,20 @@ function CustomerApp() {
             </div>
           </div>
         </header>
-        <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} />
+        <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} t={t} />
       </div>
     );
   }
+
+  // Get header title based on active tab
+  const getHeaderTitle = () => {
+    switch (activeTab) {
+      case 'new-order': return t.newOrder;
+      case 'orders': return t.myOrders;
+      case 'messages': return t.messages;
+      default: return t.newOrder;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -1546,12 +2047,13 @@ function CustomerApp() {
         setActiveTab={setActiveTab}
         customer={customer}
         onLogout={handleLogout}
+        t={t}
       />
       <div className="flex-1">
         <header className="bg-white border-b border-gray-200 px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-xl font-semibold text-gray-800 capitalize">
-              {activeTab === 'new-order' ? 'New Order' : activeTab.replace('-', ' ')}
+            <h1 className="text-xl font-semibold text-gray-800">
+              {getHeaderTitle()}
             </h1>
             <div className="flex items-center gap-4">
               {/* Language Selector */}
