@@ -6000,6 +6000,41 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
 
         await db.abandoned_quotes.insert_one(quote.dict())
 
+        # Send automatic email with quote details
+        try:
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-customer.onrender.com')
+            subject = "Your Translation Quote - Legacy Translations"
+            content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
+                <h2 style="color: #0d9488;">Your Quote Has Been Saved!</h2>
+                <p>Hello {quote_data.name},</p>
+                <p>Thank you for your interest in our translation services. Here's a summary of your quote:</p>
+
+                <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <p><strong>Service:</strong> {quote_data.service_type.replace('_', ' ').title()} Translation</p>
+                    <p><strong>From:</strong> {quote_data.translate_from.title()} → <strong>To:</strong> {quote_data.translate_to.title()}</p>
+                    <p><strong>Word Count:</strong> {quote_data.word_count} words</p>
+                    <p style="font-size: 24px; color: #0d9488; font-weight: bold;">Total: ${quote_data.total_price:.2f}</p>
+                </div>
+
+                <p>Ready to proceed? Click the button below to complete your order:</p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{frontend_url}/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+                </div>
+
+                <p style="color: #666; font-size: 14px;">If you have any questions, please reply to this email or contact us at info@legacytranslations.com</p>
+
+                <p>Best regards,<br>Legacy Translations Team</p>
+            </div>
+            """
+            await email_service.send_email(quote_data.email, subject, content)
+            logger.info(f"Quote email sent to {quote_data.email}")
+        except Exception as email_error:
+            logger.error(f"Failed to send quote email: {str(email_error)}")
+            # Don't fail the request if email fails
+
         return {"status": "created", "quote_id": quote.id}
 
     except Exception as e:
