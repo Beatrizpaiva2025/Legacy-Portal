@@ -505,6 +505,8 @@ def get_simple_client_email_template(client_name: str, message_content: str) -> 
 
 def get_translator_assignment_email_template(translator_name: str, order_details: dict, accept_url: str, decline_url: str) -> str:
     """Generate email template for translator assignment with accept/decline buttons"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
     content = f'''
                             <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
                                 Hello, {translator_name}
@@ -557,6 +559,19 @@ def get_translator_assignment_email_template(translator_name: str, order_details
                                     <td align="center" style="padding: 10px;">
                                         <a href="{decline_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); margin: 5px;">
                                             ✗ DECLINE PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0;">
+                                            🚀 <strong>Ready to start working?</strong> Access your translator portal:
+                                        </p>
+                                        <a href="{portal_url}/admin" target="_blank" style="color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: underline;">
+                                            {portal_url}/admin
                                         </a>
                                     </td>
                                 </tr>
