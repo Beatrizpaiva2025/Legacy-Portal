@@ -505,6 +505,8 @@ def get_simple_client_email_template(client_name: str, message_content: str) -> 
 
 def get_translator_assignment_email_template(translator_name: str, order_details: dict, accept_url: str, decline_url: str) -> str:
     """Generate email template for translator assignment with accept/decline buttons"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
     content = f'''
                             <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
                                 Hello, {translator_name}
@@ -557,6 +559,19 @@ def get_translator_assignment_email_template(translator_name: str, order_details
                                     <td align="center" style="padding: 10px;">
                                         <a href="{decline_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); margin: 5px;">
                                             ✗ DECLINE PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0;">
+                                            🚀 <strong>Ready to start working?</strong> Access your translator portal:
+                                        </p>
+                                        <a href="{portal_url}/admin" target="_blank" style="color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: underline;">
+                                            {portal_url}/admin
                                         </a>
                                     </td>
                                 </tr>
@@ -698,7 +713,11 @@ class AdminUserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
-    role: str  # 'admin', 'pm', 'translator'
+    role: str  # 'admin', 'pm', 'translator', 'sales'
+    # Translator-specific fields
+    rate_per_page: Optional[float] = None
+    rate_per_word: Optional[float] = None
+    language_pairs: Optional[str] = None
 
 class AdminUserLogin(BaseModel):
     email: EmailStr
@@ -2220,18 +2239,21 @@ async def verify_admin_key(admin_key: str):
 
 @api_router.post("/admin/auth/register")
 async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
-    """Register a new admin user (only admin can create users)"""
-    # Verify admin key OR valid admin token
+    """Register a new admin user (admin can create any user, PM can only create translators)"""
+    # Verify admin key OR valid admin/PM token
     is_valid = False
+    creator_role = 'admin'
 
     # Check if it's the master admin key
     if admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         is_valid = True
+        creator_role = 'admin'
     else:
-        # Check if it's a valid admin token
-        admin_user = await db.admin_users.find_one({"token": admin_key, "role": "admin", "is_active": True})
+        # Check if it's a valid admin or PM token
+        admin_user = await db.admin_users.find_one({"token": admin_key, "role": {"$in": ["admin", "pm"]}, "is_active": True})
         if admin_user:
             is_valid = True
+            creator_role = admin_user.get("role", "admin")
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -2240,6 +2262,10 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
     valid_roles = ['admin', 'pm', 'translator', 'sales']
     if user_data.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(valid_roles)}")
+
+    # PM can only create translators
+    if creator_role == 'pm' and user_data.role != 'translator':
+        raise HTTPException(status_code=403, detail="Project Managers can only register translators")
 
     try:
         # Check if email already exists
@@ -2255,8 +2281,15 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
             role=user_data.role
         )
 
-        await db.admin_users.insert_one(user.dict())
-        logger.info(f"Admin user created: {user.email} with role {user.role}")
+        # Build user dict with additional translator fields
+        user_dict = user.dict()
+        if user_data.role == 'translator':
+            user_dict['rate_per_page'] = user_data.rate_per_page
+            user_dict['rate_per_word'] = user_data.rate_per_word
+            user_dict['language_pairs'] = user_data.language_pairs
+
+        await db.admin_users.insert_one(user_dict)
+        logger.info(f"Admin user created: {user.email} with role {user.role} by {creator_role}")
 
         return {"status": "success", "message": f"User {user.name} created with role {user.role}", "user_id": user.id}
 
@@ -4162,22 +4195,36 @@ async def decline_translator_assignment(token: str):
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
     if status == "accepted":
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
+        button_html = f'''
+        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🚀 Go to Translator Portal
+        </a>
+        '''
     elif status == "declined":
         icon = "✗"
         color = "#dc3545"
         title = "Assignment Declined"
+        button_html = ""
     elif status == "already_responded":
         icon = "ℹ"
         color = "#6c757d"
         title = "Already Responded"
+        button_html = f'''
+        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
+            Go to Portal
+        </a>
+        '''
     else:
         icon = "⚠"
         color = "#ffc107"
         title = "Error"
+        button_html = ""
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -4218,7 +4265,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
             color: #4a5568;
             font-size: 16px;
             line-height: 1.6;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }}
         .logo {{
             color: #1a2a4a;
@@ -4241,6 +4288,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         <div class="icon">{icon}</div>
         <h1>{title}</h1>
         <p>{message}</p>
+        {button_html}
     </div>
 </body>
 </html>'''

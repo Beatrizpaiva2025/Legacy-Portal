@@ -305,7 +305,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
-    { id: 'users', label: 'Users', icon: '👤', roles: ['admin'] },
+    { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
 
@@ -633,7 +633,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (order.translate_to) setTargetLanguage(order.translate_to);
         setSelectedOrderId(order.id);
 
-        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload.`);
+        // Update order status to "in_translation" if it was "received"
+        if (order.translation_status === 'received') {
+          try {
+            await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+              translation_status: 'in_translation'
+            });
+            // Update local list
+            setAssignedOrders(prev => prev.map(o =>
+              o.id === order.id ? { ...o, translation_status: 'in_translation' } : o
+            ));
+          } catch (e) {
+            console.error('Failed to update status:', e);
+          }
+        }
+
+        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload/OCR.`);
         setActiveSubTab('upload');
       }
     } catch (err) {
@@ -2075,50 +2090,81 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {/* Assigned Orders for Translator/PM */}
           {(user?.role === 'translator' || user?.role === 'pm') && (
             <div className="bg-white rounded shadow">
-              <div className="p-3 border-b bg-gradient-to-r from-teal-500 to-teal-600">
+              <div className="p-3 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 My Assigned Orders
+                  📋 Meus Projetos
                   {assignedOrders.length > 0 && (
-                    <span className="ml-2 bg-white text-teal-600 px-2 py-0.5 rounded-full text-xs">{assignedOrders.length}</span>
+                    <span className="ml-2 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-bold">{assignedOrders.length}</span>
                   )}
                 </h3>
+                <p className="text-[10px] text-purple-200 mt-1">Clique em um projeto para abrir o documento</p>
               </div>
               <div className="p-3">
                 {loadingAssigned ? (
-                  <div className="text-center py-4 text-gray-500 text-xs">Carregando pedidos...</div>
+                  <div className="text-center py-4 text-gray-500 text-xs">Carregando projetos...</div>
                 ) : assignedOrders.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {assignedOrders.map(order => (
-                      <div key={order.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100">
-                        <div className="flex-1">
-                          <div className="text-xs font-medium text-blue-600">{order.order_number}</div>
-                          <div className="text-[10px] text-gray-600">{order.client_name} • {order.translate_from} → {order.translate_to}</div>
-                          <div className="text-[10px] text-gray-400">
-                            Status: <span className={`px-1 py-0.5 rounded ${order.translation_status === 'received' ? 'bg-gray-100' : order.translation_status === 'in_translation' ? 'bg-yellow-100' : 'bg-purple-100'}`}>
-                              {order.translation_status}
-                            </span>
+                      <div
+                        key={order.id}
+                        onClick={() => loadOrderDocument(order)}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                          selectedOrderId === order.id
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 bg-gray-50 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-purple-700">{order.order_number}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                order.translation_status === 'received' ? 'bg-gray-200 text-gray-700' :
+                                order.translation_status === 'in_translation' ? 'bg-yellow-200 text-yellow-800' :
+                                'bg-purple-200 text-purple-800'
+                              }`}>
+                                {order.translation_status === 'received' ? 'Novo' :
+                                 order.translation_status === 'in_translation' ? 'Em progresso' : 'Revisão'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-700 mt-1">{order.client_name}</div>
+                            <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                              <span>🌐 {order.translate_from} → {order.translate_to}</span>
+                              {order.page_count && <span>📄 {order.page_count} pg</span>}
+                            </div>
+                            {order.deadline && (
+                              <div className="text-[10px] text-orange-600 mt-1">
+                                ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')} {new Date(order.deadline).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white text-lg">
+                              📂
+                            </div>
+                            <span className="text-[9px] text-purple-600 font-medium">Abrir</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => loadOrderDocument(order)}
-                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center"
-                        >
-                          📄 Carregar Documento
-                        </button>
+                        {selectedOrderId === order.id && (
+                          <div className="mt-2 pt-2 border-t border-purple-200">
+                            <span className="text-[10px] text-purple-700 font-medium">✓ Documento carregado - Continue na aba Upload/OCR</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-gray-400 text-xs">
-                    <div className="text-2xl mb-1">📭</div>
-                    No orders assigned at the moment.
+                  <div className="text-center py-6 text-gray-400">
+                    <div className="text-4xl mb-2">📭</div>
+                    <div className="text-sm font-medium">Nenhum projeto atribuído</div>
+                    <div className="text-xs mt-1">Aguarde novos projetos serem enviados para você</div>
                   </div>
                 )}
                 <button
                   onClick={fetchAssignedOrders}
-                  className="mt-2 w-full py-1 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded"
+                  className="mt-3 w-full py-2 text-xs text-purple-600 hover:text-white hover:bg-purple-600 border border-purple-300 rounded-lg transition-colors font-medium"
                 >
-                  🔄 Atualizar lista
+                  🔄 Atualizar Lista
                 </button>
               </div>
             </div>
@@ -4144,6 +4190,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [viewingOrder, setViewingOrder] = useState(null);
   const [orderDocuments, setOrderDocuments] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [projectModalTab, setProjectModalTab] = useState('details');
+  const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
 
   // Editing states for inline edits
   const [editingTags, setEditingTags] = useState(null); // Order ID being edited
@@ -4156,6 +4206,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [translatedDocInfo, setTranslatedDocInfo] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
+
+  // Translator Assignment Modal state
+  const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
+  const [assignmentDetails, setAssignmentDetails] = useState({
+    translator_id: '',
+    due_date: '',
+    due_time: '17:00',
+    project_notes: '',
+    language_pair: ''
+  });
+  const [sendingAssignment, setSendingAssignment] = useState(false);
+
+  // Notifications state
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const [newProject, setNewProject] = useState({
     client_name: '',
@@ -4473,7 +4538,135 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Assign translator to order
+  // Upload document to order (Admin/PM only)
+  const uploadDocumentToOrder = async (orderId, file) => {
+    if (!file) return;
+    setUploadingProjectDoc(true);
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
+
+      await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+        filename: file.name,
+        file_data: base64Data,
+        content_type: file.type,
+        source: 'manual_upload'
+      });
+
+      // Refresh documents
+      viewOrderDocuments(viewingOrder);
+    } catch (err) {
+      console.error('Failed to upload document:', err);
+      alert('Error uploading document');
+    } finally {
+      setUploadingProjectDoc(false);
+    }
+  };
+
+  // Update order notes
+  const updateOrderNotes = async (orderId, clientNotes, internalNotes) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        notes: clientNotes,
+        internal_notes: internalNotes
+      });
+      // Refresh order in modal
+      setViewingOrder(prev => ({ ...prev, notes: clientNotes, internal_notes: internalNotes }));
+      setEditingNotes(false);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update notes:', err);
+      alert('Error updating notes');
+    }
+  };
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/notifications?admin_key=${adminKey}&token=${user?.token || ''}`);
+      setNotifications(response.data.notifications || []);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/notifications/${notifId}/read?admin_key=${adminKey}&token=${user?.token || ''}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  // Poll for notifications
+  useEffect(() => {
+    if (adminKey && (isAdmin || isPM)) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000); // Every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [adminKey, user]);
+
+  // Open translator assignment modal
+  const openAssignTranslatorModal = (order) => {
+    setAssigningTranslatorModal(order);
+    setAssignmentDetails({
+      translator_id: '',
+      due_date: order.deadline ? order.deadline.split('T')[0] : '',
+      due_time: '17:00',
+      project_notes: order.internal_notes || '',
+      language_pair: `${order.translate_from} → ${order.translate_to}`
+    });
+  };
+
+  // Send translator assignment with email invitation
+  const sendTranslatorAssignment = async () => {
+    if (!assignmentDetails.translator_id) {
+      alert('Please select a translator');
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      // Find translator info
+      const selectedTranslator = translatorList.find(t => t.id === assignmentDetails.translator_id);
+
+      // Build deadline if provided
+      let deadline = null;
+      if (assignmentDetails.due_date) {
+        deadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+      }
+
+      // Update order with translator assignment
+      await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
+        assigned_translator_id: assignmentDetails.translator_id,
+        deadline: deadline,
+        internal_notes: assignmentDetails.project_notes
+      });
+
+      alert(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
+      setAssigningTranslatorModal(null);
+      setAssigningTranslator(null);
+      fetchOrders();
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+      alert('Error sending assignment');
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
+
+  // Simple assign translator (from dropdown)
   const assignTranslator = async (orderId, translatorName) => {
     try {
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
@@ -4609,6 +4802,162 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
+      {/* Notification Banner - Show unread notifications */}
+      {(isAdmin || isPM) && notifications.filter(n => !n.is_read).length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-blue-600 mr-2">🔔</span>
+              <span className="text-sm font-medium text-blue-800">
+                {notifications.filter(n => !n.is_read).length} new notification(s)
+              </span>
+            </div>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              {showNotifications ? 'Hide' : 'View'}
+            </button>
+          </div>
+          {showNotifications && (
+            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              {notifications.filter(n => !n.is_read).map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`p-2 rounded text-xs ${
+                    notif.type === 'assignment_declined' ? 'bg-red-100 border border-red-200' :
+                    notif.type === 'assignment_accepted' ? 'bg-green-100 border border-green-200' :
+                    'bg-white border'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium">
+                        {notif.type === 'assignment_declined' ? '❌' :
+                         notif.type === 'assignment_accepted' ? '✅' : '📋'} {notif.title}
+                      </div>
+                      <div className="text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-[10px] text-gray-400 mt-1">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => markNotificationRead(notif.id)}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      Mark read
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Translator Assignment Modal */}
+      {assigningTranslatorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">👤 Assign Translator</h3>
+                <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
+              </div>
+              <button onClick={() => setAssigningTranslatorModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Project Info */}
+              <div className="p-3 bg-gray-50 rounded border text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-500">Language:</span>
+                    <span className="ml-1 font-medium">{assignmentDetails.language_pair}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Pages:</span>
+                    <span className="ml-1 font-medium">{assigningTranslatorModal.page_count || 1}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Select Translator */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                <select
+                  value={assignmentDetails.translator_id}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">-- Choose Translator --</option>
+                  {translatorList.filter(t => t.role === 'translator' && t.is_active).map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Due Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={assignmentDetails.due_date}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Time</label>
+                  <input
+                    type="time"
+                    value={assignmentDetails.due_time}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_time: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notes for Translator</label>
+                <textarea
+                  value={assignmentDetails.project_notes}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, project_notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows="2"
+                  placeholder="Special instructions for the translator..."
+                />
+              </div>
+
+              {/* Info */}
+              <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setAssigningTranslatorModal(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendTranslatorAssignment}
+                disabled={sendingAssignment || !assignmentDetails.translator_id}
+                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards - Different for Admin vs PM */}
       {isPM ? (
         /* PM sees: My Orders, Translators Available, Translators Busy */
@@ -5137,8 +5486,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded inline-block w-fit">✕ Declined</span>
                             {(isAdmin || isPM) && (
                               <button
-                                onClick={() => setAssigningTranslator(order.id)}
-                                className="text-[9px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                onClick={() => openAssignTranslatorModal(order)}
+                                className="text-[9px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                               >
                                 🔄 Reassign
                               </button>
@@ -5148,10 +5497,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     ) : (isAdmin || isPM) ? (
                       <button
-                        onClick={() => setAssigningTranslator(order.id)}
-                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                        onClick={() => openAssignTranslatorModal(order)}
+                        className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200"
                       >
-                        Assign
+                        📤 Assign
                       </button>
                     ) : (
                       <span className="text-[10px] text-gray-400">-</span>
@@ -5388,76 +5737,373 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
       </div>
 
-      {/* Document Viewer Modal */}
+      {/* Enhanced Project Details Modal */}
       {viewingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-            <div className="p-4 border-b flex justify-between items-center">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
               <div>
-                <h3 className="font-bold text-gray-800">📄 {viewingOrder.order_number}</h3>
-                <p className="text-xs text-gray-500">{viewingOrder.client_name} - {viewingOrder.translate_from} → {viewingOrder.translate_to}</p>
+                <h3 className="font-bold text-lg">PROJECT {viewingOrder.order_number}</h3>
+                <p className="text-xs opacity-80">{viewingOrder.client_name}</p>
               </div>
-              <button onClick={() => setViewingOrder(null)} className="text-gray-500 hover:text-gray-700 text-xl">×</button>
+              <div className="flex items-center gap-2">
+                {(isAdmin || isPM) && (
+                  <button
+                    onClick={() => {
+                      setTempNotes({ client: viewingOrder.notes || '', internal: viewingOrder.internal_notes || '' });
+                      setEditingNotes(true);
+                    }}
+                    className="px-2 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30"
+                  >
+                    Update
+                  </button>
+                )}
+                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
+              </div>
             </div>
 
-            <div className="p-4 max-h-96 overflow-y-auto">
-              {/* Order Notes */}
-              {(viewingOrder.notes || viewingOrder.internal_notes) && (
-                <div className="mb-4 space-y-2">
-                  {viewingOrder.notes && (
-                    <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                      <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Client Message:</div>
-                      <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
-                    </div>
-                  )}
-                  {viewingOrder.internal_notes && (
-                    <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
-                      <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>
-                      <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
-                    </div>
-                  )}
-                </div>
-              )}
+            {/* Tabs */}
+            <div className="flex border-b bg-gray-50">
+              {['details', 'files', 'workflow'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setProjectModalTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    projectModalTab === tab
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-white'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {tab === 'details' ? 'Details' : tab === 'files' ? 'Files' : 'Workflow'}
+                </button>
+              ))}
+            </div>
 
-              {/* Documents */}
-              <div className="text-xs font-medium text-gray-600 mb-2">📁 Documentos Originais:</div>
-              {loadingDocuments ? (
-                <div className="text-center py-4 text-gray-500 text-xs">Carregando documentos...</div>
-              ) : orderDocuments.length > 0 ? (
-                <div className="space-y-2">
-                  {orderDocuments.map((doc, idx) => (
-                    <div key={doc.id || idx} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
-                      <div className="flex items-center">
-                        <span className="text-lg mr-2">📄</span>
+            {/* Tab Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              {/* Details Tab */}
+              {projectModalTab === 'details' && (
+                <div className="space-y-4">
+                  {/* Client Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-600 mb-2">Client</h4>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600 w-1/3">Client</td>
+                          <td className="py-2 text-blue-600">{viewingOrder.client_name}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Email</td>
+                          <td className="py-2">{viewingOrder.client_email}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Requirements Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-600 mb-2">Requirements</h4>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600 w-1/3">Language Pair</td>
+                          <td className="py-2">{viewingOrder.translate_from} → {viewingOrder.translate_to}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Service Type</td>
+                          <td className="py-2 capitalize">{viewingOrder.service_type || 'Standard'}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Pages</td>
+                          <td className="py-2">{viewingOrder.page_count || 1}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Urgency</td>
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Created</td>
+                          <td className="py-2">{new Date(viewingOrder.created_at).toLocaleString()}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Deadline</td>
+                          <td className="py-2">
+                            {viewingOrder.deadline ? (
+                              <span className="text-orange-600 font-medium">
+                                {new Date(viewingOrder.deadline).toLocaleString()}
+                              </span>
+                            ) : '-'}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Notes Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-600 mb-2">Notes</h4>
+                    {editingNotes ? (
+                      <div className="space-y-3">
                         <div>
-                          <div className="text-xs font-medium">{doc.filename || 'Document'}</div>
-                          <div className="text-[10px] text-gray-500">{doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}</div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">💬 Client Note</label>
+                          <textarea
+                            value={tempNotes.client}
+                            onChange={(e) => setTempNotes(prev => ({ ...prev, client: e.target.value }))}
+                            className="w-full px-2 py-1.5 border rounded text-xs"
+                            rows="2"
+                            placeholder="Notes visible to client..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">📝 Internal Note (Admin/PM only)</label>
+                          <textarea
+                            value={tempNotes.internal}
+                            onChange={(e) => setTempNotes(prev => ({ ...prev, internal: e.target.value }))}
+                            className="w-full px-2 py-1.5 border rounded text-xs"
+                            rows="2"
+                            placeholder="Internal notes..."
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateOrderNotes(viewingOrder.id, tempNotes.client, tempNotes.internal)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          >
+                            Save Notes
+                          </button>
+                          <button
+                            onClick={() => setEditingNotes(false)}
+                            className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
                         </div>
                       </div>
-                      <button
-                        onClick={() => downloadDocument(doc.id, doc.filename)}
-                        className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                      >
-                        ⬇️ Download
-                      </button>
-                    </div>
-                  ))}
+                    ) : (
+                      <div className="space-y-2">
+                        {viewingOrder.notes ? (
+                          <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                            <div className="text-[10px] font-medium text-blue-600 mb-1">💬 Client Note:</div>
+                            <p className="text-xs text-gray-700">{viewingOrder.notes}</p>
+                          </div>
+                        ) : (
+                          <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No client notes</div>
+                        )}
+                        {(isAdmin || isPM) && (
+                          viewingOrder.internal_notes ? (
+                            <div className="p-2 bg-yellow-50 rounded border border-yellow-200">
+                              <div className="text-[10px] font-medium text-yellow-600 mb-1">📝 Internal Note:</div>
+                              <p className="text-xs text-gray-700">{viewingOrder.internal_notes}</p>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-gray-50 rounded border text-xs text-gray-400">No internal notes</div>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Assignment Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-600 mb-2">Assignment</h4>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600 w-1/3">Project Manager</td>
+                          <td className="py-2">{viewingOrder.assigned_pm_name || viewingOrder.assigned_pm || '-'}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Translator</td>
+                          <td className="py-2">
+                            {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
+                            {viewingOrder.translator_assignment_status && (
+                              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                                viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
+                                'bg-yellow-100 text-yellow-700'
+                              }`}>
+                                {viewingOrder.translator_assignment_status}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Status</td>
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[viewingOrder.translation_status] || 'bg-gray-100'}`}>
+                              {viewingOrder.translation_status}
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Financial Section */}
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
+                    <table className="w-full text-xs">
+                      <tbody>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
+                          <td className="py-2 font-bold text-green-600">${viewingOrder.total_price?.toFixed(2) || '0.00'}</td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Payment Status</td>
+                          <td className="py-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
+                              {viewingOrder.payment_status || 'pending'}
+                            </span>
+                          </td>
+                        </tr>
+                        <tr className="border-b">
+                          <td className="py-2 font-medium text-gray-600">Payment Method</td>
+                          <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-4 text-gray-400 text-xs">
-                  <div className="text-2xl mb-1">📭</div>
-                  No documents found for this order.
-                  {viewingOrder.document_filename && (
-                    <div className="mt-2 text-gray-500">
-                      Registered file: {viewingOrder.document_filename}
+              )}
+
+              {/* Files Tab */}
+              {projectModalTab === 'files' && (
+                <div className="space-y-4">
+                  {/* Upload Section - Admin/PM only */}
+                  {(isAdmin || isPM) && (
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Upload Document</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          id="project-doc-upload"
+                          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                          onChange={(e) => uploadDocumentToOrder(viewingOrder.id, e.target.files[0])}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="project-doc-upload"
+                          className={`px-3 py-1.5 rounded text-xs cursor-pointer ${uploadingProjectDoc ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                        >
+                          {uploadingProjectDoc ? 'Uploading...' : 'Choose File'}
+                        </label>
+                        <span className="text-[10px] text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents List */}
+                  <div>
+                    <div className="text-xs font-medium text-gray-600 mb-2">📁 Original Documents</div>
+                    {loadingDocuments ? (
+                      <div className="text-center py-4 text-gray-500 text-xs">Loading documents...</div>
+                    ) : orderDocuments.length > 0 ? (
+                      <div className="space-y-2">
+                        {orderDocuments.map((doc, idx) => (
+                          <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
+                            <div className="flex items-center">
+                              <span className="text-2xl mr-3">
+                                {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                              </span>
+                              <div>
+                                <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadDocument(doc.id, doc.filename)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                            >
+                              <span>⬇️</span> Download
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-gray-400">
+                        <div className="text-4xl mb-2">📭</div>
+                        <div className="text-sm">No documents found</div>
+                        {viewingOrder.document_filename && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            Registered file: {viewingOrder.document_filename}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Workflow Tab */}
+              {projectModalTab === 'workflow' && (
+                <div className="space-y-4">
+                  <div className="text-xs font-medium text-gray-600 mb-3">Project Workflow Status</div>
+
+                  {/* Workflow Steps */}
+                  <div className="space-y-3">
+                    {[
+                      { status: 'received', label: 'Received', icon: '📥', desc: 'Project received and awaiting assignment' },
+                      { status: 'in_translation', label: 'In Translation', icon: '✍️', desc: 'Translator is working on the document' },
+                      { status: 'review', label: 'PM Review', icon: '🔍', desc: 'Project Manager reviewing translation' },
+                      { status: 'client_review', label: 'Client Review', icon: '👤', desc: 'Client reviewing the translation' },
+                      { status: 'ready', label: 'Ready', icon: '✅', desc: 'Translation approved and ready for delivery' },
+                      { status: 'delivered', label: 'Delivered', icon: '📤', desc: 'Sent to client' }
+                    ].map((step, idx) => {
+                      const currentIdx = ['received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].indexOf(viewingOrder.translation_status);
+                      const stepIdx = idx;
+                      const isCompleted = stepIdx < currentIdx;
+                      const isCurrent = viewingOrder.translation_status === step.status;
+
+                      return (
+                        <div key={step.status} className={`flex items-start p-3 rounded-lg border ${isCurrent ? 'bg-blue-50 border-blue-300' : isCompleted ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${isCurrent ? 'bg-blue-600 text-white' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'}`}>
+                            {isCompleted ? '✓' : step.icon}
+                          </div>
+                          <div className="flex-1">
+                            <div className={`text-sm font-medium ${isCurrent ? 'text-blue-700' : isCompleted ? 'text-green-700' : 'text-gray-500'}`}>
+                              {step.label}
+                              {isCurrent && <span className="ml-2 px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px]">Current</span>}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">{step.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Translator Assignment Status */}
+                  {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
+                    <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="text-xs font-medium text-purple-700 mb-2">Translator Assignment</div>
+                      <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
+                      <div className={`text-xs mt-1 ${
+                        viewingOrder.translator_assignment_status === 'accepted' ? 'text-green-600' :
+                        viewingOrder.translator_assignment_status === 'declined' ? 'text-red-600' :
+                        'text-yellow-600'
+                      }`}>
+                        Status: {viewingOrder.translator_assignment_status || 'pending'}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="p-3 border-t bg-gray-50 flex justify-end">
-              <button onClick={() => setViewingOrder(null)} className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700">
+            {/* Footer */}
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); }}
+                className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
+              >
                 Close
               </button>
             </div>
@@ -5642,9 +6288,82 @@ const TranslatorsPage = ({ adminKey }) => {
 
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
+  // Permissions matrix data
+  const PERMISSIONS = {
+    roles: ['Administrator', 'Project Manager', 'Sales', 'Translator'],
+    permissions: [
+      { name: 'Projects', desc: 'View and manage projects', admin: true, pm: true, sales: true, translator: false },
+      { name: 'Create Projects', desc: 'Create new projects', admin: true, pm: true, sales: true, translator: false },
+      { name: 'Assign Translator', desc: 'Assign translators to projects', admin: true, pm: true, sales: false, translator: false },
+      { name: 'Translation Tool', desc: 'Access translation workspace', admin: true, pm: true, sales: false, translator: true },
+      { name: 'Review Translation', desc: 'Review and approve translations', admin: true, pm: true, sales: false, translator: false },
+      { name: 'Send to Client', desc: 'Send completed work to client', admin: true, pm: true, sales: false, translator: false },
+      { name: 'Clients', desc: 'View client profiles', admin: true, pm: true, sales: true, translator: false },
+      { name: 'Translators', desc: 'View translator profiles', admin: true, pm: true, sales: false, translator: false },
+      { name: 'Register Translators', desc: 'Add new translators', admin: true, pm: true, sales: false, translator: false },
+      { name: 'Delete Translators', desc: 'Remove translators', admin: true, pm: false, sales: false, translator: false },
+      { name: 'Finances', desc: 'View financial reports', admin: true, pm: false, sales: false, translator: false },
+      { name: 'Reports', desc: 'Access analytics and reports', admin: true, pm: false, sales: false, translator: false },
+      { name: 'Settings', desc: 'Manage system settings', admin: true, pm: false, sales: false, translator: false },
+      { name: 'User Management', desc: 'Create and manage users', admin: true, pm: false, sales: false, translator: false },
+    ]
+  };
+
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-6">
       <h1 className="text-lg font-bold text-blue-600 mb-4">SETTINGS</h1>
+
+      {/* Permissions Matrix */}
+      <div className="bg-white rounded shadow overflow-hidden">
+        <div className="p-4 border-b bg-gray-50">
+          <h2 className="text-sm font-bold text-gray-800">Role Permissions Matrix</h2>
+          <p className="text-xs text-gray-500 mt-1">Only Administrator can modify role permissions</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="text-left p-3 font-semibold text-gray-700 border-b">Permission</th>
+                <th className="text-center p-3 font-semibold text-gray-700 border-b w-24">Admin</th>
+                <th className="text-center p-3 font-semibold text-gray-700 border-b w-24">PM</th>
+                <th className="text-center p-3 font-semibold text-gray-700 border-b w-24">Sales</th>
+                <th className="text-center p-3 font-semibold text-gray-700 border-b w-24">Translator</th>
+              </tr>
+            </thead>
+            <tbody>
+              {PERMISSIONS.permissions.map((perm, idx) => (
+                <tr key={perm.name} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="p-3 border-b">
+                    <div className="font-medium text-gray-800">{perm.name}</div>
+                    <div className="text-[10px] text-gray-500">{perm.desc}</div>
+                  </td>
+                  <td className={`p-3 border-b text-center ${perm.admin ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.admin ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {perm.admin ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                  <td className={`p-3 border-b text-center ${perm.pm ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.pm ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {perm.pm ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                  <td className={`p-3 border-b text-center ${perm.sales ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.sales ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {perm.sales ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                  <td className={`p-3 border-b text-center ${perm.translator ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${perm.translator ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {perm.translator ? 'Yes' : 'No'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         {/* API Configuration */}
         <div className="bg-white rounded shadow p-4">
@@ -5702,9 +6421,46 @@ const SettingsPage = ({ adminKey }) => {
               </div>
               <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
             </div>
+            <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center">
+                <span className="mr-2">📊</span>
+                <span>QuickBooks (Make.com)</span>
+              </div>
+              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+            </div>
           </div>
         </div>
 
+        {/* Workflow Info */}
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold text-gray-800 mb-3">Workflow Status Legend</h2>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center justify-between p-2 bg-gray-100 rounded">
+              <span>Received</span>
+              <span className="text-gray-600">Awaiting assignment</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+              <span>In Translation</span>
+              <span className="text-yellow-700">Translator working</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+              <span>PM Review</span>
+              <span className="text-purple-700">PM reviewing</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
+              <span>Client Review</span>
+              <span className="text-orange-700">Client reviewing</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+              <span>Ready</span>
+              <span className="text-green-700">Ready to deliver</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-teal-50 rounded">
+              <span>Delivered</span>
+              <span className="text-teal-700">Sent to client</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -5735,12 +6491,15 @@ const TranslationToolPage = ({ adminKey, onLogout }) => {
 };
 
 // ==================== USERS MANAGEMENT PAGE ====================
-const UsersPage = ({ adminKey }) => {
+const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
   const [creating, setCreating] = useState(false);
+
+  const isAdmin = user?.role === 'admin';
+  const isPM = user?.role === 'pm';
 
   const fetchUsers = async () => {
     try {
@@ -5759,8 +6518,18 @@ const UsersPage = ({ adminKey }) => {
     e.preventDefault();
     setCreating(true);
     try {
-      await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, newUser);
-      setNewUser({ name: '', email: '', password: '', role: 'translator' });
+      // Build user data with optional translator pricing
+      const userData = {
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role,
+        rate_per_page: newUser.rate_per_page ? parseFloat(newUser.rate_per_page) : null,
+        rate_per_word: newUser.rate_per_word ? parseFloat(newUser.rate_per_word) : null,
+        language_pairs: newUser.language_pairs || null
+      };
+      await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
+      setNewUser({ name: '', email: '', password: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
@@ -5796,60 +6565,111 @@ const UsersPage = ({ adminKey }) => {
     sales: 'bg-purple-100 text-purple-800'
   };
 
+  // PM can only see translators
+  const filteredUsers = isPM ? users.filter(u => u.role === 'translator') : users;
+
   if (loading) return <div className="p-6 text-center">Loading users...</div>;
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold text-gray-800">👤 User Management</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">{isPM ? '👥 Translators' : '👤 User Management'}</h1>
+          {isPM && <p className="text-xs text-gray-500 mt-1">Register and manage translators</p>}
+        </div>
         <button
           onClick={() => setShowCreateForm(!showCreateForm)}
           className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
         >
-          + Create User
+          + {isPM ? 'Register Translator' : 'Create User'}
         </button>
       </div>
 
       {/* Create User Form */}
       {showCreateForm && (
         <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <h3 className="font-bold text-sm mb-3">Create New User</h3>
-          <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
-            <input
-              type="text"
-              placeholder="Name"
-              value={newUser.name}
-              onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-              required
-              className="px-3 py-2 text-sm border rounded"
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={newUser.email}
-              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-              required
-              className="px-3 py-2 text-sm border rounded"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={newUser.password}
-              onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-              required
-              className="px-3 py-2 text-sm border rounded"
-            />
-            <select
-              value={newUser.role}
-              onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-              className="px-3 py-2 text-sm border rounded"
-            >
-              <option value="translator">Translator</option>
-              <option value="pm">Project Manager</option>
-              <option value="sales">Sales</option>
-              <option value="admin">Admin</option>
-            </select>
-            <div className="col-span-4 flex justify-end gap-2">
+          <h3 className="font-bold text-sm mb-3">{isPM ? 'Register New Translator' : 'Create New User'}</h3>
+          <form onSubmit={handleCreateUser} className="space-y-3">
+            <div className="grid grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Name"
+                value={newUser.name}
+                onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                required
+                className="px-3 py-2 text-sm border rounded"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                required
+                className="px-3 py-2 text-sm border rounded"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                required
+                className="px-3 py-2 text-sm border rounded"
+              />
+              {isPM ? (
+                <input type="hidden" value="translator" />
+              ) : (
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  className="px-3 py-2 text-sm border rounded"
+                >
+                  <option value="translator">Translator</option>
+                  <option value="pm">Project Manager</option>
+                  <option value="sales">Sales</option>
+                  <option value="admin">Admin</option>
+                </select>
+              )}
+            </div>
+
+            {/* Translator Pricing - always show for translators */}
+            {(newUser.role === 'translator' || isPM) && (
+              <div className="grid grid-cols-3 gap-3 pt-2 border-t">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 15.00"
+                    value={newUser.rate_per_page}
+                    onChange={(e) => setNewUser({...newUser, rate_per_page: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Rate per Word ($)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    placeholder="e.g. 0.08"
+                    value={newUser.rate_per_word}
+                    onChange={(e) => setNewUser({...newUser, rate_per_word: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Language Pairs</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. EN-PT, ES-EN"
+                    value={newUser.language_pairs}
+                    onChange={(e) => setNewUser({...newUser, language_pairs: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-600 text-sm">Cancel</button>
               <button type="submit" disabled={creating} className="px-4 py-2 bg-teal-600 text-white rounded text-sm disabled:bg-gray-400">
                 {creating ? 'Creating...' : 'Create'}
@@ -5866,45 +6686,66 @@ const UsersPage = ({ adminKey }) => {
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              {!isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>}
+              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>}
+              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>}
               <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{user.name}</td>
-                <td className="px-4 py-3 text-gray-600">{user.email}</td>
+            {filteredUsers.map((u) => (
+              <tr key={u.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium">{u.name}</td>
+                <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                {!isPM && (
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[u.role]}`}>
+                      {u.role.toUpperCase()}
+                    </span>
+                  </td>
+                )}
+                {isPM && (
+                  <td className="px-4 py-3 text-gray-600">
+                    {u.rate_per_page ? `$${u.rate_per_page}` : '-'}
+                  </td>
+                )}
+                {isPM && (
+                  <td className="px-4 py-3 text-gray-600 text-xs">
+                    {u.language_pairs || '-'}
+                  </td>
+                )}
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[user.role]}`}>
-                    {user.role.toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs ${user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {user.is_active ? 'Active' : 'Inactive'}
+                  <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td className="px-4 py-3 space-x-2">
-                  <button
-                    onClick={() => handleToggleActive(user.id)}
-                    className="text-blue-600 hover:text-blue-800 text-xs"
-                  >
-                    {user.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id, user.name)}
-                    className="text-red-600 hover:text-red-800 text-xs"
-                  >
-                    Delete
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleToggleActive(u.id)}
+                      className="text-blue-600 hover:text-blue-800 text-xs"
+                    >
+                      {u.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDeleteUser(u.id, u.name)}
+                      className="text-red-600 hover:text-red-800 text-xs"
+                    >
+                      Delete
+                    </button>
+                  )}
+                  {isPM && (
+                    <span className="text-gray-400 text-xs">View only</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {users.length === 0 && (
+        {filteredUsers.length === 0 && (
           <div className="p-6 text-center text-gray-500">No users found. Create your first user above.</div>
         )}
       </div>
@@ -7202,8 +8043,8 @@ function AdminApp() {
           ? <FinancesPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'users':
-        return userRole === 'admin'
-          ? <UsersPage adminKey={adminKey} />
+        return ['admin', 'pm'].includes(userRole)
+          ? <UsersPage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
