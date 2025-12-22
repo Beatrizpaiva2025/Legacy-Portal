@@ -257,21 +257,23 @@ const getInitialLanguage = () => {
   return 'en'; // Always default to English
 };
 
-// Detect currency based on locale/timezone
+// Detect currency based on timezone (only Brazil changes to BRL)
 const getLocalCurrency = () => {
   try {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const locale = navigator.language;
 
-    // Brazil
-    if (timezone.includes('Sao_Paulo') || locale.includes('BR')) return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
-    // Europe
-    if (timezone.includes('Europe') && !timezone.includes('London')) return { code: 'EUR', symbol: '€', rate: 0.92, isUSA: false };
-    // UK
-    if (timezone.includes('London') || locale.includes('GB')) return { code: 'GBP', symbol: '£', rate: 0.79, isUSA: false };
-    // Mexico, Latin America (except Brazil)
-    if (timezone.includes('Mexico') || (locale.includes('es') && !locale.includes('ES'))) return { code: 'MXN', symbol: 'MX$', rate: 17.5, isUSA: false };
-    // Default USD (USA)
+    // Only Brazil (based on timezone, not locale)
+    if (timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
+        timezone.includes('Recife') || timezone.includes('Bahia') ||
+        timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
+        timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
+        timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
+        timezone.includes('Araguaina') || timezone.includes('Maceio') ||
+        timezone.includes('Campo_Grande') || timezone.includes('Noronha')) {
+      return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
+    }
+
+    // Default USD for everyone else
     return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
   } catch {
     return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
