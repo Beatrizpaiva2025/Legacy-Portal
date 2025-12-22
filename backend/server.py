@@ -2455,8 +2455,17 @@ async def get_my_projects(token: str, admin_key: str):
 
 @api_router.post("/admin/orders/manual")
 async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key: str):
-    """Create a new project manually (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    """Create a new project manually (admin/pm)"""
+    # Check if it's the master admin key
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+
+    # If not master key, check if it's a valid user token with admin/pm role
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
