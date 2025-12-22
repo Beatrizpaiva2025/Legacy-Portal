@@ -2883,7 +2883,16 @@ async def get_users_by_role(role: str, admin_key: str):
 
     try:
         users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
-        return [{"id": u["id"], "name": u["name"], "email": u["email"]} for u in users]
+        return [{
+            "id": u["id"],
+            "name": u["name"],
+            "email": u["email"],
+            "role": u.get("role", role),
+            "is_active": u.get("is_active", True),
+            "language_pairs": u.get("language_pairs"),
+            "rate_per_page": u.get("rate_per_page"),
+            "rate_per_word": u.get("rate_per_word")
+        } for u in users]
     except Exception as e:
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
