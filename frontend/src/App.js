@@ -51,9 +51,13 @@ const TRANSLATIONS = {
     // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
-    certifiedDesc: 'Official documents, USCIS, legal purposes',
-    professionalTranslation: 'Professional Translation',
-    professionalDesc: 'Business, marketing, general content',
+    certifiedDesc: 'Official documents, legal, immigration',
+    standardTranslation: 'Standard Translation',
+    standardDesc: 'General use, no certification',
+    swornTranslation: 'Sworn Translation',
+    swornDesc: 'For use outside USA - official sworn translator',
+    rmvTranslation: 'RMV Certified Translation',
+    rmvDesc: 'Massachusetts Motor Vehicle - requires physical copy',
     translateFrom: 'Translate From',
     translateTo: 'Translate To',
     uploadDocument: 'Upload Document',
@@ -85,7 +89,72 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register'
+    register: 'Register',
+    // Client Information
+    clientInformation: 'Client Information',
+    clientName: 'Client Name',
+    clientEmail: 'Client Email',
+    clientNameRequired: 'Client name is required',
+    clientEmailRequired: 'Client email is required',
+    // Physical Copy
+    physicalCopy: 'Physical Copy',
+    physicalCopyRequired: 'Physical copy required',
+    uspsPriority: 'USPS Priority Mail (1-3 business days)',
+    rmvNote: 'RMV Certified translations require physical delivery.',
+    shippingAddress: 'Shipping Address (USA)',
+    completeShippingAddress: 'Please complete the shipping address',
+    streetAddress: 'Street Address',
+    city: 'City',
+    state: 'State',
+    zipCode: 'ZIP Code',
+    country: 'Country',
+    // Quote Summary
+    quoteSummary: 'Quote Summary',
+    service: 'Service',
+    certified: 'Certified',
+    standardService: 'Standard',
+    sworn: 'Sworn',
+    rmvCertified: 'RMV Certified',
+    shippingUsps: 'Shipping (USPS Priority)',
+    paymentInvoice: '* Payment via invoice (Net 30)',
+    // Order Form
+    createOrder: 'Create Order',
+    creatingOrder: 'Creating Order...',
+    pleaseUploadDocument: 'Please upload a document',
+    connectingServer: 'Connecting to server...',
+    processingFile: 'Processing',
+    of: 'of',
+    removeFile: 'Remove file',
+    // Service Descriptions
+    certifiedDescFull: 'Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.',
+    standardDescFull: 'Accurate translation for general use; does not include certification.',
+    swornDescFull: 'Completed by a sworn translator registered in the country of use; required for specific countries.',
+    rmvDescFull: 'Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.',
+    swornOnlyPortuguese: 'Sworn translations are only available for Portuguese (Brasil)',
+    // Orders Page
+    loadingOrders: 'Loading orders...',
+    noOrdersYet: 'No orders yet',
+    createFirstOrder: 'Create your first order to get started',
+    all: 'All',
+    pending: 'Pending',
+    paid: 'Paid',
+    overdue: 'Overdue',
+    client: 'Client',
+    words: 'words',
+    due: 'Due',
+    created: 'Created',
+    // Messages Page
+    loadingMessages: 'Loading messages...',
+    noMessages: 'No messages',
+    messagesWillAppear: 'Messages from Legacy Translations will appear here',
+    new: 'New',
+    markAsRead: 'Mark as read',
+    // Translation Stages
+    received: 'Received',
+    inTranslation: 'In Translation',
+    review: 'Review',
+    ready: 'Ready',
+    delivered: 'Delivered'
   },
   es: {
     // Login
@@ -128,9 +197,13 @@ const TRANSLATIONS = {
     logout: 'Cerrar Sesión',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
-    certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
-    professionalTranslation: 'Traducción Profesional',
-    professionalDesc: 'Negocios, marketing, contenido general',
+    certifiedDesc: 'Documentos oficiales, legales, inmigración',
+    standardTranslation: 'Traducción Estándar',
+    standardDesc: 'Uso general, sin certificación',
+    swornTranslation: 'Traducción Jurada',
+    swornDesc: 'Para uso fuera de EE.UU. - traductor jurado oficial',
+    rmvTranslation: 'Traducción Certificada RMV',
+    rmvDesc: 'Vehículos de Massachusetts - requiere copia física',
     translateFrom: 'Traducir De',
     translateTo: 'Traducir A',
     uploadDocument: 'Subir Documento',
@@ -162,7 +235,72 @@ const TRANSLATIONS = {
     email: 'Correo Electrónico',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Client Information
+    clientInformation: 'Información del Cliente',
+    clientName: 'Nombre del Cliente',
+    clientEmail: 'Correo del Cliente',
+    clientNameRequired: 'El nombre del cliente es requerido',
+    clientEmailRequired: 'El correo del cliente es requerido',
+    // Physical Copy
+    physicalCopy: 'Copia Física',
+    physicalCopyRequired: 'Se requiere copia física',
+    uspsPriority: 'USPS Priority Mail (1-3 días hábiles)',
+    rmvNote: 'Las traducciones RMV Certificadas requieren entrega física.',
+    shippingAddress: 'Dirección de Envío (EE.UU.)',
+    completeShippingAddress: 'Por favor complete la dirección de envío',
+    streetAddress: 'Dirección',
+    city: 'Ciudad',
+    state: 'Estado',
+    zipCode: 'Código Postal',
+    country: 'País',
+    // Quote Summary
+    quoteSummary: 'Resumen de Cotización',
+    service: 'Servicio',
+    certified: 'Certificada',
+    standardService: 'Estándar',
+    sworn: 'Jurada',
+    rmvCertified: 'RMV Certificada',
+    shippingUsps: 'Envío (USPS Priority)',
+    paymentInvoice: '* Pago mediante factura (Net 30)',
+    // Order Form
+    createOrder: 'Crear Pedido',
+    creatingOrder: 'Creando Pedido...',
+    pleaseUploadDocument: 'Por favor suba un documento',
+    connectingServer: 'Conectando al servidor...',
+    processingFile: 'Procesando',
+    of: 'de',
+    removeFile: 'Eliminar archivo',
+    // Service Descriptions
+    certifiedDescFull: 'Incluye Declaración de Precisión firmada, sello y firma; aceptada por la mayoría de instituciones.',
+    standardDescFull: 'Traducción precisa para uso general; no incluye certificación.',
+    swornDescFull: 'Realizada por un traductor jurado registrado en el país de uso; requerida para países específicos.',
+    rmvDescFull: 'Certificada en papel oficial con todos los elementos requeridos; aceptada por el RMV para licencias, IDs y propósitos relacionados.',
+    swornOnlyPortuguese: 'Las traducciones juradas solo están disponibles para Portugués (Brasil)',
+    // Orders Page
+    loadingOrders: 'Cargando pedidos...',
+    noOrdersYet: 'Sin pedidos aún',
+    createFirstOrder: 'Cree su primer pedido para comenzar',
+    all: 'Todos',
+    pending: 'Pendiente',
+    paid: 'Pagado',
+    overdue: 'Vencido',
+    client: 'Cliente',
+    words: 'palabras',
+    due: 'Vence',
+    created: 'Creado',
+    // Messages Page
+    loadingMessages: 'Cargando mensajes...',
+    noMessages: 'Sin mensajes',
+    messagesWillAppear: 'Los mensajes de Legacy Translations aparecerán aquí',
+    new: 'Nuevo',
+    markAsRead: 'Marcar como leído',
+    // Translation Stages
+    received: 'Recibido',
+    inTranslation: 'En Traducción',
+    review: 'En Revisión',
+    ready: 'Listo',
+    delivered: 'Entregado'
   },
   pt: {
     // Login
@@ -205,9 +343,13 @@ const TRANSLATIONS = {
     logout: 'Sair',
     serviceType: 'Tipo de Serviço',
     certifiedTranslation: 'Tradução Certificada',
-    certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
-    professionalTranslation: 'Tradução Profissional',
-    professionalDesc: 'Negócios, marketing, conteúdo geral',
+    certifiedDesc: 'Documentos oficiais, legais, imigração',
+    standardTranslation: 'Tradução Padrão',
+    standardDesc: 'Uso geral, sem certificação',
+    swornTranslation: 'Tradução Juramentada',
+    swornDesc: 'Para uso fora dos EUA - tradutor juramentado oficial',
+    rmvTranslation: 'Tradução Certificada RMV',
+    rmvDesc: 'Veículos de Massachusetts - requer cópia física',
     translateFrom: 'Traduzir De',
     translateTo: 'Traduzir Para',
     uploadDocument: 'Enviar Documento',
@@ -239,7 +381,72 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Client Information
+    clientInformation: 'Informações do Cliente',
+    clientName: 'Nome do Cliente',
+    clientEmail: 'E-mail do Cliente',
+    clientNameRequired: 'Nome do cliente é obrigatório',
+    clientEmailRequired: 'E-mail do cliente é obrigatório',
+    // Physical Copy
+    physicalCopy: 'Cópia Física',
+    physicalCopyRequired: 'Cópia física necessária',
+    uspsPriority: 'USPS Priority Mail (1-3 dias úteis)',
+    rmvNote: 'Traduções RMV Certificadas requerem entrega física.',
+    shippingAddress: 'Endereço de Envio (EUA)',
+    completeShippingAddress: 'Por favor complete o endereço de envio',
+    streetAddress: 'Endereço',
+    city: 'Cidade',
+    state: 'Estado',
+    zipCode: 'CEP',
+    country: 'País',
+    // Quote Summary
+    quoteSummary: 'Resumo da Cotação',
+    service: 'Serviço',
+    certified: 'Certificada',
+    standardService: 'Padrão',
+    sworn: 'Juramentada',
+    rmvCertified: 'RMV Certificada',
+    shippingUsps: 'Envio (USPS Priority)',
+    paymentInvoice: '* Pagamento via fatura (Net 30)',
+    // Order Form
+    createOrder: 'Criar Pedido',
+    creatingOrder: 'Criando Pedido...',
+    pleaseUploadDocument: 'Por favor envie um documento',
+    connectingServer: 'Conectando ao servidor...',
+    processingFile: 'Processando',
+    of: 'de',
+    removeFile: 'Remover arquivo',
+    // Service Descriptions
+    certifiedDescFull: 'Inclui Declaração de Precisão assinada, carimbo e assinatura; aceita pela maioria das instituições.',
+    standardDescFull: 'Tradução precisa para uso geral; não inclui certificação.',
+    swornDescFull: 'Realizada por tradutor juramentado registrado no país de uso; requerida para países específicos.',
+    rmvDescFull: 'Certificada em papel timbrado oficial com todos os elementos requeridos; aceita pelo RMV para licenças, IDs e propósitos relacionados.',
+    swornOnlyPortuguese: 'Traduções juramentadas estão disponíveis apenas para Português (Brasil)',
+    // Orders Page
+    loadingOrders: 'Carregando pedidos...',
+    noOrdersYet: 'Nenhum pedido ainda',
+    createFirstOrder: 'Crie seu primeiro pedido para começar',
+    all: 'Todos',
+    pending: 'Pendente',
+    paid: 'Pago',
+    overdue: 'Vencido',
+    client: 'Cliente',
+    words: 'palavras',
+    due: 'Vence',
+    created: 'Criado',
+    // Messages Page
+    loadingMessages: 'Carregando mensagens...',
+    noMessages: 'Sem mensagens',
+    messagesWillAppear: 'Mensagens da Legacy Translations aparecerão aqui',
+    new: 'Nova',
+    markAsRead: 'Marcar como lida',
+    // Translation Stages
+    received: 'Recebido',
+    inTranslation: 'Em Tradução',
+    review: 'Em Revisão',
+    ready: 'Pronto',
+    delivered: 'Entregue'
   }
 };
 
@@ -926,11 +1133,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Client Information */}
             <div className="border-b pb-4" ref={clientNameRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Client Information</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.clientInformation}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Name *
+                    {t.clientName} *
                   </label>
                   <input
                     type="text"
@@ -946,12 +1153,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="John Smith"
                   />
                   {fieldErrors.client_name && (
-                    <p className="text-red-500 text-sm mt-1">Client name is required</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientNameRequired}</p>
                   )}
                 </div>
                 <div ref={clientEmailRef}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client Email *
+                    {t.clientEmail} *
                   </label>
                   <input
                     type="email"
@@ -967,7 +1174,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     placeholder="client@email.com"
                   />
                   {fieldErrors.client_email && (
-                    <p className="text-red-500 text-sm mt-1">Client email is required</p>
+                    <p className="text-red-500 text-sm mt-1">{t.clientEmailRequired}</p>
                   )}
                 </div>
               </div>
@@ -975,7 +1182,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Service Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.serviceType}</h2>
               <div className="space-y-3">
                 {/* Certified Translation */}
                 <label className={`flex items-center p-4 border rounded-lg cursor-pointer ${
@@ -991,12 +1198,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.">&#9432;</span>
+                      {t.certifiedTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.certifiedDescFull}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Official documents, legal, immigration</div>
+                    <div className="text-sm text-gray-500">{t.certifiedDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
 
                 {/* Standard Translation */}
@@ -1013,12 +1220,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Standard Translation
-                      <span className="text-gray-400 cursor-help" title="Accurate translation for general use; does not include certification.">&#9432;</span>
+                      {t.standardTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.standardDescFull}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">General use, no certification</div>
+                    <div className="text-sm text-gray-500">{t.standardDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(19.99)}/{t.page}</div>
                 </label>
 
                 {/* Sworn Translation */}
@@ -1035,12 +1242,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      Sworn Translation
-                      <span className="text-gray-400 cursor-help" title="Completed by a sworn translator registered in the country of use; required for specific countries.">&#9432;</span>
+                      {t.swornTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.swornDescFull}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">For use outside USA - official sworn translator</div>
+                    <div className="text-sm text-gray-500">{t.swornDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(55.00)}/{t.page}</div>
                 </label>
 
                 {/* RMV Certified Translation */}
@@ -1057,28 +1264,28 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   />
                   <div className="flex-1">
                     <div className="font-medium flex items-center gap-1">
-                      RMV Certified Translation
-                      <span className="text-gray-400 cursor-help" title="Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.">&#9432;</span>
+                      {t.rmvTranslation}
+                      <span className="text-gray-400 cursor-help" title={t.rmvDescFull}>&#9432;</span>
                     </div>
-                    <div className="text-sm text-gray-500">Massachusetts Motor Vehicle - requires physical copy</div>
+                    <div className="text-sm text-gray-500">{t.rmvDesc}</div>
                   </div>
-                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/page</div>
+                  <div className="font-semibold text-teal-600">{formatPrice(24.99)}/{t.page}</div>
                 </label>
               </div>
 
               {/* Service Type Descriptions */}
               <div className="mt-4 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-2">
-                <p><strong>Certified:</strong> Includes a signed Statement of Accuracy, stamp, and signature; accepted by most institutions.</p>
-                <p><strong>Standard:</strong> Accurate translation for general use; does not include certification.</p>
-                <p><strong>Sworn:</strong> Completed by a sworn translator registered in the country of use; required for specific countries.</p>
-                <p><strong>RMV Certified:</strong> Certified on official letterhead with all required elements; accepted by the RMV for licenses, IDs, and related purposes.</p>
+                <p><strong>{t.certified}:</strong> {t.certifiedDescFull}</p>
+                <p><strong>{t.standardService}:</strong> {t.standardDescFull}</p>
+                <p><strong>{t.sworn}:</strong> {t.swornDescFull}</p>
+                <p><strong>{t.rmvCertified}:</strong> {t.rmvDescFull}</p>
               </div>
             </div>
 
             {/* Languages */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate From</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateFrom}</label>
                 <select
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500"
                   value={formData.translate_from}
@@ -1092,7 +1299,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Translate To</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.translateTo}</label>
                 {formData.service_type === 'sworn' ? (
                   <div>
                     <select
@@ -1102,7 +1309,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     >
                       <option value="pt-br">🇧🇷 Portuguese (Brasil)</option>
                     </select>
-                    <p className="text-xs text-gray-500 mt-1">Sworn translations are only available for Portuguese (Brasil)</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.swornOnlyPortuguese}</p>
                   </div>
                 ) : (
                   <select
@@ -1122,7 +1329,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Document Upload */}
             <div ref={fileUploadRef}>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Upload Document</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.uploadDocument}</h2>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
@@ -1135,18 +1342,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               >
                 <input {...getInputProps()} />
                 <div className="text-3xl mb-2">📁</div>
-                <div className="font-medium text-teal-600">+ Upload File(s)</div>
-                <div className="text-sm text-gray-500">PDF, DOCX, Images, TXT</div>
+                <div className="font-medium text-teal-600">{t.uploadFiles}</div>
+                <div className="text-sm text-gray-500">{t.fileTypes}</div>
               </div>
               {fieldErrors.file_upload && (
-                <p className="text-red-500 text-sm mt-2">Please upload a document</p>
+                <p className="text-red-500 text-sm mt-2">{t.pleaseUploadDocument}</p>
               )}
 
               {isProcessing && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-md text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <div className="text-blue-800 font-medium">{processingStatus || 'Processing document...'}</div>
-                  <div className="text-xs text-blue-600 mt-1">This may take a moment for large or image-based files</div>
+                  <div className="text-blue-800 font-medium">{processingStatus || t.processing}</div>
+                  <div className="text-xs text-blue-600 mt-1">{t.processingNote}</div>
                 </div>
               )}
 
@@ -1159,7 +1366,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                         <div className="flex items-center">
                           <span className="text-green-600 mr-2">✓</span>
                           <span>{item.fileName}</span>
-                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
+                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? t.page : t.pages})</span>
                         </div>
                         <button
                           type="button"
@@ -1173,7 +1380,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                             }
                           }}
                           className="text-red-500 hover:text-red-700 p-1"
-                          title="Remove file"
+                          title={t.removeFile}
                         >
                           🗑️
                         </button>
@@ -1181,7 +1388,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     );
                   })}
                   <div className="text-lg font-semibold text-teal-600">
-                    Total: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? 'page' : 'pages'}
+                    {t.total}: {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0)} {uploadedFiles.reduce((sum, f) => sum + Math.max(1, Math.ceil(f.wordCount / 250)), 0) === 1 ? t.page : t.pages}
                   </div>
                 </div>
               )}
@@ -1189,12 +1396,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             {/* Urgency */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Urgency</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.urgency}</h2>
               <div className="space-y-2">
                 {[
-                  { id: 'no', label: 'Standard (2-3 days)', fee: '' },
-                  { id: 'priority', label: 'Priority (24 hours)', fee: '+25%' },
-                  { id: 'urgent', label: 'Urgent (12 hours)', fee: '+100%' }
+                  { id: 'no', label: t.standard, fee: '' },
+                  { id: 'priority', label: t.priority, fee: '+25%' },
+                  { id: 'urgent', label: t.urgent, fee: '+100%' }
                 ].map((option) => (
                   <label key={option.id} className="flex items-center p-3 border rounded-md cursor-pointer hover:bg-gray-50">
                     <input
@@ -1215,7 +1422,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Physical Copy / Shipping - USA Only */}
             {currency.isUSA && (
               <div>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Physical Copy</h2>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4">{t.physicalCopy}</h2>
                 <div className="space-y-3">
                   <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                     <input
@@ -1226,8 +1433,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                       className="mr-3 h-4 w-4 text-teal-600"
                     />
                     <div className="flex-1">
-                      <div className="font-medium">Physical copy required</div>
-                      <div className="text-sm text-gray-500">USPS Priority Mail (1-3 business days)</div>
+                      <div className="font-medium">{t.physicalCopyRequired}</div>
+                      <div className="text-sm text-gray-500">{t.uspsPriority}</div>
                     </div>
                     <div className="font-semibold text-teal-600">{formatPrice(18.99)}</div>
                   </label>
@@ -1235,18 +1442,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   {formData.service_type === 'rmv' && (
                     <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm text-amber-800">
-                        <strong>Note:</strong> RMV Certified translations require physical delivery.
+                        <strong>Note:</strong> {t.rmvNote}
                       </p>
                     </div>
                   )}
 
                   {(needsPhysicalCopy || formData.service_type === 'rmv') && (
                     <div ref={shippingRef} className={`p-4 rounded-lg space-y-3 ${fieldErrors.shipping ? 'bg-red-50 border border-red-300' : 'bg-gray-50'}`}>
-                      <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
-                      {fieldErrors.shipping && <p className="text-red-500 text-sm">Please complete the shipping address</p>}
+                      <p className="text-sm font-medium text-gray-700">{t.shippingAddress}</p>
+                      {fieldErrors.shipping && <p className="text-red-500 text-sm">{t.completeShippingAddress}</p>}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="md:col-span-2">
-                          <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
+                          <label className="block text-xs text-gray-500 mb-1">{t.streetAddress} *</label>
                           <input
                             type="text"
                             className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.street ? 'border-red-500' : 'border-gray-300'}`}
@@ -1256,7 +1463,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">City *</label>
+                          <label className="block text-xs text-gray-500 mb-1">{t.city} *</label>
                           <input
                             type="text"
                             className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.city ? 'border-red-500' : 'border-gray-300'}`}
@@ -1266,7 +1473,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">State *</label>
+                          <label className="block text-xs text-gray-500 mb-1">{t.state} *</label>
                           <input
                             type="text"
                             className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.state ? 'border-red-500' : 'border-gray-300'}`}
@@ -1276,7 +1483,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
+                          <label className="block text-xs text-gray-500 mb-1">{t.zipCode} *</label>
                           <input
                             type="text"
                             className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.zipCode ? 'border-red-500' : 'border-gray-300'}`}
@@ -1286,7 +1493,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Country</label>
+                          <label className="block text-xs text-gray-500 mb-1">{t.country}</label>
                           <input
                             type="text"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-100"
@@ -1304,23 +1511,23 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Reference (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.reference}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.reference}
                   onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  placeholder="PO number, project name..."
+                  placeholder={t.referencePlaceholder}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t.notes}</label>
                 <input
                   type="text"
                   className="w-full px-4 py-2 border border-gray-300 rounded-md"
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                  placeholder="Special instructions..."
+                  placeholder={t.notesPlaceholder}
                 />
               </div>
             </div>
@@ -1330,44 +1537,44 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               disabled={submitting || wordCount === 0}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
-              {submitting ? 'Creating Order...' : 'Create Order'}
+              {submitting ? t.creatingOrder : t.createOrder}
             </button>
           </form>
         </div>
 
         {/* Quote Summary */}
         <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-8">
-          <h2 className="text-xl font-bold text-teal-600 mb-4">Quote Summary</h2>
+          <h2 className="text-xl font-bold text-teal-600 mb-4">{t.quoteSummary}</h2>
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">Service</span>
+              <span className="text-gray-600">{t.service}</span>
               <span className="font-medium">
-                {formData.service_type === 'certified' && 'Certified'}
-                {formData.service_type === 'standard' && 'Standard'}
-                {formData.service_type === 'sworn' && 'Sworn'}
-                {formData.service_type === 'rmv' && 'RMV Certified'}
+                {formData.service_type === 'certified' && t.certified}
+                {formData.service_type === 'standard' && t.standardService}
+                {formData.service_type === 'sworn' && t.sworn}
+                {formData.service_type === 'rmv' && t.rmvCertified}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Pages</span>
+              <span className="text-gray-600">{t.pages}</span>
               <span className="font-medium">{quote?.pages || 0}</span>
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between">
-                <span className="text-gray-600">Base Price</span>
+                <span className="text-gray-600">{t.basePrice}</span>
                 <span className="font-medium">{formatPrice(quote?.base_price || 0)}</span>
               </div>
               {quote?.urgency_fee > 0 && (
                 <div className="flex justify-between text-orange-600">
-                  <span>Urgency Fee</span>
+                  <span>{t.urgencyFee}</span>
                   <span>{formatPrice(quote.urgency_fee)}</span>
                 </div>
               )}
               {quote?.shipping_fee > 0 && (
                 <div className="flex justify-between text-blue-600">
-                  <span>Shipping (USPS Priority)</span>
+                  <span>{t.shippingUsps}</span>
                   <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
@@ -1375,13 +1582,13 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
-                <span className="font-bold">Total</span>
+                <span className="font-bold">{t.total}</span>
                 <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
               </div>
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
-              * Payment via invoice (Net 30)
+              {t.paymentInvoice}
             </div>
           </div>
         </div>
@@ -1391,7 +1598,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 };
 
 // ==================== ORDERS LIST PAGE ====================
-const OrdersPage = ({ token }) => {
+const OrdersPage = ({ token, t }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -1431,11 +1638,18 @@ const OrdersPage = ({ token }) => {
     );
   };
 
+  const filterLabels = {
+    all: t.all,
+    pending: t.pending,
+    paid: t.paid,
+    overdue: t.overdue
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading orders...</p>
+        <p className="mt-4 text-gray-600">{t.loadingOrders}</p>
       </div>
     );
   }
@@ -1443,7 +1657,7 @@ const OrdersPage = ({ token }) => {
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">My Orders</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{t.myOrders}</h1>
         <div className="flex gap-2">
           {['all', 'pending', 'paid', 'overdue'].map((f) => (
             <button
@@ -1455,7 +1669,7 @@ const OrdersPage = ({ token }) => {
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -1464,8 +1678,8 @@ const OrdersPage = ({ token }) => {
       {orders.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="text-4xl mb-4">📋</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h2>
-          <p className="text-gray-600">Create your first order to get started</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.noOrdersYet}</h2>
+          <p className="text-gray-600">{t.createFirstOrder}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1484,17 +1698,17 @@ const OrdersPage = ({ token }) => {
                         {getStatusBadge(order.payment_status)}
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
-                        Client: {order.client_name} ({order.client_email})
+                        {t.client}: {order.client_name} ({order.client_email})
                       </div>
                       <div className="text-sm text-gray-500">
-                        {order.translate_from} → {order.translate_to} | {order.word_count} words
+                        {order.translate_from} → {order.translate_to} | {order.word_count} {t.words}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
                     <div className="text-sm text-gray-500">
-                      Due: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
+                      {t.due}: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -1504,31 +1718,31 @@ const OrdersPage = ({ token }) => {
                 <div className="border-t bg-gray-50 p-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <div className="text-sm text-gray-500">Service</div>
+                      <div className="text-sm text-gray-500">{t.service}</div>
                       <div className="font-medium">
-                        {order.service_type === 'certified' && 'Certified'}
-                        {order.service_type === 'standard' && 'Standard'}
-                        {order.service_type === 'sworn' && 'Sworn'}
-                        {order.service_type === 'rmv' && 'RMV Certified'}
+                        {order.service_type === 'certified' && t.certified}
+                        {order.service_type === 'standard' && t.standardService}
+                        {order.service_type === 'sworn' && t.sworn}
+                        {order.service_type === 'rmv' && t.rmvCertified}
                         {!['certified', 'standard', 'sworn', 'rmv'].includes(order.service_type) && order.service_type}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Created</div>
+                      <div className="text-sm text-gray-500">{t.created}</div>
                       <div className="font-medium">{new Date(order.created_at).toLocaleDateString()}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Base Price</div>
+                      <div className="text-sm text-gray-500">{t.basePrice}</div>
                       <div className="font-medium">${order.base_price?.toFixed(2)}</div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Urgency Fee</div>
+                      <div className="text-sm text-gray-500">{t.urgencyFee}</div>
                       <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
                     </div>
                   </div>
                   {order.reference && (
                     <div className="mt-4">
-                      <div className="text-sm text-gray-500">Reference</div>
+                      <div className="text-sm text-gray-500">{t.reference}</div>
                       <div className="font-medium">{order.reference}</div>
                     </div>
                   )}
@@ -1543,7 +1757,7 @@ const OrdersPage = ({ token }) => {
 };
 
 // ==================== MESSAGES PAGE ====================
-const MessagesPage = ({ token }) => {
+const MessagesPage = ({ token, t }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -1597,20 +1811,20 @@ const MessagesPage = ({ token }) => {
     return (
       <div className="p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Loading messages...</p>
+        <p className="mt-4 text-gray-600">{t.loadingMessages}</p>
       </div>
     );
   }
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t.messages}</h1>
 
       {messages.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center">
           <div className="text-4xl mb-4">✉️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No messages</h2>
-          <p className="text-gray-600">Messages from Legacy Translations will appear here</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">{t.noMessages}</h2>
+          <p className="text-gray-600">{t.messagesWillAppear}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1630,7 +1844,7 @@ const MessagesPage = ({ token }) => {
                         {message.title}
                       </h3>
                       {!message.read && (
-                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
+                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">{t.new}</span>
                       )}
                     </div>
                     <p className="text-gray-600 mt-1">{message.content}</p>
@@ -1642,7 +1856,7 @@ const MessagesPage = ({ token }) => {
                     onClick={() => markAsRead(message.id)}
                     className="text-sm text-teal-600 hover:text-teal-800"
                   >
-                    Mark as read
+                    {t.markAsRead}
                   </button>
                 )}
               </div>
@@ -1825,9 +2039,9 @@ function App() {
       case 'new-order':
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
-        return <OrdersPage token={token} />;
+        return <OrdersPage token={token} t={t} />;
       case 'messages':
-        return <MessagesPage token={token} />;
+        return <MessagesPage token={token} t={t} />;
       default:
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
