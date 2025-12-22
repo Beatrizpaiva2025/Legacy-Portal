@@ -594,7 +594,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   };
 
   useEffect(() => {
-    if (user?.role === 'translator' || user?.role === 'pm') {
+    // Fetch assigned orders for all roles (admin, pm, translator)
+    if (user?.role) {
       fetchAssignedOrders();
     }
   }, [user]);
@@ -649,19 +650,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const downloadResponse = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
 
       if (downloadResponse.data.file_data) {
-        // Convert base64 to File object
-        const byteString = atob(downloadResponse.data.file_data);
+        const contentType = downloadResponse.data.content_type || 'application/pdf';
+        const base64Data = downloadResponse.data.file_data;
+
+        // Convert base64 to File object for the workspace
+        const byteString = atob(base64Data);
         const ab = new ArrayBuffer(byteString.length);
         const ia = new Uint8Array(ab);
         for (let i = 0; i < byteString.length; i++) {
           ia[i] = byteString.charCodeAt(i);
         }
-        const blob = new Blob([ab], { type: downloadResponse.data.content_type || 'application/pdf' });
+        const blob = new Blob([ab], { type: contentType });
         const file = new File([blob], doc.filename || 'document.pdf', { type: blob.type });
 
         // Set the file in the workspace
         setFiles([file]);
         setSelectedFileId(doc.id);
+
+        // Also set originalImages for PDF generation (needs data URL format)
+        const dataUrl = `data:${contentType};base64,${base64Data}`;
+        setOriginalImages([{ filename: doc.filename, data: dataUrl }]);
+
         setProcessingStatus(`✅ "${doc.filename}" carregado! Prossiga para traduzir.`);
         setActiveSubTab('translate');
       }
@@ -1745,7 +1754,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
@@ -2014,8 +2023,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
         .translation-page { page-break-before: always; padding-top: 20px; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .translation-content { line-height: 1.6; font-size: 12px; }
         .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
@@ -2106,12 +2115,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
-          {/* Assigned Orders for Translator/PM */}
-          {(user?.role === 'translator' || user?.role === 'pm') && (
+          {/* Assigned Orders for all users */}
+          {(user?.role === 'admin' || user?.role === 'translator' || user?.role === 'pm') && (
             <div className="bg-white rounded shadow">
               <div className="p-3 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 Meus Projetos
+                  📋 Projetos
                   {assignedOrders.length > 0 && (
                     <span className="ml-2 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-bold">{assignedOrders.length}</span>
                   )}
@@ -4289,6 +4298,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Review Modal state (PM Side-by-Side Review)
+  const [reviewingOrder, setReviewingOrder] = useState(null);
+  const [reviewOriginalDocs, setReviewOriginalDocs] = useState([]);
+  const [reviewTranslatedDoc, setReviewTranslatedDoc] = useState(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewCurrentPage, setReviewCurrentPage] = useState(0);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4696,6 +4714,116 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     });
   };
 
+  // Open Review Modal (PM Side-by-Side Review)
+  const openReviewModal = async (order) => {
+    setReviewingOrder(order);
+    setLoadingReview(true);
+    setReviewComment('');
+    setReviewCurrentPage(0);
+    setReviewOriginalDocs([]);
+    setReviewTranslatedDoc(null);
+
+    try {
+      // Fetch original documents
+      const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      const docs = docsResponse.data.documents || [];
+
+      // Download each original document as base64
+      const originalDocsWithData = [];
+      for (const doc of docs) {
+        try {
+          const downloadRes = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+          if (downloadRes.data.file_data) {
+            const contentType = downloadRes.data.content_type || 'application/pdf';
+            originalDocsWithData.push({
+              ...doc,
+              data: `data:${contentType};base64,${downloadRes.data.file_data}`,
+              contentType
+            });
+          }
+        } catch (e) {
+          console.error('Failed to download doc:', e);
+        }
+      }
+      setReviewOriginalDocs(originalDocsWithData);
+
+      // Fetch translated document (if exists)
+      try {
+        const translatedRes = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
+        if (translatedRes.data.translation_html) {
+          setReviewTranslatedDoc({
+            type: 'html',
+            content: translatedRes.data.translation_html,
+            settings: translatedRes.data
+          });
+        } else if (translatedRes.data.file_data) {
+          const contentType = translatedRes.data.content_type || 'application/pdf';
+          setReviewTranslatedDoc({
+            type: 'file',
+            data: `data:${contentType};base64,${translatedRes.data.file_data}`,
+            filename: translatedRes.data.filename,
+            contentType
+          });
+        }
+      } catch (e) {
+        console.error('No translated document found:', e);
+      }
+    } catch (err) {
+      console.error('Failed to load review documents:', err);
+      alert('Error loading documents for review');
+    } finally {
+      setLoadingReview(false);
+    }
+  };
+
+  // Approve translation (PM approves, moves to ready)
+  const approveTranslation = async () => {
+    if (!reviewingOrder) return;
+    setSubmittingReview(true);
+    try {
+      await axios.put(`${API}/admin/orders/${reviewingOrder.id}?admin_key=${adminKey}`, {
+        translation_status: 'ready',
+        pm_review_status: 'approved',
+        pm_review_comment: reviewComment,
+        pm_reviewed_at: new Date().toISOString()
+      });
+      alert('Translation approved! Ready for delivery.');
+      setReviewingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to approve:', err);
+      alert('Error approving translation');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Request correction (PM sends back to translator)
+  const requestCorrection = async () => {
+    if (!reviewingOrder) return;
+    if (!reviewComment.trim()) {
+      alert('Please add a comment explaining what needs to be corrected');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await axios.put(`${API}/admin/orders/${reviewingOrder.id}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        pm_review_status: 'correction_requested',
+        pm_review_comment: reviewComment,
+        pm_reviewed_at: new Date().toISOString()
+      });
+      alert('Correction requested. Translator will be notified.');
+      setReviewingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to request correction:', err);
+      alert('Error requesting correction');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   // Send translator assignment with email invitation
   const sendTranslatorAssignment = async () => {
     if (!assignmentDetails.translator_id) {
@@ -5021,6 +5149,171 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PM Review Modal - Side by Side */}
+      {reviewingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold text-lg">📋 Review Translation</h3>
+                <p className="text-xs opacity-80">
+                  {reviewingOrder.order_number} - {reviewingOrder.client_name} | {reviewingOrder.translate_from} → {reviewingOrder.translate_to}
+                </p>
+              </div>
+              <button onClick={() => setReviewingOrder(null)} className="text-white hover:text-gray-200 text-2xl">×</button>
+            </div>
+
+            {loadingReview ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-4xl mb-3">⏳</div>
+                  <p className="text-gray-600">Loading documents...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Document Navigation */}
+                {reviewOriginalDocs.length > 1 && (
+                  <div className="px-4 py-2 bg-gray-100 border-b flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setReviewCurrentPage(Math.max(0, reviewCurrentPage - 1))}
+                      disabled={reviewCurrentPage === 0}
+                      className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-sm font-medium">
+                      Document {reviewCurrentPage + 1} of {reviewOriginalDocs.length}
+                    </span>
+                    <button
+                      onClick={() => setReviewCurrentPage(Math.min(reviewOriginalDocs.length - 1, reviewCurrentPage + 1))}
+                      disabled={reviewCurrentPage >= reviewOriginalDocs.length - 1}
+                      className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+
+                {/* Side by Side Content */}
+                <div className="flex-1 grid grid-cols-2 gap-0 overflow-hidden">
+                  {/* Left: Original Document */}
+                  <div className="border-r flex flex-col">
+                    <div className="px-4 py-2 bg-orange-50 border-b">
+                      <span className="text-sm font-bold text-orange-700">📄 Original Document</span>
+                      {reviewOriginalDocs[reviewCurrentPage] && (
+                        <span className="text-xs text-gray-500 ml-2">{reviewOriginalDocs[reviewCurrentPage].filename}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                      {reviewOriginalDocs[reviewCurrentPage] ? (
+                        reviewOriginalDocs[reviewCurrentPage].contentType?.includes('pdf') ? (
+                          <embed
+                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            type="application/pdf"
+                            className="w-full h-full min-h-[500px]"
+                          />
+                        ) : (
+                          <img
+                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            alt="Original"
+                            className="max-w-full border shadow-sm"
+                          />
+                        )
+                      ) : (
+                        <div className="text-center text-gray-400 py-8">
+                          <div className="text-4xl mb-2">📭</div>
+                          <p>No original document found</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Translated Document */}
+                  <div className="flex flex-col">
+                    <div className="px-4 py-2 bg-blue-50 border-b">
+                      <span className="text-sm font-bold text-blue-700">🌐 Translation ({reviewingOrder.translate_to})</span>
+                    </div>
+                    <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                      {reviewTranslatedDoc ? (
+                        reviewTranslatedDoc.type === 'html' ? (
+                          <div
+                            className="bg-white p-4 border shadow-sm prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: reviewTranslatedDoc.content }}
+                          />
+                        ) : reviewTranslatedDoc.contentType?.includes('pdf') ? (
+                          <embed
+                            src={reviewTranslatedDoc.data}
+                            type="application/pdf"
+                            className="w-full h-full min-h-[500px]"
+                          />
+                        ) : (
+                          <img
+                            src={reviewTranslatedDoc.data}
+                            alt="Translation"
+                            className="max-w-full border shadow-sm"
+                          />
+                        )
+                      ) : (
+                        <div className="text-center text-gray-400 py-8">
+                          <div className="text-4xl mb-2">📝</div>
+                          <p>No translation found</p>
+                          <p className="text-xs mt-1">Translation not yet submitted</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Review Actions Footer */}
+                <div className="p-4 border-t bg-gray-50">
+                  {/* Comment */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      💬 Review Comment {!reviewTranslatedDoc && '(required for correction request)'}
+                    </label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                      rows="2"
+                      placeholder="Add your feedback, corrections needed, or approval notes..."
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-between items-center">
+                    <button
+                      onClick={() => setReviewingOrder(null)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    >
+                      Close
+                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={requestCorrection}
+                        disabled={submittingReview || !reviewTranslatedDoc}
+                        className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-2"
+                      >
+                        {submittingReview ? '...' : '❌ Request Correction'}
+                      </button>
+                      <button
+                        onClick={approveTranslation}
+                        disabled={submittingReview || !reviewTranslatedDoc}
+                        className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-2"
+                      >
+                        {submittingReview ? '...' : '✅ Approve Translation'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -5442,11 +5735,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
-              <th className="px-2 py-2 text-left font-medium">PM</th>
+              {/* PM column - Admin only */}
+              {isAdmin && <th className="px-2 py-2 text-left font-medium">PM</th>}
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
               <th className="px-2 py-2 text-left font-medium">Notes</th>
+              {/* Translation Ready column - shows when translation is complete */}
+              <th className="px-2 py-2 text-center font-medium">Translation</th>
               {/* Total and Payment columns - Admin only */}
               {isAdmin && <th className="px-2 py-2 text-right font-medium">Total</th>}
               {isAdmin && <th className="px-2 py-2 text-center font-medium">Payment</th>}
@@ -5494,35 +5790,35 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       )}
                     </div>
                   </td>
-                  {/* PM */}
-                  <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
-                    {assigningPM === order.id ? (
-                      <select
-                        autoFocus
-                        className="px-1 py-0.5 text-[10px] border rounded w-24"
-                        onChange={(e) => {
-                          if (e.target.value) assignPM(order.id, e.target.value);
-                        }}
-                        onBlur={() => setAssigningPM(null)}
-                      >
-                        <option value="">Select...</option>
-                        {PROJECT_MANAGERS.map(pm => (
-                          <option key={pm.name} value={pm.name}>{pm.name}</option>
-                        ))}
-                      </select>
-                    ) : (order.assigned_pm_name || order.assigned_pm) ? (
-                      <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
-                    ) : isAdmin ? (
-                      <button
-                        onClick={() => setAssigningPM(order.id)}
-                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
-                      >
-                        Assign
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-gray-400">-</span>
-                    )}
-                  </td>
+                  {/* PM - Admin only */}
+                  {isAdmin && (
+                    <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
+                      {assigningPM === order.id ? (
+                        <select
+                          autoFocus
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          onChange={(e) => {
+                            if (e.target.value) assignPM(order.id, e.target.value);
+                          }}
+                          onBlur={() => setAssigningPM(null)}
+                        >
+                          <option value="">Select...</option>
+                          {PROJECT_MANAGERS.map(pm => (
+                            <option key={pm.name} value={pm.name}>{pm.name}</option>
+                          ))}
+                        </select>
+                      ) : (order.assigned_pm_name || order.assigned_pm) ? (
+                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
+                      ) : (
+                        <button
+                          onClick={() => setAssigningPM(order.id)}
+                          className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                        >
+                          Assign
+                        </button>
+                      )}
+                    </td>
+                  )}
                   {/* Translator */}
                   <td className={`px-2 py-2 ${(order.assigned_translator_name || order.assigned_translator) ? 'bg-green-50' : ''}`}>
                     {assigningTranslator === order.id ? (
@@ -5541,7 +5837,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </select>
                     ) : (order.assigned_translator_name || order.assigned_translator) ? (
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
+                          {/* Edit translator button for Admin and PM */}
+                          {(isAdmin || isPM) && (
+                            <button
+                              onClick={() => openAssignTranslatorModal(order)}
+                              className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-purple-600 text-[10px]"
+                              title="Change translator"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
                         {order.translator_assignment_status === 'pending' && (
                           <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
                         )}
@@ -5644,6 +5952,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     )}
                   </td>
+                  {/* Translation Ready column - shows when translation is complete */}
+                  <td className="px-2 py-2 text-center">
+                    {order.translation_ready ? (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-medium">
+                          ✅ Ready
+                        </span>
+                        {order.translation_ready_at && (
+                          <span className="text-[9px] text-gray-500">
+                            {new Date(order.translation_ready_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                        🔄 Review
+                      </span>
+                    ) : order.translation_status === 'in_translation' ? (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-medium">
+                        ⏳ Working
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-[10px]">-</span>
+                    )}
+                  </td>
                   {/* Total and Payment columns - Admin only */}
                   {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
                   {isAdmin && <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
@@ -5669,6 +6002,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               title="Open Translation / Review"
                             >
                               <span className="text-xs">✍️</span>
+                            </button>
+                          )}
+                          {/* Review Side-by-Side button - when translation is in review or ready */}
+                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              title="Review Translation (Side-by-Side)"
+                            >
+                              <span className="text-xs">🔍</span>
                             </button>
                           )}
                           {/* Mark as In Translation (start work) */}
@@ -5724,6 +6067,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               title="Open Translation Tool"
                             >
                               <span className="text-xs">✍️</span>
+                            </button>
+                          )}
+                          {/* Review Side-by-Side button - when translation is in review or ready */}
+                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              title="Review Translation (Side-by-Side)"
+                            >
+                              <span className="text-xs">🔍</span>
                             </button>
                           )}
                           {order.translation_status === 'received' && (
