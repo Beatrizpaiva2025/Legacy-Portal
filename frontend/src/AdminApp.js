@@ -74,6 +74,104 @@ const PROJECT_MANAGERS = [
   { name: "Beatriz Paiva", title: "Managing Director" }
 ];
 
+// ==================== SVG ICONS (Professional/Minimal) ====================
+const EditIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+
+const AssignIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+  </svg>
+);
+
+const RefreshIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const NoteIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+  </svg>
+);
+
+const MemoIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const ClockIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const DocumentIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const SendIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+);
+
+const PlayIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M8 5v14l11-7z" />
+  </svg>
+);
+
+const EyeIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const SearchIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const MailIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+);
+
+const TrashIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const CheckIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const UploadIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  </svg>
+);
+
+const WriteIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
 // ==================== ADMIN LOGIN ====================
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
@@ -5884,10 +5982,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
                           <button
                             onClick={() => setAssigningPM(order.id)}
-                            className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600 text-[10px]"
+                            className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500"
                             title="Change PM"
                           >
-                            ✏️
+                            <EditIcon className="w-3 h-3" />
                           </button>
                         </div>
                       ) : (
@@ -5924,15 +6022,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {(isAdmin || isPM) && (
                             <button
                               onClick={() => openAssignTranslatorModal(order)}
-                              className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-purple-600 text-[10px]"
+                              className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500"
                               title="Change translator"
                             >
-                              ✏️
+                              <EditIcon className="w-3 h-3" />
                             </button>
                           )}
                         </div>
                         {order.translator_assignment_status === 'pending' && (
-                          <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
+                          <span className="text-[9px] px-1 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-0.5 inline-block w-fit border border-yellow-200">Pending</span>
                         )}
                         {order.translator_assignment_status === 'accepted' && (
                           <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded mt-0.5 inline-block w-fit">✓ Accepted</span>
@@ -5943,9 +6041,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             {(isAdmin || isPM) && (
                               <button
                                 onClick={() => openAssignTranslatorModal(order)}
-                                className="text-[9px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                                className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-0.5"
                               >
-                                🔄 Reassign
+                                <RefreshIcon className="w-2.5 h-2.5" /> Reassign
                               </button>
                             )}
                           </div>
@@ -5954,9 +6052,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     ) : (isAdmin || isPM) ? (
                       <button
                         onClick={() => openAssignTranslatorModal(order)}
-                        className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200"
+                        className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] hover:bg-gray-200 flex items-center gap-0.5"
                       >
-                        📤 Assign
+                        <AssignIcon className="w-3 h-3" /> Assign
                       </button>
                     ) : (
                       <span className="text-[10px] text-gray-400">-</span>
@@ -5993,7 +6091,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
                         </div>
                         {isAdmin && (
-                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit deadline">✏️</button>
+                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500" title="Edit deadline"><EditIcon className="w-3 h-3" /></button>
                         )}
                       </div>
                     )}
@@ -6019,13 +6117,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     ) : (
                       <div className="flex items-center gap-1">
                         {order.notes && (
-                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] cursor-help" title={`Client message: ${order.notes}`}>💬</span>
+                          <span className="px-1 py-0.5 bg-blue-50 text-blue-500 rounded text-[10px] cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3 h-3 inline" /></span>
                         )}
                         {order.internal_notes && (
-                          <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] cursor-help" title={`Internal note: ${order.internal_notes}`}>📝</span>
+                          <span className="px-1 py-0.5 bg-amber-50 text-amber-500 rounded text-[10px] cursor-help border border-amber-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3 h-3 inline" /></span>
                         )}
                         {isAdmin && (
-                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 text-[10px]" title="Edit notes">✏️</button>
+                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500" title="Edit notes"><EditIcon className="w-3 h-3" /></button>
                         )}
                         {!order.notes && !order.internal_notes && !isAdmin && (
                           <span className="text-gray-300 text-[10px]">-</span>
@@ -6047,12 +6145,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         )}
                       </div>
                     ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
-                        🔄 Review
+                      <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-200 flex items-center gap-1">
+                        <RefreshIcon className="w-3 h-3" /> Review
                       </span>
                     ) : order.translation_status === 'in_translation' ? (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-medium">
-                        ⏳ Working
+                      <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded text-[10px] font-medium border border-yellow-200 flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3" /> Working
                       </span>
                     ) : (
                       <span className="text-gray-300 text-[10px]">-</span>
@@ -6066,10 +6164,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* View Documents - Always visible */}
                       <button
                         onClick={() => viewOrderDocuments(order)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-500 rounded hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
                         title="View Documents"
                       >
-                        <span className="text-xs">📄</span>
+                        <DocumentIcon className="w-3.5 h-3.5" />
                       </button>
 
                       {/* PM Actions */}
@@ -6089,10 +6187,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {['review', 'ready', 'client_review'].includes(order.translation_status) && (
                             <button
                               onClick={() => openReviewModal(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors"
                               title="Review Translation (Side-by-Side)"
                             >
-                              <span className="text-xs">🔍</span>
+                              <SearchIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {/* Mark as In Translation (start work) */}
@@ -6103,36 +6201,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
                           {/* Send to PM Review */}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to PM Review">
-                              <span className="text-xs">👁</span>
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-colors" title="Send to PM Review">
+                              <EyeIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {/* From Review: Send to Client Review OR Mark as Final */}
                           {order.translation_status === 'review' && (
                             <>
-                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-orange-300 text-orange-600 rounded hover:bg-orange-50 transition-colors" title="Send to Client Review">
-                                <span className="text-xs">📧</span>
+                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="Send to Client Review">
+                                <MailIcon className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <span className="text-xs">✓</span>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <CheckIcon className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
                           {/* Client Review: Back to revision or Mark as Final */}
                           {order.translation_status === 'client_review' && (
                             <>
-                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-yellow-300 text-yellow-600 rounded hover:bg-yellow-50 transition-colors" title="Back to Revision">
-                                <span className="text-xs">🔄</span>
+                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-yellow-300 hover:text-yellow-500 hover:bg-yellow-50 transition-colors" title="Back to Revision">
+                                <RefreshIcon className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <span className="text-xs">✓</span>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <CheckIcon className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
                           {/* Ready: Deliver to client */}
                           {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver to Client">
-                              <span className="text-xs">📤</span>
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-teal-300 hover:text-teal-500 hover:bg-teal-50 transition-colors" title="Deliver to Client">
+                              <SendIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                         </>
@@ -6144,59 +6242,59 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {['received', 'in_translation', 'review'].includes(order.translation_status) && (
                             <button
                               onClick={() => startTranslation(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
+                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
                               title="Open Translation Tool"
                             >
-                              <span className="text-xs">✍️</span>
+                              <WriteIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {/* Review Side-by-Side button - when translation is in review or ready */}
                           {['review', 'ready', 'client_review'].includes(order.translation_status) && (
                             <button
                               onClick={() => openReviewModal(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors"
                               title="Review Translation (Side-by-Side)"
                             >
-                              <span className="text-xs">🔍</span>
+                              <SearchIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {order.translation_status === 'received' && (
-                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start">
-                              <span className="text-xs">▶</span>
+                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-amber-300 hover:text-amber-500 hover:bg-amber-50 transition-colors" title="Start">
+                              <PlayIcon className="w-3 h-3" />
                             </button>
                           )}
                           {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-purple-300 text-purple-600 rounded hover:bg-purple-50 transition-colors" title="Send to PM Review">
-                              <span className="text-xs">👁</span>
+                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-colors" title="Send to PM Review">
+                              <EyeIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {order.translation_status === 'review' && (
                             <>
-                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-orange-300 text-orange-600 rounded hover:bg-orange-50 transition-colors" title="Send to Client Review">
-                                <span className="text-xs">📧</span>
+                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="Send to Client Review">
+                                <MailIcon className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <span className="text-xs">✓</span>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <CheckIcon className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
                           {order.translation_status === 'client_review' && (
                             <>
-                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-yellow-300 text-yellow-600 rounded hover:bg-yellow-50 transition-colors" title="Back to Revision">
-                                <span className="text-xs">🔄</span>
+                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-yellow-300 hover:text-yellow-500 hover:bg-yellow-50 transition-colors" title="Back to Revision">
+                                <RefreshIcon className="w-3.5 h-3.5" />
                               </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <span className="text-xs">✓</span>
+                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
+                                <CheckIcon className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
                           {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-teal-300 text-teal-600 rounded hover:bg-teal-50 transition-colors" title="Deliver">
-                              <span className="text-xs">📤</span>
+                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-teal-300 hover:text-teal-500 hover:bg-teal-50 transition-colors" title="Deliver">
+                              <SendIcon className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {order.payment_status === 'pending' && (
-                            <button onClick={() => markPaid(order.id)} className="w-6 h-6 flex items-center justify-center border border-emerald-300 text-emerald-600 rounded hover:bg-emerald-50 transition-colors" title="Mark Paid">
+                            <button onClick={() => markPaid(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-emerald-300 hover:text-emerald-500 hover:bg-emerald-50 transition-colors" title="Mark Paid">
                               <span className="text-xs font-medium">$</span>
                             </button>
                           )}
@@ -6205,7 +6303,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                             title="Delete Order"
                           >
-                            <span className="text-xs">🗑</span>
+                            <TrashIcon className="w-3.5 h-3.5" />
                           </button>
                         </>
                       )}
