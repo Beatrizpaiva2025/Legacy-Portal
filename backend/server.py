@@ -1060,23 +1060,36 @@ async def get_current_partner(token: str = None) -> Optional[dict]:
 
 async def get_current_admin_user(token: str = None) -> Optional[dict]:
     """Get current admin user from token"""
-    if not token or token not in active_admin_tokens:
+    if not token:
         return None
-    user_info = active_admin_tokens[token]
-    user = await db.admin_users.find_one({"id": user_info["user_id"]})
-    return user
+
+    # First check in-memory tokens
+    if token in active_admin_tokens:
+        user_info = active_admin_tokens[token]
+        user = await db.admin_users.find_one({"id": user_info["user_id"]})
+        return user
+
+    # Fallback: check database for persisted token
+    user = await db.admin_users.find_one({"token": token, "is_active": True})
+    if user:
+        # Restore token to memory cache
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+        return user
+
+    return None
 
 def require_admin_role(allowed_roles: List[str]):
     """Decorator helper to check if user has required role"""
     async def check_role(token: str) -> dict:
-        if not token or token not in active_admin_tokens:
+        if not token:
             raise HTTPException(status_code=401, detail="Not authenticated")
-        user_info = active_admin_tokens[token]
-        if user_info["role"] not in allowed_roles:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        user = await db.admin_users.find_one({"id": user_info["user_id"]})
+
+        user = await get_current_admin_user(token)
         if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        if user["role"] not in allowed_roles:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return check_role
 
@@ -2034,11 +2047,11 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         is_valid = True
         creator_role = 'admin'
     else:
-        # Check if it's a valid admin or PM token
-        admin_user = await db.admin_users.find_one({"token": admin_key, "role": {"$in": ["admin", "pm"]}, "is_active": True})
-        if admin_user:
+        # Check if it's a valid token (in-memory or database)
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
             is_valid = True
-            creator_role = admin_user.get("role", "admin")
+            creator_role = user.get("role", "admin")
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -2105,6 +2118,12 @@ async def login_admin_user(login_data: AdminUserLogin):
         token = generate_token()
         active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
 
+        # Also save token to database for persistence across server restarts
+        await db.admin_users.update_one(
+            {"id": user["id"]},
+            {"$set": {"token": token, "token_created": datetime.utcnow()}}
+        )
+
         return AdminUserResponse(
             id=user["id"],
             email=user["email"],
@@ -2149,7 +2168,12 @@ async def get_current_admin_user_info(token: str):
 @api_router.get("/admin/users")
 async def list_admin_users(token: str, admin_key: str):
     """List all admin users (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
@@ -2168,7 +2192,12 @@ async def list_admin_users(token: str, admin_key: str):
 @api_router.put("/admin/users/{user_id}/toggle-active")
 async def toggle_admin_user_active(user_id: str, admin_key: str):
     """Toggle admin user active status (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
@@ -2189,7 +2218,12 @@ async def toggle_admin_user_active(user_id: str, admin_key: str):
 @api_router.delete("/admin/users/{user_id}")
 async def delete_admin_user(user_id: str, admin_key: str):
     """Delete admin user (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
