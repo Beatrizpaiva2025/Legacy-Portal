@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
@@ -599,7 +604,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Quick Package state (for ready translations)
   const [quickPackageMode, setQuickPackageMode] = useState(false);
-  const [quickTranslationFiles, setQuickTranslationFiles] = useState([]); // Ready translation files
+  const [quickTranslationFiles, setQuickTranslationFiles] = useState([]); // Ready translation files (images)
+  const [quickTranslationHtml, setQuickTranslationHtml] = useState(''); // HTML content for translation (from Word/HTML/TXT)
+  const [quickTranslationType, setQuickTranslationType] = useState('images'); // 'images' or 'html'
   const [quickOriginalFiles, setQuickOriginalFiles] = useState([]); // Original document files
   const [quickPackageLoading, setQuickPackageLoading] = useState(false); // Loading state for uploads
   const [quickPackageProgress, setQuickPackageProgress] = useState(''); // Progress message
@@ -1303,6 +1310,87 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     });
   };
 
+  // Convert Word document (.docx) to HTML
+  const convertWordToHtml = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const arrayBuffer = e.target.result;
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          resolve(result.value);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Convert PDF to images (one image per page)
+  const convertPdfToImages = async (file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const typedArray = new Uint8Array(e.target.result);
+          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          const images = [];
+
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            if (onProgress) onProgress(pageNum, pdf.numPages);
+
+            const page = await pdf.getPage(pageNum);
+            const scale = 2; // Higher scale = better quality
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await page.render({ canvasContext: context, viewport }).promise;
+
+            // Convert canvas to base64 PNG
+            const base64 = canvas.toDataURL('image/png').split(',')[1];
+            images.push({
+              filename: `${file.name}_page_${pageNum}.png`,
+              data: base64,
+              type: 'image/png'
+            });
+          }
+
+          resolve(images);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  // Read HTML file content
+  const readHtmlFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
+  // Read TXT file content
+  const readTxtFile = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
   // OCR with backend (supports regular OCR or Claude OCR)
   const handleOCR = async () => {
     if (files.length === 0) {
@@ -1630,33 +1718,72 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(saveSelection, 0);
   };
 
-  // Quick Package file handlers - with progress feedback for large uploads
+  // Quick Package file handlers - with progress feedback and multi-format support
   const handleQuickTranslationUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
     setQuickPackageLoading(true);
     setQuickPackageProgress(`Processing ${files.length} translation file(s)...`);
-    const processedFiles = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const fileName = file.name.toLowerCase();
       setQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
+
       try {
-        const base64 = await fileToBase64(file);
-        processedFiles.push({
-          filename: file.name,
-          data: base64,
-          type: file.type
-        });
+        // Word document (.docx)
+        if (fileName.endsWith('.docx')) {
+          setQuickPackageProgress(`Converting Word document: ${file.name}`);
+          const html = await convertWordToHtml(file);
+          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          setQuickTranslationType('html');
+        }
+        // HTML file
+        else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+          setQuickPackageProgress(`Reading HTML: ${file.name}`);
+          const html = await readHtmlFile(file);
+          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          setQuickTranslationType('html');
+        }
+        // Text file
+        else if (fileName.endsWith('.txt')) {
+          setQuickPackageProgress(`Reading text file: ${file.name}`);
+          const text = await readTxtFile(file);
+          const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${text}</div>`;
+          setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
+          setQuickTranslationType('html');
+        }
+        // PDF - convert to images
+        else if (fileName.endsWith('.pdf')) {
+          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+          });
+          setQuickTranslationFiles(prev => [...prev, ...images]);
+          if (!quickTranslationHtml) setQuickTranslationType('images');
+        }
+        // Images (JPG, PNG, etc.)
+        else if (file.type.startsWith('image/')) {
+          const base64 = await fileToBase64(file);
+          setQuickTranslationFiles(prev => [...prev, {
+            filename: file.name,
+            data: base64,
+            type: file.type
+          }]);
+          if (!quickTranslationHtml) setQuickTranslationType('images');
+        }
+        else {
+          console.warn(`Unsupported file type: ${file.name}`);
+        }
       } catch (err) {
         console.error(`Error processing ${file.name}:`, err);
+        setQuickPackageProgress(`⚠️ Error processing ${file.name}`);
       }
     }
 
-    setQuickTranslationFiles(prev => [...prev, ...processedFiles]);
     setQuickPackageLoading(false);
-    setQuickPackageProgress(`✅ ${processedFiles.length} translation file(s) ready`);
+    setQuickPackageProgress(`✅ Translation file(s) ready`);
     setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
@@ -1670,14 +1797,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const fileName = file.name.toLowerCase();
       setQuickPackageProgress(`Processing original ${i + 1}/${files.length}: ${file.name}`);
+
       try {
-        const base64 = await fileToBase64(file);
-        processedFiles.push({
-          filename: file.name,
-          data: base64,
-          type: file.type
-        });
+        // PDF - convert to images automatically
+        if (fileName.endsWith('.pdf')) {
+          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+          });
+          processedFiles.push(...images);
+        }
+        // Images
+        else if (file.type.startsWith('image/')) {
+          const base64 = await fileToBase64(file);
+          processedFiles.push({
+            filename: file.name,
+            data: base64,
+            type: file.type
+          });
+        }
+        else {
+          console.warn(`Unsupported file type for original: ${file.name}`);
+        }
       } catch (err) {
         console.error(`Error processing ${file.name}:`, err);
       }
@@ -1685,7 +1828,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     setQuickOriginalFiles(prev => [...prev, ...processedFiles]);
     setQuickPackageLoading(false);
-    setQuickPackageProgress(`✅ ${processedFiles.length} original file(s) ready`);
+    setQuickPackageProgress(`✅ ${processedFiles.length} original page(s) ready`);
     setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
@@ -1798,14 +1941,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>`;
 
-    // Translation pages with letterhead (uploaded images)
-    const translationPagesHTML = quickTranslationFiles.map((file, idx) => `
+    // Translation pages - supports both HTML content and images
+    let translationPagesHTML = '';
+
+    // If we have HTML content (from Word/HTML/TXT)
+    if (quickTranslationHtml) {
+      translationPagesHTML = `
+    <div class="translation-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="translation-content translation-text">
+            ${quickTranslationHtml}
+        </div>
+    </div>`;
+    }
+
+    // If we have image files (from images or PDF conversion)
+    if (quickTranslationFiles.length > 0) {
+      translationPagesHTML += quickTranslationFiles.map((file, idx) => `
     <div class="translation-page">
         ${includeLetterhead ? letterheadHTML : ''}
         <div class="translation-content">
             <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
         </div>
     </div>`).join('');
+    }
 
     // Original document pages (SAME structure as handleDownload)
     const originalPagesHTML = (includeOriginal && quickOriginalFiles.length > 0) ? quickOriginalFiles.map((file, idx) => `
@@ -1895,6 +2054,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
+        .translation-content.translation-text {
+            text-align: left;
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #333;
+        }
+        .translation-content.translation-text p { margin-bottom: 12px; text-align: justify; }
+        .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 8px; }
+        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 { margin: 15px 0 10px; color: #1a365d; }
+        .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 10px 0 10px 25px; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
@@ -4027,13 +4198,13 @@ tradução juramentada | certified translation`}
               {/* Upload Translation (Ready) */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
-                <p className="text-[10px] text-green-600 mb-3">Upload translation pages (will be adjusted with letterhead)</p>
+                <p className="text-[10px] text-green-600 mb-3">Upload your translation document</p>
 
                 <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                   <input
                     type="file"
                     multiple
-                    accept="image/*,.pdf"
+                    accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
                     onChange={handleQuickTranslationUpload}
                     className="hidden"
                     id="quick-translation-upload"
@@ -4044,13 +4215,42 @@ tradução juramentada | certified translation`}
                     <span className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">
                       Upload Translation
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed (images)</p>
+                    <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
                   </label>
                 </div>
 
+                {/* Show HTML content indicator */}
+                {quickTranslationHtml && (
+                  <div className="mb-2 p-2 bg-white rounded border border-green-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-green-700">
+                        ✓ Document content loaded (Word/HTML/TXT)
+                      </span>
+                      <button
+                        onClick={() => { setQuickTranslationHtml(''); setQuickTranslationType('images'); }}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                        disabled={quickPackageLoading}
+                        title="Clear document"
+                      >
+                        <TrashIcon className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Show image files */}
                 {quickTranslationFiles.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} page(s) uploaded:</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium text-green-700">{quickTranslationFiles.length} image page(s):</p>
+                      <button
+                        onClick={() => setQuickTranslationFiles([])}
+                        className="text-[10px] text-gray-400 hover:text-red-500"
+                        disabled={quickPackageLoading}
+                      >
+                        Clear all
+                      </button>
+                    </div>
                     <div className="max-h-32 overflow-y-auto">
                       {quickTranslationFiles.map((file, idx) => (
                         <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
@@ -4072,13 +4272,13 @@ tradução juramentada | certified translation`}
               {/* Upload Originals */}
               <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Original Documents</h3>
-                <p className="text-[10px] text-orange-600 mb-3">Upload original document pages</p>
+                <p className="text-[10px] text-orange-600 mb-3">Upload original document (PDF auto-converted to images)</p>
 
                 <div className={`border-2 border-dashed border-orange-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-orange-500'}`}>
                   <input
                     type="file"
                     multiple
-                    accept="image/*,.pdf"
+                    accept=".pdf,image/*"
                     onChange={handleQuickOriginalUpload}
                     className="hidden"
                     id="quick-original-upload"
@@ -4158,7 +4358,9 @@ tradução juramentada | certified translation`}
                       <span className="text-gray-400">→</span>
                     </>
                   )}
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">📄 Translation ({quickTranslationFiles.length} pages)</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                    📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
+                  </span>
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>
@@ -4183,7 +4385,7 @@ tradução juramentada | certified translation`}
               {/* Download Button */}
               <button
                 onClick={handleQuickPackageDownload}
-                disabled={quickTranslationFiles.length === 0 || quickPackageLoading}
+                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
                 className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {quickPackageLoading ? (
@@ -4196,7 +4398,7 @@ tradução juramentada | certified translation`}
                 )}
               </button>
               <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Opens print window - save as PDF (supports large documents)
+                Opens print window - save as PDF
               </p>
             </>
           )}
