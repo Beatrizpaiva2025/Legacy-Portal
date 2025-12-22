@@ -5945,30 +5945,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </table>
                   </div>
 
-                  {/* Financial Section */}
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
-                    <table className="w-full text-xs">
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
-                          <td className="py-2 font-bold text-green-600">${viewingOrder.total_price?.toFixed(2) || '0.00'}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Payment Status</td>
-                          <td className="py-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
-                              {viewingOrder.payment_status || 'pending'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Payment Method</td>
-                          <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Financial Section - Admin only */}
+                  {isAdmin && (
+                    <div>
+                      <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
+                      <table className="w-full text-xs">
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
+                            <td className="py-2 font-bold text-green-600">${viewingOrder.total_price?.toFixed(2) || '0.00'}</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600">Payment Status</td>
+                            <td className="py-2">
+                              <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
+                                {viewingOrder.payment_status || 'pending'}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600">Payment Method</td>
+                            <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
