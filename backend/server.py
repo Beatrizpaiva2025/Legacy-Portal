@@ -2440,7 +2440,14 @@ async def admin_get_all_orders(admin_key: str):
 @api_router.get("/admin/orders/my-projects")
 async def get_my_projects(token: str, admin_key: str):
     """Get projects based on user role - PM sees their projects, Translator sees assigned projects"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Allow admin key or valid user tokens
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Get user from token
@@ -2702,7 +2709,14 @@ async def get_translators_with_status(admin_key: str):
 @api_router.get("/admin/notifications")
 async def get_user_notifications(token: str, admin_key: str, unread_only: bool = False):
     """Get notifications for current user"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Allow admin key or valid user tokens
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     user = await get_current_admin_user(token)
@@ -2729,7 +2743,14 @@ async def get_user_notifications(token: str, admin_key: str, unread_only: bool =
 @api_router.put("/admin/notifications/{notif_id}/read")
 async def mark_notification_read(notif_id: str, token: str, admin_key: str):
     """Mark a notification as read"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Allow admin key or valid user tokens
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     user = await get_current_admin_user(token)
@@ -2746,7 +2767,14 @@ async def mark_notification_read(notif_id: str, token: str, admin_key: str):
 @api_router.put("/admin/notifications/read-all")
 async def mark_all_notifications_read(token: str, admin_key: str):
     """Mark all notifications as read for current user"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Allow admin key or valid user tokens
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     user = await get_current_admin_user(token)
@@ -3494,8 +3522,15 @@ class TranslationData(BaseModel):
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
-    """Save translation from workspace to an order (admin only)"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    """Save translation from workspace to an order (admin/PM/translator)"""
+    # Allow admin key or valid user tokens
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     # Find the order
