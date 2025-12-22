@@ -570,7 +570,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         translate_from: formData.translate_from,
         translate_to: formData.translate_to,
         word_count: wordCount,
-        urgency: formData.urgency
+        urgency: formData.urgency,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        notes: formData.notes,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
       };
 
       // Create quote
@@ -580,6 +584,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       // Step 2: Create Stripe checkout session
       const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
         quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
         origin_url: window.location.origin + '/customer'
       });
 
