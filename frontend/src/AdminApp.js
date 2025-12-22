@@ -5148,115 +5148,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Select Translator */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-gray-700">Select Translator *</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickAddTranslator(!showQuickAddTranslator)}
-                    className="text-[10px] text-purple-600 hover:text-purple-800 font-medium"
-                  >
-                    {showQuickAddTranslator ? '← Back to list' : '+ Add New Translator'}
-                  </button>
-                </div>
-
-                {!showQuickAddTranslator ? (
-                  <>
-                    <select
-                      value={assignmentDetails.translator_id}
-                      onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    >
-                      <option value="">-- Choose Translator --</option>
-                      {translatorList.filter(t => t.role === 'translator' && t.is_active !== false).map(t => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    {translatorList.filter(t => t.role === 'translator').length === 0 && (
-                      <p className="text-[10px] text-orange-600 mt-1">No translators found. Click "Add New Translator" above.</p>
-                    )}
-                  </>
-                ) : (
-                  /* Quick Add Translator Form */
-                  <div className="bg-purple-50 border border-purple-200 rounded p-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Name *</label>
-                        <input
-                          type="text"
-                          value={newTranslatorData.name}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, name: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="Full name"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Email *</label>
-                        <input
-                          type="email"
-                          value={newTranslatorData.email}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, email: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="email@example.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Password *</label>
-                        <input
-                          type="password"
-                          value={newTranslatorData.password}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, password: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="Password"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Language Pairs</label>
-                        <input
-                          type="text"
-                          value={newTranslatorData.language_pairs}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, language_pairs: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="PT→EN, ES→EN"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Rate/Page ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={newTranslatorData.rate_per_page}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, rate_per_page: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="25.00"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">Rate/Word ($)</label>
-                        <input
-                          type="number"
-                          step="0.001"
-                          value={newTranslatorData.rate_per_word}
-                          onChange={(e) => setNewTranslatorData({...newTranslatorData, rate_per_word: e.target.value})}
-                          className="w-full px-2 py-1.5 border rounded text-xs"
-                          placeholder="0.10"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={quickAddTranslator}
-                      disabled={addingTranslator}
-                      className="w-full py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400"
-                    >
-                      {addingTranslator ? 'Creating...' : '✓ Create Translator'}
-                    </button>
-                  </div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                <select
+                  value={assignmentDetails.translator_id}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">-- Choose Translator --</option>
+                  {translatorList.filter(t => t.role === 'translator' && t.is_active !== false).map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
+                    </option>
+                  ))}
+                </select>
+                {translatorList.filter(t => t.role === 'translator').length === 0 && (
+                  <p className="text-[10px] text-orange-600 mt-1">No translators found. Register translators in the Translators tab first.</p>
                 )}
               </div>
 
@@ -5974,7 +5880,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           ))}
                         </select>
                       ) : (order.assigned_pm_name || order.assigned_pm) ? (
-                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
+                          <button
+                            onClick={() => setAssigningPM(order.id)}
+                            className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-blue-600 text-[10px]"
+                            title="Change PM"
+                          >
+                            ✏️
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => setAssigningPM(order.id)}
