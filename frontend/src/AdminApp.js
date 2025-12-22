@@ -4726,6 +4726,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [translatedDocInfo, setTranslatedDocInfo] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
+  const [sendBccEmail, setSendBccEmail] = useState(''); // BCC email address
+  const [notifyPM, setNotifyPM] = useState(true); // Notify assigned PM
 
   // Translator Assignment Modal state
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
@@ -5032,11 +5034,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const sendTranslationToClient = async (orderId) => {
     setSendingToClient(true);
     try {
-      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
-      alert(response.data.attachment_sent
+      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, {
+        bcc_email: sendBccEmail || null,
+        notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false
+      });
+
+      let message = response.data.attachment_sent
         ? 'Translation sent to client successfully! (with attachment)'
-        : 'Order marked as delivered! (email sent without attachment)');
+        : 'Order marked as delivered! (email sent without attachment)';
+
+      if (response.data.pm_notified) {
+        message += '\nPM notified.';
+      }
+      if (response.data.bcc_sent) {
+        message += '\nBCC copy sent.';
+      }
+
+      alert(message);
       setSendingOrder(null);
+      setSendBccEmail(''); // Reset BCC field
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
@@ -7137,6 +7153,43 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     {uploadingFile ? 'Uploading...' : '📁 Click to select file (PDF, DOC)'}
                   </label>
                 </div>
+              </div>
+
+              {/* Notify PM Option */}
+              {sendingOrder?.assigned_pm_id && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyPM}
+                      onChange={(e) => setNotifyPM(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 rounded"
+                    />
+                    <div>
+                      <span className="text-xs font-medium text-purple-700">Notify Project Manager</span>
+                      <p className="text-[10px] text-purple-600">
+                        {sendingOrder.assigned_pm_name || sendingOrder.assigned_pm || 'Assigned PM'} will receive a copy
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* BCC Field */}
+              <div className="mb-4">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  📧 BCC (Blind Carbon Copy):
+                </label>
+                <input
+                  type="email"
+                  value={sendBccEmail}
+                  onChange={(e) => setSendBccEmail(e.target.value)}
+                  placeholder="email@example.com (optional)"
+                  className="w-full px-3 py-2 border rounded text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Send a hidden copy to another email address
+                </p>
               </div>
 
               {/* Warning */}
