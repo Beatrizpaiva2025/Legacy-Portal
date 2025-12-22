@@ -1099,12 +1099,33 @@ active_tokens: Dict[str, str] = {}  # token -> partner_id
 active_admin_tokens: Dict[str, dict] = {}  # token -> {user_id, role}
 
 async def get_current_partner(token: str = None) -> Optional[dict]:
-    """Get current partner from token"""
-    if not token or token not in active_tokens:
+    """Get current partner from token (checks database with expiration)"""
+    if not token:
         return None
-    partner_id = active_tokens[token]
-    partner = await db.partners.find_one({"id": partner_id})
-    return partner
+
+    # First check memory cache for speed
+    if token in active_tokens:
+        partner_id = active_tokens[token]
+        partner = await db.partners.find_one({"id": partner_id})
+        if partner:
+            # Verify token hasn't expired
+            token_expires = partner.get("token_expires")
+            if token_expires and datetime.utcnow() < token_expires:
+                return partner
+            # Token expired, remove from cache
+            del active_tokens[token]
+
+    # Fallback: check database directly (handles server restarts)
+    partner = await db.partners.find_one({"token": token})
+    if partner:
+        # Verify token hasn't expired
+        token_expires = partner.get("token_expires")
+        if token_expires and datetime.utcnow() < token_expires:
+            # Add to memory cache for future requests
+            active_tokens[token] = partner["id"]
+            return partner
+
+    return None
 
 async def get_current_admin_user(token: str = None) -> Optional[dict]:
     """Get current admin user from token"""
@@ -2035,8 +2056,17 @@ async def login_partner(login_data: PartnerLogin):
         if not partner.get("is_active", True):
             raise HTTPException(status_code=401, detail="Account is deactivated")
 
-        # Generate token
+        # Generate token with 24 hour expiration
         token = generate_token()
+        token_expires = datetime.utcnow() + timedelta(hours=24)
+
+        # Store token in database (persists across deploys)
+        await db.partners.update_one(
+            {"id": partner["id"]},
+            {"$set": {"token": token, "token_expires": token_expires}}
+        )
+
+        # Also keep in memory for faster lookups
         active_tokens[token] = partner["id"]
 
         return PartnerResponse(
@@ -5286,12 +5316,33 @@ class CustomerOrderCreate(BaseModel):
 customer_tokens: Dict[str, str] = {}  # token -> customer_id
 
 async def get_current_customer(token: str = None) -> Optional[dict]:
-    """Get current customer from token"""
-    if not token or token not in customer_tokens:
+    """Get current customer from token (checks database with expiration)"""
+    if not token:
         return None
-    customer_id = customer_tokens[token]
-    customer = await db.customers.find_one({"id": customer_id})
-    return customer
+
+    # First check memory cache for speed
+    if token in customer_tokens:
+        customer_id = customer_tokens[token]
+        customer = await db.customers.find_one({"id": customer_id})
+        if customer:
+            # Verify token hasn't expired
+            token_expires = customer.get("token_expires")
+            if token_expires and datetime.utcnow() < token_expires:
+                return customer
+            # Token expired, remove from cache
+            del customer_tokens[token]
+
+    # Fallback: check database directly (handles server restarts)
+    customer = await db.customers.find_one({"token": token})
+    if customer:
+        # Verify token hasn't expired
+        token_expires = customer.get("token_expires")
+        if token_expires and datetime.utcnow() < token_expires:
+            # Add to memory cache for future requests
+            customer_tokens[token] = customer["id"]
+            return customer
+
+    return None
 
 # ==================== CUSTOMER AUTHENTICATION ====================
 
@@ -5314,8 +5365,17 @@ async def register_customer(customer_data: CustomerCreate):
 
         await db.customers.insert_one(customer.dict())
 
-        # Generate token
+        # Generate token with 24 hour expiration
         token = generate_token()
+        token_expires = datetime.utcnow() + timedelta(hours=24)
+
+        # Store token in database (persists across deploys)
+        await db.customers.update_one(
+            {"id": customer.id},
+            {"$set": {"token": token, "token_expires": token_expires}}
+        )
+
+        # Also keep in memory for faster lookups
         customer_tokens[token] = customer.id
 
         # Send welcome email
@@ -5395,8 +5455,17 @@ async def login_customer(login_data: CustomerLogin):
         if not customer.get("is_active", True):
             raise HTTPException(status_code=401, detail="Account is deactivated")
 
-        # Generate token
+        # Generate token with 24 hour expiration
         token = generate_token()
+        token_expires = datetime.utcnow() + timedelta(hours=24)
+
+        # Store token in database (persists across deploys)
+        await db.customers.update_one(
+            {"id": customer["id"]},
+            {"$set": {"token": token, "token_expires": token_expires}}
+        )
+
+        # Also keep in memory for faster lookups
         customer_tokens[token] = customer["id"]
 
         return CustomerResponse(
