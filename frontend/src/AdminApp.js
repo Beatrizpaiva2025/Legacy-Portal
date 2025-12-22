@@ -393,6 +393,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Assigned orders for translator
   const [assignedOrders, setAssignedOrders] = useState([]);
   const [loadingAssigned, setLoadingAssigned] = useState(false);
+  const [selectedProjectFiles, setSelectedProjectFiles] = useState([]); // Files for selected project
+  const [loadingProjectFiles, setLoadingProjectFiles] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState(null); // Currently loaded file
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
   const [customCoverLetters, setCustomCoverLetters] = useState(() => {
@@ -596,21 +599,53 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   }, [user]);
 
-  // Load document from order
-  const loadOrderDocument = async (order) => {
-    setProcessingStatus(`📂 Carregando documento do pedido ${order.order_number}...`);
+  // Select project and fetch its files
+  const selectProject = async (order) => {
+    setSelectedOrderId(order.id);
+    setOrderNumber(order.order_number);
+    if (order.translate_from) setSourceLanguage(order.translate_from);
+    if (order.translate_to) setTargetLanguage(order.translate_to);
+    setLoadingProjectFiles(true);
+    setSelectedProjectFiles([]);
+    setSelectedFileId(null);
+
     try {
       // Fetch documents for this order
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       const docs = response.data.documents || [];
+      setSelectedProjectFiles(docs);
 
       if (docs.length === 0) {
-        setProcessingStatus(`⚠️ No document found for ${order.order_number}`);
-        return;
+        setProcessingStatus(`⚠️ Nenhum documento encontrado para ${order.order_number}`);
+      } else {
+        setProcessingStatus(`📋 ${docs.length} arquivo(s) encontrado(s). Clique em um arquivo para carregar.`);
       }
 
-      // Download the first document
-      const doc = docs[0];
+      // Update order status to "in_translation" if it was "received"
+      if (order.translation_status === 'received') {
+        try {
+          await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+            translation_status: 'in_translation'
+          });
+          setAssignedOrders(prev => prev.map(o =>
+            o.id === order.id ? { ...o, translation_status: 'in_translation' } : o
+          ));
+        } catch (e) {
+          console.error('Failed to update status:', e);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+      setProcessingStatus(`❌ Erro ao buscar documentos: ${err.message}`);
+    } finally {
+      setLoadingProjectFiles(false);
+    }
+  };
+
+  // Load a specific file from the project
+  const loadProjectFile = async (doc) => {
+    setProcessingStatus(`📂 Carregando "${doc.filename}"...`);
+    try {
       const downloadResponse = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
 
       if (downloadResponse.data.file_data) {
@@ -626,35 +661,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         // Set the file in the workspace
         setFiles([file]);
-
-        // Update order info
-        setOrderNumber(order.order_number);
-        if (order.translate_from) setSourceLanguage(order.translate_from);
-        if (order.translate_to) setTargetLanguage(order.translate_to);
-        setSelectedOrderId(order.id);
-
-        // Update order status to "in_translation" if it was "received"
-        if (order.translation_status === 'received') {
-          try {
-            await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
-              translation_status: 'in_translation'
-            });
-            // Update local list
-            setAssignedOrders(prev => prev.map(o =>
-              o.id === order.id ? { ...o, translation_status: 'in_translation' } : o
-            ));
-          } catch (e) {
-            console.error('Failed to update status:', e);
-          }
-        }
-
-        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload/OCR.`);
-        setActiveSubTab('upload');
+        setSelectedFileId(doc.id);
+        setProcessingStatus(`✅ "${doc.filename}" carregado! Prossiga para traduzir.`);
+        setActiveSubTab('translate');
       }
     } catch (err) {
-      console.error('Failed to load document:', err);
-      setProcessingStatus(`❌ Erro ao carregar documento: ${err.message}`);
+      console.error('Failed to load file:', err);
+      setProcessingStatus(`❌ Erro ao carregar arquivo: ${err.message}`);
     }
+  };
+
+  // Load document from order (legacy - loads first file automatically)
+  const loadOrderDocument = async (order) => {
+    await selectProject(order);
   };
 
   // Fetch resources from backend
@@ -2145,9 +2164,57 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             <span className="text-[9px] text-purple-600 font-medium">Abrir</span>
                           </div>
                         </div>
+                        {/* Files list for selected project */}
                         {selectedOrderId === order.id && (
                           <div className="mt-2 pt-2 border-t border-purple-200">
-                            <span className="text-[10px] text-purple-700 font-medium">✓ Documento carregado - Continue na aba Upload/OCR</span>
+                            <div className="text-[10px] text-purple-700 font-medium mb-2">
+                              📁 Arquivos do Projeto ({selectedProjectFiles.length})
+                            </div>
+                            {loadingProjectFiles ? (
+                              <div className="text-[10px] text-gray-500 text-center py-2">Carregando arquivos...</div>
+                            ) : selectedProjectFiles.length > 0 ? (
+                              <div className="space-y-1.5">
+                                {selectedProjectFiles.map((doc, idx) => (
+                                  <div
+                                    key={doc.id}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      loadProjectFile(doc);
+                                    }}
+                                    className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-all ${
+                                      selectedFileId === doc.id
+                                        ? 'bg-green-100 border-2 border-green-500'
+                                        : 'bg-white border border-gray-200 hover:bg-purple-100 hover:border-purple-400'
+                                    }`}
+                                  >
+                                    <div className={`w-8 h-8 rounded flex items-center justify-center text-sm ${
+                                      selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                                    }`}>
+                                      {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className={`text-xs font-medium truncate ${
+                                        selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                                      }`}>
+                                        {doc.filename || `Arquivo ${idx + 1}`}
+                                      </div>
+                                      <div className="text-[9px] text-gray-400">
+                                        {selectedFileId === doc.id ? '✓ Carregado' : 'Clique para abrir'}
+                                      </div>
+                                    </div>
+                                    {selectedFileId === doc.id && (
+                                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                                        ✓
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-gray-400 text-center py-2">
+                                Nenhum arquivo encontrado
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -5945,30 +6012,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </table>
                   </div>
 
-                  {/* Financial Section */}
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
-                    <table className="w-full text-xs">
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
-                          <td className="py-2 font-bold text-green-600">${viewingOrder.total_price?.toFixed(2) || '0.00'}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Payment Status</td>
-                          <td className="py-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
-                              {viewingOrder.payment_status || 'pending'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Payment Method</td>
-                          <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Financial Section - Admin only */}
+                  {isAdmin && (
+                    <div>
+                      <h4 className="text-sm font-bold text-blue-600 mb-2">Financial</h4>
+                      <table className="w-full text-xs">
+                        <tbody>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
+                            <td className="py-2 font-bold text-green-600">${viewingOrder.total_price?.toFixed(2) || '0.00'}</td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600">Payment Status</td>
+                            <td className="py-2">
+                              <span className={`px-2 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[viewingOrder.payment_status] || 'bg-gray-100'}`}>
+                                {viewingOrder.payment_status || 'pending'}
+                              </span>
+                            </td>
+                          </tr>
+                          <tr className="border-b">
+                            <td className="py-2 font-medium text-gray-600">Payment Method</td>
+                            <td className="py-2 capitalize">{viewingOrder.payment_method || '-'}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
