@@ -4298,6 +4298,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Review Modal state (PM Side-by-Side Review)
+  const [reviewingOrder, setReviewingOrder] = useState(null);
+  const [reviewOriginalDocs, setReviewOriginalDocs] = useState([]);
+  const [reviewTranslatedDoc, setReviewTranslatedDoc] = useState(null);
+  const [loadingReview, setLoadingReview] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewCurrentPage, setReviewCurrentPage] = useState(0);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4705,6 +4714,116 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     });
   };
 
+  // Open Review Modal (PM Side-by-Side Review)
+  const openReviewModal = async (order) => {
+    setReviewingOrder(order);
+    setLoadingReview(true);
+    setReviewComment('');
+    setReviewCurrentPage(0);
+    setReviewOriginalDocs([]);
+    setReviewTranslatedDoc(null);
+
+    try {
+      // Fetch original documents
+      const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      const docs = docsResponse.data.documents || [];
+
+      // Download each original document as base64
+      const originalDocsWithData = [];
+      for (const doc of docs) {
+        try {
+          const downloadRes = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+          if (downloadRes.data.file_data) {
+            const contentType = downloadRes.data.content_type || 'application/pdf';
+            originalDocsWithData.push({
+              ...doc,
+              data: `data:${contentType};base64,${downloadRes.data.file_data}`,
+              contentType
+            });
+          }
+        } catch (e) {
+          console.error('Failed to download doc:', e);
+        }
+      }
+      setReviewOriginalDocs(originalDocsWithData);
+
+      // Fetch translated document (if exists)
+      try {
+        const translatedRes = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
+        if (translatedRes.data.translation_html) {
+          setReviewTranslatedDoc({
+            type: 'html',
+            content: translatedRes.data.translation_html,
+            settings: translatedRes.data
+          });
+        } else if (translatedRes.data.file_data) {
+          const contentType = translatedRes.data.content_type || 'application/pdf';
+          setReviewTranslatedDoc({
+            type: 'file',
+            data: `data:${contentType};base64,${translatedRes.data.file_data}`,
+            filename: translatedRes.data.filename,
+            contentType
+          });
+        }
+      } catch (e) {
+        console.error('No translated document found:', e);
+      }
+    } catch (err) {
+      console.error('Failed to load review documents:', err);
+      alert('Error loading documents for review');
+    } finally {
+      setLoadingReview(false);
+    }
+  };
+
+  // Approve translation (PM approves, moves to ready)
+  const approveTranslation = async () => {
+    if (!reviewingOrder) return;
+    setSubmittingReview(true);
+    try {
+      await axios.put(`${API}/admin/orders/${reviewingOrder.id}?admin_key=${adminKey}`, {
+        translation_status: 'ready',
+        pm_review_status: 'approved',
+        pm_review_comment: reviewComment,
+        pm_reviewed_at: new Date().toISOString()
+      });
+      alert('Translation approved! Ready for delivery.');
+      setReviewingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to approve:', err);
+      alert('Error approving translation');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  // Request correction (PM sends back to translator)
+  const requestCorrection = async () => {
+    if (!reviewingOrder) return;
+    if (!reviewComment.trim()) {
+      alert('Please add a comment explaining what needs to be corrected');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      await axios.put(`${API}/admin/orders/${reviewingOrder.id}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        pm_review_status: 'correction_requested',
+        pm_review_comment: reviewComment,
+        pm_reviewed_at: new Date().toISOString()
+      });
+      alert('Correction requested. Translator will be notified.');
+      setReviewingOrder(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to request correction:', err);
+      alert('Error requesting correction');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
   // Send translator assignment with email invitation
   const sendTranslatorAssignment = async () => {
     if (!assignmentDetails.translator_id) {
@@ -5030,6 +5149,171 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PM Review Modal - Side by Side */}
+      {reviewingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold text-lg">📋 Review Translation</h3>
+                <p className="text-xs opacity-80">
+                  {reviewingOrder.order_number} - {reviewingOrder.client_name} | {reviewingOrder.translate_from} → {reviewingOrder.translate_to}
+                </p>
+              </div>
+              <button onClick={() => setReviewingOrder(null)} className="text-white hover:text-gray-200 text-2xl">×</button>
+            </div>
+
+            {loadingReview ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-4xl mb-3">⏳</div>
+                  <p className="text-gray-600">Loading documents...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Document Navigation */}
+                {reviewOriginalDocs.length > 1 && (
+                  <div className="px-4 py-2 bg-gray-100 border-b flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setReviewCurrentPage(Math.max(0, reviewCurrentPage - 1))}
+                      disabled={reviewCurrentPage === 0}
+                      className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-sm font-medium">
+                      Document {reviewCurrentPage + 1} of {reviewOriginalDocs.length}
+                    </span>
+                    <button
+                      onClick={() => setReviewCurrentPage(Math.min(reviewOriginalDocs.length - 1, reviewCurrentPage + 1))}
+                      disabled={reviewCurrentPage >= reviewOriginalDocs.length - 1}
+                      className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+
+                {/* Side by Side Content */}
+                <div className="flex-1 grid grid-cols-2 gap-0 overflow-hidden">
+                  {/* Left: Original Document */}
+                  <div className="border-r flex flex-col">
+                    <div className="px-4 py-2 bg-orange-50 border-b">
+                      <span className="text-sm font-bold text-orange-700">📄 Original Document</span>
+                      {reviewOriginalDocs[reviewCurrentPage] && (
+                        <span className="text-xs text-gray-500 ml-2">{reviewOriginalDocs[reviewCurrentPage].filename}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                      {reviewOriginalDocs[reviewCurrentPage] ? (
+                        reviewOriginalDocs[reviewCurrentPage].contentType?.includes('pdf') ? (
+                          <embed
+                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            type="application/pdf"
+                            className="w-full h-full min-h-[500px]"
+                          />
+                        ) : (
+                          <img
+                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            alt="Original"
+                            className="max-w-full border shadow-sm"
+                          />
+                        )
+                      ) : (
+                        <div className="text-center text-gray-400 py-8">
+                          <div className="text-4xl mb-2">📭</div>
+                          <p>No original document found</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Translated Document */}
+                  <div className="flex flex-col">
+                    <div className="px-4 py-2 bg-blue-50 border-b">
+                      <span className="text-sm font-bold text-blue-700">🌐 Translation ({reviewingOrder.translate_to})</span>
+                    </div>
+                    <div className="flex-1 overflow-auto p-4 bg-gray-50">
+                      {reviewTranslatedDoc ? (
+                        reviewTranslatedDoc.type === 'html' ? (
+                          <div
+                            className="bg-white p-4 border shadow-sm prose prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: reviewTranslatedDoc.content }}
+                          />
+                        ) : reviewTranslatedDoc.contentType?.includes('pdf') ? (
+                          <embed
+                            src={reviewTranslatedDoc.data}
+                            type="application/pdf"
+                            className="w-full h-full min-h-[500px]"
+                          />
+                        ) : (
+                          <img
+                            src={reviewTranslatedDoc.data}
+                            alt="Translation"
+                            className="max-w-full border shadow-sm"
+                          />
+                        )
+                      ) : (
+                        <div className="text-center text-gray-400 py-8">
+                          <div className="text-4xl mb-2">📝</div>
+                          <p>No translation found</p>
+                          <p className="text-xs mt-1">Translation not yet submitted</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Review Actions Footer */}
+                <div className="p-4 border-t bg-gray-50">
+                  {/* Comment */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      💬 Review Comment {!reviewTranslatedDoc && '(required for correction request)'}
+                    </label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      className="w-full px-3 py-2 border rounded text-sm"
+                      rows="2"
+                      placeholder="Add your feedback, corrections needed, or approval notes..."
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex justify-between items-center">
+                    <button
+                      onClick={() => setReviewingOrder(null)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                    >
+                      Close
+                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={requestCorrection}
+                        disabled={submittingReview || !reviewTranslatedDoc}
+                        className="px-6 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-2"
+                      >
+                        {submittingReview ? '...' : '❌ Request Correction'}
+                      </button>
+                      <button
+                        onClick={approveTranslation}
+                        disabled={submittingReview || !reviewTranslatedDoc}
+                        className="px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-2"
+                      >
+                        {submittingReview ? '...' : '✅ Approve Translation'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -5720,6 +6004,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <span className="text-xs">✍️</span>
                             </button>
                           )}
+                          {/* Review Side-by-Side button - when translation is in review or ready */}
+                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              title="Review Translation (Side-by-Side)"
+                            >
+                              <span className="text-xs">🔍</span>
+                            </button>
+                          )}
                           {/* Mark as In Translation (start work) */}
                           {order.translation_status === 'received' && order.translator_assignment_status === 'accepted' && (
                             <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start Translation">
@@ -5773,6 +6067,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               title="Open Translation Tool"
                             >
                               <span className="text-xs">✍️</span>
+                            </button>
+                          )}
+                          {/* Review Side-by-Side button - when translation is in review or ready */}
+                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => openReviewModal(order)}
+                              className="w-6 h-6 flex items-center justify-center border border-green-300 text-green-600 rounded hover:bg-green-50 transition-colors"
+                              title="Review Translation (Side-by-Side)"
+                            >
+                              <span className="text-xs">🔍</span>
                             </button>
                           )}
                           {order.translation_status === 'received' && (
