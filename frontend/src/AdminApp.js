@@ -1946,9 +1946,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // If we have HTML content (from Word/HTML/TXT)
     if (quickTranslationHtml) {
+      // For HTML content, use a running header that appears on every printed page
       translationPagesHTML = `
-    <div class="translation-page">
-        ${includeLetterhead ? letterheadHTML : ''}
+    <div class="translation-text-page">
+        ${includeLetterhead ? `
+        <!-- Running header that repeats on each printed page -->
+        <div class="running-header">
+            ${letterheadHTML}
+        </div>
+        <div class="running-header-spacer"></div>
+        ` : ''}
         <div class="translation-content translation-text">
             ${quickTranslationHtml}
         </div>
@@ -2074,6 +2081,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            /* Running header for HTML content pages */
+            .running-header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 20px 50px 10px;
+            }
+            .running-header-spacer {
+                height: 100px;
+            }
+            .translation-text-page {
+                page-break-before: always;
+            }
+            .translation-text-page:first-child {
+                page-break-before: auto;
+            }
         }
     </style>
 </head>
@@ -4700,6 +4726,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [translatedDocInfo, setTranslatedDocInfo] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
+  const [sendBccEmail, setSendBccEmail] = useState(''); // BCC email address
+  const [notifyPM, setNotifyPM] = useState(true); // Notify assigned PM
 
   // Translator Assignment Modal state
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
@@ -5006,11 +5034,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const sendTranslationToClient = async (orderId) => {
     setSendingToClient(true);
     try {
-      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
-      alert(response.data.attachment_sent
+      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, {
+        bcc_email: sendBccEmail || null,
+        notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false
+      });
+
+      let message = response.data.attachment_sent
         ? 'Translation sent to client successfully! (with attachment)'
-        : 'Order marked as delivered! (email sent without attachment)');
+        : 'Order marked as delivered! (email sent without attachment)';
+
+      if (response.data.pm_notified) {
+        message += '\nPM notified.';
+      }
+      if (response.data.bcc_sent) {
+        message += '\nBCC copy sent.';
+      }
+
+      alert(message);
       setSendingOrder(null);
+      setSendBccEmail(''); // Reset BCC field
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
@@ -5367,15 +5409,39 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   // Create new project manually
   const createProject = async (e) => {
     e.preventDefault();
+
+    // Validate required fields
+    if (!newProject.client_name || !newProject.client_name.trim()) {
+      alert('Client name is required');
+      return;
+    }
+    if (!newProject.client_email || !newProject.client_email.trim()) {
+      alert('Client email is required');
+      return;
+    }
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newProject.client_email)) {
+      alert('Please enter a valid email address');
+      return;
+    }
+
     setCreatingProject(true);
     try {
       // Prepare project data with document if uploaded
       let projectData = { ...newProject };
 
+      // Remove fields that shouldn't be sent to backend
+      delete projectData.deadline_time; // This is combined into deadline
+
       // Clean up empty string fields - convert to null or proper types
       if (projectData.assigned_pm_id === '') projectData.assigned_pm_id = null;
       if (projectData.assigned_translator_id === '') projectData.assigned_translator_id = null;
       if (projectData.payment_method === '') projectData.payment_method = null;
+      if (projectData.reference === '') projectData.reference = null;
+      if (projectData.notes === '') projectData.notes = null;
+      if (projectData.internal_notes === '') projectData.internal_notes = null;
+      if (projectData.payment_tag === '') projectData.payment_tag = null;
       if (projectData.base_price === '' || projectData.base_price === null) projectData.base_price = 0;
       if (projectData.total_price === '' || projectData.total_price === null) projectData.total_price = 0;
       if (projectData.page_count === '' || projectData.page_count === null) projectData.page_count = 1;
@@ -7113,6 +7179,43 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </div>
               </div>
 
+              {/* Notify PM Option */}
+              {sendingOrder?.assigned_pm_id && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notifyPM}
+                      onChange={(e) => setNotifyPM(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 rounded"
+                    />
+                    <div>
+                      <span className="text-xs font-medium text-purple-700">Notify Project Manager</span>
+                      <p className="text-[10px] text-purple-600">
+                        {sendingOrder.assigned_pm_name || sendingOrder.assigned_pm || 'Assigned PM'} will receive a copy
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* BCC Field */}
+              <div className="mb-4">
+                <label className="text-xs font-medium text-gray-600 mb-1 block">
+                  📧 BCC (Blind Carbon Copy):
+                </label>
+                <input
+                  type="email"
+                  value={sendBccEmail}
+                  onChange={(e) => setSendBccEmail(e.target.value)}
+                  placeholder="email@example.com (optional)"
+                  className="w-full px-3 py-2 border rounded text-sm"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Send a hidden copy to another email address
+                </p>
+              </div>
+
               {/* Warning */}
               <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
                 💡 By clicking "Send", the client will receive an email with the translation attached (if available).
@@ -7209,6 +7312,209 @@ const TranslatorsPage = ({ adminKey }) => {
 
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState('');
+
+  // Export functions
+  const exportToCSV = (data, filename) => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const val = row[h];
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return val;
+      }).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  const exportToJSON = (data, filename) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+  };
+
+  const exportProjects = async (format = 'csv') => {
+    setExporting(true);
+    setExportProgress('Fetching projects...');
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const projects = response.data.orders || response.data || [];
+      const exportData = projects.map(p => ({
+        order_number: p.order_number,
+        client_name: p.client_name,
+        client_email: p.client_email,
+        document_type: p.document_type || p.service_type,
+        source_language: p.translate_from,
+        target_language: p.translate_to,
+        status: p.translation_status,
+        payment_status: p.payment_status,
+        total_price: p.total_price,
+        deadline: p.deadline,
+        created_at: p.created_at,
+        assigned_pm: p.assigned_pm_name,
+        assigned_translator: p.assigned_translator_name
+      }));
+      if (format === 'csv') exportToCSV(exportData, 'projects');
+      else exportToJSON(exportData, 'projects');
+      setExportProgress('✅ Projects exported!');
+    } catch (err) {
+      setExportProgress('❌ Error exporting projects');
+      console.error(err);
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportProgress(''), 3000);
+    }
+  };
+
+  const exportClients = async (format = 'csv') => {
+    setExporting(true);
+    setExportProgress('Fetching client data...');
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const projects = response.data.orders || response.data || [];
+      // Get unique clients
+      const clientsMap = new Map();
+      projects.forEach(p => {
+        if (p.client_email && !clientsMap.has(p.client_email)) {
+          clientsMap.set(p.client_email, {
+            name: p.client_name,
+            email: p.client_email,
+            phone: p.client_phone || '',
+            total_orders: 0,
+            total_spent: 0
+          });
+        }
+        if (p.client_email) {
+          const client = clientsMap.get(p.client_email);
+          client.total_orders++;
+          client.total_spent += p.total_price || 0;
+        }
+      });
+      const clients = Array.from(clientsMap.values());
+      if (format === 'csv') exportToCSV(clients, 'clients');
+      else exportToJSON(clients, 'clients');
+      setExportProgress('✅ Clients exported!');
+    } catch (err) {
+      setExportProgress('❌ Error exporting clients');
+      console.error(err);
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportProgress(''), 3000);
+    }
+  };
+
+  const exportTranslators = async (format = 'csv') => {
+    setExporting(true);
+    setExportProgress('Fetching translators...');
+    try {
+      const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+      const translators = response.data || [];
+      const exportData = translators.map(t => ({
+        name: t.name,
+        email: t.email,
+        language_pairs: t.language_pairs,
+        rate_per_page: t.rate_per_page,
+        rate_per_word: t.rate_per_word,
+        is_active: t.is_active
+      }));
+      if (format === 'csv') exportToCSV(exportData, 'translators');
+      else exportToJSON(exportData, 'translators');
+      setExportProgress('✅ Translators exported!');
+    } catch (err) {
+      setExportProgress('❌ Error exporting translators');
+      console.error(err);
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportProgress(''), 3000);
+    }
+  };
+
+  const exportFinancialReport = async (format = 'csv') => {
+    setExporting(true);
+    setExportProgress('Generating financial report...');
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const projects = response.data.orders || response.data || [];
+      const reportData = projects.map(p => ({
+        order_number: p.order_number,
+        client_name: p.client_name,
+        document_type: p.document_type || p.service_type,
+        base_price: p.base_price || 0,
+        urgency_fee: p.urgency_fee || 0,
+        total_price: p.total_price || 0,
+        payment_status: p.payment_status,
+        payment_method: p.payment_method,
+        created_at: p.created_at,
+        delivered_at: p.delivered_at
+      }));
+      if (format === 'csv') exportToCSV(reportData, 'financial_report');
+      else exportToJSON(reportData, 'financial_report');
+      setExportProgress('✅ Financial report exported!');
+    } catch (err) {
+      setExportProgress('❌ Error exporting report');
+      console.error(err);
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportProgress(''), 3000);
+    }
+  };
+
+  const createFullBackup = async () => {
+    setExporting(true);
+    setExportProgress('Creating full backup...');
+    try {
+      // Fetch all data
+      setExportProgress('Fetching projects...');
+      const ordersRes = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+
+      setExportProgress('Fetching users...');
+      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
+
+      setExportProgress('Fetching translators...');
+      const translatorsRes = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+
+      const backupData = {
+        backup_date: new Date().toISOString(),
+        backup_version: '1.0',
+        data: {
+          projects: ordersRes.data.orders || ordersRes.data || [],
+          users: usersRes.data || [],
+          translators: translatorsRes.data || []
+        },
+        stats: {
+          total_projects: (ordersRes.data.orders || ordersRes.data || []).length,
+          total_users: (usersRes.data || []).length,
+          total_translators: (translatorsRes.data || []).length
+        }
+      };
+
+      exportToJSON(backupData, 'full_backup');
+      setExportProgress('✅ Full backup created!');
+    } catch (err) {
+      setExportProgress('❌ Error creating backup');
+      console.error(err);
+    } finally {
+      setExporting(false);
+      setTimeout(() => setExportProgress(''), 3000);
+    }
+  };
+
   // Permissions matrix data
   const PERMISSIONS = {
     roles: ['Administrator', 'Project Manager', 'Sales', 'Translator'],
@@ -7379,6 +7685,133 @@ const SettingsPage = ({ adminKey }) => {
             <div className="flex items-center justify-between p-2 bg-teal-50 rounded">
               <span>Delivered</span>
               <span className="text-teal-700">Sent to client</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Export & Backup Section */}
+      <div className="bg-white rounded shadow overflow-hidden">
+        <div className="p-4 border-b bg-gray-50">
+          <h2 className="text-sm font-bold text-gray-800">Export & Backup</h2>
+          <p className="text-xs text-gray-500 mt-1">Export data or create a full system backup</p>
+        </div>
+        <div className="p-4">
+          {exportProgress && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+              {exportProgress}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Export Projects */}
+            <div className="border rounded p-3">
+              <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Projects</h3>
+              <p className="text-[10px] text-gray-500 mb-3">Download all project data including status, client info, and pricing</p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => exportProjects('csv')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportProjects('json')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+
+            {/* Export Clients */}
+            <div className="border rounded p-3">
+              <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Clients</h3>
+              <p className="text-[10px] text-gray-500 mb-3">Download client contact info, phone numbers, and order history</p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => exportClients('csv')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportClients('json')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+
+            {/* Export Translators */}
+            <div className="border rounded p-3">
+              <h3 className="text-xs font-semibold text-gray-700 mb-2">Export Translators</h3>
+              <p className="text-[10px] text-gray-500 mb-3">Download translator profiles, language pairs, and rates</p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => exportTranslators('csv')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportTranslators('json')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+
+            {/* Export Financial Report */}
+            <div className="border rounded p-3">
+              <h3 className="text-xs font-semibold text-gray-700 mb-2">Financial Report</h3>
+              <p className="text-[10px] text-gray-500 mb-3">Download financial data including pricing and payment status</p>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => exportFinancialReport('csv')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                >
+                  CSV
+                </button>
+                <button
+                  onClick={() => exportFinancialReport('json')}
+                  disabled={exporting}
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Backup */}
+          <div className="mt-4 border-t pt-4">
+            <div className="border rounded p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-700">Full System Backup</h3>
+                  <p className="text-[10px] text-gray-500 mt-1">Create a complete backup of all projects, users, and translators in JSON format</p>
+                </div>
+                <button
+                  onClick={createFullBackup}
+                  disabled={exporting}
+                  className="px-4 py-2 bg-slate-700 text-white text-xs rounded hover:bg-slate-800 disabled:bg-gray-300 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Create Backup
+                </button>
+              </div>
             </div>
           </div>
         </div>

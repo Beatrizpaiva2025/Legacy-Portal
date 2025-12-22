@@ -4058,12 +4058,20 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     logger.info(f"Translation saved for order {order_id}, moved to review status")
     return {"success": True, "message": "Translation saved and sent to review"}
 
+class DeliverOrderRequest(BaseModel):
+    bcc_email: Optional[str] = None
+    notify_pm: bool = False
+
 @api_router.post("/admin/orders/{order_id}/deliver")
-async def admin_deliver_order(order_id: str, admin_key: str):
+async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
     """Mark order as delivered and send translation to client (admin/PM only)"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Handle both with and without request body
+    bcc_email = request.bcc_email if request else None
+    notify_pm = request.notify_pm if request else False
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -4081,6 +4089,10 @@ async def admin_deliver_order(order_id: str, admin_key: str):
             "delivered_at": datetime.utcnow()
         }}
     )
+
+    # Track what was sent
+    pm_notified = False
+    bcc_sent = False
 
     # Send emails
     try:
@@ -4108,6 +4120,60 @@ async def admin_deliver_order(order_id: str, admin_key: str):
                 email_html
             )
 
+        # Send BCC if provided
+        if bcc_email:
+            try:
+                bcc_subject = f"[BCC] Translation Delivered - {order['order_number']}"
+                bcc_html = f"""
+                <div style="background: #fef3c7; padding: 10px; margin-bottom: 15px; border-radius: 5px;">
+                    <strong>BCC Copy</strong> - This email was sent to: {order['client_email']}
+                </div>
+                {email_html}
+                """
+                if has_attachment:
+                    await email_service.send_email_with_attachment(
+                        bcc_email,
+                        bcc_subject,
+                        bcc_html,
+                        order["translated_file"],
+                        order["translated_filename"],
+                        order.get("translated_file_type", "application/pdf")
+                    )
+                else:
+                    await email_service.send_email(bcc_email, bcc_subject, bcc_html)
+                bcc_sent = True
+            except Exception as e:
+                logger.error(f"Failed to send BCC: {str(e)}")
+
+        # Notify PM if requested
+        if notify_pm and order.get("assigned_pm_id"):
+            try:
+                pm_user = await db.admin_users.find_one({"id": order["assigned_pm_id"]})
+                if pm_user and pm_user.get("email"):
+                    pm_subject = f"[PM Notification] Translation Delivered - {order['order_number']}"
+                    pm_html = f"""
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: #8b5cf6; color: white; padding: 20px; text-align: center;">
+                            <h2 style="margin: 0;">Translation Delivered</h2>
+                        </div>
+                        <div style="padding: 20px; background: #f9fafb;">
+                            <p>Hello {pm_user.get('name', 'Project Manager')},</p>
+                            <p>The translation for order <strong>#{order['order_number']}</strong> has been delivered to the client.</p>
+                            <div style="background: white; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                                <p><strong>Client:</strong> {order['client_name']}</p>
+                                <p><strong>Email:</strong> {order['client_email']}</p>
+                                <p><strong>Document:</strong> {order.get('document_type', 'N/A')}</p>
+                                <p><strong>Attachment:</strong> {'Yes' if has_attachment else 'No'}</p>
+                            </div>
+                            <p style="color: #6b7280; font-size: 12px;">This is an automated notification from Legacy Translations.</p>
+                        </div>
+                    </div>
+                    """
+                    await email_service.send_email(pm_user["email"], pm_subject, pm_html)
+                    pm_notified = True
+            except Exception as e:
+                logger.error(f"Failed to notify PM: {str(e)}")
+
         # Send notification to partner
         if partner:
             partner_message = f"Order {order['order_number']} for client {order['client_name']} has been delivered. The translation was sent to {order['client_email']}."
@@ -4132,7 +4198,13 @@ async def admin_deliver_order(order_id: str, admin_key: str):
             }
             await db.messages.insert_one(message)
 
-        return {"status": "success", "message": "Order delivered and emails sent", "attachment_sent": has_attachment}
+        return {
+            "status": "success",
+            "message": "Order delivered and emails sent",
+            "attachment_sent": has_attachment,
+            "pm_notified": pm_notified,
+            "bcc_sent": bcc_sent
+        }
 
     except Exception as e:
         logger.error(f"Failed to send delivery emails: {str(e)}")
