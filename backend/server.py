@@ -591,6 +591,10 @@ class TranslationQuote(BaseModel):
     urgency_fee: float
     total_price: float
     estimated_delivery: str
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
+    notes: Optional[str] = None
+    document_ids: Optional[List[str]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class TranslationQuoteCreate(BaseModel):
@@ -600,6 +604,10 @@ class TranslationQuoteCreate(BaseModel):
     translate_to: str
     word_count: int
     urgency: str = "no"
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
+    notes: Optional[str] = None
+    document_ids: Optional[List[str]] = None
 
 class DocumentUploadResponse(BaseModel):
     filename: str
@@ -626,6 +634,8 @@ class PaymentTransaction(BaseModel):
 class PaymentCheckoutRequest(BaseModel):
     quote_id: str
     origin_url: str
+    customer_email: Optional[str] = None
+    customer_name: Optional[str] = None
 
 class EmailNotificationRequest(BaseModel):
     quote_id: str
@@ -1554,7 +1564,11 @@ async def calculate_quote(quote_data: TranslationQuoteCreate):
             base_price=base_price,
             urgency_fee=urgency_fee,
             total_price=total_price,
-            estimated_delivery=estimated_delivery
+            estimated_delivery=estimated_delivery,
+            customer_email=quote_data.customer_email,
+            customer_name=quote_data.customer_name,
+            notes=quote_data.notes,
+            document_ids=quote_data.document_ids
         )
         
         # Save quote to database
@@ -1607,15 +1621,18 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
             status="initiated"
         )
         
+        # Get customer email from request or quote
+        customer_email = request.customer_email or quote.get("customer_email")
+
         # Create Stripe checkout session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            payment_method_options={
+        checkout_params = {
+            'payment_method_types': ['card'],
+            'payment_method_options': {
                 'card': {
                     'request_three_d_secure': 'automatic'
                 }
             },
-            line_items=[{
+            'line_items': [{
                 'price_data': {
                     'currency': 'usd',
                     'product_data': {
@@ -1626,17 +1643,25 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 },
                 'quantity': 1,
             }],
-            mode='payment',
-            saved_payment_method_options={
+            'mode': 'payment',
+            'saved_payment_method_options': {
                 'payment_method_save': 'disabled'
             },
-            success_url=f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{request.origin_url}?payment_cancelled=true",
-            metadata={
+            'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
+            'cancel_url': f"{request.origin_url}?payment_cancelled=true",
+            'metadata': {
                 'quote_id': request.quote_id,
-                'transaction_id': transaction.id
+                'transaction_id': transaction.id,
+                'customer_email': customer_email or '',
+                'customer_name': request.customer_name or quote.get("customer_name", '')
             }
-        )
+        }
+
+        # Add customer email to pre-fill in Stripe checkout
+        if customer_email:
+            checkout_params['customer_email'] = customer_email
+
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
         
         # Update transaction with session ID
         transaction.session_id = checkout_session.id

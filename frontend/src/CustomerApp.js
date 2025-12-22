@@ -570,7 +570,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
         translate_from: formData.translate_from,
         translate_to: formData.translate_to,
         word_count: wordCount,
-        urgency: formData.urgency
+        urgency: formData.urgency,
+        customer_email: guestEmail,
+        customer_name: guestName,
+        notes: formData.notes,
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
       };
 
       // Create quote
@@ -580,6 +584,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
       // Step 2: Create Stripe checkout session
       const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
         quote_id: quoteId,
+        customer_email: guestEmail,
+        customer_name: guestName,
         origin_url: window.location.origin + '/customer'
       });
 
@@ -598,31 +604,41 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
 
   return (
     <div className="p-8">
-      {/* Exit Intent Popup */}
+      {/* Exit Intent Popup - Special Discount Offer */}
       {showExitPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center relative">
+            <button
+              onClick={() => setShowExitPopup(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              &times;
+            </button>
             <div className="text-5xl mb-4">🎁</div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Don't leave yet!</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Special Offer!</h2>
             <p className="text-gray-600 mb-4">
-              We'll save your quote and send you a reminder with a special discount!
+              Complete your order now and get <span className="text-teal-600 font-bold">5% OFF</span>!
             </p>
-            <div className="bg-teal-50 p-4 rounded-lg mb-4">
-              <p className="text-teal-800 font-semibold">Your quote has been saved</p>
-              <p className="text-sm text-teal-600">Check your email ({guestEmail}) for details</p>
+            <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg mb-4 border border-teal-200">
+              <p className="text-2xl font-bold text-teal-600 mb-1">SAVE5</p>
+              <p className="text-sm text-gray-600">Use this code at checkout</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3">
               <button
-                onClick={() => setShowExitPopup(false)}
-                className="flex-1 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-medium"
+                onClick={() => {
+                  setDiscountCode('SAVE5');
+                  setAppliedDiscount({ type: 'percentage', value: 5 });
+                  setShowExitPopup(false);
+                }}
+                className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold text-lg"
               >
-                Continue with Order
+                Yes, Apply My 5% Discount!
               </button>
               <button
                 onClick={() => setShowExitPopup(false)}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium"
+                className="w-full py-2 text-gray-500 hover:text-gray-700 font-medium text-sm"
               >
-                Close
+                No thanks, I'll pay full price
               </button>
             </div>
           </div>
