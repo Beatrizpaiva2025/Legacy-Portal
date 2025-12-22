@@ -22,7 +22,7 @@ const PAYMENT_STATUS = {
   'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
 };
 
-// Languages list
+// Languages list (for translation services)
 const LANGUAGES = [
   { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
   { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
@@ -37,6 +37,20 @@ const LANGUAGES = [
   { code: 'russian', name: 'Russian', flag: '🇷🇺' },
   { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
 ];
+
+// UI Languages (for interface translation)
+const UI_LANGUAGES = [
+  { code: 'en', flag: '🇺🇸', name: 'English' },
+  { code: 'es', flag: '🇪🇸', name: 'Español' },
+  { code: 'pt', flag: '🇧🇷', name: 'Português' }
+];
+
+// Get saved UI language or default to English
+const getSavedUILanguage = () => {
+  const saved = localStorage.getItem('customer_ui_language');
+  if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
+  return 'en';
+};
 
 // ==================== LOGIN PAGE (Customer) ====================
 const CustomerLoginPage = ({ onLogin }) => {
@@ -1436,6 +1450,13 @@ function CustomerApp() {
   const [customer, setCustomer] = useState(null);
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
+  const [uiLang, setUiLang] = useState(getSavedUILanguage);
+
+  // Handle UI language change
+  const changeUILanguage = (newLang) => {
+    setUiLang(newLang);
+    localStorage.setItem('customer_ui_language', newLang);
+  };
 
   // Check for saved session
   useEffect(() => {
@@ -1496,6 +1517,21 @@ function CustomerApp() {
               alt="Legacy Translations"
               className="h-12"
             />
+            {/* Language Selector */}
+            <div className="flex items-center gap-2">
+              {UI_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => changeUILanguage(lang.code)}
+                  className={`text-xl hover:scale-110 transition-transform ${
+                    uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                  }`}
+                  title={lang.name}
+                >
+                  {lang.flag}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
         <CustomerNewOrderPage customer={null} token={null} onOrderCreated={() => {}} />
@@ -1517,8 +1553,25 @@ function CustomerApp() {
             <h1 className="text-xl font-semibold text-gray-800 capitalize">
               {activeTab === 'new-order' ? 'New Order' : activeTab.replace('-', ' ')}
             </h1>
-            <div className="text-sm text-gray-600">
-              {customer?.full_name} | {customer?.email}
+            <div className="flex items-center gap-4">
+              {/* Language Selector */}
+              <div className="flex items-center gap-2">
+                {UI_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => changeUILanguage(lang.code)}
+                    className={`text-lg hover:scale-110 transition-transform ${
+                      uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                    }`}
+                    title={lang.name}
+                  >
+                    {lang.flag}
+                  </button>
+                ))}
+              </div>
+              <div className="text-sm text-gray-600">
+                {customer?.full_name} | {customer?.email}
+              </div>
             </div>
           </div>
         </header>
