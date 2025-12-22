@@ -4954,6 +4954,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Prepare project data with document if uploaded
       let projectData = { ...newProject };
 
+      // Clean up empty string fields - convert to null or proper types
+      if (projectData.assigned_pm_id === '') projectData.assigned_pm_id = null;
+      if (projectData.assigned_translator_id === '') projectData.assigned_translator_id = null;
+      if (projectData.payment_method === '') projectData.payment_method = null;
+      if (projectData.base_price === '' || projectData.base_price === null) projectData.base_price = 0;
+      if (projectData.total_price === '' || projectData.total_price === null) projectData.total_price = 0;
+      if (projectData.page_count === '' || projectData.page_count === null) projectData.page_count = 1;
+      if (projectData.word_count === '' || projectData.word_count === null) projectData.word_count = 0;
+
+      // Convert numeric fields to numbers
+      projectData.base_price = parseFloat(projectData.base_price) || 0;
+      projectData.total_price = parseFloat(projectData.total_price) || 0;
+      projectData.page_count = parseInt(projectData.page_count) || 1;
+      projectData.word_count = parseInt(projectData.word_count) || 0;
+
       // Convert document to base64 if provided
       if (documentFile) {
         const reader = new FileReader();
@@ -4980,6 +4995,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Combine deadline date and time
       if (projectData.deadline && projectData.deadline_time) {
         projectData.deadline = `${projectData.deadline}T${projectData.deadline_time}`;
+      } else if (!projectData.deadline) {
+        projectData.deadline = null;
       }
 
       await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, projectData);
