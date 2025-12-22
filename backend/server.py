@@ -3822,7 +3822,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#28a745"
         title = "Assignment Accepted"
         button_html = f'''
-        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+        <a href="{portal_url}/translator" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
             🚀 Go to Translator Portal
         </a>
         '''
@@ -3836,7 +3836,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#6c757d"
         title = "Already Responded"
         button_html = f'''
-        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
+        <a href="{portal_url}/translator" style="display: inline-block; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
             Go to Portal
         </a>
         '''
