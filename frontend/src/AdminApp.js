@@ -4734,7 +4734,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
     setAddingTranslator(true);
     try {
-      const response = await axios.post(`${API}/admin/users?admin_key=${adminKey}`, {
+      const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, {
         name: newTranslatorData.name,
         email: newTranslatorData.email,
         password: newTranslatorData.password,
@@ -4751,13 +4751,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setShowQuickAddTranslator(false);
 
       // Refresh translator list
-      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
-      const allUsers = usersRes.data.users || [];
-      setTranslatorList(allUsers.filter(u => u.role === 'translator'));
+      const usersRes = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+      setTranslatorList(usersRes.data || []);
 
       // Auto-select the new translator
-      if (response.data.user?.id) {
-        setAssignmentDetails({...assignmentDetails, translator_id: response.data.user.id});
+      if (response.data.user_id) {
+        setAssignmentDetails({...assignmentDetails, translator_id: response.data.user_id});
       }
     } catch (err) {
       console.error('Failed to add translator:', err);
