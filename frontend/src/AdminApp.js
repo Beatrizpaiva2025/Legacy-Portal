@@ -182,13 +182,17 @@ const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
   const [adminKey, setAdminKey] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
@@ -219,6 +223,83 @@ const AdminLogin = ({ onLogin }) => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      await axios.post(`${API}/admin/auth/forgot-password`, { email: forgotEmail });
+      setSuccess('If an account exists with this email, a password reset link has been sent.');
+      setForgotEmail('');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Error sending reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Forgot password modal
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl text-white">🔑</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Reset Password</h1>
+            <p className="text-xs text-gray-500">Enter your email to receive a reset link</p>
+          </div>
+
+          {error && (
+            <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleForgotPassword} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+            >
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => { setShowForgotPassword(false); setError(''); setSuccess(''); }}
+              className="text-teal-600 hover:underline text-xs"
+            >
+              ← Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
@@ -233,6 +314,12 @@ const AdminLogin = ({ onLogin }) => {
         {error && (
           <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+            {success}
           </div>
         )}
 
@@ -286,6 +373,14 @@ const AdminLogin = ({ onLogin }) => {
         </form>
 
         <div className="mt-4 text-center space-y-2">
+          {!useAdminKey && (
+            <button
+              onClick={() => setShowForgotPassword(true)}
+              className="text-teal-600 hover:underline text-xs block w-full"
+            >
+              Forgot Password?
+            </button>
+          )}
           <button
             onClick={() => setUseAdminKey(!useAdminKey)}
             className="text-gray-500 hover:text-teal-600 text-xs"
@@ -7849,7 +7944,7 @@ const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
   const [creating, setCreating] = useState(false);
 
   const isAdmin = user?.role === 'admin';
@@ -7872,18 +7967,18 @@ const UsersPage = ({ adminKey, user }) => {
     e.preventDefault();
     setCreating(true);
     try {
-      // Build user data with optional translator pricing
+      // Build user data - password will be set by user via invitation email
       const userData = {
         name: newUser.name,
         email: newUser.email,
-        password: newUser.password,
         role: newUser.role,
         rate_per_page: newUser.rate_per_page ? parseFloat(newUser.rate_per_page) : null,
         rate_per_word: newUser.rate_per_word ? parseFloat(newUser.rate_per_word) : null,
         language_pairs: newUser.language_pairs || null
       };
-      await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
-      setNewUser({ name: '', email: '', password: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+      const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
+      alert(response.data?.message || 'User created! Invitation email sent.');
+      setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
@@ -7944,7 +8039,7 @@ const UsersPage = ({ adminKey, user }) => {
         <div className="bg-white p-4 rounded-lg shadow mb-6">
           <h3 className="font-bold text-sm mb-3">{isPM ? 'Register New Translator' : 'Create New User'}</h3>
           <form onSubmit={handleCreateUser} className="space-y-3">
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <input
                 type="text"
                 placeholder="Name"
@@ -7958,14 +8053,6 @@ const UsersPage = ({ adminKey, user }) => {
                 placeholder="Email"
                 value={newUser.email}
                 onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                required
-                className="px-3 py-2 text-sm border rounded"
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={newUser.password}
-                onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                 required
                 className="px-3 py-2 text-sm border rounded"
               />
@@ -7984,6 +8071,7 @@ const UsersPage = ({ adminKey, user }) => {
                 </select>
               )}
             </div>
+            <p className="text-xs text-gray-500 mt-1">An invitation email will be sent to set up the password</p>
 
             {/* Translator Pricing - always show for translators */}
             {(newUser.role === 'translator' || isPM) && (
@@ -9306,12 +9394,622 @@ const FinancesPage = ({ adminKey }) => {
   );
 };
 
+// ==================== SET PASSWORD PAGE (Invitation Acceptance) ====================
+const SetPasswordPage = ({ inviteToken, onComplete }) => {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [userInfo, setUserInfo] = useState(null);
+  const [verifying, setVerifying] = useState(true);
+  const [step, setStep] = useState(1); // 1: password, 2: translator info (if translator)
+
+  // Translator-specific fields
+  const [languagePairs, setLanguagePairs] = useState('');
+  const [ratePerPage, setRatePerPage] = useState('');
+  const [ratePerWord, setRatePerWord] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [routingNumber, setRoutingNumber] = useState('');
+  const [paypalEmail, setPaypalEmail] = useState('');
+  const [zelleEmail, setZelleEmail] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedEthics, setAcceptedEthics] = useState(false);
+
+  const isTranslator = userInfo?.role === 'translator';
+
+  useEffect(() => {
+    const verifyToken = async () => {
+      try {
+        const response = await axios.get(`${API}/admin/auth/verify-invitation?token=${inviteToken}`);
+        setUserInfo(response.data.user);
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Invalid or expired invitation link');
+      } finally {
+        setVerifying(false);
+      }
+    };
+    verifyToken();
+  }, [inviteToken]);
+
+  const handlePasswordStep = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    // If translator, go to step 2, otherwise submit directly
+    if (isTranslator) {
+      setStep(2);
+    } else {
+      handleFinalSubmit();
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    setError('');
+
+    // Validate translator-specific requirements
+    if (isTranslator) {
+      if (!acceptedTerms) {
+        setError('You must accept the terms and conditions');
+        return;
+      }
+      if (!acceptedEthics) {
+        setError('You must accept the translator ethics guidelines');
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const data = {
+        token: inviteToken,
+        password: password
+      };
+
+      // Add translator-specific data
+      if (isTranslator) {
+        data.language_pairs = languagePairs || null;
+        data.rate_per_page = ratePerPage ? parseFloat(ratePerPage) : null;
+        data.rate_per_word = ratePerWord ? parseFloat(ratePerWord) : null;
+        data.payment_method = paymentMethod || null;
+        data.bank_name = bankName || null;
+        data.account_holder = accountHolder || null;
+        data.account_number = accountNumber || null;
+        data.routing_number = routingNumber || null;
+        data.paypal_email = paypalEmail || null;
+        data.zelle_email = zelleEmail || null;
+        data.accepted_terms = acceptedTerms;
+        data.accepted_ethics = acceptedEthics;
+      }
+
+      await axios.post(`${API}/admin/auth/accept-invitation`, data);
+      setSuccess('Account set up successfully! You can now log in.');
+      setTimeout(() => onComplete(), 2000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to set up account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
+          <p className="text-gray-600">Verifying invitation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !userInfo) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl text-white">!</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Invalid Link</h1>
+          </div>
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm text-center">
+            {error}
+          </div>
+          <button
+            onClick={onComplete}
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm font-medium"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Translator onboarding form
+  if (step === 2 && isTranslator) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center py-8">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-4">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl text-white">📋</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Complete Your Profile</h1>
+            <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
+            <p className="text-xs text-teal-600">Step 2 of 2 - Translator Information</p>
+          </div>
+
+          {error && (
+            <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+              {success}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Language & Rates Section */}
+            <div className="border rounded p-3 bg-gray-50">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Language & Rates</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Language Pairs *</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                    value={languagePairs}
+                    onChange={(e) => setLanguagePairs(e.target.value)}
+                    placeholder="e.g. EN-PT, EN-ES, PT-EN"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Separate multiple pairs with commas</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Rate per Page ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                      value={ratePerPage}
+                      onChange={(e) => setRatePerPage(e.target.value)}
+                      placeholder="e.g. 15.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Rate per Word ($)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                      value={ratePerWord}
+                      onChange={(e) => setRatePerWord(e.target.value)}
+                      placeholder="e.g. 0.08"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Section */}
+            <div className="border rounded p-3 bg-gray-50">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Information</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
+                  <select
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                  >
+                    <option value="">Select payment method</option>
+                    <option value="bank_transfer">Bank Transfer (ACH)</option>
+                    <option value="wire_transfer">Wire Transfer</option>
+                    <option value="paypal">PayPal</option>
+                    <option value="zelle">Zelle</option>
+                  </select>
+                </div>
+
+                {(paymentMethod === 'bank_transfer' || paymentMethod === 'wire_transfer') && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Bank Name</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                        placeholder="Bank name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Account Holder Name</label>
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                        value={accountHolder}
+                        onChange={(e) => setAccountHolder(e.target.value)}
+                        placeholder="Full name on account"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Account Number</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="Account number"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Routing Number</label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                          value={routingNumber}
+                          onChange={(e) => setRoutingNumber(e.target.value)}
+                          placeholder="9-digit routing"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'paypal' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">PayPal Email</label>
+                    <input
+                      type="email"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                      value={paypalEmail}
+                      onChange={(e) => setPaypalEmail(e.target.value)}
+                      placeholder="your@paypal.com"
+                    />
+                  </div>
+                )}
+
+                {paymentMethod === 'zelle' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Zelle Email/Phone</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
+                      value={zelleEmail}
+                      onChange={(e) => setZelleEmail(e.target.value)}
+                      placeholder="Email or phone for Zelle"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Terms & Ethics Section */}
+            <div className="border rounded p-3 bg-gray-50">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Terms & Ethics Agreement</h3>
+
+              <div className="space-y-3">
+                {/* Ethics Guidelines */}
+                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                  <strong>Translator Ethics Guidelines (ATA Standards)</strong>
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Maintain strict confidentiality of all client documents and information</li>
+                    <li>Provide accurate and faithful translations without additions or omissions</li>
+                    <li>Only accept work within your area of competence and language expertise</li>
+                    <li>Disclose any conflicts of interest before accepting assignments</li>
+                    <li>Meet agreed deadlines and communicate promptly about any delays</li>
+                    <li>Respect intellectual property rights and copyright laws</li>
+                    <li>Maintain professional development and stay current in your field</li>
+                    <li>Never use client materials for personal gain or share with third parties</li>
+                  </ul>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedEthics}
+                    onChange={(e) => setAcceptedEthics(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-gray-700">
+                    I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
+                  </span>
+                </label>
+
+                {/* Terms and Conditions */}
+                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                  <strong>Terms and Conditions</strong>
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Translations remain property of Legacy Translations until delivered to client</li>
+                    <li>Payment is processed within 30 days of approved work completion</li>
+                    <li>Work quality is subject to review and revision requests</li>
+                    <li>Contractor is responsible for their own taxes (1099 contractor status)</li>
+                    <li>Non-compete for direct contact with clients for 12 months</li>
+                    <li>Confidentiality obligations continue after contract termination</li>
+                  </ul>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-gray-700">
+                    I accept the Terms and Conditions for working as a contractor with Legacy Translations *
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex-1 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 text-sm font-medium"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleFinalSubmit}
+                disabled={loading || success || !acceptedTerms || !acceptedEthics}
+                className="flex-1 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+              >
+                {loading ? 'Setting up...' : 'Complete Setup'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 1: Password setup
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl text-white">🔐</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800">Set Up Your Account</h1>
+          <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
+          <p className="text-xs text-teal-600 mt-1">{userInfo?.role?.toUpperCase()}</p>
+          {isTranslator && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
+        </div>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handlePasswordStep} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Create Password</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password</label>
+            <input
+              type="password"
+              required
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter password"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || success}
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+          >
+            {isTranslator ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// ==================== RESET PASSWORD PAGE ====================
+const ResetPasswordPage = ({ resetToken, onComplete }) => {
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [verifying, setVerifying] = useState(true);
+  const [tokenValid, setTokenValid] = useState(false);
+
+  useEffect(() => {
+    const verifyToken = async () => {
+      try {
+        await axios.get(`${API}/admin/auth/verify-reset-token?token=${resetToken}`);
+        setTokenValid(true);
+      } catch (err) {
+        setError(err.response?.data?.detail || 'Invalid or expired reset link');
+      } finally {
+        setVerifying(false);
+      }
+    };
+    verifyToken();
+  }, [resetToken]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.post(`${API}/admin/auth/reset-password`, {
+        token: resetToken,
+        new_password: password
+      });
+      setSuccess('Password reset successfully! You can now log in.');
+      setTimeout(() => onComplete(), 2000);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (verifying) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm text-center">
+          <p className="text-gray-600">Verifying link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !tokenValid) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl text-white">!</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Invalid Link</h1>
+          </div>
+          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm text-center">
+            {error}
+          </div>
+          <button
+            onClick={onComplete}
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm font-medium"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl text-white">🔑</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800">Reset Password</h1>
+          <p className="text-xs text-gray-500 mt-1">Create your new password</p>
+        </div>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">New Password</label>
+            <input
+              type="password"
+              required
+              minLength={6}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password</label>
+            <input
+              type="password"
+              required
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter password"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || success}
+            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+          >
+            {loading ? 'Resetting...' : 'Reset Password'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
   const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
+
+  // Check for invite_token or reset_token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteToken = urlParams.get('invite_token');
+  const resetToken = urlParams.get('reset_token');
+
+  // Clear URL parameters after reading
+  const clearUrlParams = () => {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
 
   // Get current path
   const isTranslationTool = window.location.pathname.includes('/admin/translation-tool');
@@ -9410,6 +10108,16 @@ function AdminApp() {
           : <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
     }
   };
+
+  // Handle invitation token - show set password page
+  if (inviteToken) {
+    return <SetPasswordPage inviteToken={inviteToken} onComplete={clearUrlParams} />;
+  }
+
+  // Handle reset token - show reset password page
+  if (resetToken) {
+    return <ResetPasswordPage resetToken={resetToken} onComplete={clearUrlParams} />;
+  }
 
   if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
 

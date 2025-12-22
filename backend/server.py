@@ -704,13 +704,37 @@ class AdminUser(BaseModel):
 
 class AdminUserCreate(BaseModel):
     email: EmailStr
-    password: str
+    password: Optional[str] = None  # Optional - user will set via invitation
     name: str
     role: str  # 'admin', 'pm', 'translator', 'sales'
     # Translator-specific fields
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
+
+class AdminInvitationAccept(BaseModel):
+    token: str
+    password: str
+    # Translator onboarding fields (optional - only for translators)
+    language_pairs: Optional[str] = None
+    rate_per_page: Optional[float] = None
+    rate_per_word: Optional[float] = None
+    payment_method: Optional[str] = None  # 'bank_transfer', 'paypal', 'zelle', etc.
+    bank_name: Optional[str] = None
+    account_holder: Optional[str] = None
+    account_number: Optional[str] = None
+    routing_number: Optional[str] = None
+    paypal_email: Optional[str] = None
+    zelle_email: Optional[str] = None
+    accepted_terms: Optional[bool] = False
+    accepted_ethics: Optional[bool] = False
+
+class AdminForgotPassword(BaseModel):
+    email: EmailStr
+
+class AdminResetPassword(BaseModel):
+    token: str
+    new_password: str
 
 class AdminUserLogin(BaseModel):
     email: EmailStr
@@ -2118,6 +2142,8 @@ async def logout_partner(token: str):
 
 # Store for password reset tokens (token -> {email, expires})
 password_reset_tokens = {}
+admin_invitation_tokens = {}  # For admin user invitations
+admin_reset_tokens = {}  # For admin user password resets
 
 @api_router.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
@@ -2245,7 +2271,7 @@ async def verify_admin_key(admin_key: str):
 
 @api_router.post("/admin/auth/register")
 async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
-    """Register a new admin user (admin can create any user, PM can only create translators)"""
+    """Register a new admin user and send invitation email to set password"""
     # Verify admin key OR valid admin/PM token
     is_valid = False
     creator_role = 'admin'
@@ -2279,16 +2305,18 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Create user
+        # Create user without password (pending invitation)
         user = AdminUser(
             email=user_data.email,
-            password_hash=hash_password(user_data.password),
+            password_hash="",  # No password yet - user will set via invitation
             name=user_data.name,
-            role=user_data.role
+            role=user_data.role,
+            is_active=False  # Inactive until password is set
         )
 
         # Build user dict with additional translator fields
         user_dict = user.dict()
+        user_dict['invitation_pending'] = True  # Flag for pending invitation
         if user_data.role == 'translator':
             user_dict['rate_per_page'] = user_data.rate_per_page
             user_dict['rate_per_word'] = user_data.rate_per_word
@@ -2297,7 +2325,52 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         await db.admin_users.insert_one(user_dict)
         logger.info(f"Admin user created: {user.email} with role {user.role} by {creator_role}")
 
-        return {"status": "success", "message": f"User {user.name} created with role {user.role}", "user_id": user.id}
+        # Generate invitation token
+        invite_token = secrets.token_urlsafe(32)
+        expires = datetime.utcnow() + timedelta(days=7)  # 7 days to accept invitation
+
+        admin_invitation_tokens[invite_token] = {
+            "email": user_data.email,
+            "user_id": user.id,
+            "expires": expires
+        }
+
+        # Send invitation email
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+        invite_link = f"{frontend_url}/admin?invite_token={invite_token}"
+
+        role_display = {
+            'admin': 'Administrator',
+            'pm': 'Project Manager',
+            'translator': 'Translator',
+            'sales': 'Sales'
+        }.get(user_data.role, user_data.role)
+
+        subject = f"Welcome to Legacy Translations - Set Up Your {role_display} Account"
+        content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
+            <h2 style="color: #0d9488;">Welcome to Legacy Translations!</h2>
+            <p>Hello {user_data.name},</p>
+            <p>You have been invited to join Legacy Translations as a <strong>{role_display}</strong>.</p>
+            <p>Click the button below to set up your password and access your account:</p>
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="{invite_link}" style="background: linear-gradient(to right, #0d9488, #0891b2); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">Set Up My Account</a>
+            </p>
+            <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
+            <p style="color: #666; font-size: 14px;">If you didn't expect this invitation, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+        </div>
+        """
+
+        try:
+            await email_service.send_email(user_data.email, subject, content)
+            logger.info(f"Invitation email sent to {user_data.email}")
+        except Exception as e:
+            logger.error(f"Failed to send invitation email: {str(e)}")
+
+        return {"status": "success", "message": f"User {user.name} created. Invitation email sent to {user_data.email}", "user_id": user.id}
 
     except HTTPException:
         raise
@@ -2317,6 +2390,10 @@ async def login_admin_user(login_data: AdminUserLogin):
         # Verify password
         if not verify_password(login_data.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if invitation is pending
+        if user.get("invitation_pending", False):
+            raise HTTPException(status_code=401, detail="Please complete your registration using the invitation link sent to your email")
 
         # Check if active
         if not user.get("is_active", True):
@@ -2355,6 +2432,237 @@ async def logout_admin_user(token: str):
     if token in active_admin_tokens:
         del active_admin_tokens[token]
     return {"status": "success", "message": "Logged out successfully"}
+
+@api_router.post("/admin/auth/forgot-password")
+async def admin_forgot_password(request: AdminForgotPassword):
+    """Send password reset email for admin users"""
+    try:
+        # Find admin user by email
+        user = await db.admin_users.find_one({"email": request.email})
+
+        # Always return success for security (don't reveal if email exists)
+        if user:
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            expires = datetime.utcnow() + timedelta(hours=1)
+
+            # Store token
+            admin_reset_tokens[reset_token] = {
+                "email": request.email,
+                "user_id": user["id"],
+                "expires": expires
+            }
+
+            # Get frontend URL
+            frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+            reset_link = f"{frontend_url}/admin?reset_token={reset_token}"
+
+            # Send email
+            subject = "Reset Your Password - Legacy Translations Admin"
+            content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
+                <h2 style="color: #0d9488;">Password Reset Request</h2>
+                <p>Hello {user.get('name', 'User')},</p>
+                <p>We received a request to reset your password for your Legacy Translations Admin account.</p>
+                <p>Click the button below to reset your password:</p>
+                <p style="text-align: center; margin: 30px 0;">
+                    <a href="{reset_link}" style="background: linear-gradient(to right, #0d9488, #0891b2); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
+                </p>
+                <p style="color: #666; font-size: 14px;">This link will expire in 1 hour.</p>
+                <p style="color: #666; font-size: 14px;">If you didn't request this, you can safely ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="color: #999; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+            </div>
+            """
+
+            try:
+                await email_service.send_email(request.email, subject, content)
+                logger.info(f"Admin password reset email sent to {request.email}")
+            except Exception as e:
+                logger.error(f"Failed to send admin password reset email: {str(e)}")
+
+        return {"status": "success", "message": "If an account exists with this email, a reset link has been sent"}
+
+    except Exception as e:
+        logger.error(f"Error in admin forgot password: {str(e)}")
+        return {"status": "success", "message": "If an account exists with this email, a reset link has been sent"}
+
+@api_router.post("/admin/auth/reset-password")
+async def admin_reset_password(request: AdminResetPassword):
+    """Reset password using token for admin users"""
+    try:
+        # Check if token exists and is valid
+        token_data = admin_reset_tokens.get(request.token)
+
+        if not token_data:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+        if datetime.utcnow() > token_data["expires"]:
+            del admin_reset_tokens[request.token]
+            raise HTTPException(status_code=400, detail="Reset link has expired")
+
+        # Update password
+        email = token_data["email"]
+        new_hash = hash_password(request.new_password)
+
+        result = await db.admin_users.update_one(
+            {"email": email},
+            {"$set": {"password_hash": new_hash, "is_active": True}}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="Failed to update password")
+
+        # Remove used token
+        del admin_reset_tokens[request.token]
+
+        logger.info(f"Admin password reset successful for {email}")
+        return {"status": "success", "message": "Password has been reset successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting admin password: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reset password")
+
+@api_router.post("/admin/auth/accept-invitation")
+async def accept_admin_invitation(request: AdminInvitationAccept):
+    """Accept invitation and set password for new admin user"""
+    try:
+        # Check if token exists and is valid
+        token_data = admin_invitation_tokens.get(request.token)
+
+        if not token_data:
+            raise HTTPException(status_code=400, detail="Invalid or expired invitation link")
+
+        if datetime.utcnow() > token_data["expires"]:
+            del admin_invitation_tokens[request.token]
+            raise HTTPException(status_code=400, detail="Invitation link has expired")
+
+        # Get user to check role
+        email = token_data["email"]
+        existing_user = await db.admin_users.find_one({"email": email})
+
+        if not existing_user:
+            raise HTTPException(status_code=400, detail="User not found")
+
+        # Check if translator needs to accept terms and ethics
+        if existing_user.get("role") == "translator":
+            if not request.accepted_terms:
+                raise HTTPException(status_code=400, detail="You must accept the terms and conditions")
+            if not request.accepted_ethics:
+                raise HTTPException(status_code=400, detail="You must accept the translator ethics guidelines")
+
+        # Update user password and activate account
+        new_hash = hash_password(request.password)
+
+        update_data = {
+            "password_hash": new_hash,
+            "is_active": True,
+            "invitation_pending": False,
+            "onboarding_completed": True,
+            "onboarding_date": datetime.utcnow()
+        }
+
+        # Add translator-specific fields
+        if existing_user.get("role") == "translator":
+            if request.language_pairs:
+                update_data["language_pairs"] = request.language_pairs
+            if request.rate_per_page:
+                update_data["rate_per_page"] = request.rate_per_page
+            if request.rate_per_word:
+                update_data["rate_per_word"] = request.rate_per_word
+            update_data["accepted_terms"] = request.accepted_terms
+            update_data["accepted_ethics"] = request.accepted_ethics
+            update_data["terms_accepted_date"] = datetime.utcnow()
+
+            # Payment information
+            if request.payment_method:
+                update_data["payment_method"] = request.payment_method
+            if request.bank_name:
+                update_data["bank_name"] = request.bank_name
+            if request.account_holder:
+                update_data["account_holder"] = request.account_holder
+            if request.account_number:
+                update_data["account_number"] = request.account_number
+            if request.routing_number:
+                update_data["routing_number"] = request.routing_number
+            if request.paypal_email:
+                update_data["paypal_email"] = request.paypal_email
+            if request.zelle_email:
+                update_data["zelle_email"] = request.zelle_email
+
+        result = await db.admin_users.update_one(
+            {"email": email},
+            {"$set": update_data}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="Failed to set up account")
+
+        # Remove used token
+        del admin_invitation_tokens[request.token]
+
+        # Get user info for response
+        user = await db.admin_users.find_one({"email": email})
+
+        logger.info(f"Invitation accepted for {email}")
+        return {
+            "status": "success",
+            "message": "Account set up successfully. You can now log in.",
+            "user": {
+                "name": user.get("name"),
+                "email": user.get("email"),
+                "role": user.get("role")
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting invitation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to set up account")
+
+@api_router.get("/admin/auth/verify-invitation")
+async def verify_invitation_token(token: str):
+    """Verify if an invitation token is valid"""
+    token_data = admin_invitation_tokens.get(token)
+
+    if not token_data:
+        raise HTTPException(status_code=400, detail="Invalid invitation link")
+
+    if datetime.utcnow() > token_data["expires"]:
+        del admin_invitation_tokens[token]
+        raise HTTPException(status_code=400, detail="Invitation link has expired")
+
+    # Get user info
+    user = await db.admin_users.find_one({"email": token_data["email"]})
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found")
+
+    return {
+        "valid": True,
+        "user": {
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "role": user.get("role")
+        }
+    }
+
+@api_router.get("/admin/auth/verify-reset-token")
+async def verify_reset_token(token: str):
+    """Verify if a reset token is valid"""
+    token_data = admin_reset_tokens.get(token)
+
+    if not token_data:
+        raise HTTPException(status_code=400, detail="Invalid reset link")
+
+    if datetime.utcnow() > token_data["expires"]:
+        del admin_reset_tokens[token]
+        raise HTTPException(status_code=400, detail="Reset link has expired")
+
+    return {"valid": True}
 
 @api_router.get("/admin/auth/me")
 async def get_current_admin_user_info(token: str):
