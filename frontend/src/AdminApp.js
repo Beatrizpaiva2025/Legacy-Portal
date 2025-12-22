@@ -7119,7 +7119,6 @@ const TranslatorLogin = ({ onLogin }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="translator@legacy.com"
               />
             </div>
 
@@ -7131,7 +7130,6 @@ const TranslatorLogin = ({ onLogin }) => {
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
               />
             </div>
 
