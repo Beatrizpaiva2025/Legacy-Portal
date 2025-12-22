@@ -633,7 +633,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (order.translate_to) setTargetLanguage(order.translate_to);
         setSelectedOrderId(order.id);
 
-        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload.`);
+        // Update order status to "in_translation" if it was "received"
+        if (order.translation_status === 'received') {
+          try {
+            await axios.put(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+              translation_status: 'in_translation'
+            });
+            // Update local list
+            setAssignedOrders(prev => prev.map(o =>
+              o.id === order.id ? { ...o, translation_status: 'in_translation' } : o
+            ));
+          } catch (e) {
+            console.error('Failed to update status:', e);
+          }
+        }
+
+        setProcessingStatus(`✅ Documento "${doc.filename}" carregado! Prossiga para Upload/OCR.`);
         setActiveSubTab('upload');
       }
     } catch (err) {
@@ -2075,50 +2090,81 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {/* Assigned Orders for Translator/PM */}
           {(user?.role === 'translator' || user?.role === 'pm') && (
             <div className="bg-white rounded shadow">
-              <div className="p-3 border-b bg-gradient-to-r from-teal-500 to-teal-600">
+              <div className="p-3 border-b bg-gradient-to-r from-purple-600 to-purple-700">
                 <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 My Assigned Orders
+                  📋 Meus Projetos
                   {assignedOrders.length > 0 && (
-                    <span className="ml-2 bg-white text-teal-600 px-2 py-0.5 rounded-full text-xs">{assignedOrders.length}</span>
+                    <span className="ml-2 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-bold">{assignedOrders.length}</span>
                   )}
                 </h3>
+                <p className="text-[10px] text-purple-200 mt-1">Clique em um projeto para abrir o documento</p>
               </div>
               <div className="p-3">
                 {loadingAssigned ? (
-                  <div className="text-center py-4 text-gray-500 text-xs">Carregando pedidos...</div>
+                  <div className="text-center py-4 text-gray-500 text-xs">Carregando projetos...</div>
                 ) : assignedOrders.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {assignedOrders.map(order => (
-                      <div key={order.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border hover:bg-gray-100">
-                        <div className="flex-1">
-                          <div className="text-xs font-medium text-blue-600">{order.order_number}</div>
-                          <div className="text-[10px] text-gray-600">{order.client_name} • {order.translate_from} → {order.translate_to}</div>
-                          <div className="text-[10px] text-gray-400">
-                            Status: <span className={`px-1 py-0.5 rounded ${order.translation_status === 'received' ? 'bg-gray-100' : order.translation_status === 'in_translation' ? 'bg-yellow-100' : 'bg-purple-100'}`}>
-                              {order.translation_status}
-                            </span>
+                      <div
+                        key={order.id}
+                        onClick={() => loadOrderDocument(order)}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+                          selectedOrderId === order.id
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 bg-gray-50 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-purple-700">{order.order_number}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                order.translation_status === 'received' ? 'bg-gray-200 text-gray-700' :
+                                order.translation_status === 'in_translation' ? 'bg-yellow-200 text-yellow-800' :
+                                'bg-purple-200 text-purple-800'
+                              }`}>
+                                {order.translation_status === 'received' ? 'Novo' :
+                                 order.translation_status === 'in_translation' ? 'Em progresso' : 'Revisão'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-700 mt-1">{order.client_name}</div>
+                            <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                              <span>🌐 {order.translate_from} → {order.translate_to}</span>
+                              {order.page_count && <span>📄 {order.page_count} pg</span>}
+                            </div>
+                            {order.deadline && (
+                              <div className="text-[10px] text-orange-600 mt-1">
+                                ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')} {new Date(order.deadline).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white text-lg">
+                              📂
+                            </div>
+                            <span className="text-[9px] text-purple-600 font-medium">Abrir</span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => loadOrderDocument(order)}
-                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center"
-                        >
-                          📄 Carregar Documento
-                        </button>
+                        {selectedOrderId === order.id && (
+                          <div className="mt-2 pt-2 border-t border-purple-200">
+                            <span className="text-[10px] text-purple-700 font-medium">✓ Documento carregado - Continue na aba Upload/OCR</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-gray-400 text-xs">
-                    <div className="text-2xl mb-1">📭</div>
-                    No orders assigned at the moment.
+                  <div className="text-center py-6 text-gray-400">
+                    <div className="text-4xl mb-2">📭</div>
+                    <div className="text-sm font-medium">Nenhum projeto atribuído</div>
+                    <div className="text-xs mt-1">Aguarde novos projetos serem enviados para você</div>
                   </div>
                 )}
                 <button
                   onClick={fetchAssignedOrders}
-                  className="mt-2 w-full py-1 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded"
+                  className="mt-3 w-full py-2 text-xs text-purple-600 hover:text-white hover:bg-purple-600 border border-purple-300 rounded-lg transition-colors font-medium"
                 >
-                  🔄 Atualizar lista
+                  🔄 Atualizar Lista
                 </button>
               </div>
             </div>
