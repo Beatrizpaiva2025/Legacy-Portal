@@ -681,7 +681,11 @@ class AdminUserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
-    role: str  # 'admin', 'pm', 'translator'
+    role: str  # 'admin', 'pm', 'translator', 'sales'
+    # Translator-specific fields
+    rate_per_page: Optional[float] = None
+    rate_per_word: Optional[float] = None
+    language_pairs: Optional[str] = None
 
 class AdminUserLogin(BaseModel):
     email: EmailStr
@@ -2005,18 +2009,21 @@ async def verify_admin_key(admin_key: str):
 
 @api_router.post("/admin/auth/register")
 async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
-    """Register a new admin user (only admin can create users)"""
-    # Verify admin key OR valid admin token
+    """Register a new admin user (admin can create any user, PM can only create translators)"""
+    # Verify admin key OR valid admin/PM token
     is_valid = False
+    creator_role = 'admin'
 
     # Check if it's the master admin key
     if admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         is_valid = True
+        creator_role = 'admin'
     else:
-        # Check if it's a valid admin token
-        admin_user = await db.admin_users.find_one({"token": admin_key, "role": "admin", "is_active": True})
+        # Check if it's a valid admin or PM token
+        admin_user = await db.admin_users.find_one({"token": admin_key, "role": {"$in": ["admin", "pm"]}, "is_active": True})
         if admin_user:
             is_valid = True
+            creator_role = admin_user.get("role", "admin")
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -2025,6 +2032,10 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
     valid_roles = ['admin', 'pm', 'translator', 'sales']
     if user_data.role not in valid_roles:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be: {', '.join(valid_roles)}")
+
+    # PM can only create translators
+    if creator_role == 'pm' and user_data.role != 'translator':
+        raise HTTPException(status_code=403, detail="Project Managers can only register translators")
 
     try:
         # Check if email already exists
@@ -2040,8 +2051,15 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
             role=user_data.role
         )
 
-        await db.admin_users.insert_one(user.dict())
-        logger.info(f"Admin user created: {user.email} with role {user.role}")
+        # Build user dict with additional translator fields
+        user_dict = user.dict()
+        if user_data.role == 'translator':
+            user_dict['rate_per_page'] = user_data.rate_per_page
+            user_dict['rate_per_word'] = user_data.rate_per_word
+            user_dict['language_pairs'] = user_data.language_pairs
+
+        await db.admin_users.insert_one(user_dict)
+        logger.info(f"Admin user created: {user.email} with role {user.role} by {creator_role}")
 
         return {"status": "success", "message": f"User {user.name} created with role {user.role}", "user_id": user.id}
 
