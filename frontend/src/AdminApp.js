@@ -7037,26 +7037,163 @@ const SettingsPage = ({ adminKey }) => {
   );
 };
 
+// ==================== TRANSLATOR LOGIN (Blue Design) ====================
+const TranslatorLogin = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await axios.post(`${API}/admin/auth/login`, { email, password });
+      if (response.data && response.data.token) {
+        // Only allow translators to login here
+        if (response.data.role !== 'translator') {
+          setError('This portal is for translators only. Please use the admin panel.');
+          setLoading(false);
+          return;
+        }
+        onLogin({
+          adminKey: response.data.token,
+          token: response.data.token,
+          role: response.data.role,
+          name: response.data.name,
+          email: response.data.email,
+          id: response.data.id
+        });
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Blue Header */}
+      <div className="bg-gradient-to-b from-blue-500 to-blue-600 text-white py-12 px-4 text-center">
+        {/* Globe Icon */}
+        <div className="mb-4">
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-400 to-cyan-300 rounded-full flex items-center justify-center shadow-lg">
+            <svg className="w-12 h-12" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+              <ellipse cx="50" cy="50" rx="20" ry="45" stroke="white" strokeWidth="2" fill="none"/>
+              <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="2"/>
+              <ellipse cx="50" cy="30" rx="35" ry="12" stroke="white" strokeWidth="2" fill="none"/>
+              <ellipse cx="50" cy="70" rx="35" ry="12" stroke="white" strokeWidth="2" fill="none"/>
+              {/* Land masses */}
+              <path d="M30 35 Q35 30 45 32 Q50 35 48 42 Q45 45 38 43 Q32 40 30 35Z" fill="#66BB6A"/>
+              <path d="M55 25 Q65 22 72 28 Q75 35 70 40 Q62 38 55 35 Q52 30 55 25Z" fill="#66BB6A"/>
+              <path d="M25 55 Q30 52 40 54 Q45 58 42 65 Q35 68 28 65 Q22 60 25 55Z" fill="#66BB6A"/>
+              <path d="M60 55 Q70 52 78 58 Q80 65 75 70 Q65 72 58 68 Q55 62 60 55Z" fill="#66BB6A"/>
+            </svg>
+          </div>
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Legacy Translations</h1>
+        <p className="text-blue-100 text-sm">Complete Certified Translation System</p>
+      </div>
+
+      {/* Login Form Card */}
+      <div className="flex-1 flex items-start justify-center px-4 -mt-6">
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8">
+          <h2 className="text-xl font-semibold text-gray-800 text-center mb-6">Translator Login</h2>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="translator@legacy.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium flex items-center justify-center space-x-2 transition-all shadow-md"
+            >
+              <span>🔐</span>
+              <span>{loading ? 'Logging in...' : 'Login'}</span>
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <a href="/admin" className="text-blue-600 hover:text-blue-700 text-sm hover:underline">
+              ← Back to Admin Panel
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="py-4 text-center text-gray-500 text-xs">
+        © 2024 Legacy Translations. All rights reserved.
+      </div>
+    </div>
+  );
+};
+
 // ==================== TRANSLATION TOOL PAGE (Standalone) ====================
-const TranslationToolPage = ({ adminKey, onLogout }) => {
+const TranslationToolPage = ({ adminKey, onLogout, user }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">✍️</div>
+          <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6" viewBox="0 0 100 100" fill="white">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="3"/>
+              <ellipse cx="50" cy="50" rx="20" ry="45" stroke="currentColor" strokeWidth="2" fill="none"/>
+              <line x1="5" y1="50" x2="95" y2="50" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </div>
           <div>
-            <div className="font-bold text-sm">Translation Tool</div>
-            <div className="text-[10px] text-slate-400">Legacy Translations</div>
+            <div className="font-bold">Translation Tool</div>
+            <div className="text-xs text-blue-200">Legacy Translations</div>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
-          <a href="/admin" className="text-xs text-slate-300 hover:text-white">← Back to Admin</a>
-          <button onClick={onLogout} className="text-xs text-red-400 hover:text-red-300">Logout</button>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-blue-200">
+            Welcome, <span className="text-white font-medium">{user?.name || 'Translator'}</span>
+          </span>
+          <button
+            onClick={onLogout}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </div>
       {/* Translation Workspace */}
-      <TranslationWorkspace adminKey={adminKey} />
+      <TranslationWorkspace adminKey={adminKey} user={user} />
     </div>
   );
 };
@@ -8628,11 +8765,18 @@ function AdminApp() {
     }
   };
 
-  if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
+  // If not logged in
+  if (!adminKey) {
+    // Use TranslatorLogin for translation-tool route
+    if (isTranslationTool) {
+      return <TranslatorLogin onLogin={handleLogin} />;
+    }
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   // If translation-tool route, render standalone page
   if (isTranslationTool) {
-    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} />;
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
   }
 
   return (
