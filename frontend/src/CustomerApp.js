@@ -617,22 +617,22 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated }) => {
             <div className="text-5xl mb-4">🎁</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Wait! Special Offer!</h2>
             <p className="text-gray-600 mb-4">
-              Complete your order now and get <span className="text-teal-600 font-bold">10% OFF</span>!
+              Complete your order now and get <span className="text-teal-600 font-bold">5% OFF</span>!
             </p>
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 p-4 rounded-lg mb-4 border border-teal-200">
-              <p className="text-2xl font-bold text-teal-600 mb-1">SAVE10</p>
+              <p className="text-2xl font-bold text-teal-600 mb-1">SAVE5</p>
               <p className="text-sm text-gray-600">Use this code at checkout</p>
             </div>
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => {
-                  setDiscountCode('SAVE10');
-                  setAppliedDiscount({ type: 'percentage', value: 10 });
+                  setDiscountCode('SAVE5');
+                  setAppliedDiscount({ type: 'percentage', value: 5 });
                   setShowExitPopup(false);
                 }}
                 className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 font-semibold text-lg"
               >
-                Yes, Apply My 10% Discount!
+                Yes, Apply My 5% Discount!
               </button>
               <button
                 onClick={() => setShowExitPopup(false)}
