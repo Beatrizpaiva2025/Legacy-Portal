@@ -5451,11 +5451,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
-              <th className="px-2 py-2 text-left font-medium">PM</th>
+              {/* PM column - Admin only */}
+              {isAdmin && <th className="px-2 py-2 text-left font-medium">PM</th>}
               <th className="px-2 py-2 text-left font-medium">Translator</th>
               <th className="px-2 py-2 text-left font-medium">Deadline</th>
               <th className="px-2 py-2 text-left font-medium">Status</th>
               <th className="px-2 py-2 text-left font-medium">Notes</th>
+              {/* Translation Ready column - shows when translation is complete */}
+              <th className="px-2 py-2 text-center font-medium">Translation</th>
               {/* Total and Payment columns - Admin only */}
               {isAdmin && <th className="px-2 py-2 text-right font-medium">Total</th>}
               {isAdmin && <th className="px-2 py-2 text-center font-medium">Payment</th>}
@@ -5503,35 +5506,35 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       )}
                     </div>
                   </td>
-                  {/* PM */}
-                  <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
-                    {assigningPM === order.id ? (
-                      <select
-                        autoFocus
-                        className="px-1 py-0.5 text-[10px] border rounded w-24"
-                        onChange={(e) => {
-                          if (e.target.value) assignPM(order.id, e.target.value);
-                        }}
-                        onBlur={() => setAssigningPM(null)}
-                      >
-                        <option value="">Select...</option>
-                        {PROJECT_MANAGERS.map(pm => (
-                          <option key={pm.name} value={pm.name}>{pm.name}</option>
-                        ))}
-                      </select>
-                    ) : (order.assigned_pm_name || order.assigned_pm) ? (
-                      <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
-                    ) : isAdmin ? (
-                      <button
-                        onClick={() => setAssigningPM(order.id)}
-                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
-                      >
-                        Assign
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-gray-400">-</span>
-                    )}
-                  </td>
+                  {/* PM - Admin only */}
+                  {isAdmin && (
+                    <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
+                      {assigningPM === order.id ? (
+                        <select
+                          autoFocus
+                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          onChange={(e) => {
+                            if (e.target.value) assignPM(order.id, e.target.value);
+                          }}
+                          onBlur={() => setAssigningPM(null)}
+                        >
+                          <option value="">Select...</option>
+                          {PROJECT_MANAGERS.map(pm => (
+                            <option key={pm.name} value={pm.name}>{pm.name}</option>
+                          ))}
+                        </select>
+                      ) : (order.assigned_pm_name || order.assigned_pm) ? (
+                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
+                      ) : (
+                        <button
+                          onClick={() => setAssigningPM(order.id)}
+                          className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                        >
+                          Assign
+                        </button>
+                      )}
+                    </td>
+                  )}
                   {/* Translator */}
                   <td className={`px-2 py-2 ${(order.assigned_translator_name || order.assigned_translator) ? 'bg-green-50' : ''}`}>
                     {assigningTranslator === order.id ? (
@@ -5550,7 +5553,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </select>
                     ) : (order.assigned_translator_name || order.assigned_translator) ? (
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
+                          {/* Edit translator button for Admin and PM */}
+                          {(isAdmin || isPM) && (
+                            <button
+                              onClick={() => openAssignTranslatorModal(order)}
+                              className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-purple-600 text-[10px]"
+                              title="Change translator"
+                            >
+                              ✏️
+                            </button>
+                          )}
+                        </div>
                         {order.translator_assignment_status === 'pending' && (
                           <span className="text-[9px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded mt-0.5 inline-block w-fit">⏳ Pending</span>
                         )}
@@ -5651,6 +5666,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <span className="text-gray-300 text-[10px]">-</span>
                         )}
                       </div>
+                    )}
+                  </td>
+                  {/* Translation Ready column - shows when translation is complete */}
+                  <td className="px-2 py-2 text-center">
+                    {order.translation_ready ? (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-medium">
+                          ✅ Ready
+                        </span>
+                        {order.translation_ready_at && (
+                          <span className="text-[9px] text-gray-500">
+                            {new Date(order.translation_ready_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                    ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
+                        🔄 Review
+                      </span>
+                    ) : order.translation_status === 'in_translation' ? (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-[10px] font-medium">
+                        ⏳ Working
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-[10px]">-</span>
                     )}
                   </td>
                   {/* Total and Payment columns - Admin only */}
