@@ -4161,6 +4161,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [sendingToClient, setSendingToClient] = useState(false);
 
+  // Translator Assignment Modal state
+  const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
+  const [assignmentDetails, setAssignmentDetails] = useState({
+    translator_id: '',
+    due_date: '',
+    due_time: '17:00',
+    project_notes: '',
+    language_pair: ''
+  });
+  const [sendingAssignment, setSendingAssignment] = useState(false);
+
+  // Notifications state
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -4527,7 +4542,85 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Assign translator to order
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/notifications?admin_key=${adminKey}&token=${user?.token || ''}`);
+      setNotifications(response.data.notifications || []);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  // Mark notification as read
+  const markNotificationRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/notifications/${notifId}/read?admin_key=${adminKey}&token=${user?.token || ''}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  // Poll for notifications
+  useEffect(() => {
+    if (adminKey && (isAdmin || isPM)) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000); // Every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [adminKey, user]);
+
+  // Open translator assignment modal
+  const openAssignTranslatorModal = (order) => {
+    setAssigningTranslatorModal(order);
+    setAssignmentDetails({
+      translator_id: '',
+      due_date: order.deadline ? order.deadline.split('T')[0] : '',
+      due_time: '17:00',
+      project_notes: order.internal_notes || '',
+      language_pair: `${order.translate_from} → ${order.translate_to}`
+    });
+  };
+
+  // Send translator assignment with email invitation
+  const sendTranslatorAssignment = async () => {
+    if (!assignmentDetails.translator_id) {
+      alert('Please select a translator');
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      // Find translator info
+      const selectedTranslator = translatorList.find(t => t.id === assignmentDetails.translator_id);
+
+      // Build deadline if provided
+      let deadline = null;
+      if (assignmentDetails.due_date) {
+        deadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+      }
+
+      // Update order with translator assignment
+      await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
+        assigned_translator_id: assignmentDetails.translator_id,
+        deadline: deadline,
+        internal_notes: assignmentDetails.project_notes
+      });
+
+      alert(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
+      setAssigningTranslatorModal(null);
+      setAssigningTranslator(null);
+      fetchOrders();
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+      alert('Error sending assignment');
+    } finally {
+      setSendingAssignment(false);
+    }
+  };
+
+  // Simple assign translator (from dropdown)
   const assignTranslator = async (orderId, translatorName) => {
     try {
       await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
@@ -4663,6 +4756,162 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
+      {/* Notification Banner - Show unread notifications */}
+      {(isAdmin || isPM) && notifications.filter(n => !n.is_read).length > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-blue-600 mr-2">🔔</span>
+              <span className="text-sm font-medium text-blue-800">
+                {notifications.filter(n => !n.is_read).length} new notification(s)
+              </span>
+            </div>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              {showNotifications ? 'Hide' : 'View'}
+            </button>
+          </div>
+          {showNotifications && (
+            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              {notifications.filter(n => !n.is_read).map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`p-2 rounded text-xs ${
+                    notif.type === 'assignment_declined' ? 'bg-red-100 border border-red-200' :
+                    notif.type === 'assignment_accepted' ? 'bg-green-100 border border-green-200' :
+                    'bg-white border'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-medium">
+                        {notif.type === 'assignment_declined' ? '❌' :
+                         notif.type === 'assignment_accepted' ? '✅' : '📋'} {notif.title}
+                      </div>
+                      <div className="text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-[10px] text-gray-400 mt-1">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => markNotificationRead(notif.id)}
+                      className="text-gray-400 hover:text-gray-600 text-xs"
+                    >
+                      Mark read
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Translator Assignment Modal */}
+      {assigningTranslatorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">👤 Assign Translator</h3>
+                <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
+              </div>
+              <button onClick={() => setAssigningTranslatorModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Project Info */}
+              <div className="p-3 bg-gray-50 rounded border text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-500">Language:</span>
+                    <span className="ml-1 font-medium">{assignmentDetails.language_pair}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Pages:</span>
+                    <span className="ml-1 font-medium">{assigningTranslatorModal.page_count || 1}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Select Translator */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                <select
+                  value={assignmentDetails.translator_id}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">-- Choose Translator --</option>
+                  {translatorList.filter(t => t.role === 'translator' && t.is_active).map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Due Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={assignmentDetails.due_date}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Time</label>
+                  <input
+                    type="time"
+                    value={assignmentDetails.due_time}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_time: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notes for Translator</label>
+                <textarea
+                  value={assignmentDetails.project_notes}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, project_notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows="2"
+                  placeholder="Special instructions for the translator..."
+                />
+              </div>
+
+              {/* Info */}
+              <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setAssigningTranslatorModal(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendTranslatorAssignment}
+                disabled={sendingAssignment || !assignmentDetails.translator_id}
+                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards - Different for Admin vs PM */}
       {isPM ? (
         /* PM sees: My Orders, Translators Available, Translators Busy */
@@ -5191,8 +5440,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded inline-block w-fit">✕ Declined</span>
                             {(isAdmin || isPM) && (
                               <button
-                                onClick={() => setAssigningTranslator(order.id)}
-                                className="text-[9px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                onClick={() => openAssignTranslatorModal(order)}
+                                className="text-[9px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
                               >
                                 🔄 Reassign
                               </button>
@@ -5202,10 +5451,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     ) : (isAdmin || isPM) ? (
                       <button
-                        onClick={() => setAssigningTranslator(order.id)}
-                        className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                        onClick={() => openAssignTranslatorModal(order)}
+                        className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200"
                       >
-                        Assign
+                        📤 Assign
                       </button>
                     ) : (
                       <span className="text-[10px] text-gray-400">-</span>

@@ -3722,22 +3722,36 @@ async def decline_translator_assignment(token: str):
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
     if status == "accepted":
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
+        button_html = f'''
+        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🚀 Go to Translator Portal
+        </a>
+        '''
     elif status == "declined":
         icon = "✗"
         color = "#dc3545"
         title = "Assignment Declined"
+        button_html = ""
     elif status == "already_responded":
         icon = "ℹ"
         color = "#6c757d"
         title = "Already Responded"
+        button_html = f'''
+        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
+            Go to Portal
+        </a>
+        '''
     else:
         icon = "⚠"
         color = "#ffc107"
         title = "Error"
+        button_html = ""
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -3778,7 +3792,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
             color: #4a5568;
             font-size: 16px;
             line-height: 1.6;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }}
         .logo {{
             color: #1a2a4a;
@@ -3801,6 +3815,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         <div class="icon">{icon}</div>
         <h1>{title}</h1>
         <p>{message}</p>
+        {button_html}
     </div>
 </body>
 </html>'''
