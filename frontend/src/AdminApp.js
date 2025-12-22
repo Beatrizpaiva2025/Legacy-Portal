@@ -1884,7 +1884,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; }
-        .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
+        .header-line {
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
+            margin-bottom: 15px;
+            border: none;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
@@ -1892,7 +1900,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .original-documents-page { page-break-before: always; padding-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
-        @media print { body { padding: 0; } }
+        @media print {
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body>
@@ -2188,7 +2199,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
-        .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
+        .header-line {
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
+            margin-bottom: 15px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
@@ -2199,7 +2217,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .original-images-wrapper { margin-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
-        @media print { body { padding: 0; } .logo-placeholder { border: 1px dashed #ccc; } }
+        @media print {
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .logo-placeholder { border: 1px dashed #ccc; }
+            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; }
+        }
     </style>
 </head>
 <body>
