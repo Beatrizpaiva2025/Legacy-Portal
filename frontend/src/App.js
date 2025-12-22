@@ -673,6 +673,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const clientNameRef = useRef(null);
   const clientEmailRef = useRef(null);
   const fileUploadRef = useRef(null);
+  const shippingRef = useRef(null);
 
   // Format price with currency conversion
   const formatPrice = (usdPrice) => {
@@ -837,6 +838,11 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     if (wordCount === 0) {
       newFieldErrors.file_upload = true;
     }
+    // Validate shipping address for RMV or physical copy
+    if ((needsPhysicalCopy || formData.service_type === 'rmv') && currency.isUSA &&
+        (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) {
+      newFieldErrors.shipping = true;
+    }
 
     // If there are errors, scroll to the first one
     if (Object.keys(newFieldErrors).length > 0) {
@@ -852,6 +858,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       } else if (newFieldErrors.file_upload && fileUploadRef.current) {
         fileUploadRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setError('Please upload a document first');
+      } else if (newFieldErrors.shipping && shippingRef.current) {
+        shippingRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setError('Please complete the shipping address');
       }
       return;
     }
@@ -1230,16 +1239,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   )}
 
                   {(needsPhysicalCopy || formData.service_type === 'rmv') && (
-                    <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+                    <div ref={shippingRef} className={`p-4 rounded-lg space-y-3 ${fieldErrors.shipping ? 'bg-red-50 border border-red-300' : 'bg-gray-50'}`}>
                       <p className="text-sm font-medium text-gray-700">Shipping Address (USA)</p>
+                      {fieldErrors.shipping && <p className="text-red-500 text-sm">Please complete the shipping address</p>}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="md:col-span-2">
                           <label className="block text-xs text-gray-500 mb-1">Street Address *</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.street ? 'border-red-500' : 'border-gray-300'}`}
                             value={shippingAddress.street}
-                            onChange={(e) => setShippingAddress({...shippingAddress, street: e.target.value})}
+                            onChange={(e) => { setShippingAddress({...shippingAddress, street: e.target.value}); setFieldErrors(prev => ({...prev, shipping: false})); }}
                             placeholder="123 Main Street, Apt 4B"
                           />
                         </div>
@@ -1247,9 +1257,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           <label className="block text-xs text-gray-500 mb-1">City *</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.city ? 'border-red-500' : 'border-gray-300'}`}
                             value={shippingAddress.city}
-                            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                            onChange={(e) => { setShippingAddress({...shippingAddress, city: e.target.value}); setFieldErrors(prev => ({...prev, shipping: false})); }}
                             placeholder="Boston"
                           />
                         </div>
@@ -1257,9 +1267,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           <label className="block text-xs text-gray-500 mb-1">State *</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.state ? 'border-red-500' : 'border-gray-300'}`}
                             value={shippingAddress.state}
-                            onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                            onChange={(e) => { setShippingAddress({...shippingAddress, state: e.target.value}); setFieldErrors(prev => ({...prev, shipping: false})); }}
                             placeholder="MA"
                           />
                         </div>
@@ -1267,9 +1277,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                           <label className="block text-xs text-gray-500 mb-1">ZIP Code *</label>
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                            className={`w-full px-3 py-2 border rounded-md text-sm ${fieldErrors.shipping && !shippingAddress.zipCode ? 'border-red-500' : 'border-gray-300'}`}
                             value={shippingAddress.zipCode}
-                            onChange={(e) => setShippingAddress({...shippingAddress, zipCode: e.target.value})}
+                            onChange={(e) => { setShippingAddress({...shippingAddress, zipCode: e.target.value}); setFieldErrors(prev => ({...prev, shipping: false})); }}
                             placeholder="02101"
                           />
                         </div>
