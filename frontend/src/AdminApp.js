@@ -650,19 +650,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const downloadResponse = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
 
       if (downloadResponse.data.file_data) {
-        // Convert base64 to File object
-        const byteString = atob(downloadResponse.data.file_data);
+        const contentType = downloadResponse.data.content_type || 'application/pdf';
+        const base64Data = downloadResponse.data.file_data;
+
+        // Convert base64 to File object for the workspace
+        const byteString = atob(base64Data);
         const ab = new ArrayBuffer(byteString.length);
         const ia = new Uint8Array(ab);
         for (let i = 0; i < byteString.length; i++) {
           ia[i] = byteString.charCodeAt(i);
         }
-        const blob = new Blob([ab], { type: downloadResponse.data.content_type || 'application/pdf' });
+        const blob = new Blob([ab], { type: contentType });
         const file = new File([blob], doc.filename || 'document.pdf', { type: blob.type });
 
         // Set the file in the workspace
         setFiles([file]);
         setSelectedFileId(doc.id);
+
+        // Also set originalImages for PDF generation (needs data URL format)
+        const dataUrl = `data:${contentType};base64,${base64Data}`;
+        setOriginalImages([{ filename: doc.filename, data: dataUrl }]);
+
         setProcessingStatus(`✅ "${doc.filename}" carregado! Prossiga para traduzir.`);
         setActiveSubTab('translate');
       }
@@ -1746,7 +1754,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
@@ -2015,8 +2023,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .header-line { width: 100%; height: 2px; background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd); margin-bottom: 15px; }
         .translation-page { page-break-before: always; padding-top: 20px; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #2563eb; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
+        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .translation-content { line-height: 1.6; font-size: 12px; }
         .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
