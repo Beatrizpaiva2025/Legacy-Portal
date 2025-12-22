@@ -564,19 +564,6 @@ def get_translator_assignment_email_template(translator_name: str, order_details
                                 </tr>
                             </table>
 
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); border-radius: 8px; margin: 25px 0;">
-                                <tr>
-                                    <td style="padding: 20px; text-align: center;">
-                                        <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0;">
-                                            🚀 <strong>Ready to start working?</strong> Access your translator portal:
-                                        </p>
-                                        <a href="{portal_url}/admin" target="_blank" style="color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: underline;">
-                                            {portal_url}/admin
-                                        </a>
-                                    </td>
-                                </tr>
-                            </table>
-
                             <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 20px 0; text-align: center;">
                                 Please respond as soon as possible so we can proceed with the project.
                             </p>
@@ -4286,8 +4273,9 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#28a745"
         title = "Assignment Accepted"
         button_html = f'''
-        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🚀 Go to Translator Portal
+        <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Use your email and password to access the translator portal:</p>
+        <a href="{portal_url}/translator" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Login to Translator Portal
         </a>
         '''
     elif status == "declined":
@@ -4299,11 +4287,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         icon = "ℹ"
         color = "#6c757d"
         title = "Already Responded"
-        button_html = f'''
-        <a href="{portal_url}/admin" style="display: inline-block; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);">
-            Go to Portal
-        </a>
-        '''
+        button_html = ""
     else:
         icon = "⚠"
         color = "#ffc107"
