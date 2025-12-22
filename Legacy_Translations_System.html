@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy Translations System - Partner Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --text-dark: #1f2937;
+            --text-light: #6b7280;
+            --bg-light: #f8fafc;
+            --white: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--white);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            padding: 1rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-dark);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-color);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: var(--white);
+            padding: 2rem;
+            padding-top: 80px;
+        }
+
+        .hero-content {
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease 0.2s both;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: var(--white);
+            color: var(--primary-color);
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            animation: fadeInUp 1s ease 0.4s both;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        /* Section Styles */
+        section {
+            padding: 5rem 5%;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-dark);
+        }
+
+        .section-subtitle {
+            text-align: center;
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        /* Features Section */
+        .features {
+            background: var(--bg-light);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.12);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-light);
+        }
+
+        /* Workflow Section */
+        .workflow {
+            background: var(--white);
+        }
+
+        .workflow-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .workflow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            background: var(--bg-light);
+            border-radius: 12px;
+            transition: all 0.3s;
+        }
+
+        .workflow-step:hover {
+            background: var(--white);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .step-content h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .step-content p {
+            color: var(--text-light);
+            font-size: 0.95rem;
+        }
+
+        /* Integrations Section */
+        .integrations {
+            background: linear-gradient(135deg, var(--text-dark) 0%, #374151 100%);
+            color: var(--white);
+        }
+
+        .integrations .section-title {
+            color: var(--white);
+        }
+
+        .integrations .section-subtitle {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .integrations-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .integration-card {
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .integration-card:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-5px);
+        }
+
+        .integration-logo {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .integration-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .integration-card p {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+        }
+
+        /* Tech Stack Section */
+        .tech-stack {
+            background: var(--bg-light);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .tech-item {
+            background: var(--white);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+        }
+
+        .tech-item h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .tech-item p {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        /* Architecture Section */
+        .architecture {
+            background: var(--white);
+        }
+
+        .arch-diagram {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--bg-light);
+            border-radius: 20px;
+            padding: 2rem;
+        }
+
+        .arch-row {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .arch-box {
+            background: var(--white);
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.08);
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .arch-box.frontend {
+            border-left: 4px solid #61dafb;
+        }
+
+        .arch-box.backend {
+            border-left: 4px solid #10b981;
+        }
+
+        .arch-box.database {
+            border-left: 4px solid #10b981;
+        }
+
+        .arch-box.services {
+            border-left: 4px solid var(--warning-color);
+        }
+
+        .arch-box h4 {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 0.3rem;
+        }
+
+        .arch-box p {
+            font-weight: 600;
+        }
+
+        .arch-arrow {
+            text-align: center;
+            font-size: 2rem;
+            color: var(--text-light);
+            margin: 1rem 0;
+        }
+
+        /* Contact Section */
+        .contact {
+            background: var(--primary-color);
+            color: var(--white);
+            text-align: center;
+        }
+
+        .contact .section-title {
+            color: var(--white);
+        }
+
+        .contact p {
+            max-width: 500px;
+            margin: 0 auto 2rem;
+            opacity: 0.9;
+        }
+
+        .contact-btn {
+            display: inline-block;
+            background: var(--white);
+            color: var(--primary-color);
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .contact-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        /* Footer */
+        footer {
+            background: var(--text-dark);
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .arch-row {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        /* Slide Navigation */
+        .slide-nav {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1000;
+        }
+
+        .slide-nav a {
+            display: block;
+            width: 12px;
+            height: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            margin: 10px 0;
+            transition: all 0.3s;
+        }
+
+        .slide-nav a:hover,
+        .slide-nav a.active {
+            background: var(--primary-color);
+            transform: scale(1.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="logo">Legacy Translations</div>
+        <ul class="nav-links">
+            <li><a href="#home">Home</a></li>
+            <li><a href="#features">Funcionalidades</a></li>
+            <li><a href="#workflow">Workflow</a></li>
+            <li><a href="#integrations">Integracoes</a></li>
+            <li><a href="#architecture">Arquitetura</a></li>
+        </ul>
+    </nav>
+
+    <!-- Slide Navigation Dots -->
+    <div class="slide-nav">
+        <a href="#home" title="Home"></a>
+        <a href="#features" title="Funcionalidades"></a>
+        <a href="#workflow" title="Workflow"></a>
+        <a href="#integrations" title="Integracoes"></a>
+        <a href="#tech" title="Tecnologias"></a>
+        <a href="#architecture" title="Arquitetura"></a>
+        <a href="#contact" title="Contato"></a>
+    </div>
+
+    <!-- Hero Section (Slide 1) -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1>Legacy Translations System</h1>
+            <p>Portal para Parceiros com Sistema Completo de Cotacoes, Tracking de Pedidos e Integracoes Empresariais</p>
+            <a href="#features" class="cta-button">Conhecer o Sistema</a>
+        </div>
+    </section>
+
+    <!-- Features Section (Slide 2) -->
+    <section class="features" id="features">
+        <h2 class="section-title">Funcionalidades Principais</h2>
+        <p class="section-subtitle">Um sistema completo para gerenciamento de traducoes profissionais</p>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l4.59-4.59L18 11l-6 6z"/></svg>
+                </div>
+                <h3>Portal de Cotacoes</h3>
+                <p>Calculo automatico de precos baseado em pares de idiomas, tipo de documento e prazo de entrega.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                </div>
+                <h3>Tracking de Pedidos</h3>
+                <p>Acompanhamento em tempo real do status de cada traducao com 6 estagios detalhados.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                </div>
+                <h3>Sistema de Mensagens</h3>
+                <p>Comunicacao direta entre clientes, tradutores e equipe de suporte.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg width="24" height="24" fill="white" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                </div>
+                <h3>Sistema de Pagamentos</h3>
+                <p>Gestao completa de pagamentos para tradutores e cobrancas de clientes.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Section (Slide 3) -->
+    <section class="workflow" id="workflow">
+        <h2 class="section-title">Fluxo de Trabalho</h2>
+        <p class="section-subtitle">Acompanhe cada etapa do processo de traducao</p>
+
+        <div class="workflow-container">
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Order Received - Pedido Recebido</h4>
+                        <p>O cliente submete o documento e a solicitacao entra no sistema.</p>
+                    </div>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>In Translation - Em Traducao</h4>
+                        <p>O tradutor designado inicia o trabalho de traducao do documento.</p>
+                    </div>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Quality Review - Revisao de Qualidade</h4>
+                        <p>Revisao linguistica e verificacao de consistencia terminologica.</p>
+                    </div>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <h4>Final Review - Revisao Final</h4>
+                        <p>Ultima verificacao de formatacao e controle de qualidade.</p>
+                    </div>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <h4>Ready for Delivery - Pronto para Entrega</h4>
+                        <p>Documento finalizado e aguardando envio ao cliente.</p>
+                    </div>
+                </div>
+
+                <div class="workflow-step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <h4>Delivered - Entregue</h4>
+                        <p>Traducao entregue com sucesso ao cliente.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Integrations Section (Slide 4) -->
+    <section class="integrations" id="integrations">
+        <h2 class="section-title">Integracoes Empresariais</h2>
+        <p class="section-subtitle">Conectado com as melhores plataformas do mercado</p>
+
+        <div class="integrations-grid">
+            <div class="integration-card">
+                <div class="integration-logo">
+                    <svg width="50" height="50" viewBox="0 0 50 50" fill="white"><path d="M25 5C13.9 5 5 13.9 5 25s8.9 20 20 20 20-8.9 20-20S36.1 5 25 5zm-2.5 30v-5h5v5h-5zm0-7.5v-12.5h5v12.5h-5z"/></svg>
+                </div>
+                <h3>Stripe</h3>
+                <p>Processamento seguro de pagamentos com cartoes de credito e outras formas de pagamento.</p>
+            </div>
+
+            <div class="integration-card">
+                <div class="integration-logo">
+                    <svg width="50" height="50" viewBox="0 0 50 50" fill="white"><path d="M40 10H10c-2.75 0-5 2.25-5 5v20c0 2.75 2.25 5 5 5h30c2.75 0 5-2.25 5-5V15c0-2.75-2.25-5-5-5zm0 10L25 27.5 10 20v-5l15 7.5L40 15v5z"/></svg>
+                </div>
+                <h3>SendGrid</h3>
+                <p>Envio automatizado de emails transacionais e notificacoes para clientes.</p>
+            </div>
+
+            <div class="integration-card">
+                <div class="integration-logo">
+                    <svg width="50" height="50" viewBox="0 0 50 50" fill="white"><path d="M25 5L5 15v20l20 10 20-10V15L25 5zm0 5.5l12.5 6.25L25 23l-12.5-6.25L25 10.5zM10 32.5V20l12.5 6.25V39L10 32.5zm15 6.5V26.25L37.5 20v12.5L25 39z"/></svg>
+                </div>
+                <h3>Protemos</h3>
+                <p>Gestao profissional de projetos de traducao e controle de equipes.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section (Slide 5) -->
+    <section class="tech-stack" id="tech">
+        <h2 class="section-title">Stack Tecnologico</h2>
+        <p class="section-subtitle">Construido com tecnologias modernas e confiaveis</p>
+
+        <div class="tech-grid">
+            <div class="tech-item">
+                <h4>React.js</h4>
+                <p>Frontend moderno e responsivo</p>
+            </div>
+
+            <div class="tech-item">
+                <h4>FastAPI</h4>
+                <p>Backend Python de alta performance</p>
+            </div>
+
+            <div class="tech-item">
+                <h4>MongoDB</h4>
+                <p>Banco de dados NoSQL flexivel</p>
+            </div>
+
+            <div class="tech-item">
+                <h4>Render</h4>
+                <p>Hospedagem cloud escalavel</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section (Slide 6) -->
+    <section class="architecture" id="architecture">
+        <h2 class="section-title">Arquitetura do Sistema</h2>
+        <p class="section-subtitle">Visao geral da estrutura tecnica</p>
+
+        <div class="arch-diagram">
+            <div class="arch-row">
+                <div class="arch-box frontend">
+                    <h4>FRONTEND</h4>
+                    <p>React.js App</p>
+                </div>
+            </div>
+
+            <div class="arch-arrow">&#8595;</div>
+
+            <div class="arch-row">
+                <div class="arch-box backend">
+                    <h4>BACKEND</h4>
+                    <p>FastAPI (Python)</p>
+                </div>
+            </div>
+
+            <div class="arch-arrow">&#8595;</div>
+
+            <div class="arch-row">
+                <div class="arch-box database">
+                    <h4>DATABASE</h4>
+                    <p>MongoDB Atlas</p>
+                </div>
+                <div class="arch-box services">
+                    <h4>SERVICES</h4>
+                    <p>Stripe | SendGrid | Protemos</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section (Slide 7) -->
+    <section class="contact" id="contact">
+        <h2 class="section-title">Comece Agora</h2>
+        <p>Entre em contato para saber mais sobre o Legacy Translations Partner Portal</p>
+        <a href="mailto:contato@legacytranslations.com" class="contact-btn">Falar com a Equipe</a>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2024 Legacy Translations. Todos os direitos reservados.</p>
+    </footer>
+
+    <!-- JavaScript for smooth scrolling and navigation -->
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // Update active navigation dot on scroll
+        const sections = document.querySelectorAll('section');
+        const navDots = document.querySelectorAll('.slide-nav a');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+
+                if (scrollY >= sectionTop - sectionHeight / 3) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navDots.forEach(dot => {
+                dot.classList.remove('active');
+                if (dot.getAttribute('href') === '#' + current) {
+                    dot.classList.add('active');
+                }
+            });
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.feature-card, .workflow-step, .integration-card, .tech-item').forEach(el => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(20px)';
+            el.style.transition = 'all 0.6s ease';
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
