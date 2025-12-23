@@ -1389,7 +1389,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isApprovalComplete = approvalChecks.projectNumber && approvalChecks.languageCorrect && approvalChecks.proofread;
 
   // Send translation to Projects
-  const sendToProjects = async () => {
+  const sendToProjects = async (destination = 'admin') => {
     // Validate document type
     if (!documentType.trim()) {
       alert('Please fill in the Document Type field');
@@ -1422,7 +1422,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Build translation HTML (simplified for storage)
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
 
-      // Send to backend
+      // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
         translation_html: translationHTML,
         source_language: sourceLanguage,
@@ -1436,11 +1436,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
         logo_left: logoLeft,
         logo_right: logoRight,
-        logo_stamp: logoStamp
+        logo_stamp: logoStamp,
+        send_to: destination // 'pm' or 'admin'
       });
 
+      const destinationLabel = destination === 'pm' ? 'PM' : 'Admin';
       if (response.data.status === 'success' || response.data.success) {
-        setProcessingStatus('✅ Translation sent to Projects! Returning to Projects...');
+        setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
         setSelectedOrderId('');
 
         // Navigate back to Projects after a short delay
@@ -2567,8 +2569,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             padding-bottom: 10px;
+        }
+        .header-line {
+            height: 2px;
+            background: #93C5FD;
+            margin-bottom: 15px;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -2614,15 +2621,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; }
-        .header-line {
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
-            margin-bottom: 15px;
-            border: none;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
@@ -2644,7 +2642,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
             /* Running header for HTML content pages */
             .running-header {
@@ -2921,8 +2918,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             padding-bottom: 10px;
+        }
+        .header-line {
+            height: 2px;
+            background: #93C5FD;
+            margin-bottom: 15px;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -2967,14 +2969,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
-        .header-line {
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
-            margin-bottom: 15px;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
@@ -2988,7 +2982,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .logo-placeholder { border: 1px dashed #ccc; }
-            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; }
         }
     </style>
 </head>
@@ -5301,11 +5294,11 @@ tradução juramentada | certified translation`}
                   </div>
                 )}
 
-                <div className="flex space-x-2">
+                <div className="flex flex-col space-y-2">
                   <select
                     value={selectedOrderId}
                     onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                    className="w-full px-2 py-1.5 text-xs border rounded"
                   >
                     <option value="">-- Select Order --</option>
                     {availableOrders.map(order => (
@@ -5314,13 +5307,22 @@ tradução juramentada | certified translation`}
                       </option>
                     ))}
                   </select>
-                  <button
-                    onClick={sendToProjects}
-                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => sendToProjects('pm')}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                      className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                    </button>
+                    <button
+                      onClick={() => sendToProjects('admin')}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                    </button>
+                  </div>
                 </div>
                 {availableOrders.length === 0 && (
                   <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
