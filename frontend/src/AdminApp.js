@@ -6179,7 +6179,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setDocumentFile(null);
       fetchOrders();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error creating project');
+      console.error('Error creating project:', err.response?.data || err);
+      const errorMsg = err.response?.data?.detail || 'Error creating project';
+      alert(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
     } finally {
       setCreatingProject(false);
     }
