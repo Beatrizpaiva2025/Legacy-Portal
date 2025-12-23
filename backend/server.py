@@ -3681,15 +3681,17 @@ class TranslationData(BaseModel):
     logo_left: Optional[str] = None
     logo_right: Optional[str] = None
     logo_stamp: Optional[str] = None
+    send_to: str = "admin"  # 'pm' or 'admin'
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
     """Save translation from workspace to an order (admin/PM/translator)"""
     # Allow admin key or valid user tokens
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    current_user = None
     if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm", "translator"]:
+        current_user = await get_current_admin_user(admin_key)
+        if current_user and current_user.get("role") in ["admin", "pm", "translator"]:
             is_valid = True
 
     if not is_valid:
@@ -3699,6 +3701,15 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     order = await db.translation_orders.find_one({"id": order_id})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Determine status based on destination
+    destination = data.send_to or "admin"
+    if destination == "pm":
+        new_status = "pending_pm_review"
+        status_message = "Translation saved and sent to PM for review"
+    else:
+        new_status = "review"
+        status_message = "Translation saved and sent to Admin for review"
 
     # Update order with translation data
     await db.translation_orders.update_one(
@@ -3717,14 +3728,16 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_logo_left": data.logo_left,
             "translation_logo_right": data.logo_right,
             "translation_logo_stamp": data.logo_stamp,
-            "translation_status": "review",  # Move to review status
+            "translation_status": new_status,
+            "translation_sent_to": destination,
             "translation_ready": True,
-            "translation_ready_at": datetime.utcnow().isoformat()
+            "translation_ready_at": datetime.utcnow().isoformat(),
+            "translation_submitted_by": current_user.get("name") if current_user else "Admin"
         }}
     )
 
-    logger.info(f"Translation saved for order {order_id}, moved to review status")
-    return {"success": True, "message": "Translation saved and sent to review"}
+    logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+    return {"success": True, "message": status_message}
 
 class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None

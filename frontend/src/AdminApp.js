@@ -901,11 +901,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const destinationLabel = destination === 'pm' ? 'PM' : 'Admin';
       if (response.data.status === 'success' || response.data.success) {
-        setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
+        // Check if user is a translator (they can't access Projects page)
+        const isTranslator = user?.role === 'translator';
+
+        if (isTranslator) {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! You can start a new translation.`);
+        } else {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
+        }
         setSelectedOrderId('');
 
-        // Navigate back to Projects after a short delay
-        if (onBack) {
+        // Navigate back to Projects after a short delay (only for non-translators)
+        if (onBack && !isTranslator) {
           setTimeout(() => {
             onBack();
           }, 1500);
@@ -4649,13 +4656,16 @@ tradução juramentada | certified translation`}
                     >
                       {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
                     </button>
-                    <button
-                      onClick={() => sendToProjects('admin')}
-                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
-                    </button>
+                    {/* Only show "Send to Admin" for non-translators */}
+                    {user?.role !== 'translator' && (
+                      <button
+                        onClick={() => sendToProjects('admin')}
+                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 {availableOrders.length === 0 && (
