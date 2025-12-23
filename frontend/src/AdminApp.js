@@ -4410,6 +4410,24 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
+              {/* Download Button */}
+              <button
+                onClick={handleQuickPackageDownload}
+                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {quickPackageLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </>
+                ) : (
+                  '📦 Generate Complete Package (Print/PDF)'
+                )}
+              </button>
+              <p className="text-[10px] text-gray-500 mt-2 text-center">
+                Opens print window - save as PDF
+              </p>
             </>
           )}
 
@@ -4527,6 +4545,53 @@ tradução juramentada | certified translation`}
                     </p>
                   </div>
                 </label>
+              </div>
+
+              {/* Download Options */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-3">📥 Download Complete Package</h3>
+
+                {/* Document Order Preview */}
+                <div className="bg-white rounded border p-3 mb-3">
+                  <p className="text-xs font-medium text-gray-700 mb-2">📋 Document Order:</p>
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    {includeCover && (
+                      <>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Certificate</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Translation</span>
+                    {includeOriginal && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Original</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2">
+                    {includeLetterhead ? '✓ Letterhead on all pages' : '✗ No letterhead'}
+                  </p>
+                </div>
+
+                {/* Download Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleDownload('html')}
+                    className="py-3 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                  >
+                    📄 Download HTML
+                  </button>
+                  <button
+                    onClick={() => handleDownload('pdf')}
+                    className="py-3 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center justify-center gap-2"
+                  >
+                    📑 Print / Save PDF
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2 text-center">
+                  HTML: Edit in browser before printing | PDF: Opens print dialog
+                </p>
               </div>
 
               {/* Send to Projects */}
