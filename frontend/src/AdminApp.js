@@ -665,6 +665,170 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
         'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
       ]
+    },
+    'rmv-foreign-dl': {
+      name: "RMV_Foreign Driver's License Form",
+      description: 'Official MA RMV Form LIC114',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px;">
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 50px; height: 50px; border: 1px solid #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center;">MA State Seal</div>
+              <div style="display: flex; gap: 2px;">
+                <div style="background: #000; color: #fff; padding: 5px 8px; font-weight: bold;">r</div>
+                <div style="background: #c00; color: #fff; padding: 5px 8px; font-weight: bold;">m</div>
+                <div style="background: #006; color: #fff; padding: 5px 8px; font-weight: bold;">v</div>
+              </div>
+              <div style="font-size: 8px; color: #666;">REGISTRY OF MOTOR VEHICLES</div>
+            </div>
+            <div>
+              <div style="font-size: 18px; font-weight: bold;">Translation into English</div>
+              <div style="font-size: 16px; font-weight: bold;">of a Foreign Driver License</div>
+            </div>
+            <div style="border: 1px solid #000; width: 100px; height: 120px; display: flex; align-items: center; justify-content: center; font-size: 10px; text-align: center;">Attach photo here</div>
+          </div>
+
+          <!-- Yellow Box Notice -->
+          <div style="background: #fff3cd; border: 1px solid #000; padding: 10px; margin-bottom: 15px; font-style: italic; font-size: 10px;">
+            <p style="margin: 0 0 5px 0;"><em>Massachusetts General Law (Chapter 90, Section 10) was changed July 2018. Everyone operating a motor vehicle in Massachusetts with a foreign driver's license that is not written in English must carry either this completed translation, an International Driving Permit (IDP) issued from the country that issued the license, or an alternative translation document that contains a photo and English translation that closely matches the information from an IDP.</em></p>
+            <p style="margin: 0; font-weight: bold;"><em>This form must be completed <u>for</u> an applicant who does not have an IDP or alternative translation document and whose license is not written in English.</em></p>
+          </div>
+
+          <!-- Qualified Translator Section -->
+          <div style="margin-bottom: 15px;">
+            <p style="font-weight: bold; margin-bottom: 10px;">All information below must be completed by a <u>qualified</u> translator.</p>
+
+            <p style="margin-bottom: 10px;">I hereby certify that this is a true and complete original translation from (original language)</p>
+            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+              <input type="text" placeholder="Original Language" style="border: none; border-bottom: 1px solid #000; width: 150px; padding: 2px;" contenteditable="true" />
+              <span>into English of a driver's license issued by the Country of</span>
+              <input type="text" placeholder="Country" style="border: none; border-bottom: 1px solid #000; width: 150px; padding: 2px;" contenteditable="true" />
+              <span>.</span>
+            </div>
+
+            <p style="margin-bottom: 10px;">I further certify that I speak the language of the original driver's license fluently and I (check one):</p>
+
+            <div style="margin-left: 20px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px;">
+                <input type="checkbox" style="margin-top: 3px;" />
+                <span>Work for a college, university, or private language school. Name, Address, and Department:</span>
+              </div>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; margin-left: 20px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-left: 20px; margin-bottom: 8px;">
+              <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 5px;">
+                <input type="checkbox" style="margin-top: 3px;" />
+                <span>Work for a local consulate. Name and Address of Consulate:</span>
+              </div>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; margin-left: 20px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-left: 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" style="margin-top: 0;" />
+              <span>Am a Massachusetts bilingual notary public ---------------------------- (place official notary seal below)</span>
+            </div>
+
+            <div style="margin-left: 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" style="margin-top: 0;" checked />
+              <span>Am a member of the American Translators Association</span>
+            </div>
+          </div>
+
+          <!-- Licensee Information Box -->
+          <div style="border: 1px solid #000; padding: 10px; margin-bottom: 15px;">
+            <p style="font-weight: bold; margin: 0 0 5px 0;">Licensee Information:</p>
+            <p style="font-style: italic; margin: 0 0 10px 0; font-size: 10px;">In translating information fields from the license into English, I find the following is indicated on the license:</p>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 220px;">Country where the license was issued:</span>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 220px;">Full name of the license holder:</span>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 220px;">Date of birth (month/ day/ year):</span>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 220px;">Place of residence on license:</span>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 250px;">Type of vehicle for which the license is valid:</span>
+              <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 20px;">
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 150px;">Driver license number:</span>
+                <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 100px;">Class of license:</span>
+                <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 20px;">
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 120px;">License issue date:</span>
+                <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 150px;">License expiration date:</span>
+                <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+            </div>
+
+            <p style="font-weight: bold; margin: 10px 0 0 0; font-size: 10px;"><u>Note: A passport-sized photo of the person depicted on the license must be securely attached to this document in the area provided in the top right corner.</u></p>
+          </div>
+
+          <!-- Translator Attestation Box -->
+          <div style="border: 1px solid #000; padding: 10px; margin-bottom: 10px;">
+            <p style="font-weight: bold; margin: 0 0 5px 0;">Translator Attestation:</p>
+            <p style="margin: 0 0 10px 0; font-size: 10px;">I understand that the original driver's license document for this certified translation and the translation itself may be relied on by law enforcement officers and/or other drivers (in the event of a crash) to properly identify the individual shown on the driver's license and I further understand that false statements may be punished by fine, imprisonment, or both (M.G.L. Chapter 90, Section 24).</p>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 20px;">
+              <div style="display: flex; align-items: center; flex: 2;">
+                <span style="width: 180px;">Translator's name (printed):</span>
+                <input type="text" value="Beatriz Paiva" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 40px;">Date:</span>
+                <input type="text" placeholder="" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 150px;">Translator's full address:</span>
+              <input type="text" value="867 Boylston Street, 5th Floor, #2073, Boston, MA 02116" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <div style="margin-bottom: 8px; display: flex; align-items: center;">
+              <span style="width: 220px;">Translator's tel. number/ Email address:</span>
+              <input type="text" value="(857) 316-7770 / contact@legacytranslations.com" style="border: none; border-bottom: 1px solid #000; flex: 1; padding: 2px;" contenteditable="true" />
+            </div>
+
+            <p style="margin: 5px 0;">Signed under the penalties of perjury:</p>
+
+            <div style="margin-bottom: 5px; display: flex; align-items: center;">
+              <span style="width: 150px;">Translator's signature:</span>
+              <div style="border-bottom: 1px solid #000; flex: 1; height: 30px;"></div>
+            </div>
+          </div>
+
+          <div style="text-align: right; font-size: 9px; color: #666;">LIC114_1118</div>
+        </div>
+      `
     }
   };
 
@@ -2374,8 +2538,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-    // Cover Letter HTML
-    const coverLetterHTML = `
+    // Check if selected template is a form (like RMV Foreign DL)
+    const isFormTemplate = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm;
+
+    // Cover Letter HTML - use form HTML if it's a form template
+    const coverLetterHTML = isFormTemplate ? `
+    <!-- FORM TEMPLATE PAGE -->
+    <div class="cover-page" style="padding: 20px;">
+        ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML}
+    </div>` : `
     <!-- COVER LETTER PAGE -->
     <div class="cover-page">
         <!-- HEADER WITH LOGOS -->
@@ -3496,83 +3667,92 @@ tradução juramentada | certified translation`}
               </div>
             </div>
 
-            {/* The Certificate Document */}
-            <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
+            {/* Check if selected template is a form type */}
+            {CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm ? (
+              /* Render Form Template (like RMV Foreign DL) */
+              <div
+                className="border rounded bg-white overflow-auto"
+                style={{maxHeight: '800px'}}
+                dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML }}
+              />
+            ) : (
+              /* Render Standard Certificate Template */
+              <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
 
-              {/* Header with logos */}
-              <div className="flex justify-between items-center mb-2 pb-2">
-                <div className="w-32">
-                  {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
+                {/* Header with logos */}
+                <div className="flex justify-between items-center mb-2 pb-2">
+                  <div className="w-32">
+                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
+                  </div>
+                  <div className="text-center flex-1 px-4">
+                    <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
+                    <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                  </div>
+                  <div className="w-20 text-right">
+                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
+                  </div>
                 </div>
-                <div className="text-center flex-1 px-4">
-                  <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
-                  <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                  <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                {/* Light blue line below header */}
+                <div className="w-full h-0.5 bg-blue-200 mb-4"></div>
+
+                {/* Order Number */}
+                <div className="text-right mb-6 text-sm">
+                  <span>Order # </span>
+                  <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
                 </div>
-                <div className="w-20 text-right">
-                  {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
-                </div>
-              </div>
-              {/* Light blue line below header */}
-              <div className="w-full h-0.5 bg-blue-200 mb-4"></div>
 
-              {/* Order Number */}
-              <div className="text-right mb-6 text-sm">
-                <span>Order # </span>
-                <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
-              </div>
+                {/* Main Title */}
+                <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
 
-              {/* Main Title */}
-              <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
+                {/* Translation of ... */}
+                <p className="text-center mb-6 text-sm">
+                  Translation of{' '}
+                  <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600" placeholder="School Transcript" />
+                  {' '}from<br/>
+                  <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1">
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                  {' '}to{' '}
+                  <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600">
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </p>
 
-              {/* Translation of ... */}
-              <p className="text-center mb-6 text-sm">
-                Translation of{' '}
-                <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600" placeholder="School Transcript" />
-                {' '}from<br/>
-                <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1">
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-                {' '}to{' '}
-                <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600">
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </p>
+                {/* Body paragraphs - Dynamic based on selected template */}
+                {(() => {
+                  // Get the template paragraphs
+                  let templateParagraphs;
+                  if (selectedCertificateTemplate.startsWith('custom-')) {
+                    const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+                    templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                  } else {
+                    templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                  }
 
-              {/* Body paragraphs - Dynamic based on selected template */}
-              {(() => {
-                // Get the template paragraphs
-                let templateParagraphs;
-                if (selectedCertificateTemplate.startsWith('custom-')) {
-                  const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
-                  templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-                } else {
-                  templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-                }
+                  // Replace placeholders with actual values
+                  return templateParagraphs.map((paragraph, index) => {
+                    const processedParagraph = paragraph
+                      .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+                      .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
 
-                // Replace placeholders with actual values
-                return templateParagraphs.map((paragraph, index) => {
-                  const processedParagraph = paragraph
-                    .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
-                    .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+                    return (
+                      <p
+                        key={index}
+                        className={`${index === templateParagraphs.length - 1 ? 'mb-6' : 'mb-4'} text-justify text-xs leading-relaxed`}
+                        dangerouslySetInnerHTML={{ __html: processedParagraph }}
+                      />
+                    );
+                  });
+                })()}
 
-                  return (
-                    <p
-                      key={index}
-                      className={`${index === templateParagraphs.length - 1 ? 'mb-6' : 'mb-4'} text-justify text-xs leading-relaxed`}
-                      dangerouslySetInnerHTML={{ __html: processedParagraph }}
-                    />
-                  );
-                });
-              })()}
-
-              {/* Signature and Stamp Section */}
-              <div className="mt-8 flex justify-between items-end">
-                <div>
-                  {signatureImage ? (
-                    <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
-                  ) : (
-                    <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
+                {/* Signature and Stamp Section */}
+                <div className="mt-8 flex justify-between items-end">
+                  <div>
+                    {signatureImage ? (
+                      <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
+                    ) : (
+                      <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
                   )}
                   <div className="text-xs">Authorized Representative</div>
                   <div className="text-xs">Legacy Translations Inc.</div>
@@ -3594,6 +3774,7 @@ tradução juramentada | certified translation`}
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           {/* Page Format Section */}
