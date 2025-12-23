@@ -6097,6 +6097,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Prepare project data with document if uploaded
       let projectData = { ...newProject };
 
+      // Combine deadline date and time FIRST (before removing deadline_time)
+      if (projectData.deadline && projectData.deadline_time) {
+        projectData.deadline = `${projectData.deadline}T${projectData.deadline_time}`;
+      } else if (!projectData.deadline) {
+        projectData.deadline = null;
+      }
+
       // Remove fields that shouldn't be sent to backend
       delete projectData.deadline_time; // This is combined into deadline
 
@@ -6140,13 +6147,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         projectData.payment_status = 'paid';
       } else {
         projectData.payment_status = 'pending';
-      }
-
-      // Combine deadline date and time
-      if (projectData.deadline && projectData.deadline_time) {
-        projectData.deadline = `${projectData.deadline}T${projectData.deadline_time}`;
-      } else if (!projectData.deadline) {
-        projectData.deadline = null;
       }
 
       await axios.post(`${API}/admin/orders/manual?admin_key=${adminKey}`, projectData);
