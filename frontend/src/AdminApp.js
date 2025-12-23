@@ -996,6 +996,139 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div style="text-align: right; font-size: 9px; color: #666; margin-top: 5px;">LIC114_1118</div>
         </div>
       `
+    },
+    'rmv-documents': {
+      name: "RMV-Documents",
+      description: 'RMV Form - Editable Fields',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 12px; line-height: 1.5; max-width: 780px; margin: 0 auto; padding: 25px; background: #fff;">
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 60px; height: 60px; border: 1px solid #999; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='none' stroke='%23333' stroke-width='2'/%3E%3Ctext x='50' y='35' text-anchor='middle' font-size='8' fill='%23333'%3ECommonwealth%3C/text%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='8' fill='%23333'%3Eof%3C/text%3E%3Ctext x='50' y='65' text-anchor='middle' font-size='8' fill='%23333'%3EMassachusetts%3C/text%3E%3C/svg%3E" alt="MA Seal" style="width: 55px; height: 55px;" />
+              </div>
+              <div style="display: flex; gap: 3px;">
+                <div style="background: #000; color: #fff; padding: 8px 12px; font-weight: bold; font-size: 16px;">r</div>
+                <div style="background: #c00; color: #fff; padding: 8px 12px; font-weight: bold; font-size: 16px;">m</div>
+                <div style="background: #003; color: #fff; padding: 8px 12px; font-weight: bold; font-size: 16px;">v</div>
+              </div>
+              <div style="font-size: 8px; color: #666; text-transform: uppercase; line-height: 1.2;">REGISTRY OF<br/>MOTOR VEHICLES</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 22px; font-weight: bold;">Translation into English</div>
+              <div style="font-size: 18px; font-weight: bold;">of a Foreign Driver License</div>
+            </div>
+            <div style="border: 1px solid #000; width: 100px; height: 125px; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center;">
+              Attach photo here
+            </div>
+          </div>
+
+          <!-- Yellow Notice Box -->
+          <div style="background: #fffacd; border: 1px solid #000; padding: 12px; margin-bottom: 18px; font-style: italic; font-size: 11px;">
+            <p style="margin: 0 0 8px 0;">Massachusetts General Law (Chapter 90, Section 10) was changed July 2018. Everyone operating a motor vehicle in Massachusetts with a foreign driver's license that is not written in English must carry either this completed translation, an International Driving Permit (IDP) issued from the country that issued the license, or an alternative translation document that contains a photo and English translation that closely matches the information from an IDP.</p>
+            <p style="margin: 0;"><strong>This form must be completed <u>for</u> an applicant who does not have an IDP or alternative translation document and whose license is not written in English.</strong></p>
+          </div>
+
+          <!-- Translator Certification -->
+          <div style="margin-bottom: 18px;">
+            <p style="font-weight: bold; margin-bottom: 12px;">All information below must be completed by a <u>qualified</u> translator.</p>
+
+            <p style="margin-bottom: 10px;">I hereby certify that this is a true and complete original translation from (original language)</p>
+            <p style="margin-bottom: 12px;">
+              <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+              into English of a driver's license issued by the Country of
+              <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>.
+            </p>
+
+            <p style="margin-bottom: 10px;">I further certify that I speak the language of the original driver's license fluently and I (check one):</p>
+
+            <div style="margin-left: 20px;">
+              <p style="margin-bottom: 8px;">
+                <input type="checkbox" style="margin-right: 8px;" />
+                Work for a college, university, or private language school. Name, Address, and Department:
+              </p>
+              <p style="margin-bottom: 12px; margin-left: 25px;">
+                <span style="border-bottom: 1px solid #000; display: inline-block; width: 95%; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+              </p>
+
+              <p style="margin-bottom: 8px;">
+                <input type="checkbox" style="margin-right: 8px;" />
+                Work for a local consulate. Name and Address of Consulate:
+              </p>
+              <p style="margin-bottom: 12px; margin-left: 25px;">
+                <span style="border-bottom: 1px solid #000; display: inline-block; width: 95%; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+              </p>
+
+              <p style="margin-bottom: 8px;">
+                <input type="checkbox" style="margin-right: 8px;" />
+                Am a Massachusetts bilingual notary public ---------------------------- (place official notary seal below)
+              </p>
+
+              <p style="margin-bottom: 8px;">
+                <input type="checkbox" checked style="margin-right: 8px;" />
+                Am a member of the American Translators Association
+              </p>
+            </div>
+          </div>
+
+          <!-- Licensee Information Box -->
+          <div style="border: 1px solid #000; padding: 12px; margin-bottom: 18px;">
+            <p style="font-weight: bold; margin: 0 0 5px 0;">Licensee Information:</p>
+            <p style="font-style: italic; margin: 0 0 12px 0; font-size: 11px;">In translating information fields from the license into English, I find the following is indicated on the license:</p>
+
+            <p style="margin-bottom: 8px;">
+              Country where the license was issued: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 350px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Full name of the license holder: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 380px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Date of birth (month/ day/ year): <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 370px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Place of residence on license: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 390px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Type of vehicle for which the license is valid: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 310px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Driver license number: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 200px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+              &nbsp;&nbsp;&nbsp;Class of license: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              License issue date: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+              &nbsp;&nbsp;&nbsp;License expiration date: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+
+            <p style="font-weight: bold; margin: 12px 0 0 0; font-size: 11px;"><u>Note: A passport-sized photo of the person depicted on the license must be securely attached to this document in the area provided in the top right corner.</u></p>
+          </div>
+
+          <!-- Translator Attestation Box -->
+          <div style="border: 1px solid #000; padding: 12px; margin-bottom: 12px;">
+            <p style="font-weight: bold; margin: 0 0 8px 0;">Translator Attestation:</p>
+            <p style="margin: 0 0 12px 0; font-size: 11px;">I understand that the original driver's license document for this certified translation and the translation itself may be relied on by law enforcement officers and/or other drivers (in the event of a crash) to properly identify the individual shown on the driver's license and I further understand that false statements may be punished by fine, imprisonment, or both (M.G.L. Chapter 90, Section 24).</p>
+
+            <p style="margin-bottom: 8px;">
+              Translator's name (printed): <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 300px; padding: 2px 5px;" contenteditable="true">Beatriz Paiva</span>
+              &nbsp;&nbsp;Date: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 120px; padding: 2px 5px;" contenteditable="true">&nbsp;</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Translator's full address: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 450px; padding: 2px 5px;" contenteditable="true">867 Boylston Street, 5th Floor, #2073, Boston, MA 02116</span>
+            </p>
+            <p style="margin-bottom: 8px;">
+              Translator's tel. number/ Email address: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 350px; padding: 2px 5px;" contenteditable="true">(857) 316-7770 / contact@legacytranslations.com</span>
+            </p>
+            <p style="margin-bottom: 8px;">Signed under the penalties of perjury:</p>
+            <p style="margin-bottom: 5px;">
+              Translator's signature: <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 400px; height: 25px;">&nbsp;</span>
+            </p>
+          </div>
+
+          <div style="text-align: right; font-size: 9px; color: #666;">LIC114_1118</div>
+        </div>
+      `
     }
   };
 
