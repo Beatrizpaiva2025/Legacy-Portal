@@ -72,6 +72,28 @@ const PROJECT_MANAGERS = [
   { name: "Beatriz Paiva", title: "Managing Director" }
 ];
 
+// Document Types for translation projects
+const DOCUMENT_TYPES = [
+  { value: '', label: '-- Select Document Type --' },
+  { value: 'birth_certificate', label: 'Certidão de Nascimento / Birth Certificate' },
+  { value: 'marriage_certificate', label: 'Certidão de Casamento / Marriage Certificate' },
+  { value: 'vaccination_card', label: 'Cartão de Vacina / Vaccination Card' },
+  { value: 'divorce_certificate', label: 'Divórcio / Divorce Certificate' },
+  { value: 'rg', label: 'RG (Brazilian ID)' },
+  { value: 'cnh', label: 'CNH (Brazilian Driver\'s License)' },
+  { value: 'dmv', label: 'DMV Document' },
+  { value: 'rmv', label: 'RMV Document' },
+  { value: 'passport', label: 'Passaporte / Passport' },
+  { value: 'diploma', label: 'Diploma / Academic Degree' },
+  { value: 'transcript', label: 'Histórico Escolar / Academic Transcript' },
+  { value: 'power_of_attorney', label: 'Procuração / Power of Attorney' },
+  { value: 'criminal_record', label: 'Antecedentes Criminais / Criminal Record' },
+  { value: 'medical_report', label: 'Relatório Médico / Medical Report' },
+  { value: 'contract', label: 'Contrato / Contract' },
+  { value: 'immigration_doc', label: 'Documento de Imigração / Immigration Document' },
+  { value: 'other', label: 'Outros / Other' }
+];
+
 // ==================== SVG ICONS (Professional/Minimal) ====================
 const EditIcon = ({ className = "w-3 h-3" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -4772,6 +4794,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     translate_from: 'Portuguese',
     translate_to: 'English',
     service_type: 'standard',
+    document_type: '',
     page_count: 1,
     word_count: 0,
     urgency: 'no',
@@ -4792,8 +4815,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     invoice_custom_date: ''
   });
 
+  // Document type filter state
+  const [documentTypeFilter, setDocumentTypeFilter] = useState('');
+
   const REVENUE_SOURCES = [
     { value: 'website', label: 'Website' },
+    { value: 'google', label: 'Google' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'facebook', label: 'Facebook' },
     { value: 'whatsapp', label: 'WhatsApp' },
     { value: 'social_media', label: 'Social Media' },
     { value: 'referral', label: 'Referral' },
@@ -5601,9 +5630,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     const matchSearch =
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
       o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
-      o.order_number?.toLowerCase().includes(search.toLowerCase());
+      o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
+      o.document_type?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
+    return matchSearch && matchStatus && matchDocType;
   });
 
   const totalReceive = filtered.reduce((sum, o) => sum + (o.total_price || 0), 0);
@@ -6058,6 +6089,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </button>
             ))}
           </div>
+          {/* Document Type Filter */}
+          <select
+            value={documentTypeFilter}
+            onChange={(e) => setDocumentTypeFilter(e.target.value)}
+            className="px-2 py-1 text-[10px] border rounded bg-white"
+          >
+            <option value="">All Documents</option>
+            {DOCUMENT_TYPES.filter(d => d.value).map(doc => (
+              <option key={doc.value} value={doc.value}>{doc.label}</option>
+            ))}
+          </select>
         </div>
         <SearchBar value={search} onChange={setSearch} />
       </div>
@@ -6113,7 +6155,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-6 gap-3 mb-3">
+            {/* Document Type Row */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Type</label>
+                <select
+                  value={newProject.document_type}
+                  onChange={(e) => setNewProject({...newProject, document_type: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {DOCUMENT_TYPES.map(doc => <option key={doc.value} value={doc.value}>{doc.label}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
                 <select
@@ -6125,6 +6178,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   <option value="professional">Professional</option>
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-3 mb-3">
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Pages</label>
                 <input
@@ -6369,6 +6425,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
+              <th className="px-2 py-2 text-left font-medium">Doc Type</th>
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-2 py-2 text-left font-medium">PM</th>}
               <th className="px-2 py-2 text-left font-medium">Translator</th>
@@ -6424,6 +6481,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       )}
                     </div>
                   </td>
+                  {/* Document Type */}
+                  <td className="px-2 py-2">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">
+                      {DOCUMENT_TYPES.find(d => d.value === order.document_type)?.label?.split('/')[0]?.trim() || order.document_type || '-'}
+                    </span>
+                  </td>
                   {/* PM - Admin only */}
                   {isAdmin && (
                     <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
@@ -6437,8 +6500,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           onBlur={() => setAssigningPM(null)}
                         >
                           <option value="">Select...</option>
-                          {PROJECT_MANAGERS.map(pm => (
-                            <option key={pm.name} value={pm.name}>{pm.name}</option>
+                          {/* Use registered PMs from database, fallback to static list */}
+                          {(pmList.length > 0 ? pmList : PROJECT_MANAGERS).map(pm => (
+                            <option key={pm.id || pm.name} value={pm.name}>{pm.name}</option>
                           ))}
                         </select>
                       ) : (order.assigned_pm_name || order.assigned_pm) ? (
@@ -6474,8 +6538,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onBlur={() => setAssigningTranslator(null)}
                       >
                         <option value="">Select...</option>
-                        {TRANSLATORS.map(t => (
-                          <option key={t.name} value={t.name}>{t.name}</option>
+                        {/* Use registered translators from database, fallback to static list */}
+                        {(translatorList.length > 0 ? translatorList : TRANSLATORS).map(t => (
+                          <option key={t.id || t.name} value={t.name}>{t.name}</option>
                         ))}
                       </select>
                     ) : (order.assigned_translator_name || order.assigned_translator) ? (
@@ -8670,6 +8735,9 @@ const FinancesPage = ({ adminKey }) => {
 
   const REVENUE_SOURCES = {
     website: { label: 'Website', color: '#3B82F6' },
+    google: { label: 'Google', color: '#EA4335' },
+    instagram: { label: 'Instagram', color: '#E4405F' },
+    facebook: { label: 'Facebook', color: '#1877F2' },
     whatsapp: { label: 'WhatsApp', color: '#22C55E' },
     social_media: { label: 'Social Media', color: '#A855F7' },
     referral: { label: 'Referral', color: '#F59E0B' },
@@ -9129,6 +9197,183 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     delayed: 0
   });
 
+  // Quote generation state
+  const [quoteForm, setQuoteForm] = useState({
+    clientName: '',
+    clientEmail: '',
+    documentType: '',
+    sourceLanguage: 'Portuguese',
+    targetLanguage: 'English',
+    serviceType: 'standard',
+    pageCount: 1,
+    pricePerPage: 24.99,
+    discount: 0,
+    urgency: 'no',
+    notes: ''
+  });
+  const [quoteLanguage, setQuoteLanguage] = useState('en'); // en, pt, es
+  const [showQuotePreview, setShowQuotePreview] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
+
+  // Quote translations
+  const quoteTranslations = {
+    en: {
+      title: 'TRANSLATION QUOTE',
+      company: 'Legacy Translation Services',
+      tagline: 'Professional Certified Translation Services',
+      quoteNumber: 'Quote #',
+      date: 'Date',
+      validUntil: 'Valid Until',
+      clientInfo: 'Client Information',
+      name: 'Name',
+      email: 'Email',
+      serviceDetails: 'Service Details',
+      documentType: 'Document Type',
+      sourceLanguage: 'Source Language',
+      targetLanguage: 'Target Language',
+      serviceType: 'Service Type',
+      certified: 'Certified Translation',
+      professional: 'Professional Translation',
+      urgency: 'Urgency',
+      normal: 'Standard (2-3 business days)',
+      priority: 'Priority (24 hours)',
+      urgent: 'Urgent (12 hours)',
+      pricing: 'Pricing',
+      pages: 'Number of Pages',
+      pricePerPage: 'Price per Page',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Urgency Fee',
+      discount: 'Discount',
+      total: 'TOTAL',
+      notes: 'Notes',
+      terms: 'Terms & Conditions',
+      termsText: 'This quote is valid for 30 days. Payment is due upon completion. Certified translations include notarization.',
+      thankYou: 'Thank you for choosing Legacy Translation Services!',
+      contact: 'Contact us',
+      phone: 'Phone',
+      website: 'Website'
+    },
+    pt: {
+      title: 'ORÇAMENTO DE TRADUÇÃO',
+      company: 'Legacy Translation Services',
+      tagline: 'Serviços Profissionais de Tradução Juramentada',
+      quoteNumber: 'Orçamento #',
+      date: 'Data',
+      validUntil: 'Válido Até',
+      clientInfo: 'Informações do Cliente',
+      name: 'Nome',
+      email: 'E-mail',
+      serviceDetails: 'Detalhes do Serviço',
+      documentType: 'Tipo de Documento',
+      sourceLanguage: 'Idioma de Origem',
+      targetLanguage: 'Idioma de Destino',
+      serviceType: 'Tipo de Serviço',
+      certified: 'Tradução Juramentada',
+      professional: 'Tradução Profissional',
+      urgency: 'Urgência',
+      normal: 'Normal (2-3 dias úteis)',
+      priority: 'Prioritário (24 horas)',
+      urgent: 'Urgente (12 horas)',
+      pricing: 'Valores',
+      pages: 'Número de Páginas',
+      pricePerPage: 'Preço por Página',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Taxa de Urgência',
+      discount: 'Desconto',
+      total: 'TOTAL',
+      notes: 'Observações',
+      terms: 'Termos e Condições',
+      termsText: 'Este orçamento é válido por 30 dias. O pagamento é devido após a conclusão. Traduções juramentadas incluem reconhecimento de firma.',
+      thankYou: 'Obrigado por escolher a Legacy Translation Services!',
+      contact: 'Entre em contato',
+      phone: 'Telefone',
+      website: 'Website'
+    },
+    es: {
+      title: 'COTIZACIÓN DE TRADUCCIÓN',
+      company: 'Legacy Translation Services',
+      tagline: 'Servicios Profesionales de Traducción Certificada',
+      quoteNumber: 'Cotización #',
+      date: 'Fecha',
+      validUntil: 'Válido Hasta',
+      clientInfo: 'Información del Cliente',
+      name: 'Nombre',
+      email: 'Correo Electrónico',
+      serviceDetails: 'Detalles del Servicio',
+      documentType: 'Tipo de Documento',
+      sourceLanguage: 'Idioma de Origen',
+      targetLanguage: 'Idioma de Destino',
+      serviceType: 'Tipo de Servicio',
+      certified: 'Traducción Certificada',
+      professional: 'Traducción Profesional',
+      urgency: 'Urgencia',
+      normal: 'Estándar (2-3 días hábiles)',
+      priority: 'Prioritario (24 horas)',
+      urgent: 'Urgente (12 horas)',
+      pricing: 'Precios',
+      pages: 'Número de Páginas',
+      pricePerPage: 'Precio por Página',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Tarifa de Urgencia',
+      discount: 'Descuento',
+      total: 'TOTAL',
+      notes: 'Notas',
+      terms: 'Términos y Condiciones',
+      termsText: 'Esta cotización es válida por 30 días. El pago se realiza al finalizar. Las traducciones certificadas incluyen notarización.',
+      thankYou: '¡Gracias por elegir Legacy Translation Services!',
+      contact: 'Contáctenos',
+      phone: 'Teléfono',
+      website: 'Sitio Web'
+    }
+  };
+
+  // Calculate quote totals
+  const calculateQuote = () => {
+    const basePrice = quoteForm.pageCount * quoteForm.pricePerPage;
+    let urgencyFee = 0;
+    if (quoteForm.urgency === 'priority') urgencyFee = basePrice * 0.25;
+    if (quoteForm.urgency === 'urgent') urgencyFee = basePrice * 1.0;
+    const discountAmount = basePrice * (quoteForm.discount / 100);
+    const total = basePrice + urgencyFee - discountAmount;
+    return { basePrice, urgencyFee, discountAmount, total };
+  };
+
+  // Send quote via email
+  const sendQuoteEmail = async () => {
+    if (!quoteForm.clientEmail) {
+      alert('Por favor, informe o email do cliente.');
+      return;
+    }
+    setSendingQuote(true);
+    try {
+      const t = quoteTranslations[quoteLanguage];
+      const prices = calculateQuote();
+      const quoteNumber = `LT-${Date.now().toString().slice(-6)}`;
+
+      await axios.post(`${API}/admin/send-quote-email?admin_key=${adminKey}`, {
+        to_email: quoteForm.clientEmail,
+        client_name: quoteForm.clientName,
+        quote_number: quoteNumber,
+        language: quoteLanguage,
+        quote_data: {
+          ...quoteForm,
+          ...prices,
+          quoteNumber,
+          date: new Date().toLocaleDateString(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+        }
+      });
+
+      alert(`✅ Orçamento enviado com sucesso para ${quoteForm.clientEmail}!`);
+      setShowQuotePreview(false);
+    } catch (err) {
+      console.error('Failed to send quote:', err);
+      alert('❌ Erro ao enviar orçamento. Tente novamente.');
+    } finally {
+      setSendingQuote(false);
+    }
+  };
+
   // Fetch data on mount
   useEffect(() => {
     fetchDashboardData();
@@ -9351,6 +9596,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Section navigation
   const sections = [
     { id: 'overview', label: 'Visão Geral', icon: '📊' },
+    { id: 'quote', label: 'Gerar Orçamento', icon: '💰' },
     { id: 'review', label: 'Revisar Traduções', icon: '✅' },
     { id: 'team', label: 'Minha Equipe', icon: '👥' },
     { id: 'calendar', label: 'Agenda', icon: '📅' },
@@ -9498,6 +9744,425 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* QUOTE SECTION - Professional Quote Generator */}
+      {activeSection === 'quote' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Quote Form */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-bold text-gray-800 mb-4">💰 Gerar Orçamento Profissional</h3>
+
+              <div className="space-y-3">
+                {/* Client Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nome do Cliente *</label>
+                    <input
+                      type="text"
+                      value={quoteForm.clientName}
+                      onChange={(e) => setQuoteForm({...quoteForm, clientName: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Email do Cliente *</label>
+                    <input
+                      type="email"
+                      value={quoteForm.clientEmail}
+                      onChange={(e) => setQuoteForm({...quoteForm, clientEmail: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                      placeholder="client@email.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Document Type */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Documento</label>
+                  <select
+                    value={quoteForm.documentType}
+                    onChange={(e) => setQuoteForm({...quoteForm, documentType: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    {DOCUMENT_TYPES.map(doc => <option key={doc.value} value={doc.value}>{doc.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Languages */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Origem</label>
+                    <select
+                      value={quoteForm.sourceLanguage}
+                      onChange={(e) => setQuoteForm({...quoteForm, sourceLanguage: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Destino</label>
+                    <select
+                      value={quoteForm.targetLanguage}
+                      onChange={(e) => setQuoteForm({...quoteForm, targetLanguage: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Service Type & Urgency */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Serviço</label>
+                    <select
+                      value={quoteForm.serviceType}
+                      onChange={(e) => setQuoteForm({
+                        ...quoteForm,
+                        serviceType: e.target.value,
+                        pricePerPage: e.target.value === 'standard' ? 24.99 : 19.50
+                      })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="standard">Tradução Juramentada (Certified)</option>
+                      <option value="professional">Tradução Profissional (Professional)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgência</label>
+                    <select
+                      value={quoteForm.urgency}
+                      onChange={(e) => setQuoteForm({...quoteForm, urgency: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="no">Normal (2-3 dias úteis)</option>
+                      <option value="priority">Prioritário (24 horas) +25%</option>
+                      <option value="urgent">Urgente (12 horas) +100%</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nº de Páginas</label>
+                    <input
+                      type="number"
+                      value={quoteForm.pageCount}
+                      onChange={(e) => setQuoteForm({...quoteForm, pageCount: parseInt(e.target.value) || 1})}
+                      min="1"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Preço por Página ($)</label>
+                    <input
+                      type="number"
+                      value={quoteForm.pricePerPage}
+                      onChange={(e) => setQuoteForm({...quoteForm, pricePerPage: parseFloat(e.target.value) || 0})}
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Desconto (%)</label>
+                    <input
+                      type="number"
+                      value={quoteForm.discount}
+                      onChange={(e) => setQuoteForm({...quoteForm, discount: parseFloat(e.target.value) || 0})}
+                      min="0"
+                      max="100"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Observações</label>
+                  <textarea
+                    value={quoteForm.notes}
+                    onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                    rows="2"
+                    placeholder="Observações adicionais para o orçamento..."
+                  />
+                </div>
+
+                {/* Quote Language Selection */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma do Orçamento</label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'en', label: '🇺🇸 English' },
+                      { value: 'pt', label: '🇧🇷 Português' },
+                      { value: 'es', label: '🇪🇸 Español' }
+                    ].map(lang => (
+                      <button
+                        key={lang.value}
+                        onClick={() => setQuoteLanguage(lang.value)}
+                        className={`px-3 py-1.5 text-xs rounded ${
+                          quoteLanguage === lang.value
+                            ? 'bg-teal-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => setShowQuotePreview(true)}
+                    className="w-full px-4 py-2 bg-teal-500 text-white rounded text-sm font-medium hover:bg-teal-600"
+                  >
+                    👁️ Visualizar Orçamento
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Summary Card */}
+            <div className="space-y-4">
+              {/* Price Summary */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3">📊 Resumo do Orçamento</h3>
+                {(() => {
+                  const prices = calculateQuote();
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">{quoteForm.pageCount} página(s) × ${quoteForm.pricePerPage.toFixed(2)}</span>
+                        <span className="font-medium">${prices.basePrice.toFixed(2)}</span>
+                      </div>
+                      {prices.urgencyFee > 0 && (
+                        <div className="flex justify-between text-sm text-orange-600">
+                          <span>Taxa de Urgência ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
+                          <span>+${prices.urgencyFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {prices.discountAmount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Desconto ({quoteForm.discount}%)</span>
+                          <span>-${prices.discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between text-lg font-bold">
+                          <span>TOTAL</span>
+                          <span className="text-teal-600">${prices.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Recent Clients */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3">👤 Clientes Recentes</h3>
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {orders.slice(0, 5).map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => setQuoteForm({
+                        ...quoteForm,
+                        clientName: order.client_name,
+                        clientEmail: order.client_email
+                      })}
+                      className="p-2 border rounded cursor-pointer hover:bg-teal-50 text-xs"
+                    >
+                      <div className="font-medium">{order.client_name}</div>
+                      <div className="text-gray-500">{order.client_email}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quote Preview Modal */}
+          {showQuotePreview && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+                {/* Quote Document */}
+                <div className="p-8" id="quote-preview">
+                  {(() => {
+                    const t = quoteTranslations[quoteLanguage];
+                    const prices = calculateQuote();
+                    const quoteNumber = `LT-${Date.now().toString().slice(-6)}`;
+                    const today = new Date().toLocaleDateString(quoteLanguage === 'pt' ? 'pt-BR' : quoteLanguage === 'es' ? 'es-ES' : 'en-US');
+                    const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(quoteLanguage === 'pt' ? 'pt-BR' : quoteLanguage === 'es' ? 'es-ES' : 'en-US');
+
+                    return (
+                      <>
+                        {/* Header with Logo */}
+                        <div className="text-center border-b pb-4 mb-6">
+                          <div className="text-3xl font-bold text-teal-600 mb-1">LEGACY</div>
+                          <div className="text-sm text-gray-500">{t.tagline}</div>
+                        </div>
+
+                        {/* Quote Title */}
+                        <div className="text-center mb-6">
+                          <h1 className="text-2xl font-bold text-gray-800">{t.title}</h1>
+                          <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                            <div>
+                              <span className="text-gray-500">{t.quoteNumber}</span>
+                              <div className="font-bold text-teal-600">{quoteNumber}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.date}</span>
+                              <div className="font-medium">{today}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.validUntil}</span>
+                              <div className="font-medium">{validUntil}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Client Info */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                          <h3 className="font-bold text-gray-700 mb-2">{t.clientInfo}</h3>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-gray-500">{t.name}:</span>
+                              <span className="ml-2 font-medium">{quoteForm.clientName || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.email}:</span>
+                              <span className="ml-2 font-medium">{quoteForm.clientEmail || '-'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Service Details */}
+                        <div className="mb-6">
+                          <h3 className="font-bold text-gray-700 mb-3">{t.serviceDetails}</h3>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.documentType}:</span>
+                              <span className="font-medium">{DOCUMENT_TYPES.find(d => d.value === quoteForm.documentType)?.label || '-'}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.serviceType}:</span>
+                              <span className="font-medium">{quoteForm.serviceType === 'standard' ? t.certified : t.professional}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.sourceLanguage}:</span>
+                              <span className="font-medium">{quoteForm.sourceLanguage}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.targetLanguage}:</span>
+                              <span className="font-medium">{quoteForm.targetLanguage}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2 col-span-2">
+                              <span className="text-gray-500">{t.urgency}:</span>
+                              <span className="font-medium">
+                                {quoteForm.urgency === 'no' ? t.normal : quoteForm.urgency === 'priority' ? t.priority : t.urgent}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pricing Table */}
+                        <div className="mb-6">
+                          <h3 className="font-bold text-gray-700 mb-3">{t.pricing}</h3>
+                          <table className="w-full text-sm">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.pages}</td>
+                                <td className="py-2 text-right">{quoteForm.pageCount}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.pricePerPage}</td>
+                                <td className="py-2 text-right">${quoteForm.pricePerPage.toFixed(2)}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.subtotal}</td>
+                                <td className="py-2 text-right">${prices.basePrice.toFixed(2)}</td>
+                              </tr>
+                              {prices.urgencyFee > 0 && (
+                                <tr className="border-b text-orange-600">
+                                  <td className="py-2">{t.urgencyFee}</td>
+                                  <td className="py-2 text-right">+${prices.urgencyFee.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              {prices.discountAmount > 0 && (
+                                <tr className="border-b text-green-600">
+                                  <td className="py-2">{t.discount} ({quoteForm.discount}%)</td>
+                                  <td className="py-2 text-right">-${prices.discountAmount.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              <tr className="bg-teal-50 font-bold text-lg">
+                                <td className="py-3 text-teal-700">{t.total}</td>
+                                <td className="py-3 text-right text-teal-700">${prices.total.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Notes */}
+                        {quoteForm.notes && (
+                          <div className="mb-6 bg-yellow-50 rounded-lg p-4">
+                            <h3 className="font-bold text-gray-700 mb-2">{t.notes}</h3>
+                            <p className="text-sm text-gray-600">{quoteForm.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Terms */}
+                        <div className="mb-6 text-xs text-gray-500 border-t pt-4">
+                          <h4 className="font-bold mb-1">{t.terms}</h4>
+                          <p>{t.termsText}</p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="text-center border-t pt-4 text-sm text-gray-500">
+                          <p className="font-medium text-teal-600 mb-2">{t.thankYou}</p>
+                          <p>{t.contact}: info@legacytranslation.com | {t.phone}: (555) 123-4567</p>
+                          <p>{t.website}: www.legacytranslation.com</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Modal Actions */}
+                <div className="border-t p-4 flex justify-between items-center bg-gray-50">
+                  <button
+                    onClick={() => setShowQuotePreview(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  >
+                    ← Voltar
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 flex items-center gap-1"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                    <button
+                      onClick={sendQuoteEmail}
+                      disabled={sendingQuote || !quoteForm.clientEmail}
+                      className="px-4 py-2 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 disabled:bg-gray-400 flex items-center gap-1"
+                    >
+                      {sendingQuote ? '⏳ Enviando...' : '📧 Enviar por Email'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
