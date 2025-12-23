@@ -829,6 +829,173 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div style="text-align: right; font-size: 9px; color: #666;">LIC114_1118</div>
         </div>
       `
+    },
+    'rmv-formulario': {
+      name: "RMV-Formulario",
+      description: 'Formulário RMV - Tradução CNH',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px; background: #fff;">
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 2px solid #003366; padding-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 55px; height: 55px; border: 2px solid #003366; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 7px; text-align: center; color: #003366; font-weight: bold;">
+                <div>Commonwealth<br/>of<br/>Massachusetts</div>
+              </div>
+              <div style="display: flex; gap: 2px;">
+                <div style="background: #000; color: #fff; padding: 6px 10px; font-weight: bold; font-size: 14px;">r</div>
+                <div style="background: #cc0000; color: #fff; padding: 6px 10px; font-weight: bold; font-size: 14px;">m</div>
+                <div style="background: #003366; color: #fff; padding: 6px 10px; font-weight: bold; font-size: 14px;">v</div>
+              </div>
+              <div style="font-size: 9px; color: #666; text-transform: uppercase;">Registry of<br/>Motor Vehicles</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 20px; font-weight: bold; color: #003366;">Translation into English</div>
+              <div style="font-size: 16px; font-weight: bold; color: #003366;">of a Foreign Driver License</div>
+            </div>
+            <div style="border: 2px solid #000; width: 110px; height: 130px; display: flex; align-items: center; justify-content: center; font-size: 10px; text-align: center; color: #666;">
+              <div>Attach<br/>passport-sized<br/>photo here</div>
+            </div>
+          </div>
+
+          <!-- Yellow Box Notice -->
+          <div style="background: #fff8dc; border: 2px solid #d4a800; padding: 12px; margin-bottom: 15px; font-size: 10px;">
+            <p style="margin: 0 0 8px 0; font-style: italic;"><em>Massachusetts General Law (Chapter 90, Section 10) was changed July 2018. Everyone operating a motor vehicle in Massachusetts with a foreign driver's license that is not written in English must carry either this completed translation, an International Driving Permit (IDP) issued from the country that issued the license, or an alternative translation document that contains a photo and English translation that closely matches the information from an IDP.</em></p>
+            <p style="margin: 0; font-weight: bold; font-style: italic;"><em>This form must be completed <u>for</u> an applicant who does not have an IDP or alternative translation document and whose license is not written in English.</em></p>
+          </div>
+
+          <!-- Qualified Translator Section -->
+          <div style="margin-bottom: 15px;">
+            <p style="font-weight: bold; margin-bottom: 12px; font-size: 12px;">All information below must be completed by a <u>qualified</u> translator.</p>
+
+            <p style="margin-bottom: 8px;">I hereby certify that this is a true and complete original translation from (original language)</p>
+            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 12px; flex-wrap: wrap;">
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; width: 180px; padding: 4px; font-size: 11px; background: #f8f9fa;" />
+              <span>into English of a driver's license issued by the Country of</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; width: 180px; padding: 4px; font-size: 11px; background: #f8f9fa;" />
+            </div>
+
+            <p style="margin-bottom: 10px;">I further certify that I speak the language of the original driver's license fluently and I (check one):</p>
+
+            <div style="margin-left: 25px; margin-bottom: 10px;">
+              <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;">
+                <input type="checkbox" style="margin-top: 4px; width: 16px; height: 16px;" />
+                <span>Work for a college, university, or private language school. Name, Address, and Department:</span>
+              </div>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; width: calc(100% - 30px); padding: 4px; margin-left: 26px; font-size: 11px; background: #f8f9fa;" />
+            </div>
+
+            <div style="margin-left: 25px; margin-bottom: 10px;">
+              <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px;">
+                <input type="checkbox" style="margin-top: 4px; width: 16px; height: 16px;" />
+                <span>Work for a local consulate. Name and Address of Consulate:</span>
+              </div>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; width: calc(100% - 30px); padding: 4px; margin-left: 26px; font-size: 11px; background: #f8f9fa;" />
+            </div>
+
+            <div style="margin-left: 25px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+              <input type="checkbox" style="width: 16px; height: 16px;" />
+              <span>Am a Massachusetts bilingual notary public <span style="color: #666;">------------------------</span> (place official notary seal below)</span>
+            </div>
+
+            <div style="margin-left: 25px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+              <input type="checkbox" checked style="width: 16px; height: 16px;" />
+              <span><strong>Am a member of the American Translators Association</strong></span>
+            </div>
+          </div>
+
+          <!-- Licensee Information Box -->
+          <div style="border: 2px solid #003366; padding: 15px; margin-bottom: 15px; background: #fafafa;">
+            <p style="font-weight: bold; margin: 0 0 5px 0; font-size: 13px; color: #003366;">Licensee Information:</p>
+            <p style="font-style: italic; margin: 0 0 12px 0; font-size: 10px; color: #555;">In translating information fields from the license into English, I find the following is indicated on the license:</p>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 240px; font-weight: 500;">Country where the license was issued:</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 240px; font-weight: 500;">Full name of the license holder:</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 240px; font-weight: 500;">Date of birth (month/day/year):</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 240px; font-weight: 500;">Place of residence on license:</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 270px; font-weight: 500;">Type of vehicle for which the license is valid:</span>
+              <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 25px;">
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 160px; font-weight: 500;">Driver license number:</span>
+                <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 110px; font-weight: 500;">Class of license:</span>
+                <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 25px;">
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 130px; font-weight: 500;">License issue date:</span>
+                <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 160px; font-weight: 500;">License expiration date:</span>
+                <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+              </div>
+            </div>
+
+            <p style="font-weight: bold; margin: 12px 0 0 0; font-size: 10px; color: #cc0000;"><u>Note: A passport-sized photo of the person depicted on the license must be securely attached to this document in the area provided in the top right corner.</u></p>
+          </div>
+
+          <!-- Translator Attestation Box -->
+          <div style="border: 2px solid #003366; padding: 15px; margin-bottom: 10px; background: #fafafa;">
+            <p style="font-weight: bold; margin: 0 0 8px 0; font-size: 13px; color: #003366;">Translator Attestation:</p>
+            <p style="margin: 0 0 12px 0; font-size: 10px; line-height: 1.5;">I understand that the original driver's license document for this certified translation and the translation itself may be relied on by law enforcement officers and/or other drivers (in the event of a crash) to properly identify the individual shown on the driver's license and I further understand that false statements may be punished by fine, imprisonment, or both (M.G.L. Chapter 90, Section 24).</p>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 25px;">
+              <div style="display: flex; align-items: center; flex: 2;">
+                <span style="width: 190px; font-weight: 500;">Translator's name (printed):</span>
+                <input type="text" value="Beatriz Paiva" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff; font-weight: bold;" />
+              </div>
+              <div style="display: flex; align-items: center; flex: 1;">
+                <span style="width: 50px; font-weight: 500;">Date:</span>
+                <input type="text" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+              </div>
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 160px; font-weight: 500;">Translator's full address:</span>
+              <input type="text" value="867 Boylston Street, 5th Floor, #2073, Boston, MA 02116" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <div style="margin-bottom: 10px; display: flex; align-items: center;">
+              <span style="width: 235px; font-weight: 500;">Translator's tel. number / Email address:</span>
+              <input type="text" value="(857) 316-7770 / contact@legacytranslations.com" style="border: none; border-bottom: 2px solid #003366; flex: 1; padding: 4px; font-size: 11px; background: #fff;" />
+            </div>
+
+            <p style="margin: 8px 0; font-weight: 500;">Signed under the penalties of perjury:</p>
+
+            <div style="margin-bottom: 5px; display: flex; align-items: flex-end;">
+              <span style="width: 160px; font-weight: 500;">Translator's signature:</span>
+              <div style="border-bottom: 2px solid #003366; flex: 1; height: 35px; background: #fff;"></div>
+            </div>
+          </div>
+
+          <div style="text-align: right; font-size: 9px; color: #666; margin-top: 5px;">LIC114_1118</div>
+        </div>
+      `
     }
   };
 
