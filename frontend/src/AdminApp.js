@@ -600,6 +600,74 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const saved = localStorage.getItem('custom_cover_letters');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Certificate Template state - for customizing certificate body text while keeping header/logos/signature
+  const [selectedCertificateTemplate, setSelectedCertificateTemplate] = useState(() => {
+    return localStorage.getItem('selected_certificate_template') || 'default';
+  });
+  const [customCertificateTemplates, setCustomCertificateTemplates] = useState(() => {
+    const saved = localStorage.getItem('custom_certificate_templates');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Predefined certificate templates with body text only (header, logos, signature are separate)
+  const CERTIFICATE_TEMPLATES = {
+    'default': {
+      name: 'Default - Standard',
+      description: 'Standard Certificate of Translation',
+      bodyParagraphs: [
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {{targetLanguage}} (United States) translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.',
+        'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
+        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
+      ]
+    },
+    'rmv-ma': {
+      name: 'RMV - Massachusetts',
+      description: 'Driver\'s License - MA Registry',
+      bodyParagraphs: [
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'This translation is being provided for use with the <strong>Massachusetts Registry of Motor Vehicles (RMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the Commonwealth of Massachusetts.',
+        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used.',
+        'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
+        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
+      ]
+    },
+    'dmv-fl': {
+      name: 'DMV - Florida',
+      description: 'Driver\'s License - FL DMV',
+      bodyParagraphs: [
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'This translation is being provided for use with the <strong>Florida Department of Highway Safety and Motor Vehicles (FLHSMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the State of Florida.',
+        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used.',
+        'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
+        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
+      ]
+    },
+    'uscis': {
+      name: 'USCIS - Immigration',
+      description: 'Immigration Documents',
+      bodyParagraphs: [
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'This translation is being provided for use with the <strong>United States Citizenship and Immigration Services (USCIS)</strong> and complies with the USCIS translation requirements as specified in 8 CFR 103.2(b)(3).',
+        'I, <strong>Beatriz Paiva</strong>, am competent to translate from {{sourceLanguage}} to English, and hereby certify that this translation is complete and accurate to the best of my knowledge and ability.',
+        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein.',
+        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
+      ]
+    },
+    'education': {
+      name: 'Education - WES/ECE',
+      description: 'Academic Documents',
+      bodyParagraphs: [
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>academic document(s)</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'This translation is suitable for submission to <strong>credential evaluation services</strong> such as World Education Services (WES), Educational Credential Evaluators (ECE), and similar organizations, as well as educational institutions in the United States.',
+        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used.',
+        'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
+        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
+      ]
+    }
+  };
+
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
   const [translationResults, setTranslationResults] = useState([]);
@@ -1971,24 +2039,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <strong>${targetLanguage}</strong>
         </div>
 
-        <p class="body-text">
-            We, Legacy Translations, a professional translation services company and ATA
-            Member (#275993), having no relation to the client, hereby certify that the
-            annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
-            executed by us, is to the best of our knowledge and belief, a true and accurate
-            translation of the original document, likewise annexed hereunto.
-        </p>
-        <p class="body-text">
-            This is to certify the correctness of the translation only. We do not guarantee
-            that the original is a genuine document, or that the statements contained in the
-            original document are true. Further, Legacy Translations assumes no liability for
-            the way in which the translation is used by the customer or any third party,
-            including end-users of the translation.
-        </p>
-        <p class="body-text">
-            A copy of the translation, and original files presented, are attached to this
-            certification.
-        </p>
+        ${(() => {
+          // Get the template paragraphs for download
+          let templateParagraphs;
+          if (selectedCertificateTemplate.startsWith('custom-')) {
+            const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+            templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          } else {
+            templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          }
+
+          // Replace placeholders and generate HTML
+          return templateParagraphs.map(paragraph => {
+            const processedParagraph = paragraph
+              .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+              .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+            return `<p class="body-text">${processedParagraph}</p>`;
+          }).join('\n        ');
+        })()}
 
         <div class="footer-section">
             <div class="signature-block">
@@ -2342,24 +2410,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <strong>${targetLanguage}</strong>
         </div>
 
-        <p class="body-text">
-            We, Legacy Translations, a professional translation services company and ATA
-            Member (#275993), having no relation to the client, hereby certify that the
-            annexed <strong>${targetLanguage}</strong> translation of the <strong>${sourceLanguage}</strong> document,
-            executed by us, is to the best of our knowledge and belief, a true and accurate
-            translation of the original document, likewise annexed hereunto.
-        </p>
-        <p class="body-text">
-            This is to certify the correctness of the translation only. We do not guarantee
-            that the original is a genuine document, or that the statements contained in the
-            original document are true. Further, Legacy Translations assumes no liability for
-            the way in which the translation is used by the customer or any third party,
-            including end-users of the translation.
-        </p>
-        <p class="body-text">
-            A copy of the translation, and original files presented, are attached to this
-            certification.
-        </p>
+        ${(() => {
+          // Get the template paragraphs for download
+          let templateParagraphs;
+          if (selectedCertificateTemplate.startsWith('custom-')) {
+            const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+            templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          } else {
+            templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          }
+
+          // Replace placeholders and generate HTML
+          return templateParagraphs.map(paragraph => {
+            const processedParagraph = paragraph
+              .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+              .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+            return `<p class="body-text">${processedParagraph}</p>`;
+          }).join('\n        ');
+        })()}
 
         <div class="footer-section">
             <div class="signature-block">
@@ -3323,11 +3391,109 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
+          {/* Certificate Template Selector */}
+          <div className="bg-white rounded shadow p-4">
+            <h3 className="text-sm font-bold mb-3">📜 Certificate Template</h3>
+            <p className="text-xs text-gray-500 mb-3">Select a certificate template or upload a custom one. Headers, logos, and signatures are applied automatically.</p>
+
+            {/* Predefined Templates */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+              {Object.entries(CERTIFICATE_TEMPLATES).map(([key, template]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setSelectedCertificateTemplate(key);
+                    localStorage.setItem('selected_certificate_template', key);
+                  }}
+                  className={`p-3 text-xs rounded border-2 transition-all ${selectedCertificateTemplate === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className="font-bold">{template.name}</div>
+                  <div className="text-[10px] text-gray-500">{template.description}</div>
+                </button>
+              ))}
+
+              {/* Upload Custom Template Button */}
+              <button
+                onClick={() => {
+                  const name = prompt('Enter template name (e.g., "State Court - NY"):');
+                  if (name) {
+                    const templateText = prompt('Enter the certificate body paragraphs (use {{sourceLanguage}} and {{targetLanguage}} for language placeholders). Separate paragraphs with ||:');
+                    if (templateText) {
+                      const paragraphs = templateText.split('||').map(p => p.trim()).filter(p => p);
+                      if (paragraphs.length > 0) {
+                        const newTemplate = {
+                          id: Date.now(),
+                          name,
+                          description: 'Custom Template',
+                          bodyParagraphs: paragraphs
+                        };
+                        const updated = [...customCertificateTemplates, newTemplate];
+                        setCustomCertificateTemplates(updated);
+                        localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                        setSelectedCertificateTemplate(`custom-${newTemplate.id}`);
+                        localStorage.setItem('selected_certificate_template', `custom-${newTemplate.id}`);
+                      }
+                    }
+                  }
+                }}
+                className="p-3 text-xs rounded border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
+              >
+                <div className="font-bold text-blue-600">+ Add Custom</div>
+                <div className="text-[10px] text-gray-500">Create your template</div>
+              </button>
+            </div>
+
+            {/* Custom Templates List */}
+            {customCertificateTemplates.length > 0 && (
+              <div className="border-t pt-3">
+                <p className="text-xs font-medium text-gray-600 mb-2">Custom Templates:</p>
+                <div className="flex flex-wrap gap-2">
+                  {customCertificateTemplates.map(tpl => (
+                    <div key={tpl.id} className="flex items-center">
+                      <button
+                        onClick={() => {
+                          setSelectedCertificateTemplate(`custom-${tpl.id}`);
+                          localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
+                        }}
+                        className={`px-3 py-1.5 text-xs rounded-l border ${selectedCertificateTemplate === `custom-${tpl.id}` ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200'}`}
+                      >
+                        {tpl.name}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Delete template "${tpl.name}"?`)) {
+                            const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
+                            setCustomCertificateTemplates(updated);
+                            localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                            if (selectedCertificateTemplate === `custom-${tpl.id}`) {
+                              setSelectedCertificateTemplate('default');
+                              localStorage.setItem('selected_certificate_template', 'default');
+                            }
+                          }
+                        }}
+                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-l-0 border-red-200 rounded-r hover:bg-red-100"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Certificate Preview - LIVE with Editable Fields */}
           <div className="bg-white rounded shadow p-4">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
-              <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded">
+                  Template: {selectedCertificateTemplate.startsWith('custom-')
+                    ? customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate)?.name || 'Custom'
+                    : CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.name || 'Default'}
+                </span>
+                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
+              </div>
             </div>
 
             {/* The Certificate Document */}
@@ -3373,22 +3539,32 @@ tradução juramentada | certified translation`}
                 </select>
               </p>
 
-              {/* Body paragraphs */}
-              <p className="mb-4 text-justify text-xs leading-relaxed">
-                We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {targetLanguage} (United States) translation of the {sourceLanguage} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.
-              </p>
+              {/* Body paragraphs - Dynamic based on selected template */}
+              {(() => {
+                // Get the template paragraphs
+                let templateParagraphs;
+                if (selectedCertificateTemplate.startsWith('custom-')) {
+                  const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+                  templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                } else {
+                  templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                }
 
-              <p className="mb-4 text-justify text-xs leading-relaxed">
-                This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.
-              </p>
+                // Replace placeholders with actual values
+                return templateParagraphs.map((paragraph, index) => {
+                  const processedParagraph = paragraph
+                    .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+                    .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
 
-              <p className="mb-4 text-justify text-xs leading-relaxed">
-                I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.
-              </p>
-
-              <p className="mb-6 text-justify text-xs leading-relaxed">
-                A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.
-              </p>
+                  return (
+                    <p
+                      key={index}
+                      className={`${index === templateParagraphs.length - 1 ? 'mb-6' : 'mb-4'} text-justify text-xs leading-relaxed`}
+                      dangerouslySetInnerHTML={{ __html: processedParagraph }}
+                    />
+                  );
+                });
+              })()}
 
               {/* Signature and Stamp Section */}
               <div className="mt-8 flex justify-between items-end">
