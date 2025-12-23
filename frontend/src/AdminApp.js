@@ -40,31 +40,24 @@ const FLAGS = {
 };
 
 const LANGUAGES = [
-  // Major Languages
-  "English", "English (USA)", "English (UK)",
-  "Spanish", "Spanish (Spain)", "Spanish (Latin America)",
-  "Portuguese", "Portuguese (Brazil)", "Portuguese (Portugal)",
-  "French", "French (France)", "French (Canada)",
-  "German", "Italian", "Dutch",
-  // Asian Languages
-  "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean",
-  "Vietnamese", "Thai", "Indonesian", "Malay", "Filipino/Tagalog", "Hindi",
-  "Bengali", "Punjabi", "Tamil", "Telugu", "Urdu", "Gujarati", "Nepali",
-  "Burmese", "Khmer", "Lao", "Mongolian",
-  // Middle Eastern & African
-  "Arabic", "Arabic (Saudi Arabia)", "Hebrew", "Turkish", "Persian/Farsi",
-  "Swahili", "Amharic", "Somali", "Yoruba", "Igbo", "Zulu", "Afrikaans",
-  // European Languages
-  "Russian", "Polish", "Ukrainian", "Czech", "Slovak", "Hungarian",
-  "Romanian", "Bulgarian", "Greek", "Serbian", "Croatian", "Slovenian",
-  "Swedish", "Norwegian", "Danish", "Finnish", "Icelandic",
-  "Albanian", "Armenian", "Georgian", "Azerbaijani", "Kazakh", "Uzbek",
-  "Lithuanian", "Latvian", "Estonian", "Maltese", "Belarusian",
-  "Bosnian", "Macedonian", "Luxembourgish",
-  // Celtic & Regional
-  "Welsh", "Irish", "Scottish Gaelic", "Catalan", "Basque", "Galician",
-  // Creole & Other
-  "Haitian Creole", "Cape Verdean Creole", "Papiamento", "Latin", "Esperanto"
+  // Primary Languages (Top 3)
+  "English", "Spanish", "Portuguese",
+  // All other languages in alphabetical order
+  "Afrikaans", "Albanian", "Amharic", "Arabic", "Arabic (Saudi Arabia)", "Armenian",
+  "Azerbaijani", "Basque", "Belarusian", "Bengali", "Bosnian", "Bulgarian",
+  "Burmese", "Cape Verdean Creole", "Catalan", "Chinese (Simplified)", "Chinese (Traditional)",
+  "Croatian", "Czech", "Danish", "Dutch", "English (UK)", "English (USA)",
+  "Esperanto", "Estonian", "Filipino/Tagalog", "Finnish", "French", "French (Canada)",
+  "French (France)", "Galician", "Georgian", "German", "Greek", "Gujarati",
+  "Haitian Creole", "Hebrew", "Hindi", "Hungarian", "Icelandic", "Igbo",
+  "Indonesian", "Irish", "Italian", "Japanese", "Kazakh", "Khmer",
+  "Korean", "Lao", "Latin", "Latvian", "Lithuanian", "Luxembourgish",
+  "Macedonian", "Malay", "Maltese", "Mongolian", "Nepali", "Norwegian",
+  "Papiamento", "Persian/Farsi", "Polish", "Portuguese (Brazil)", "Portuguese (Portugal)",
+  "Punjabi", "Romanian", "Russian", "Scottish Gaelic", "Serbian", "Slovak",
+  "Slovenian", "Somali", "Spanish (Latin America)", "Spanish (Spain)", "Swahili",
+  "Swedish", "Tamil", "Telugu", "Thai", "Turkish", "Ukrainian",
+  "Urdu", "Uzbek", "Vietnamese", "Welsh", "Yoruba", "Zulu"
 ];
 
 const TRANSLATORS = [
@@ -4820,7 +4813,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     { value: 'bank_transfer', label: 'Bank Transfer' }
   ];
 
-  const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
+  // Primary Languages first, then alphabetical
+  const PM_LANGUAGES = [
+    'English', 'Spanish', 'Portuguese',
+    'Afrikaans', 'Albanian', 'Amharic', 'Arabic', 'Armenian', 'Azerbaijani',
+    'Basque', 'Belarusian', 'Bengali', 'Bosnian', 'Bulgarian', 'Burmese',
+    'Catalan', 'Chinese', 'Croatian', 'Czech', 'Danish', 'Dutch',
+    'Estonian', 'Filipino', 'Finnish', 'French', 'Galician', 'Georgian',
+    'German', 'Greek', 'Gujarati', 'Haitian Creole', 'Hebrew', 'Hindi',
+    'Hungarian', 'Icelandic', 'Igbo', 'Indonesian', 'Irish', 'Italian',
+    'Japanese', 'Kazakh', 'Khmer', 'Korean', 'Lao', 'Latin', 'Latvian',
+    'Lithuanian', 'Luxembourgish', 'Macedonian', 'Malay', 'Maltese',
+    'Mongolian', 'Nepali', 'Norwegian', 'Papiamento', 'Persian', 'Polish',
+    'Punjabi', 'Romanian', 'Russian', 'Serbian', 'Slovak', 'Slovenian',
+    'Somali', 'Swahili', 'Swedish', 'Tamil', 'Telugu', 'Thai', 'Turkish',
+    'Ukrainian', 'Urdu', 'Uzbek', 'Vietnamese', 'Welsh', 'Yoruba', 'Zulu'
+  ];
 
   useEffect(() => {
     fetchOrders();
@@ -5103,7 +5111,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Upload document to order (Admin/PM only)
+  // Upload single document to order (Admin/PM only)
   const uploadDocumentToOrder = async (orderId, file) => {
     if (!file) return;
     setUploadingProjectDoc(true);
@@ -5122,7 +5130,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
         filename: file.name,
         file_data: base64Data,
-        content_type: file.type,
+        content_type: file.type || 'application/octet-stream',
         source: 'manual_upload'
       });
 
@@ -5131,6 +5139,68 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to upload document:', err);
       alert('Error uploading document');
+    } finally {
+      setUploadingProjectDoc(false);
+    }
+  };
+
+  // Upload multiple documents to order (Admin/PM only)
+  const uploadDocumentsToOrder = async (orderId, files) => {
+    if (!files || files.length === 0) return;
+    setUploadingProjectDoc(true);
+
+    const maxFileSize = 100 * 1024 * 1024; // 100MB max per file
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const file of files) {
+        // Check file size
+        if (file.size > maxFileSize) {
+          alert(`File "${file.name}" exceeds 100MB limit and was skipped.`);
+          errorCount++;
+          continue;
+        }
+
+        try {
+          const reader = new FileReader();
+          const base64Promise = new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const base64 = reader.result.split(',')[1];
+              resolve(base64);
+            };
+            reader.onerror = reject;
+          });
+          reader.readAsDataURL(file);
+          const base64Data = await base64Promise;
+
+          await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+            filename: file.name,
+            file_data: base64Data,
+            content_type: file.type || 'application/octet-stream',
+            source: 'manual_upload'
+          });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to upload ${file.name}:`, err);
+          errorCount++;
+        }
+      }
+
+      // Show summary
+      if (successCount > 0 && errorCount === 0) {
+        alert(`Successfully uploaded ${successCount} file(s)!`);
+      } else if (successCount > 0 && errorCount > 0) {
+        alert(`Uploaded ${successCount} file(s), ${errorCount} failed.`);
+      } else {
+        alert('Failed to upload files.');
+      }
+
+      // Refresh documents
+      viewOrderDocuments(viewingOrder);
+    } catch (err) {
+      console.error('Failed to upload documents:', err);
+      alert('Error uploading documents');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -6028,7 +6098,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, translate_from: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  {PM_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </div>
               <div>
@@ -6038,7 +6108,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, translate_to: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  {PM_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </div>
             </div>
@@ -6973,22 +7043,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {/* Upload Section - Admin/PM only */}
                   {(isAdmin || isPM) && (
                     <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Upload Document</div>
+                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Upload Documents (Multiple Files Allowed)</div>
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
                           id="project-doc-upload"
-                          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                          onChange={(e) => uploadDocumentToOrder(viewingOrder.id, e.target.files[0])}
+                          multiple
+                          accept="*/*"
+                          onChange={(e) => uploadDocumentsToOrder(viewingOrder.id, Array.from(e.target.files))}
                           className="hidden"
                         />
                         <label
                           htmlFor="project-doc-upload"
                           className={`px-3 py-1.5 rounded text-xs cursor-pointer ${uploadingProjectDoc ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                         >
-                          {uploadingProjectDoc ? 'Uploading...' : 'Choose File'}
+                          {uploadingProjectDoc ? 'Uploading...' : 'Choose Files'}
                         </label>
-                        <span className="text-[10px] text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG</span>
+                        <span className="text-[10px] text-gray-500">All formats accepted • Max 100MB per file • Multiple files allowed</span>
                       </div>
                     </div>
                   )}
