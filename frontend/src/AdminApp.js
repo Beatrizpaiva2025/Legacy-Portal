@@ -7915,26 +7915,238 @@ const SettingsPage = ({ adminKey }) => {
   );
 };
 
+// ==================== TRANSLATOR LOGIN (Blue Design) ====================
+const TranslatorLogin = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await axios.post(`${API}/admin/auth/login`, { email, password });
+      if (response.data && response.data.token) {
+        // Only allow translators to login here
+        if (response.data.role !== 'translator') {
+          setError('This portal is for translators only. Please use the admin panel.');
+          setLoading(false);
+          return;
+        }
+        onLogin({
+          adminKey: response.data.token,
+          token: response.data.token,
+          role: response.data.role,
+          name: response.data.name,
+          email: response.data.email,
+          id: response.data.id
+        });
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      await axios.post(`${API}/admin/auth/forgot-password`, { email: resetEmail });
+      setResetSent(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Blue Header with Globe */}
+        <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
+          {/* Globe Icon */}
+          <div className="mb-3">
+            <div className="w-16 h-16 mx-auto">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
+                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
+                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                {/* Land masses */}
+                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
+                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
+                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
+                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
+        </div>
+
+        {/* Form */}
+        <div className="p-8">
+          {showForgotPassword ? (
+            // Forgot Password Form
+            <div>
+              <h2 className="text-lg font-medium text-gray-800 text-center mb-6">Reset Password</h2>
+
+              {resetSent ? (
+                <div className="text-center">
+                  <div className="text-green-600 mb-4">
+                    <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <p className="text-gray-600 mb-4">If an account exists with this email, you will receive a password reset link.</p>
+                  <button
+                    onClick={() => { setShowForgotPassword(false); setResetSent(false); setResetEmail(''); }}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <p className="text-sm text-gray-600 text-center mb-4">
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+
+                  {error && (
+                    <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
+                      {error}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium transition-all"
+                  >
+                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotPassword(false); setError(''); }}
+                    className="w-full py-3 text-gray-600 hover:text-gray-800 font-medium"
+                  >
+                    Back to Login
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+            // Login Form
+            <div>
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                  <input
+                    type="password"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium transition-all"
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => { setShowForgotPassword(true); setError(''); }}
+                  className="text-blue-600 hover:text-blue-700 text-sm hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== TRANSLATION TOOL PAGE (Standalone) ====================
-const TranslationToolPage = ({ adminKey, onLogout }) => {
+const TranslationToolPage = ({ adminKey, onLogout, user }) => {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 flex items-center justify-between shadow-md">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">✍️</div>
+          <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6" viewBox="0 0 100 100" fill="white">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="3"/>
+              <ellipse cx="50" cy="50" rx="20" ry="45" stroke="currentColor" strokeWidth="2" fill="none"/>
+              <line x1="5" y1="50" x2="95" y2="50" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+          </div>
           <div>
-            <div className="font-bold text-sm">Translation Tool</div>
-            <div className="text-[10px] text-slate-400">Legacy Translations</div>
+            <div className="font-bold">Translation Tool</div>
+            <div className="text-xs text-blue-200">Legacy Translations</div>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
-          <a href="/admin" className="text-xs text-slate-300 hover:text-white">← Back to Admin</a>
-          <button onClick={onLogout} className="text-xs text-red-400 hover:text-red-300">Logout</button>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-blue-200">
+            Welcome, <span className="text-white font-medium">{user?.name || 'Translator'}</span>
+          </span>
+          <button
+            onClick={onLogout}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
+          >
+            Logout
+          </button>
         </div>
       </div>
       {/* Translation Workspace */}
-      <TranslationWorkspace adminKey={adminKey} />
+      <TranslationWorkspace adminKey={adminKey} user={user} />
     </div>
   );
 };
@@ -10119,11 +10331,18 @@ function AdminApp() {
     return <ResetPasswordPage resetToken={resetToken} onComplete={clearUrlParams} />;
   }
 
-  if (!adminKey) return <AdminLogin onLogin={handleLogin} />;
+  // If not logged in
+  if (!adminKey) {
+    // Use TranslatorLogin for translation-tool route
+    if (isTranslationTool) {
+      return <TranslatorLogin onLogin={handleLogin} />;
+    }
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   // If translation-tool route, render standalone page
   if (isTranslationTool) {
-    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} />;
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
   }
 
   return (
