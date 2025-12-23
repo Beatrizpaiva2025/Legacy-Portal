@@ -7995,9 +7995,25 @@ const UsersPage = ({ adminKey, user }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
   const [creating, setCreating] = useState(false);
+  const [expandedUser, setExpandedUser] = useState(null);
+  const [userDocuments, setUserDocuments] = useState({});
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [search, setSearch] = useState('');
 
   const isAdmin = user?.role === 'admin';
   const isPM = user?.role === 'pm';
+
+  // Document types for translators
+  const TRANSLATOR_DOC_TYPES = [
+    { value: 'id_document', label: 'Documento de Identidade (RG/ID)' },
+    { value: 'cpf', label: 'CPF' },
+    { value: 'address_proof', label: 'Comprovante de Residência' },
+    { value: 'contract', label: 'Contrato de Prestação de Serviço' },
+    { value: 'bank_info', label: 'Dados Bancários' },
+    { value: 'certification', label: 'Certificação/Diploma' },
+    { value: 'portfolio', label: 'Portfólio/Amostras' },
+    { value: 'other', label: 'Outro Documento' }
+  ];
 
   const fetchUsers = async () => {
     try {
@@ -8011,6 +8027,76 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   useEffect(() => { fetchUsers(); }, [adminKey]);
+
+  // Fetch documents for a specific user
+  const fetchUserDocuments = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`);
+      setUserDocuments(prev => ({ ...prev, [userId]: response.data.documents || [] }));
+    } catch (err) {
+      console.error('Error fetching user documents:', err);
+      setUserDocuments(prev => ({ ...prev, [userId]: [] }));
+    }
+  };
+
+  // Upload document for a user
+  const handleUploadDocument = async (userId, file, docType) => {
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('document_type', docType);
+      await axios.post(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchUserDocuments(userId);
+      alert('Documento enviado com sucesso!');
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      alert('Erro ao enviar documento');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  // Download document
+  const handleDownloadDocument = async (userId, docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/documents/${docId}/download?admin_key=${adminKey}`);
+      const link = document.createElement('a');
+      link.href = `data:${response.data.content_type};base64,${response.data.file_data}`;
+      link.download = filename;
+      link.click();
+    } catch (err) {
+      console.error('Error downloading document:', err);
+      alert('Erro ao baixar documento');
+    }
+  };
+
+  // Delete document
+  const handleDeleteDocument = async (userId, docId) => {
+    if (!window.confirm('Excluir este documento?')) return;
+    try {
+      await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
+      await fetchUserDocuments(userId);
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      alert('Erro ao excluir documento');
+    }
+  };
+
+  // Toggle expanded user profile
+  const toggleExpandUser = async (userId) => {
+    if (expandedUser === userId) {
+      setExpandedUser(null);
+    } else {
+      setExpandedUser(userId);
+      if (!userDocuments[userId]) {
+        await fetchUserDocuments(userId);
+      }
+    }
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -8064,7 +8150,14 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   // PM can only see translators
-  const filteredUsers = isPM ? users.filter(u => u.role === 'translator') : users;
+  const baseFilteredUsers = isPM ? users.filter(u => u.role === 'translator') : users;
+
+  // Apply search filter
+  const filteredUsers = baseFilteredUsers.filter(u =>
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.language_pairs?.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (loading) return <div className="p-6 text-center">Loading users...</div>;
 
@@ -8075,12 +8168,25 @@ const UsersPage = ({ adminKey, user }) => {
           <h1 className="text-xl font-bold text-gray-800">{isPM ? '👥 Translators' : '👤 User Management'}</h1>
           {isPM && <p className="text-xs text-gray-500 mt-1">Register and manage translators</p>}
         </div>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
-        >
-          + {isPM ? 'Register Translator' : 'Create User'}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar por nome, email ou idiomas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 text-sm border rounded-lg w-64 pl-8"
+            />
+            <SearchIcon className="w-4 h-4 absolute left-2 top-2.5 text-gray-400" />
+          </div>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
+          >
+            + {isPM ? 'Register Translator' : 'Create User'}
+          </button>
+        </div>
       </div>
 
       {/* Create User Form */}
@@ -8184,62 +8290,232 @@ const UsersPage = ({ adminKey, user }) => {
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
-              {!isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>}
-              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>}
-              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>}
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredUsers.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{u.name}</td>
-                <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                {!isPM && (
+              <React.Fragment key={u.id}>
+                <tr className={`hover:bg-gray-50 ${expandedUser === u.id ? 'bg-teal-50' : ''}`}>
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleExpandUser(u.id)}
+                        className={`text-gray-400 hover:text-teal-600 transition-transform ${expandedUser === u.id ? 'rotate-90' : ''}`}
+                      >
+                        ▶
+                      </button>
+                      {u.name}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[u.role]}`}>
                       {u.role.toUpperCase()}
                     </span>
                   </td>
-                )}
-                {isPM && (
                   <td className="px-4 py-3 text-gray-600">
                     {u.rate_per_page ? `$${u.rate_per_page}` : '-'}
                   </td>
-                )}
-                {isPM && (
                   <td className="px-4 py-3 text-gray-600 text-xs">
                     {u.language_pairs || '-'}
                   </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button
+                      onClick={() => toggleExpandUser(u.id)}
+                      className="text-teal-600 hover:text-teal-800 text-xs"
+                    >
+                      {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleToggleActive(u.id)}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                      >
+                        {u.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteUser(u.id, u.name)}
+                        className="text-red-600 hover:text-red-800 text-xs"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+
+                {/* Expanded Profile Section */}
+                {expandedUser === u.id && (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-4 bg-gray-50">
+                      <div className="grid grid-cols-2 gap-6">
+                        {/* Profile Information */}
+                        <div className="bg-white rounded-lg p-4 border">
+                          <h4 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
+                            📋 Informações do Perfil
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-gray-500 text-xs">Nome Completo:</span>
+                              <div className="font-medium">{u.name}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Email:</span>
+                              <div className="font-medium">{u.email}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Função:</span>
+                              <div className="font-medium capitalize">{u.role}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Status:</span>
+                              <div className={`font-medium ${u.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                                {u.is_active ? 'Ativo' : 'Inativo'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Valor por Página:</span>
+                              <div className="font-medium text-green-600">
+                                {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Não definido'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Valor por Palavra:</span>
+                              <div className="font-medium text-green-600">
+                                {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Não definido'}
+                              </div>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-500 text-xs">Pares de Idiomas:</span>
+                              <div className="font-medium">
+                                {u.language_pairs ? (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {u.language_pairs.split(',').map((pair, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                        {pair.trim()}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : 'Não definido'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Páginas Traduzidas:</span>
+                              <div className="font-medium">{u.pages_translated || 0}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Data de Cadastro:</span>
+                              <div className="font-medium">
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Documents Section */}
+                        <div className="bg-white rounded-lg p-4 border">
+                          <h4 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
+                            📁 Documentos Pessoais
+                          </h4>
+
+                          {/* Upload Section */}
+                          {isAdmin && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded border-dashed border-2 border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  id={`doc-type-${u.id}`}
+                                  className="px-2 py-1.5 text-xs border rounded flex-1"
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled>Tipo de documento...</option>
+                                  {TRANSLATOR_DOC_TYPES.map(dt => (
+                                    <option key={dt.value} value={dt.value}>{dt.label}</option>
+                                  ))}
+                                </select>
+                                <label className="px-3 py-1.5 bg-teal-500 text-white text-xs rounded cursor-pointer hover:bg-teal-600">
+                                  {uploadingDoc ? '⏳...' : '📤 Upload'}
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    disabled={uploadingDoc}
+                                    onChange={(e) => {
+                                      const docType = document.getElementById(`doc-type-${u.id}`).value;
+                                      if (!docType) {
+                                        alert('Selecione o tipo de documento primeiro');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      handleUploadDocument(u.id, e.target.files[0], docType);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-1">PDF, DOC, JPG, PNG (max 10MB)</p>
+                            </div>
+                          )}
+
+                          {/* Documents List */}
+                          <div className="space-y-2 max-h-48 overflow-auto">
+                            {userDocuments[u.id]?.length > 0 ? (
+                              userDocuments[u.id].map((doc) => (
+                                <div key={doc.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">
+                                      {doc.filename?.endsWith('.pdf') ? '📄' :
+                                       doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📎'}
+                                    </span>
+                                    <div>
+                                      <div className="font-medium">{doc.filename}</div>
+                                      <div className="text-gray-400">
+                                        {TRANSLATOR_DOC_TYPES.find(dt => dt.value === doc.document_type)?.label || doc.document_type}
+                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleDownloadDocument(u.id, doc.id, doc.filename)}
+                                      className="px-2 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                    >
+                                      ⬇️
+                                    </button>
+                                    {isAdmin && (
+                                      <button
+                                        onClick={() => handleDeleteDocument(u.id, doc.id)}
+                                        className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                      >
+                                        🗑️
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-4 text-gray-400 text-xs">
+                                <div className="text-2xl mb-1">📭</div>
+                                Nenhum documento enviado
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
                 )}
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {u.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 space-x-2">
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleToggleActive(u.id)}
-                      className="text-blue-600 hover:text-blue-800 text-xs"
-                    >
-                      {u.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDeleteUser(u.id, u.name)}
-                      className="text-red-600 hover:text-red-800 text-xs"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  {isPM && (
-                    <span className="text-gray-400 text-xs">View only</span>
-                  )}
-                </td>
-              </tr>
+              </React.Fragment>
             ))}
           </tbody>
         </table>

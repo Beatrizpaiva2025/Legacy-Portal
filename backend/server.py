@@ -2165,13 +2165,19 @@ async def list_admin_users(token: str, admin_key: str):
 
     try:
         users = await db.admin_users.find().to_list(100)
-        return [AdminUserPublic(
-            id=u["id"],
-            email=u["email"],
-            name=u["name"],
-            role=u["role"],
-            is_active=u.get("is_active", True)
-        ) for u in users]
+        return [{
+            "id": u["id"],
+            "email": u["email"],
+            "name": u["name"],
+            "role": u["role"],
+            "is_active": u.get("is_active", True),
+            "rate_per_page": u.get("rate_per_page"),
+            "rate_per_word": u.get("rate_per_word"),
+            "language_pairs": u.get("language_pairs"),
+            "pages_translated": u.get("pages_translated", 0),
+            "pages_pending_payment": u.get("pages_pending_payment", 0),
+            "created_at": u.get("created_at")
+        } for u in users]
     except Exception as e:
         logger.error(f"Error listing admin users: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to list users")
@@ -2224,6 +2230,132 @@ async def delete_admin_user(user_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
+
+# ==================== USER DOCUMENTS MANAGEMENT ====================
+
+@api_router.get("/admin/users/{user_id}/documents")
+async def get_user_documents(user_id: str, admin_key: str):
+    """Get all documents for a user"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        documents = await db.user_documents.find({"user_id": user_id}).to_list(100)
+        return {
+            "documents": [{
+                "id": doc["id"],
+                "filename": doc["filename"],
+                "document_type": doc["document_type"],
+                "content_type": doc.get("content_type", "application/octet-stream"),
+                "file_size": doc.get("file_size", 0),
+                "uploaded_at": doc.get("uploaded_at"),
+                "uploaded_by": doc.get("uploaded_by")
+            } for doc in documents]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching user documents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch documents")
+
+@api_router.post("/admin/users/{user_id}/documents")
+async def upload_user_document(user_id: str, admin_key: str, file: UploadFile = File(...), document_type: str = Form(...)):
+    """Upload a document for a user"""
+    # Validate admin access
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check user exists
+        target_user = await db.admin_users.find_one({"id": user_id})
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # Validate file size (max 10MB)
+        if file_size > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+        # Create document record
+        doc_id = str(uuid.uuid4())
+        document = {
+            "id": doc_id,
+            "user_id": user_id,
+            "filename": file.filename,
+            "document_type": document_type,
+            "content_type": file.content_type,
+            "file_data": base64.b64encode(file_content).decode('utf-8'),
+            "file_size": file_size,
+            "uploaded_at": datetime.utcnow().isoformat(),
+            "uploaded_by": admin_key[:10] + "..."
+        }
+
+        await db.user_documents.insert_one(document)
+
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": file.filename,
+            "message": "Document uploaded successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload document")
+
+@api_router.get("/admin/users/{user_id}/documents/{doc_id}/download")
+async def download_user_document(user_id: str, doc_id: str, admin_key: str):
+    """Download a user document"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        document = await db.user_documents.find_one({"id": doc_id, "user_id": user_id})
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {
+            "filename": document["filename"],
+            "content_type": document.get("content_type", "application/octet-stream"),
+            "file_data": document.get("file_data", "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to download document")
+
+@api_router.delete("/admin/users/{user_id}/documents/{doc_id}")
+async def delete_user_document(user_id: str, doc_id: str, admin_key: str):
+    """Delete a user document (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.user_documents.delete_one({"id": doc_id, "user_id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {"status": "success", "message": "Document deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete document")
 
 # ==================== TRANSLATION ORDERS ====================
 
