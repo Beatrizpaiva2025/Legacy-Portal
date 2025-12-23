@@ -404,6 +404,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -9025,6 +9026,913 @@ const FinancesPage = ({ adminKey }) => {
   );
 };
 
+// ==================== PM DASHBOARD (EXCLUSIVE FOR PROJECT MANAGERS) ====================
+const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
+  // State
+  const [activeSection, setActiveSection] = useState('overview');
+  const [orders, setOrders] = useState([]);
+  const [translators, setTranslators] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [selectedTranslator, setSelectedTranslator] = useState(null);
+  const [reviewQueue, setReviewQueue] = useState([]);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [originalContent, setOriginalContent] = useState(null);
+  const [translatedContent, setTranslatedContent] = useState(null);
+  const [correctionNotes, setCorrectionNotes] = useState('');
+  const [sendingAction, setSendingAction] = useState(false);
+  const [stats, setStats] = useState({
+    totalProjects: 0,
+    inProgress: 0,
+    awaitingReview: 0,
+    completed: 0,
+    onTime: 0,
+    delayed: 0
+  });
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch orders assigned to this PM
+      const ordersRes = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const allOrders = ordersRes.data.orders || [];
+      const myOrders = allOrders.filter(o =>
+        o.assigned_pm_id === user?.id ||
+        o.assigned_pm_name === user?.name
+      );
+      setOrders(myOrders);
+
+      // Fetch translators
+      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
+      const allUsers = usersRes.data.users || [];
+      const translatorsList = allUsers.filter(u => u.role === 'translator');
+      setTranslators(translatorsList);
+
+      // Build review queue - orders with translation_status === 'review'
+      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      setReviewQueue(reviewOrders);
+
+      // Calculate stats
+      const now = new Date();
+      let onTime = 0;
+      let delayed = 0;
+      myOrders.forEach(o => {
+        if (o.deadline) {
+          const deadline = new Date(o.deadline);
+          if (deadline >= now || o.translation_status === 'delivered') {
+            onTime++;
+          } else {
+            delayed++;
+          }
+        }
+      });
+
+      setStats({
+        totalProjects: myOrders.length,
+        inProgress: myOrders.filter(o => o.translation_status === 'in_translation').length,
+        awaitingReview: reviewOrders.length,
+        completed: myOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).length,
+        onTime,
+        delayed
+      });
+
+      // Load messages from localStorage (simulated)
+      const savedMessages = localStorage.getItem(`pm_messages_${user?.id}`);
+      if (savedMessages) setMessages(JSON.parse(savedMessages));
+
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send message to translator
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedTranslator) return;
+
+    const msg = {
+      id: Date.now(),
+      from: user?.name,
+      to: selectedTranslator.name,
+      toId: selectedTranslator.id,
+      content: newMessage,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+
+    const updatedMessages = [...messages, msg];
+    setMessages(updatedMessages);
+    localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
+    setNewMessage('');
+  };
+
+  // Load review content
+  const loadReviewContent = async (order) => {
+    setSelectedReview(order);
+    setCorrectionNotes('');
+
+    try {
+      // Fetch documents for this order
+      const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      const docs = docsRes.data.documents || [];
+
+      // Find original and translated documents
+      const originalDoc = docs.find(d => d.document_type === 'original' || !d.document_type);
+      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+
+      if (originalDoc) {
+        const origData = await axios.get(`${API}/admin/order-documents/${originalDoc.id}/download?admin_key=${adminKey}`);
+        setOriginalContent({
+          filename: originalDoc.filename,
+          data: origData.data.file_data,
+          contentType: origData.data.content_type
+        });
+      }
+
+      if (translatedDoc) {
+        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+        setTranslatedContent({
+          filename: translatedDoc.filename,
+          data: transData.data.file_data,
+          contentType: transData.data.content_type,
+          html: transData.data.html_content
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load review content:', err);
+    }
+  };
+
+  // Approve translation
+  const approveTranslation = async (sendTo) => {
+    if (!selectedReview) return;
+    setSendingAction(true);
+
+    try {
+      const newStatus = sendTo === 'client_review' ? 'client_review' : 'ready';
+      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
+        translation_status: newStatus
+      });
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === selectedReview.id ? { ...o, translation_status: newStatus } : o
+      ));
+      setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
+      setSelectedReview(null);
+      setOriginalContent(null);
+      setTranslatedContent(null);
+
+      alert(sendTo === 'client_review'
+        ? '✅ Enviado para revisão do cliente!'
+        : '✅ Tradução final aprovada e enviada!');
+    } catch (err) {
+      console.error('Failed to approve:', err);
+      alert('❌ Erro ao aprovar tradução');
+    } finally {
+      setSendingAction(false);
+    }
+  };
+
+  // Request correction
+  const requestCorrection = async () => {
+    if (!selectedReview || !correctionNotes.trim()) {
+      alert('Por favor, adicione notas de correção.');
+      return;
+    }
+    setSendingAction(true);
+
+    try {
+      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        pm_notes: correctionNotes
+      });
+
+      // Add message to translator
+      const translator = translators.find(t =>
+        t.id === selectedReview.assigned_translator_id ||
+        t.name === selectedReview.assigned_translator
+      );
+
+      if (translator) {
+        const msg = {
+          id: Date.now(),
+          from: user?.name,
+          to: translator.name,
+          toId: translator.id,
+          content: `📝 Correção necessária para ${selectedReview.order_number}:\n${correctionNotes}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'correction'
+        };
+        const updatedMessages = [...messages, msg];
+        setMessages(updatedMessages);
+        localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
+      }
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === selectedReview.id ? { ...o, translation_status: 'in_translation' } : o
+      ));
+      setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
+      setSelectedReview(null);
+      setOriginalContent(null);
+      setTranslatedContent(null);
+      setCorrectionNotes('');
+
+      alert('📨 Solicitação de correção enviada ao tradutor!');
+    } catch (err) {
+      console.error('Failed to request correction:', err);
+      alert('❌ Erro ao solicitar correção');
+    } finally {
+      setSendingAction(false);
+    }
+  };
+
+  // Get upcoming deadlines for calendar
+  const getUpcomingDeadlines = () => {
+    const now = new Date();
+    const upcoming = orders
+      .filter(o => o.deadline && !['delivered', 'ready'].includes(o.translation_status))
+      .map(o => ({
+        ...o,
+        deadlineDate: new Date(o.deadline),
+        daysLeft: Math.ceil((new Date(o.deadline) - now) / (1000 * 60 * 60 * 24))
+      }))
+      .sort((a, b) => a.deadlineDate - b.deadlineDate);
+    return upcoming;
+  };
+
+  // Section navigation
+  const sections = [
+    { id: 'overview', label: 'Visão Geral', icon: '📊' },
+    { id: 'review', label: 'Revisar Traduções', icon: '✅' },
+    { id: 'team', label: 'Minha Equipe', icon: '👥' },
+    { id: 'calendar', label: 'Agenda', icon: '📅' },
+    { id: 'reports', label: 'Relatórios', icon: '📈' },
+    { id: 'messages', label: 'Mensagens', icon: '💬' }
+  ];
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+        <span className="ml-3 text-gray-600">Carregando dashboard...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">🎯 PM Dashboard</h1>
+          <p className="text-sm text-gray-500">Bem-vindo(a), {user?.name}</p>
+        </div>
+        <button
+          onClick={fetchDashboardData}
+          className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1"
+        >
+          <RefreshIcon className="w-3 h-3" /> Atualizar
+        </button>
+      </div>
+
+      {/* Section Navigation */}
+      <div className="flex space-x-1 mb-4 bg-white rounded-lg shadow p-1">
+        {sections.map(section => (
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id)}
+            className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-colors ${
+              activeSection === section.id
+                ? 'bg-teal-500 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <span className="mr-1">{section.icon}</span>
+            {section.label}
+            {section.id === 'review' && reviewQueue.length > 0 && (
+              <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {reviewQueue.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* OVERVIEW SECTION */}
+      {activeSection === 'overview' && (
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-6 gap-3">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-[10px] text-gray-500 uppercase">Total Projetos</div>
+              <div className="text-2xl font-bold text-gray-800">{stats.totalProjects}</div>
+            </div>
+            <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Em Andamento</div>
+              <div className="text-2xl font-bold">{stats.inProgress}</div>
+            </div>
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Aguardando Revisão</div>
+              <div className="text-2xl font-bold">{stats.awaitingReview}</div>
+            </div>
+            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Concluídos</div>
+              <div className="text-2xl font-bold">{stats.completed}</div>
+            </div>
+            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">No Prazo</div>
+              <div className="text-2xl font-bold">{stats.onTime}</div>
+            </div>
+            <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Atrasados</div>
+              <div className="text-2xl font-bold">{stats.delayed}</div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Ações Rápidas</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveSection('review')}
+                className="px-4 py-2 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center gap-2"
+              >
+                ✅ Revisar Traduções ({reviewQueue.length})
+              </button>
+              <button
+                onClick={() => setActiveSection('team')}
+                className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-2"
+              >
+                👥 Ver Equipe
+              </button>
+              <button
+                onClick={() => setActiveSection('calendar')}
+                className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 flex items-center gap-2"
+              >
+                📅 Ver Prazos
+              </button>
+            </div>
+          </div>
+
+          {/* Recent Projects */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Projetos Recentes</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2">Código</th>
+                    <th className="text-left py-2 px-2">Cliente</th>
+                    <th className="text-left py-2 px-2">Idiomas</th>
+                    <th className="text-left py-2 px-2">Tradutor</th>
+                    <th className="text-left py-2 px-2">Status</th>
+                    <th className="text-left py-2 px-2">Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.slice(0, 10).map(order => (
+                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-2 font-mono text-blue-600">{order.order_number}</td>
+                      <td className="py-2 px-2">{order.client_name}</td>
+                      <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
+                      <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                          {order.translation_status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2">
+                        {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REVIEW SECTION - Side by Side View */}
+      {activeSection === 'review' && (
+        <div className="space-y-4">
+          {!selectedReview ? (
+            /* Review Queue List */
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">📥 Fila de Revisão ({reviewQueue.length})</h3>
+              {reviewQueue.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">✅</div>
+                  <p>Nenhuma tradução aguardando revisão</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {reviewQueue.map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => loadReviewContent(order)}
+                      className="p-3 border rounded-lg hover:bg-teal-50 cursor-pointer transition-colors flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
+                        <div className="text-xs text-gray-500">{order.client_name}</div>
+                        <div className="text-[10px] text-gray-400">
+                          {order.translate_from} → {order.translate_to} • Tradutor: {order.assigned_translator || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-600">
+                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                        </div>
+                        <button className="mt-1 px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600">
+                          Revisar →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Side-by-Side Review View */
+            <div className="bg-white rounded-lg shadow">
+              {/* Review Header */}
+              <div className="p-4 border-b flex justify-between items-center">
+                <div>
+                  <button
+                    onClick={() => { setSelectedReview(null); setOriginalContent(null); setTranslatedContent(null); }}
+                    className="text-gray-500 hover:text-gray-700 text-sm mb-1"
+                  >
+                    ← Voltar para fila
+                  </button>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Revisão: {selectedReview.order_number}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Cliente: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={requestCorrection}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    ❌ Solicitar Correção
+                  </button>
+                  <button
+                    onClick={() => approveTranslation('client_review')}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    👁️ Review p/ Cliente
+                  </button>
+                  <button
+                    onClick={() => approveTranslation('ready')}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    ✅ Final p/ Cliente & Admin
+                  </button>
+                </div>
+              </div>
+
+              {/* Side by Side Content */}
+              <div className="grid grid-cols-2 divide-x" style={{ height: 'calc(100vh - 300px)' }}>
+                {/* Original Document */}
+                <div className="p-4 overflow-auto">
+                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
+                    📄 Documento Original
+                  </h4>
+                  {originalContent ? (
+                    originalContent.contentType?.includes('image') ? (
+                      <img
+                        src={`data:${originalContent.contentType};base64,${originalContent.data}`}
+                        alt="Original"
+                        className="max-w-full border rounded"
+                      />
+                    ) : originalContent.contentType?.includes('pdf') ? (
+                      <iframe
+                        src={`data:application/pdf;base64,${originalContent.data}`}
+                        className="w-full h-full border rounded"
+                        title="Original PDF"
+                      />
+                    ) : (
+                      <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
+                        {atob(originalContent.data)}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-2xl mb-2">📄</div>
+                      <p className="text-xs">Documento original não encontrado</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Translated Document */}
+                <div className="p-4 overflow-auto">
+                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
+                    ✍️ Tradução
+                  </h4>
+                  {translatedContent ? (
+                    translatedContent.html ? (
+                      <div
+                        className="border rounded p-4 bg-white"
+                        dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                      />
+                    ) : translatedContent.contentType?.includes('image') ? (
+                      <img
+                        src={`data:${translatedContent.contentType};base64,${translatedContent.data}`}
+                        alt="Translation"
+                        className="max-w-full border rounded"
+                      />
+                    ) : translatedContent.contentType?.includes('pdf') ? (
+                      <iframe
+                        src={`data:application/pdf;base64,${translatedContent.data}`}
+                        className="w-full h-full border rounded"
+                        title="Translation PDF"
+                      />
+                    ) : (
+                      <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
+                        {atob(translatedContent.data)}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-2xl mb-2">✍️</div>
+                      <p className="text-xs">Tradução não encontrada</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Correction Notes */}
+              <div className="p-4 border-t bg-gray-50">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  📝 Notas de Correção (para enviar ao tradutor):
+                </label>
+                <textarea
+                  value={correctionNotes}
+                  onChange={(e) => setCorrectionNotes(e.target.value)}
+                  placeholder="Descreva as correções necessárias..."
+                  className="w-full p-2 border rounded text-xs h-20 resize-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TEAM SECTION */}
+      {activeSection === 'team' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">👥 Minha Equipe de Tradutores</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {translators.map(translator => {
+                const translatorOrders = orders.filter(o =>
+                  o.assigned_translator_id === translator.id ||
+                  o.assigned_translator === translator.name
+                );
+                const activeOrders = translatorOrders.filter(o =>
+                  ['in_translation', 'review'].includes(o.translation_status)
+                );
+                const completedOrders = translatorOrders.filter(o =>
+                  ['ready', 'delivered'].includes(o.translation_status)
+                );
+                const isBusy = activeOrders.length > 0;
+
+                return (
+                  <div
+                    key={translator.id}
+                    className={`p-4 rounded-lg border-2 ${isBusy ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-2 ${isBusy ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                        <span className="font-medium text-sm">{translator.name}</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${isBusy ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}`}>
+                        {isBusy ? 'Ocupado' : 'Disponível'}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-gray-500 mb-2">{translator.email}</div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center mt-3">
+                      <div className="bg-white rounded p-2">
+                        <div className="text-lg font-bold text-yellow-600">{activeOrders.length}</div>
+                        <div className="text-[9px] text-gray-500">Em Andamento</div>
+                      </div>
+                      <div className="bg-white rounded p-2">
+                        <div className="text-lg font-bold text-green-600">{completedOrders.length}</div>
+                        <div className="text-[9px] text-gray-500">Concluídos</div>
+                      </div>
+                    </div>
+
+                    {activeOrders.length > 0 && (
+                      <div className="mt-3 pt-2 border-t">
+                        <div className="text-[10px] font-medium text-gray-600 mb-1">Projetos Ativos:</div>
+                        {activeOrders.slice(0, 3).map((order, idx) => (
+                          <div key={idx} className="flex justify-between text-[10px] py-0.5">
+                            <span className="text-blue-600 font-mono">{order.order_number}</span>
+                            <span className="text-gray-500">
+                              {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => { setSelectedTranslator(translator); setActiveSection('messages'); }}
+                      className="mt-3 w-full px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                    >
+                      💬 Enviar Mensagem
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CALENDAR SECTION */}
+      {activeSection === 'calendar' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📅 Agenda de Prazos</h3>
+            <div className="space-y-2">
+              {getUpcomingDeadlines().map(order => (
+                <div
+                  key={order.id}
+                  className={`p-3 rounded-lg border flex justify-between items-center ${
+                    order.daysLeft < 0 ? 'bg-red-50 border-red-200' :
+                    order.daysLeft <= 2 ? 'bg-orange-50 border-orange-200' :
+                    order.daysLeft <= 5 ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-green-50 border-green-200'
+                  }`}
+                >
+                  <div>
+                    <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
+                    <div className="text-xs text-gray-600">{order.client_name}</div>
+                    <div className="text-[10px] text-gray-500">
+                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'Sem tradutor'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-lg font-bold ${
+                      order.daysLeft < 0 ? 'text-red-600' :
+                      order.daysLeft <= 2 ? 'text-orange-600' :
+                      order.daysLeft <= 5 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {order.daysLeft < 0
+                        ? `${Math.abs(order.daysLeft)} dias atrasado`
+                        : order.daysLeft === 0
+                        ? 'HOJE'
+                        : `${order.daysLeft} dias`
+                      }
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {order.deadlineDate.toLocaleDateString('pt-BR')}
+                    </div>
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                      {order.translation_status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {getUpcomingDeadlines().length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">📅</div>
+                  <p>Nenhum prazo pendente</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REPORTS SECTION */}
+      {activeSection === 'reports' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📈 Relatórios do PM</h3>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-blue-600">{stats.totalProjects}</div>
+                <div className="text-xs text-gray-600">Total de Projetos</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-green-600">
+                  {stats.totalProjects > 0 ? Math.round((stats.completed / stats.totalProjects) * 100) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Taxa de Conclusão</div>
+              </div>
+              <div className="bg-teal-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-teal-600">
+                  {stats.totalProjects > 0 ? Math.round((stats.onTime / stats.totalProjects) * 100) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Entregas no Prazo</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-purple-600">{translators.length}</div>
+                <div className="text-xs text-gray-600">Tradutores na Equipe</div>
+              </div>
+            </div>
+
+            {/* Status Distribution */}
+            <div className="mb-6">
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Distribuição por Status</h4>
+              <div className="flex h-6 rounded-lg overflow-hidden">
+                {[
+                  { status: 'received', color: 'bg-gray-400', count: orders.filter(o => o.translation_status === 'received').length },
+                  { status: 'in_translation', color: 'bg-yellow-500', count: stats.inProgress },
+                  { status: 'review', color: 'bg-purple-500', count: stats.awaitingReview },
+                  { status: 'ready', color: 'bg-green-500', count: orders.filter(o => o.translation_status === 'ready').length },
+                  { status: 'delivered', color: 'bg-teal-500', count: orders.filter(o => o.translation_status === 'delivered').length }
+                ].map(item => (
+                  item.count > 0 && (
+                    <div
+                      key={item.status}
+                      className={`${item.color} flex items-center justify-center text-white text-[10px]`}
+                      style={{ width: `${(item.count / stats.totalProjects) * 100}%` }}
+                      title={`${item.status}: ${item.count}`}
+                    >
+                      {item.count}
+                    </div>
+                  )
+                ))}
+              </div>
+              <div className="flex justify-between text-[9px] text-gray-500 mt-1">
+                <span>Recebido</span>
+                <span>Em Tradução</span>
+                <span>Revisão</span>
+                <span>Pronto</span>
+                <span>Entregue</span>
+              </div>
+            </div>
+
+            {/* Translator Performance */}
+            <div>
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Desempenho dos Tradutores</h4>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left py-2 px-2">Tradutor</th>
+                    <th className="text-center py-2 px-2">Ativos</th>
+                    <th className="text-center py-2 px-2">Concluídos</th>
+                    <th className="text-center py-2 px-2">No Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {translators.map(translator => {
+                    const tOrders = orders.filter(o =>
+                      o.assigned_translator_id === translator.id ||
+                      o.assigned_translator === translator.name
+                    );
+                    const active = tOrders.filter(o => ['in_translation', 'review'].includes(o.translation_status)).length;
+                    const completed = tOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).length;
+                    const onTimeCount = tOrders.filter(o => {
+                      if (!o.deadline) return true;
+                      return new Date(o.deadline) >= new Date() || ['ready', 'delivered'].includes(o.translation_status);
+                    }).length;
+
+                    return (
+                      <tr key={translator.id} className="border-b hover:bg-gray-50">
+                        <td className="py-2 px-2">{translator.name}</td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">{active}</span>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">{completed}</span>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded">
+                            {tOrders.length > 0 ? Math.round((onTimeCount / tOrders.length) * 100) : 100}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MESSAGES SECTION */}
+      {activeSection === 'messages' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Tradutores</h3>
+
+            <div className="grid grid-cols-3 gap-4">
+              {/* Translator List */}
+              <div className="border rounded-lg p-3">
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
+                <div className="space-y-1">
+                  {translators.map(translator => (
+                    <button
+                      key={translator.id}
+                      onClick={() => setSelectedTranslator(translator)}
+                      className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                        selectedTranslator?.id === translator.id
+                          ? 'bg-teal-500 text-white'
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="font-medium">{translator.name}</div>
+                      <div className="text-[10px] opacity-70">{translator.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Message Area */}
+              <div className="col-span-2 border rounded-lg p-3">
+                {selectedTranslator ? (
+                  <>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">
+                      Conversa com {selectedTranslator.name}
+                    </h4>
+
+                    {/* Messages */}
+                    <div className="h-64 overflow-y-auto border rounded p-2 mb-2 bg-gray-50">
+                      {messages
+                        .filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name)
+                        .map(msg => (
+                          <div
+                            key={msg.id}
+                            className={`mb-2 p-2 rounded text-xs ${
+                              msg.from === user?.name
+                                ? 'bg-teal-100 ml-8'
+                                : 'bg-white mr-8 border'
+                            }`}
+                          >
+                            <div className="font-medium text-[10px] text-gray-500 mb-1">
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                            </div>
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                        ))}
+                      {messages.filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name).length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-xs">
+                          Nenhuma mensagem ainda
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Send Message */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Digite sua mensagem..."
+                        className="flex-1 px-3 py-2 border rounded text-xs"
+                      />
+                      <button
+                        onClick={sendMessage}
+                        className="px-4 py-2 bg-teal-500 text-white rounded text-xs hover:bg-teal-600"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">👈</div>
+                      <p className="text-xs">Selecione um tradutor para iniciar conversa</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
@@ -9066,6 +9974,8 @@ function AdminApp() {
     // Set default tab based on role
     if (userData.role === 'translator') {
       setActiveTab('translation');
+    } else if (userData.role === 'pm') {
+      setActiveTab('pm-dashboard');
     }
   };
 
@@ -9101,6 +10011,10 @@ function AdminApp() {
     const userRole = user?.role || 'admin';
 
     switch (activeTab) {
+      case 'pm-dashboard':
+        return userRole === 'pm'
+          ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
+          : <div className="p-6 text-center text-gray-500">Access denied - PM only</div>;
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
