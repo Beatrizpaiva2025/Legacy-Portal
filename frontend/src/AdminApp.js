@@ -7043,6 +7043,10 @@ const TranslatorLogin = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -7074,86 +7078,159 @@ const TranslatorLogin = ({ onLogin }) => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setResetLoading(true);
+    try {
+      await axios.post(`${API}/admin/auth/forgot-password`, { email: resetEmail });
+      setResetSent(true);
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to send reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Blue Header */}
-      <div className="bg-gradient-to-b from-blue-500 to-blue-600 text-white py-12 px-4 text-center">
-        {/* Globe Icon */}
-        <div className="mb-4">
-          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-blue-400 to-cyan-300 rounded-full flex items-center justify-center shadow-lg">
-            <svg className="w-12 h-12" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
-              <ellipse cx="50" cy="50" rx="20" ry="45" stroke="white" strokeWidth="2" fill="none"/>
-              <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="2"/>
-              <ellipse cx="50" cy="30" rx="35" ry="12" stroke="white" strokeWidth="2" fill="none"/>
-              <ellipse cx="50" cy="70" rx="35" ry="12" stroke="white" strokeWidth="2" fill="none"/>
-              {/* Land masses */}
-              <path d="M30 35 Q35 30 45 32 Q50 35 48 42 Q45 45 38 43 Q32 40 30 35Z" fill="#66BB6A"/>
-              <path d="M55 25 Q65 22 72 28 Q75 35 70 40 Q62 38 55 35 Q52 30 55 25Z" fill="#66BB6A"/>
-              <path d="M25 55 Q30 52 40 54 Q45 58 42 65 Q35 68 28 65 Q22 60 25 55Z" fill="#66BB6A"/>
-              <path d="M60 55 Q70 52 78 58 Q80 65 75 70 Q65 72 58 68 Q55 62 60 55Z" fill="#66BB6A"/>
-            </svg>
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Blue Header with Globe */}
+        <div className="bg-gradient-to-b from-blue-500 to-blue-600 py-8 px-4 text-center">
+          {/* Globe Icon */}
+          <div className="mb-3">
+            <div className="w-16 h-16 mx-auto">
+              <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="#4FC3F7"/>
+                <ellipse cx="50" cy="50" rx="18" ry="45" stroke="white" strokeWidth="1.5" fill="none"/>
+                <line x1="5" y1="50" x2="95" y2="50" stroke="white" strokeWidth="1.5"/>
+                <ellipse cx="50" cy="28" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                <ellipse cx="50" cy="72" rx="38" ry="10" stroke="white" strokeWidth="1.5" fill="none"/>
+                {/* Land masses */}
+                <path d="M28 32 Q34 26 46 30 Q52 34 48 44 Q42 48 34 44 Q28 38 28 32Z" fill="#4CAF50"/>
+                <path d="M56 22 Q68 18 76 26 Q80 36 72 42 Q62 40 54 34 Q50 28 56 22Z" fill="#4CAF50"/>
+                <path d="M22 54 Q30 50 42 54 Q48 60 44 70 Q34 74 26 68 Q18 62 22 54Z" fill="#4CAF50"/>
+                <path d="M58 56 Q70 52 80 60 Q84 70 76 76 Q64 78 56 72 Q52 64 58 56Z" fill="#4CAF50"/>
+              </svg>
+            </div>
           </div>
+          <h1 className="text-xl font-semibold text-white">Legacy Translations</h1>
         </div>
-        <h1 className="text-2xl font-bold mb-2">Legacy Translations</h1>
-        <p className="text-blue-100 text-sm">Complete Certified Translation System</p>
-      </div>
 
-      {/* Login Form Card */}
-      <div className="flex-1 flex items-start justify-center px-4 -mt-6">
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-8">
-          <h2 className="text-xl font-semibold text-gray-800 text-center mb-6">Translator Login</h2>
+        {/* Form */}
+        <div className="p-8">
+          {showForgotPassword ? (
+            // Forgot Password Form
+            <div>
+              <h2 className="text-lg font-medium text-gray-800 text-center mb-6">Reset Password</h2>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
-              {error}
+              {resetSent ? (
+                <div className="text-center">
+                  <div className="text-green-600 mb-4">
+                    <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                  </div>
+                  <p className="text-gray-600 mb-4">If an account exists with this email, you will receive a password reset link.</p>
+                  <button
+                    onClick={() => { setShowForgotPassword(false); setResetSent(false); setResetEmail(''); }}
+                    className="text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <p className="text-sm text-gray-600 text-center mb-4">
+                    Enter your email address and we'll send you a link to reset your password.
+                  </p>
+
+                  {error && (
+                    <div className="p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
+                      {error}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading}
+                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium transition-all"
+                  >
+                    {resetLoading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgotPassword(false); setError(''); }}
+                    className="w-full py-3 text-gray-600 hover:text-gray-800 font-medium"
+                  >
+                    Back to Login
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : (
+            // Login Form
+            <div>
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm text-center">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                  <input
+                    type="password"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium transition-all"
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+              </form>
+
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => { setShowForgotPassword(true); setError(''); }}
+                  className="text-blue-600 hover:text-blue-700 text-sm hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
             </div>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <input
-                type="email"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-              <input
-                type="password"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 font-medium flex items-center justify-center space-x-2 transition-all shadow-md"
-            >
-              <span>🔐</span>
-              <span>{loading ? 'Logging in...' : 'Login'}</span>
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <a href="/admin" className="text-blue-600 hover:text-blue-700 text-sm hover:underline">
-              ← Back to Admin Panel
-            </a>
-          </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="py-4 text-center text-gray-500 text-xs">
-        © 2024 Legacy Translations. All rights reserved.
       </div>
     </div>
   );
