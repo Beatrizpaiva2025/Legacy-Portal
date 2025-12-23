@@ -419,7 +419,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -10414,10 +10414,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </div>
 
                         {/* Footer */}
-                        <div className="text-center border-t pt-4 text-sm text-gray-500">
-                          <p className="font-medium text-teal-600 mb-2">{t.thankYou}</p>
-                          <p>{t.contact}: info@legacytranslation.com | {t.phone}: (555) 123-4567</p>
-                          <p>{t.website}: www.legacytranslation.com</p>
+                        <div className="text-center border-t pt-4">
+                          <p className="font-medium text-teal-600 mb-3 text-base">{t.thankYou}</p>
+                          <div className="bg-gray-50 rounded-lg p-4 inline-block">
+                            <p className="text-gray-700 font-medium mb-1">Legacy Translation Services</p>
+                            <p className="text-gray-600 text-sm">legacytranslations.com | {t.phone}: +1(857)316-7770</p>
+                            <p className="text-gray-600 text-sm">{t.website}: www.legacytranslation.com</p>
+                          </div>
                         </div>
                       </>
                     );
@@ -11043,9 +11046,9 @@ function AdminApp() {
 
     switch (activeTab) {
       case 'pm-dashboard':
-        return userRole === 'pm'
+        return (userRole === 'pm' || userRole === 'admin')
           ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
-          : <div className="p-6 text-center text-gray-500">Access denied - PM only</div>;
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
