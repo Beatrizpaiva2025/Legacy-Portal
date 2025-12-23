@@ -3135,6 +3135,10 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         await db.translation_orders.insert_one(order_dict)
         logger.info(f"Manual order created: {order.order_number}")
 
+        # Remove MongoDB _id from response (it's not JSON serializable)
+        if "_id" in order_dict:
+            del order_dict["_id"]
+
         # If document data provided, save it
         if project_data.document_data and project_data.document_filename:
             doc_record = {
