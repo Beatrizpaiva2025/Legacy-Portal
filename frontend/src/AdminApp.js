@@ -460,8 +460,15 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
       {/* User Info and Actions */}
       <div className="flex items-center space-x-3">
         {user && (
-          <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
-            {roleInfo.label}
+          <div className="flex items-center space-x-2">
+            <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
+              {roleInfo.label}
+            </div>
+            {(userRole === 'pm' || userRole === 'translator') && user.name && (
+              <span className="text-white text-[11px]">
+                Welcome, {user.name.split(' ')[0]}
+              </span>
+            )}
           </div>
         )}
         <button
