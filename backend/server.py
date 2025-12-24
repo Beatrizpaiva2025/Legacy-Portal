@@ -884,6 +884,8 @@ class ManualProjectCreate(BaseModel):
     # Files (base64)
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
+    # Multiple files support
+    documents: Optional[list] = None  # List of {filename, data, content_type}
 
 # Make.com Webhook URL for QuickBooks integration
 MAKE_WEBHOOK_URL = "https://hook.us2.make.com/9qd4rfzl5re2u2t24lr94qwcqahrpt1i"
@@ -3925,8 +3927,21 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         if "_id" in order_dict:
             del order_dict["_id"]
 
-        # If document data provided, save it
-        if project_data.document_data and project_data.document_filename:
+        # Save multiple documents if provided
+        if project_data.documents and len(project_data.documents) > 0:
+            for doc in project_data.documents:
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order.id,
+                    "filename": doc.get("filename", "document.pdf"),
+                    "data": doc.get("data"),
+                    "content_type": doc.get("content_type", "application/pdf"),
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+            logger.info(f"Saved {len(project_data.documents)} documents for order {order.order_number}")
+        # Fallback: If single document data provided (backwards compatibility)
+        elif project_data.document_data and project_data.document_filename:
             doc_record = {
                 "id": str(uuid.uuid4()),
                 "order_id": order.id,
