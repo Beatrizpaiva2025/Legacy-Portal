@@ -5783,43 +5783,47 @@ tradução juramentada | certified translation`}
                 )}
               </div>
 
-              {/* Submit for Review - For Translators */}
-              {user?.role === 'translator' && (
-                <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
-                  <h3 className="text-sm font-bold text-teal-700 mb-2">📤 Submit for Review</h3>
-                  <p className="text-[10px] text-teal-600 mb-3">Send your translation to Admin/PM for review and approval</p>
+              {/* Submit for Review - For All Roles */}
+              <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-teal-700 mb-2">
+                  📤 {user?.role === 'translator' ? 'Submit for Review' : 'Submit & Notify Team'}
+                </h3>
+                <p className="text-[10px] text-teal-600 mb-3">
+                  {user?.role === 'translator'
+                    ? 'Send your translation to Admin/PM for review and approval'
+                    : 'Link translation to order and notify team members'}
+                </p>
 
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
-                    <select
-                      value={selectedOrderId}
-                      onChange={(e) => setSelectedOrderId(e.target.value)}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                    >
-                      <option value="">-- Select Order --</option>
-                      {availableOrders.map(order => (
-                        <option key={order.id} value={order.id}>
-                          {order.order_number} - {order.client_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    onClick={() => sendToProjects('review')}
-                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className="w-full py-2 bg-teal-600 text-white text-sm font-bold rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => setSelectedOrderId(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Submit for Admin/PM Review'}
-                  </button>
-
-                  {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                    <p className="text-[10px] text-orange-600 mt-2">
-                      ⚠️ Fill document type and upload translation first
-                    </p>
-                  )}
+                    <option value="">-- Select Order --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_number} - {order.client_name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+
+                <button
+                  onClick={() => sendToProjects('review')}
+                  disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                  className="w-full py-2 bg-teal-600 text-white text-sm font-bold rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {sendingToProjects ? '⏳ Sending...' : (user?.role === 'translator' ? '📤 Submit for Admin/PM Review' : '📤 Submit & Notify Admin/PM')}
+                </button>
+
+                {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                  <p className="text-[10px] text-orange-600 mt-2">
+                    ⚠️ Fill document type and upload translation first
+                  </p>
+                )}
+              </div>
 
               {/* Download Button */}
               <button
