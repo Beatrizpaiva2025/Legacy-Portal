@@ -52,6 +52,10 @@ db = client[os.environ['DB_NAME']]
 
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+# Detect if running in test mode (test keys start with sk_test_)
+STRIPE_TEST_MODE = stripe.api_key.startswith('sk_test_') if stripe.api_key else True
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -649,6 +653,13 @@ class EmailNotificationRequest(BaseModel):
     quote_id: str
     partner_email: EmailStr
     send_to_company: bool = True
+
+class SupportRequest(BaseModel):
+    issue_type: str
+    description: str
+    customer_email: Optional[str] = "Not provided"
+    customer_name: Optional[str] = "Not provided"
+    files_count: int = 0
 
 # Partner Models
 class Partner(BaseModel):
@@ -1805,29 +1816,53 @@ async def get_payment_status(session_id: str):
 
 @api_router.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhooks"""
-    
+    """Handle Stripe webhooks with proper signature verification"""
+
     try:
         payload = await request.body()
         sig_header = request.headers.get('stripe-signature')
-        
-        if not sig_header:
-            raise HTTPException(status_code=400, detail="Missing Stripe signature")
-        
-        # For now, we'll skip webhook verification in test mode
-        # In production, you should verify the webhook signature
-        
-        event = stripe.Event.construct_from(
-            json.loads(payload.decode('utf-8')), stripe.api_key
-        )
-        
+
+        # Verify webhook signature
+        if STRIPE_WEBHOOK_SECRET:
+            # Production mode: verify webhook signature
+            if not sig_header:
+                logger.warning("Missing Stripe signature header")
+                raise HTTPException(status_code=400, detail="Missing Stripe signature")
+
+            try:
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, STRIPE_WEBHOOK_SECRET
+                )
+                logger.info(f"Webhook signature verified for event: {event['type']}")
+            except stripe.error.SignatureVerificationError as e:
+                logger.error(f"Webhook signature verification failed: {str(e)}")
+                raise HTTPException(status_code=400, detail="Invalid signature")
+        else:
+            # Test mode without webhook secret: parse event without verification
+            # Log warning to encourage setting up webhook secret even in test mode
+            if STRIPE_TEST_MODE:
+                logger.warning("Webhook secret not configured - processing without signature verification (test mode)")
+            else:
+                logger.error("Webhook secret not configured in production mode - rejecting request")
+                raise HTTPException(status_code=400, detail="Webhook secret not configured")
+
+            try:
+                event = stripe.Event.construct_from(
+                    json.loads(payload.decode('utf-8')), stripe.api_key
+                )
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse webhook payload: {str(e)}")
+                raise HTTPException(status_code=400, detail="Invalid payload")
+
         # Handle the event
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             session_id = session['id']
-            
+
+            logger.info(f"Processing checkout.session.completed for session: {session_id}")
+
             # Update payment status
-            await db.payment_transactions.update_one(
+            result = await db.payment_transactions.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
@@ -1837,17 +1872,30 @@ async def stripe_webhook(request: Request):
                     }
                 }
             )
-            
+
+            if result.matched_count == 0:
+                logger.warning(f"No transaction found for session_id: {session_id}")
+
             # Get transaction and handle success
             transaction = await db.payment_transactions.find_one({"session_id": session_id})
             if transaction:
                 await handle_successful_payment(session_id, transaction)
-        
-        return {"status": "success"}
-        
+                logger.info(f"Successfully processed payment for session: {session_id}")
+        else:
+            logger.info(f"Received unhandled webhook event type: {event['type']}")
+
+        # Return 200 OK to acknowledge receipt of the event
+        return {"status": "success", "received": True}
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error handling webhook: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
     except Exception as e:
-        logger.error(f"Error handling webhook: {str(e)}")
-        raise HTTPException(status_code=400, detail="Webhook error")
+        logger.error(f"Unexpected error handling webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 async def handle_successful_payment(session_id: str, payment_transaction: dict):
     """Handle successful payment by sending confirmation emails and creating Protemos project"""
@@ -2046,6 +2094,78 @@ async def send_email_notification(request: EmailNotificationRequest, background_
     except Exception as e:
         logger.error(f"Error sending email notification: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send email notification")
+
+# Support request endpoint
+@api_router.post("/send-support-request")
+async def send_support_request(request: SupportRequest):
+    """Send support request email to contact@legacytranslations.com"""
+    try:
+        # Map issue types to readable names
+        issue_type_labels = {
+            "upload": "Problems with Upload",
+            "translation_type": "Not Sure What Type of Translation to Order",
+            "other": "Other"
+        }
+
+        issue_label = issue_type_labels.get(request.issue_type, request.issue_type)
+
+        # Build email content
+        subject = f"Customer Support Request: {issue_label}"
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0d9488; border-bottom: 2px solid #0d9488; padding-bottom: 10px;">
+                Customer Support Request
+            </h2>
+
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Issue Type:</strong> {issue_label}</p>
+                <p><strong>Customer Name:</strong> {request.customer_name}</p>
+                <p><strong>Customer Email:</strong> {request.customer_email}</p>
+                <p><strong>Attachments:</strong> {request.files_count} file(s)</p>
+            </div>
+
+            <div style="background: #fff; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px;">
+                <h3 style="color: #374151; margin-top: 0;">Description:</h3>
+                <p style="white-space: pre-wrap; color: #4b5563;">{request.description}</p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+            <p style="color: #9ca3af; font-size: 12px;">
+                This support request was submitted from the Legacy Translations Customer Portal.
+            </p>
+        </div>
+        """
+
+        # Send email to support
+        await email_service.send_email(
+            to="contact@legacytranslations.com",
+            subject=subject,
+            content=html_content,
+            content_type="html"
+        )
+
+        # Also save to database for tracking
+        support_ticket = {
+            "id": str(uuid.uuid4()),
+            "issue_type": request.issue_type,
+            "description": request.description,
+            "customer_email": request.customer_email,
+            "customer_name": request.customer_name,
+            "files_count": request.files_count,
+            "status": "new",
+            "created_at": datetime.utcnow()
+        }
+        await db.support_tickets.insert_one(support_ticket)
+
+        logger.info(f"Support request received from {request.customer_email}: {issue_label}")
+
+        return {"status": "success", "message": "Support request sent successfully"}
+
+    except Exception as e:
+        logger.error(f"Error sending support request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send support request")
 
 # ==================== PARTNER AUTHENTICATION ====================
 
@@ -2433,7 +2553,7 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
         await db.admin_users.update_one(
             {"id": user["id"]},
             {
-                "$push": {"ip_history": {"$each": [login_record], "$slice": -50}},  # Keep last 50 logins
+                "$push": {"ip_history": {"$each": [login_record], "$slice": -50}},
                 "$set": {"last_login_ip": client_ip, "last_login_at": datetime.utcnow()}
             }
         )
@@ -2745,13 +2865,19 @@ async def list_admin_users(token: str, admin_key: str):
 
     try:
         users = await db.admin_users.find().to_list(100)
-        return [AdminUserPublic(
-            id=u["id"],
-            email=u["email"],
-            name=u["name"],
-            role=u["role"],
-            is_active=u.get("is_active", True)
-        ) for u in users]
+        return [{
+            "id": u["id"],
+            "email": u["email"],
+            "name": u["name"],
+            "role": u["role"],
+            "is_active": u.get("is_active", True),
+            "rate_per_page": u.get("rate_per_page"),
+            "rate_per_word": u.get("rate_per_word"),
+            "language_pairs": u.get("language_pairs"),
+            "pages_translated": u.get("pages_translated", 0),
+            "pages_pending_payment": u.get("pages_pending_payment", 0),
+            "created_at": u.get("created_at")
+        } for u in users]
     except Exception as e:
         logger.error(f"Error listing admin users: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to list users")
@@ -2805,6 +2931,132 @@ async def delete_admin_user(user_id: str, admin_key: str):
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
+# ==================== USER DOCUMENTS MANAGEMENT ====================
+
+@api_router.get("/admin/users/{user_id}/documents")
+async def get_user_documents(user_id: str, admin_key: str):
+    """Get all documents for a user"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        documents = await db.user_documents.find({"user_id": user_id}).to_list(100)
+        return {
+            "documents": [{
+                "id": doc["id"],
+                "filename": doc["filename"],
+                "document_type": doc["document_type"],
+                "content_type": doc.get("content_type", "application/octet-stream"),
+                "file_size": doc.get("file_size", 0),
+                "uploaded_at": doc.get("uploaded_at"),
+                "uploaded_by": doc.get("uploaded_by")
+            } for doc in documents]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching user documents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch documents")
+
+@api_router.post("/admin/users/{user_id}/documents")
+async def upload_user_document(user_id: str, admin_key: str, file: UploadFile = File(...), document_type: str = Form(...)):
+    """Upload a document for a user"""
+    # Validate admin access
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check user exists
+        target_user = await db.admin_users.find_one({"id": user_id})
+        if not target_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Read file content
+        file_content = await file.read()
+        file_size = len(file_content)
+
+        # Validate file size (max 10MB)
+        if file_size > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+        # Create document record
+        doc_id = str(uuid.uuid4())
+        document = {
+            "id": doc_id,
+            "user_id": user_id,
+            "filename": file.filename,
+            "document_type": document_type,
+            "content_type": file.content_type,
+            "file_data": base64.b64encode(file_content).decode('utf-8'),
+            "file_size": file_size,
+            "uploaded_at": datetime.utcnow().isoformat(),
+            "uploaded_by": admin_key[:10] + "..."
+        }
+
+        await db.user_documents.insert_one(document)
+
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": file.filename,
+            "message": "Document uploaded successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload document")
+
+@api_router.get("/admin/users/{user_id}/documents/{doc_id}/download")
+async def download_user_document(user_id: str, doc_id: str, admin_key: str):
+    """Download a user document"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        document = await db.user_documents.find_one({"id": doc_id, "user_id": user_id})
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {
+            "filename": document["filename"],
+            "content_type": document.get("content_type", "application/octet-stream"),
+            "file_data": document.get("file_data", "")
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error downloading user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to download document")
+
+@api_router.delete("/admin/users/{user_id}/documents/{doc_id}")
+async def delete_user_document(user_id: str, doc_id: str, admin_key: str):
+    """Delete a user document (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.user_documents.delete_one({"id": doc_id, "user_id": user_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        return {"status": "success", "message": "Document deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete document")
+
 # ==================== IP TRACKING & SECURITY ====================
 
 @api_router.get("/admin/users/{user_id}/ip-history")
@@ -2824,8 +3076,6 @@ async def get_user_ip_history(user_id: str, admin_key: str):
             raise HTTPException(status_code=404, detail="User not found")
 
         ip_history = user.get("ip_history", [])
-
-        # Analyze for suspicious activity (multiple unique IPs)
         unique_ips = set()
         for record in ip_history:
             if record.get("ip_address"):
@@ -2840,7 +3090,7 @@ async def get_user_ip_history(user_id: str, admin_key: str):
             "unique_ip_count": len(unique_ips),
             "unique_ips": list(unique_ips),
             "ip_history": ip_history,
-            "suspicious": len(unique_ips) > 3  # Flag if more than 3 different IPs
+            "suspicious": len(unique_ips) > 3
         }
     except HTTPException:
         raise
@@ -2865,8 +3115,6 @@ async def get_login_attempts(admin_key: str, limit: int = 100, user_id: str = No
             query["user_id"] = user_id
 
         attempts = await db.login_attempts.find(query).sort("timestamp", -1).limit(limit).to_list(limit)
-
-        # Convert ObjectId and datetime for JSON serialization
         for attempt in attempts:
             if "_id" in attempt:
                 attempt["_id"] = str(attempt["_id"])
@@ -2892,15 +3140,13 @@ async def get_suspicious_users(admin_key: str):
     try:
         users = await db.admin_users.find({"role": "translator"}).to_list(100)
         suspicious = []
-
         for user in users:
             ip_history = user.get("ip_history", [])
             unique_ips = set()
             for record in ip_history:
                 if record.get("ip_address"):
                     unique_ips.add(record["ip_address"])
-
-            if len(unique_ips) > 3:  # More than 3 different IPs is suspicious
+            if len(unique_ips) > 3:
                 suspicious.append({
                     "user_id": user["id"],
                     "name": user.get("name", ""),
@@ -2911,7 +3157,6 @@ async def get_suspicious_users(admin_key: str):
                     "last_login_ip": user.get("last_login_ip", ""),
                     "last_login_at": user.get("last_login_at", "").isoformat() if user.get("last_login_at") else ""
                 })
-
         return {"suspicious_users": suspicious, "total": len(suspicious)}
     except Exception as e:
         logger.error(f"Error getting suspicious users: {str(e)}")
@@ -2930,16 +3175,12 @@ async def submit_translation(
     original_file: UploadFile = File(None)
 ):
     """Submit completed translation for PM/Admin review"""
-    # Verify token
     user = await get_current_admin_user(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
-        # Get client IP
         client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.client.host
-
-        # Create submission record
         submission_id = str(uuid.uuid4())
         submission = {
             "id": submission_id,
@@ -2948,13 +3189,11 @@ async def submit_translation(
             "translator_name": user.get("name", ""),
             "translator_email": user.get("email", ""),
             "submitted_at": datetime.utcnow(),
-            "status": "pending_review",  # pending_review, approved, revision_requested
+            "status": "pending_review",
             "translation_html": translation_html,
             "notes": notes,
             "ip_address": client_ip
         }
-
-        # Handle translation file upload
         if translation_file:
             file_content = await translation_file.read()
             submission["translation_file"] = {
@@ -2963,8 +3202,6 @@ async def submit_translation(
                 "data": base64.b64encode(file_content).decode('utf-8'),
                 "size": len(file_content)
             }
-
-        # Handle original file upload
         if original_file:
             file_content = await original_file.read()
             submission["original_file"] = {
@@ -2973,31 +3210,13 @@ async def submit_translation(
                 "data": base64.b64encode(file_content).decode('utf-8'),
                 "size": len(file_content)
             }
-
-        # Save to database
         await db.translation_submissions.insert_one(submission)
-
-        # Update order status
         await db.translation_orders.update_one(
             {"id": order_id},
-            {
-                "$set": {
-                    "translation_status": "ready_for_review",
-                    "submission_id": submission_id,
-                    "submitted_at": datetime.utcnow(),
-                    "submitted_by": user["id"]
-                }
-            }
+            {"$set": {"translation_status": "ready_for_review", "submission_id": submission_id, "submitted_at": datetime.utcnow(), "submitted_by": user["id"]}}
         )
-
-        # Log submission
         logger.info(f"Translation submitted: {submission_id} by {user.get('name', user['id'])}")
-
-        return {
-            "status": "success",
-            "submission_id": submission_id,
-            "message": "Translation submitted for review"
-        }
+        return {"status": "success", "submission_id": submission_id, "message": "Translation submitted for review"}
     except HTTPException:
         raise
     except Exception as e:
@@ -3016,15 +3235,10 @@ async def get_pending_translations(admin_key: str):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
-        submissions = await db.translation_submissions.find(
-            {"status": "pending_review"}
-        ).sort("submitted_at", -1).to_list(100)
-
-        # Get order details for each submission
+        submissions = await db.translation_submissions.find({"status": "pending_review"}).sort("submitted_at", -1).to_list(100)
         result = []
         for sub in submissions:
             order = await db.translation_orders.find_one({"id": sub["order_id"]})
-
             result.append({
                 "submission_id": sub["id"],
                 "order_id": sub["order_id"],
@@ -3038,7 +3252,6 @@ async def get_pending_translations(admin_key: str):
                 "notes": sub.get("notes", ""),
                 "ip_address": sub.get("ip_address", "")
             })
-
         return {"submissions": result, "total": len(result)}
     except Exception as e:
         logger.error(f"Error getting pending translations: {str(e)}")
@@ -3059,17 +3272,11 @@ async def get_submission_details(submission_id: str, admin_key: str):
         submission = await db.translation_submissions.find_one({"id": submission_id})
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
-
-        # Get order details
         order = await db.translation_orders.find_one({"id": submission["order_id"]})
-
-        # Convert ObjectId
         if "_id" in submission:
             submission["_id"] = str(submission["_id"])
         if submission.get("submitted_at"):
             submission["submitted_at"] = submission["submitted_at"].isoformat()
-
-        # Add order info
         submission["order_info"] = {
             "order_number": order.get("order_number", "") if order else "",
             "client_name": order.get("client_name", "") if order else "",
@@ -3077,7 +3284,6 @@ async def get_submission_details(submission_id: str, admin_key: str):
             "translate_from": order.get("translate_from", "") if order else "",
             "translate_to": order.get("translate_to", "") if order else ""
         }
-
         return submission
     except HTTPException:
         raise
@@ -3100,19 +3306,8 @@ async def approve_submission(submission_id: str, admin_key: str):
         submission = await db.translation_submissions.find_one({"id": submission_id})
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
-
-        # Update submission status
-        await db.translation_submissions.update_one(
-            {"id": submission_id},
-            {"$set": {"status": "approved", "approved_at": datetime.utcnow()}}
-        )
-
-        # Update order status
-        await db.translation_orders.update_one(
-            {"id": submission["order_id"]},
-            {"$set": {"translation_status": "approved", "approved_at": datetime.utcnow()}}
-        )
-
+        await db.translation_submissions.update_one({"id": submission_id}, {"$set": {"status": "approved", "approved_at": datetime.utcnow()}})
+        await db.translation_orders.update_one({"id": submission["order_id"]}, {"$set": {"translation_status": "approved", "approved_at": datetime.utcnow()}})
         return {"status": "success", "message": "Submission approved"}
     except HTTPException:
         raise
@@ -3135,23 +3330,8 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
         submission = await db.translation_submissions.find_one({"id": submission_id})
         if not submission:
             raise HTTPException(status_code=404, detail="Submission not found")
-
-        # Update submission status
-        await db.translation_submissions.update_one(
-            {"id": submission_id},
-            {"$set": {
-                "status": "revision_requested",
-                "revision_requested_at": datetime.utcnow(),
-                "revision_reason": reason
-            }}
-        )
-
-        # Update order status
-        await db.translation_orders.update_one(
-            {"id": submission["order_id"]},
-            {"$set": {"translation_status": "revision_requested"}}
-        )
-
+        await db.translation_submissions.update_one({"id": submission_id}, {"$set": {"status": "revision_requested", "revision_requested_at": datetime.utcnow(), "revision_reason": reason}})
+        await db.translation_orders.update_one({"id": submission["order_id"]}, {"$set": {"translation_status": "revision_requested"}})
         return {"status": "success", "message": "Revision requested"}
     except HTTPException:
         raise
@@ -3173,23 +3353,14 @@ async def get_translators_payment_summary(admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        # Get all translators
         translators = await db.admin_users.find({"role": "translator"}).to_list(100)
-
         result = []
         for translator in translators:
-            # Get payment history
-            payments = await db.translator_payments.find(
-                {"translator_id": translator["id"]}
-            ).sort("payment_date", -1).to_list(100)
-
+            payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
             total_paid = sum(p.get("amount", 0) for p in payments)
-
-            # Calculate pending amount based on rate and pages
             rate_per_page = translator.get("rate_per_page", 0) or 0
             pages_pending = translator.get("pages_pending_payment", 0) or 0
             pending_amount = rate_per_page * pages_pending
-
             result.append({
                 "translator_id": translator["id"],
                 "name": translator.get("name", ""),
@@ -3207,7 +3378,6 @@ async def get_translators_payment_summary(admin_key: str):
                 "last_payment": payments[0] if payments else None,
                 "is_active": translator.get("is_active", True)
             })
-
         return {"translators": result, "total": len(result)}
     except Exception as e:
         logger.error(f"Error getting translator payments: {str(e)}")
@@ -3228,12 +3398,7 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
         translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
         if not translator:
             raise HTTPException(status_code=404, detail="Translator not found")
-
-        payments = await db.translator_payments.find(
-            {"translator_id": translator_id}
-        ).sort("payment_date", -1).to_list(100)
-
-        # Convert for JSON serialization
+        payments = await db.translator_payments.find({"translator_id": translator_id}).sort("payment_date", -1).to_list(100)
         for payment in payments:
             if "_id" in payment:
                 payment["_id"] = str(payment["_id"])
@@ -3241,7 +3406,6 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
                 payment["payment_date"] = payment["payment_date"].isoformat()
             if payment.get("created_at"):
                 payment["created_at"] = payment["created_at"].isoformat()
-
         return {
             "translator": {
                 "id": translator["id"],
@@ -3268,15 +3432,7 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to get payment history")
 
 @api_router.post("/admin/payments/register")
-async def register_payment(
-    admin_key: str,
-    translator_id: str = Body(...),
-    amount: float = Body(...),
-    pages_paid: int = Body(0),
-    payment_method: str = Body(""),
-    reference: str = Body(""),
-    notes: str = Body("")
-):
+async def register_payment(admin_key: str, translator_id: str = Body(...), amount: float = Body(...), pages_paid: int = Body(0), payment_method: str = Body(""), reference: str = Body(""), notes: str = Body("")):
     """Register a payment made to a translator (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -3290,7 +3446,6 @@ async def register_payment(
         translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
         if not translator:
             raise HTTPException(status_code=404, detail="Translator not found")
-
         payment_id = str(uuid.uuid4())
         payment = {
             "id": payment_id,
@@ -3305,26 +3460,12 @@ async def register_payment(
             "created_at": datetime.utcnow(),
             "status": "completed"
         }
-
         await db.translator_payments.insert_one(payment)
-
-        # Update translator's pending pages (subtract paid pages)
         current_pending = translator.get("pages_pending_payment", 0) or 0
         new_pending = max(0, current_pending - pages_paid)
-
-        await db.admin_users.update_one(
-            {"id": translator_id},
-            {"$set": {"pages_pending_payment": new_pending}}
-        )
-
+        await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_pending_payment": new_pending}})
         logger.info(f"Payment registered: ${amount} to {translator.get('name')} for {pages_paid} pages")
-
-        return {
-            "status": "success",
-            "payment_id": payment_id,
-            "message": f"Payment of ${amount:.2f} registered successfully",
-            "new_pending_pages": new_pending
-        }
+        return {"status": "success", "payment_id": payment_id, "message": f"Payment of ${amount:.2f} registered successfully", "new_pending_pages": new_pending}
     except HTTPException:
         raise
     except Exception as e:
@@ -3332,13 +3473,7 @@ async def register_payment(
         raise HTTPException(status_code=500, detail="Failed to register payment")
 
 @api_router.post("/admin/payments/add-pages")
-async def add_translator_pages(
-    admin_key: str,
-    translator_id: str = Body(...),
-    pages: int = Body(...),
-    order_id: str = Body(""),
-    notes: str = Body("")
-):
+async def add_translator_pages(admin_key: str, translator_id: str = Body(...), pages: int = Body(...), order_id: str = Body(""), notes: str = Body("")):
     """Add pages to a translator's pending payment count (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -3352,78 +3487,16 @@ async def add_translator_pages(
         translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
         if not translator:
             raise HTTPException(status_code=404, detail="Translator not found")
-
         current_translated = translator.get("pages_translated", 0) or 0
         current_pending = translator.get("pages_pending_payment", 0) or 0
-
-        await db.admin_users.update_one(
-            {"id": translator_id},
-            {
-                "$set": {
-                    "pages_translated": current_translated + pages,
-                    "pages_pending_payment": current_pending + pages
-                }
-            }
-        )
-
-        # Log the page addition
-        await db.translator_page_log.insert_one({
-            "translator_id": translator_id,
-            "pages": pages,
-            "order_id": order_id,
-            "notes": notes,
-            "created_at": datetime.utcnow()
-        })
-
-        return {
-            "status": "success",
-            "message": f"Added {pages} pages to {translator.get('name')}",
-            "new_total_translated": current_translated + pages,
-            "new_pending_payment": current_pending + pages
-        }
+        await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_translated": current_translated + pages, "pages_pending_payment": current_pending + pages}})
+        await db.translator_page_log.insert_one({"translator_id": translator_id, "pages": pages, "order_id": order_id, "notes": notes, "created_at": datetime.utcnow()})
+        return {"status": "success", "message": f"Added {pages} pages to {translator.get('name')}", "new_total_translated": current_translated + pages, "new_pending_payment": current_pending + pages}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error adding pages: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to add pages")
-
-@api_router.delete("/admin/payments/{payment_id}")
-async def delete_payment(payment_id: str, admin_key: str):
-    """Delete a payment record (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
-
-    try:
-        payment = await db.translator_payments.find_one({"id": payment_id})
-        if not payment:
-            raise HTTPException(status_code=404, detail="Payment not found")
-
-        # Restore pages to pending
-        translator_id = payment.get("translator_id")
-        pages_paid = payment.get("pages_paid", 0)
-
-        if translator_id and pages_paid > 0:
-            translator = await db.admin_users.find_one({"id": translator_id})
-            if translator:
-                current_pending = translator.get("pages_pending_payment", 0) or 0
-                await db.admin_users.update_one(
-                    {"id": translator_id},
-                    {"$set": {"pages_pending_payment": current_pending + pages_paid}}
-                )
-
-        await db.translator_payments.delete_one({"id": payment_id})
-
-        return {"status": "success", "message": "Payment deleted"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting payment: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to delete payment")
 
 @api_router.get("/admin/payments/report")
 async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
@@ -3445,43 +3518,24 @@ async def get_payment_report(admin_key: str, start_date: str = None, end_date: s
                 query["payment_date"]["$lte"] = datetime.fromisoformat(end_date)
             else:
                 query["payment_date"] = {"$lte": datetime.fromisoformat(end_date)}
-
         payments = await db.translator_payments.find(query).sort("payment_date", -1).to_list(500)
-
-        # Calculate totals
         total_paid = sum(p.get("amount", 0) for p in payments)
         total_pages = sum(p.get("pages_paid", 0) for p in payments)
-
-        # Group by translator
         by_translator = {}
         for p in payments:
             tid = p.get("translator_id", "unknown")
             if tid not in by_translator:
-                by_translator[tid] = {
-                    "name": p.get("translator_name", "Unknown"),
-                    "total_paid": 0,
-                    "total_pages": 0,
-                    "payment_count": 0
-                }
+                by_translator[tid] = {"name": p.get("translator_name", "Unknown"), "total_paid": 0, "total_pages": 0, "payment_count": 0}
             by_translator[tid]["total_paid"] += p.get("amount", 0)
             by_translator[tid]["total_pages"] += p.get("pages_paid", 0)
             by_translator[tid]["payment_count"] += 1
-
-        # Get pending amounts
         translators = await db.admin_users.find({"role": "translator"}).to_list(100)
         total_pending = 0
         for t in translators:
             rate = t.get("rate_per_page", 0) or 0
             pending_pages = t.get("pages_pending_payment", 0) or 0
             total_pending += rate * pending_pages
-
-        return {
-            "total_paid": round(total_paid, 2),
-            "total_pages_paid": total_pages,
-            "total_pending": round(total_pending, 2),
-            "payment_count": len(payments),
-            "by_translator": by_translator
-        }
+        return {"total_paid": round(total_paid, 2), "total_pages_paid": total_pages, "total_pending": round(total_pending, 2), "payment_count": len(payments), "by_translator": by_translator}
     except Exception as e:
         logger.error(f"Error getting payment report: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get report")
@@ -5057,15 +5111,17 @@ class TranslationData(BaseModel):
     logo_left: Optional[str] = None
     logo_right: Optional[str] = None
     logo_stamp: Optional[str] = None
+    send_to: str = "admin"  # 'pm' or 'admin'
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
     """Save translation from workspace to an order (admin/PM/translator)"""
     # Allow admin key or valid user tokens
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    current_user = None
     if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm", "translator"]:
+        current_user = await get_current_admin_user(admin_key)
+        if current_user and current_user.get("role") in ["admin", "pm", "translator"]:
             is_valid = True
 
     if not is_valid:
@@ -5075,6 +5131,15 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     order = await db.translation_orders.find_one({"id": order_id})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    # Determine status based on destination
+    destination = data.send_to or "admin"
+    if destination == "pm":
+        new_status = "pending_pm_review"
+        status_message = "Translation saved and sent to PM for review"
+    else:
+        new_status = "review"
+        status_message = "Translation saved and sent to Admin for review"
 
     # Update order with translation data
     await db.translation_orders.update_one(
@@ -5093,14 +5158,16 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_logo_left": data.logo_left,
             "translation_logo_right": data.logo_right,
             "translation_logo_stamp": data.logo_stamp,
-            "translation_status": "review",  # Move to review status
+            "translation_status": new_status,
+            "translation_sent_to": destination,
             "translation_ready": True,
-            "translation_ready_at": datetime.utcnow().isoformat()
+            "translation_ready_at": datetime.utcnow().isoformat(),
+            "translation_submitted_by": current_user.get("name") if current_user else "Admin"
         }}
     )
 
-    logger.info(f"Translation saved for order {order_id}, moved to review status")
-    return {"success": True, "message": "Translation saved and sent to review"}
+    logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+    return {"success": True, "message": status_message}
 
 class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
@@ -5795,13 +5862,6 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Get API key: use provided key, or fall back to shared key from database
-    ocr_api_key = request.claude_api_key
-    if not ocr_api_key:
-        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
-        if settings and settings.get("value"):
-            ocr_api_key = settings["value"]
-
     try:
         # Decode base64 file
         file_content = base64.b64decode(request.file_base64)
@@ -5816,11 +5876,11 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
         text = ""
 
         # Use Claude for OCR if requested
-        if request.use_claude and ocr_api_key:
+        if request.use_claude and request.claude_api_key:
             logger.info("Using Claude AI for OCR with layout preservation...")
             try:
                 import anthropic
-                client = anthropic.Anthropic(api_key=ocr_api_key)
+                client = anthropic.Anthropic(api_key=request.claude_api_key)
 
                 # Prepare the image for Claude
                 image_data = base64.b64encode(file_content).decode('utf-8')
@@ -6000,17 +6060,8 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Get API key: use provided key, or fall back to shared key from database
-    api_key_to_use = request.claude_api_key
-    if not api_key_to_use:
-        # Try to get shared API key from database
-        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
-        if settings and settings.get("value"):
-            api_key_to_use = settings["value"]
-            logger.info("Using shared Claude API key for translation")
-
-    if not api_key_to_use:
-        raise HTTPException(status_code=400, detail="No API key configured. Please ask your administrator to configure the shared API key.")
+    if not request.claude_api_key:
+        raise HTTPException(status_code=400, detail="Claude API key is required")
 
     try:
         # Build the prompt based on action
@@ -6258,7 +6309,7 @@ CRITICAL: Your HTML output MUST match the visual layout of the original document
             response = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key": api_key_to_use,
+                    "x-api-key": request.claude_api_key,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json"
                 },

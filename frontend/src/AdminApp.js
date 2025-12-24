@@ -40,31 +40,24 @@ const FLAGS = {
 };
 
 const LANGUAGES = [
-  // Major Languages
-  "English", "English (USA)", "English (UK)",
-  "Spanish", "Spanish (Spain)", "Spanish (Latin America)",
-  "Portuguese", "Portuguese (Brazil)", "Portuguese (Portugal)",
-  "French", "French (France)", "French (Canada)",
-  "German", "Italian", "Dutch",
-  // Asian Languages
-  "Chinese (Simplified)", "Chinese (Traditional)", "Japanese", "Korean",
-  "Vietnamese", "Thai", "Indonesian", "Malay", "Filipino/Tagalog", "Hindi",
-  "Bengali", "Punjabi", "Tamil", "Telugu", "Urdu", "Gujarati", "Nepali",
-  "Burmese", "Khmer", "Lao", "Mongolian",
-  // Middle Eastern & African
-  "Arabic", "Arabic (Saudi Arabia)", "Hebrew", "Turkish", "Persian/Farsi",
-  "Swahili", "Amharic", "Somali", "Yoruba", "Igbo", "Zulu", "Afrikaans",
-  // European Languages
-  "Russian", "Polish", "Ukrainian", "Czech", "Slovak", "Hungarian",
-  "Romanian", "Bulgarian", "Greek", "Serbian", "Croatian", "Slovenian",
-  "Swedish", "Norwegian", "Danish", "Finnish", "Icelandic",
-  "Albanian", "Armenian", "Georgian", "Azerbaijani", "Kazakh", "Uzbek",
-  "Lithuanian", "Latvian", "Estonian", "Maltese", "Belarusian",
-  "Bosnian", "Macedonian", "Luxembourgish",
-  // Celtic & Regional
-  "Welsh", "Irish", "Scottish Gaelic", "Catalan", "Basque", "Galician",
-  // Creole & Other
-  "Haitian Creole", "Cape Verdean Creole", "Papiamento", "Latin", "Esperanto"
+  // Primary Languages (Top 3)
+  "English", "Spanish", "Portuguese",
+  // All other languages in alphabetical order
+  "Afrikaans", "Albanian", "Amharic", "Arabic", "Arabic (Saudi Arabia)", "Armenian",
+  "Azerbaijani", "Basque", "Belarusian", "Bengali", "Bosnian", "Bulgarian",
+  "Burmese", "Cape Verdean Creole", "Catalan", "Chinese (Simplified)", "Chinese (Traditional)",
+  "Croatian", "Czech", "Danish", "Dutch", "English (UK)", "English (USA)",
+  "Esperanto", "Estonian", "Filipino/Tagalog", "Finnish", "French", "French (Canada)",
+  "French (France)", "Galician", "Georgian", "German", "Greek", "Gujarati",
+  "Haitian Creole", "Hebrew", "Hindi", "Hungarian", "Icelandic", "Igbo",
+  "Indonesian", "Irish", "Italian", "Japanese", "Kazakh", "Khmer",
+  "Korean", "Lao", "Latin", "Latvian", "Lithuanian", "Luxembourgish",
+  "Macedonian", "Malay", "Maltese", "Mongolian", "Nepali", "Norwegian",
+  "Papiamento", "Persian/Farsi", "Polish", "Portuguese (Brazil)", "Portuguese (Portugal)",
+  "Punjabi", "Romanian", "Russian", "Scottish Gaelic", "Serbian", "Slovak",
+  "Slovenian", "Somali", "Spanish (Latin America)", "Spanish (Spain)", "Swahili",
+  "Swedish", "Tamil", "Telugu", "Thai", "Turkish", "Ukrainian",
+  "Urdu", "Uzbek", "Vietnamese", "Welsh", "Yoruba", "Zulu"
 ];
 
 const TRANSLATORS = [
@@ -77,6 +70,28 @@ const TRANSLATORS = [
 const PROJECT_MANAGERS = [
   { name: "Ana Clara", title: "Project Manager" },
   { name: "Beatriz Paiva", title: "Managing Director" }
+];
+
+// Document Types for translation projects
+const DOCUMENT_TYPES = [
+  { value: '', label: '-- Select Document Type --' },
+  { value: 'birth_certificate', label: 'Certidão de Nascimento / Birth Certificate' },
+  { value: 'marriage_certificate', label: 'Certidão de Casamento / Marriage Certificate' },
+  { value: 'vaccination_card', label: 'Cartão de Vacina / Vaccination Card' },
+  { value: 'divorce_certificate', label: 'Divórcio / Divorce Certificate' },
+  { value: 'rg', label: 'RG (Brazilian ID)' },
+  { value: 'cnh', label: 'CNH (Brazilian Driver\'s License)' },
+  { value: 'dmv', label: 'DMV Document' },
+  { value: 'rmv', label: 'RMV Document' },
+  { value: 'passport', label: 'Passaporte / Passport' },
+  { value: 'diploma', label: 'Diploma / Academic Degree' },
+  { value: 'transcript', label: 'Histórico Escolar / Academic Transcript' },
+  { value: 'power_of_attorney', label: 'Procuração / Power of Attorney' },
+  { value: 'criminal_record', label: 'Antecedentes Criminais / Criminal Record' },
+  { value: 'medical_report', label: 'Relatório Médico / Medical Report' },
+  { value: 'contract', label: 'Contrato / Contract' },
+  { value: 'immigration_doc', label: 'Documento de Imigração / Immigration Document' },
+  { value: 'other', label: 'Outros / Other' }
 ];
 
 // ==================== SVG ICONS (Professional/Minimal) ====================
@@ -499,9 +514,10 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'review', label: 'Review', icon: '📥', roles: ['admin', 'pm'] },
+    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
@@ -555,8 +571,15 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
       {/* User Info and Actions */}
       <div className="flex items-center space-x-3">
         {user && (
-          <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
-            {roleInfo.label}
+          <div className="flex items-center space-x-2">
+            <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
+              {roleInfo.label}
+            </div>
+            {(userRole === 'pm' || userRole === 'translator') && user.name && (
+              <span className="text-white text-[11px]">
+                Welcome, {user.name.split(' ')[0]}
+              </span>
+            )}
           </div>
         )}
         <button
@@ -1772,12 +1795,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     fetchAvailableOrders();
   }, []);
 
-  // Load shared API key from backend when adminKey is available (admin only)
+  // Load shared API key from backend when adminKey is available
   useEffect(() => {
-    if (adminKey && user?.role === 'admin') {
+    if (adminKey) {
       loadSharedApiKey();
     }
-  }, [adminKey, user?.role]);
+  }, [adminKey]);
 
   // Pre-fill from selectedOrder when coming from Projects
   useEffect(() => {
@@ -1958,7 +1981,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isApprovalComplete = approvalChecks.projectNumber && approvalChecks.languageCorrect && approvalChecks.proofread;
 
   // Send translation to Projects
-  const sendToProjects = async () => {
+  const sendToProjects = async (destination = 'admin') => {
     // Validate document type
     if (!documentType.trim()) {
       alert('Please fill in the Document Type field');
@@ -1976,11 +1999,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    // Check if we have content (either normal flow or Quick Package)
-    const hasNormalContent = translationResults.length > 0;
-    const hasQuickPackageContent = quickTranslationHtml || quickTranslationFiles.length > 0;
-
-    if (!hasNormalContent && !hasQuickPackageContent) {
+    if (translationResults.length === 0) {
       alert('No translation to send');
       return;
     }
@@ -1989,30 +2008,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+      const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-      // Build translation HTML
-      let translationHTML = '';
-      if (quickPackageMode && (quickTranslationHtml || quickTranslationFiles.length > 0)) {
-        // Quick Package mode
-        translationHTML = quickTranslationHtml || '<p>See attached file(s)</p>';
-      } else {
-        // Normal flow
-        translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
-      }
+      // Build translation HTML (simplified for storage)
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
 
-      // Create submission for PM/Admin review
-      const formData = new FormData();
-      formData.append('token', user?.token || adminKey);
-      formData.append('order_id', selectedOrderId);
-      formData.append('translation_html', translationHTML);
-      formData.append('notes', `Document Type: ${documentType}\nTranslator: ${translator?.name || selectedTranslator}\nDate: ${translationDate}`);
-
-      // Submit for review
-      const submitResponse = await axios.post(`${API}/admin/translations/submit`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      // Also update the order with translation data
+      // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
         translation_html: translationHTML,
         source_language: sourceLanguage,
@@ -2026,15 +2028,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
         logo_left: logoLeft,
         logo_right: logoRight,
-        logo_stamp: logoStamp
+        logo_stamp: logoStamp,
+        send_to: destination // 'pm' or 'admin'
       });
 
-      if ((response.data.status === 'success' || response.data.success) && submitResponse.data.status === 'success') {
-        setProcessingStatus('✅ Translation sent for PM/Admin review! Returning to Projects...');
+      const destinationLabel = destination === 'pm' ? 'PM' : 'Admin';
+      if (response.data.status === 'success' || response.data.success) {
+        // Check if user is a translator (they can't access Projects page)
+        const isTranslator = user?.role === 'translator';
+
+        if (isTranslator) {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! You can start a new translation.`);
+        } else {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
+        }
         setSelectedOrderId('');
 
-        // Navigate back to Projects after a short delay
-        if (onBack) {
+        // Navigate back to Projects after a short delay (only for non-translators)
+        if (onBack && !isTranslator) {
           setTimeout(() => {
             onBack();
           }, 1500);
@@ -3196,8 +3207,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             padding-bottom: 10px;
+        }
+        .header-line {
+            height: 2px;
+            background: #93C5FD;
+            margin-bottom: 15px;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -3243,15 +3259,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; }
-        .header-line {
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
-            margin-bottom: 15px;
-            border: none;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
@@ -3261,57 +3268,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             line-height: 1.6;
             color: #333;
         }
-        .translation-content.translation-text p {
-            margin-bottom: 12px;
-            text-align: justify;
-            orphans: 3;
-            widows: 3;
-        }
-        .translation-content.translation-text table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 15px 0;
-            page-break-inside: avoid;
-        }
-        .translation-content.translation-text td, .translation-content.translation-text th {
-            border: 1px solid #333;
-            padding: 8px;
-            page-break-inside: avoid;
-        }
-        .translation-content.translation-text tr {
-            page-break-inside: avoid;
-            page-break-after: auto;
-        }
-        .translation-content.translation-text thead {
-            display: table-header-group;
-        }
-        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 {
-            margin: 15px 0 10px;
-            color: #1a365d;
-            page-break-after: avoid;
-        }
-        .translation-content.translation-text ul, .translation-content.translation-text ol {
-            margin: 10px 0 10px 25px;
-            page-break-inside: avoid;
-        }
-        .translation-content.translation-text li {
-            page-break-inside: avoid;
-        }
-        /* Avoid breaking inside important elements */
-        .translation-content.translation-text img {
-            page-break-inside: avoid;
-            page-break-before: auto;
-            page-break-after: auto;
-            max-width: 100%;
-        }
-        .translation-content.translation-text div {
-            page-break-inside: avoid;
-        }
-        /* Force page break class */
-        .page-break {
-            page-break-before: always;
-            break-before: page;
-        }
+        .translation-content.translation-text p { margin-bottom: 12px; text-align: justify; }
+        .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 8px; }
+        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 { margin: 15px 0 10px; color: #1a365d; }
+        .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 10px 0 10px 25px; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
@@ -3319,7 +3280,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
             /* Running header for HTML content pages */
             .running-header {
@@ -3596,8 +3556,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             padding-bottom: 10px;
+        }
+        .header-line {
+            height: 2px;
+            background: #93C5FD;
+            margin-bottom: 15px;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -3642,25 +3607,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
-        .header-line {
-            width: 100%;
-            height: 3px;
-            background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd);
-            margin-bottom: 15px;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
         .translation-page { page-break-before: always; padding-top: 20px; }
         .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
         .translation-content { line-height: 1.6; font-size: 12px; }
-        .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; page-break-inside: avoid; }
+        .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
         .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
-        .translation-content tr { page-break-inside: avoid; }
-        .translation-content h1, .translation-content h2, .translation-content h3, .translation-content h4 { page-break-after: avoid; }
-        .translation-content p { orphans: 3; widows: 3; }
-        .translation-content ul, .translation-content ol { page-break-inside: avoid; }
-        .page-break { page-break-before: always; }
         .original-documents-page { page-break-before: always; padding-top: 20px; }
         .original-images-wrapper { margin-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
@@ -3668,7 +3620,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .logo-placeholder { border: 1px dashed #ccc; }
-            .header-line { background: linear-gradient(to right, #93c5fd, #3b82f6, #93c5fd) !important; }
         }
     </style>
 </head>
@@ -3890,58 +3841,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </p>
           </div>
 
-          {/* API Key - Only visible to Admin (translators use shared key automatically) */}
-          {user?.role === 'admin' ? (
-            <div className="bg-white rounded shadow">
-              <button
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">🔑</span>
-                  <span className="text-sm font-medium">API Key Settings</span>
-                  {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
-                  <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
-                </div>
-                <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
-              </button>
-              {showApiKey && (
-                <div className="p-4 border-t">
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-                    <p className="text-xs text-blue-700">
-                      <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
-                    </p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <input
-                      type="password"
-                      value={claudeApiKey}
-                      onChange={(e) => setClaudeApiKey(e.target.value)}
-                      placeholder="sk-ant-api03-..."
-                      className="flex-1 px-3 py-2 text-xs border rounded"
-                    />
-                    <button
-                      onClick={saveApiKey}
-                      className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-                    >
-                      💾 Save & Share
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* For translators: show status only, no API key visible */
-            <div className="bg-white rounded shadow p-3">
+          {/* API Key - Collapsible (Shared with all translators) */}
+          <div className="bg-white rounded shadow">
+            <button
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
+            >
               <div className="flex items-center space-x-2">
                 <span className="text-lg">🔑</span>
-                <span className="text-sm font-medium">API Key</span>
-                <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Provided by Admin</span>
+                <span className="text-sm font-medium">API Key Settings</span>
+                {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
+                <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
               </div>
-              <p className="text-[10px] text-gray-500 mt-1">Your translation requests use the shared API key configured by your administrator.</p>
-            </div>
-          )}
+              <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
+            </button>
+            {showApiKey && (
+              <div className="p-4 border-t">
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
+                  <p className="text-xs text-blue-700">
+                    <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
+                  </p>
+                </div>
+                <div className="flex space-x-2">
+                  <input
+                    type="password"
+                    value={claudeApiKey}
+                    onChange={(e) => setClaudeApiKey(e.target.value)}
+                    placeholder="sk-ant-api03-..."
+                    className="flex-1 px-3 py-2 text-xs border rounded"
+                  />
+                  <button
+                    onClick={saveApiKey}
+                    className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                  >
+                    💾 Save & Share
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+              </div>
+            )}
+          </div>
 
           {/* Glossaries & Translation Memories Section - Collapsible */}
           <div className="bg-white rounded shadow">
@@ -5783,139 +5722,24 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* Approval Checklist - Same as Normal Flow */}
-              <div className={`p-4 rounded mb-4 ${
-                isApprovalComplete
-                  ? 'bg-green-50 border border-green-200'
-                  : 'bg-purple-50 border-2 border-purple-300'
-              }`}>
-                <h3 className="text-sm font-bold text-purple-700 mb-1">
-                  📋 Translation Approval Checklist <span className="text-red-500">*</span>
-                </h3>
-                <p className="text-[10px] text-purple-600 mb-3">⚠️ All items must be checked before sending</p>
-                <div className="space-y-2">
-                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
-                    approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={approvalChecks.projectNumber}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="font-medium">Did you include the correct project number?</span>
-                    {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
-                  </label>
-                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
-                    approvalChecks.languageCorrect ? 'bg-green-100' : 'bg-white'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={approvalChecks.languageCorrect}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="font-medium">Is the source and target language correct?</span>
-                    {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
-                  </label>
-                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
-                    approvalChecks.proofread ? 'bg-green-100' : 'bg-white'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      checked={approvalChecks.proofread}
-                      onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="font-medium">Did you proofread the entire document carefully?</span>
-                    {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
-                  </label>
-                </div>
-                {!isApprovalComplete && (
-                  <p className="text-[10px] text-red-500 mt-3 font-medium">
-                    ⚠️ Complete all checklist items to enable sending
-                  </p>
-                )}
-                {isApprovalComplete && (
-                  <p className="text-[10px] text-green-600 mt-3 font-medium">
-                    ✅ All checks completed - Ready to download and send!
-                  </p>
-                )}
-              </div>
-
               {/* Download Button */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-2">📥 Step 1: Download & Save as PDF</h3>
-                <p className="text-[10px] text-blue-600 mb-3">Generate the package, then use Print → Save as PDF</p>
-                <button
-                  onClick={handleQuickPackageDownload}
-                  disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading || !isApprovalComplete}
-                  className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {quickPackageLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Generating...
-                    </>
-                  ) : (
-                    '📦 Generate Complete Package (Print/PDF)'
-                  )}
-                </button>
-                {!isApprovalComplete && (
-                  <p className="text-[10px] text-red-500 mt-2 text-center">
-                    ⚠️ Complete the checklist above to enable download
-                  </p>
+              <button
+                onClick={handleQuickPackageDownload}
+                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {quickPackageLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </>
+                ) : (
+                  '📦 Generate Complete Package (Print/PDF)'
                 )}
-              </div>
-
-              {/* Send to PM/Admin */}
-              <div className={`p-4 rounded mb-4 ${
-                isApprovalComplete && documentType.trim()
-                  ? 'bg-green-50 border border-green-200'
-                  : 'bg-gray-50 border border-gray-200'
-              }`}>
-                <h3 className="text-sm font-bold text-green-700 mb-2">📤 Step 2: Send to PM/Admin for Review</h3>
-                <p className="text-[10px] text-gray-600 mb-3">After saving the PDF, send this translation for final review and delivery.</p>
-
-                {/* Validation warnings */}
-                {(!isApprovalComplete || !documentType.trim()) && (
-                  <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                    <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
-                    <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
-                      {!documentType.trim() && <li>Fill in "Translation of" field (Document Type)</li>}
-                      {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
-                    </ul>
-                  </div>
-                )}
-
-                <div className="flex space-x-2">
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-xs border rounded"
-                  >
-                    <option value="">-- Select Project --</option>
-                    {availableOrders.map(order => (
-                      <option key={order.id} value={order.id}>
-                        {order.order_number} - {order.client_name} ({order.translation_status})
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={sendToProjects}
-                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                  </button>
-                </div>
-                {availableOrders.length === 0 && (
-                  <p className="text-[10px] text-yellow-600 mt-2">No projects available. Ask your PM to assign a project first.</p>
-                )}
-                {isApprovalComplete && documentType.trim() && selectedOrderId && (
-                  <p className="text-[10px] text-green-600 mt-2">✅ Ready to send! Click "Send to PM" when your PDF is saved.</p>
-                )}
-              </div>
+              </button>
+              <p className="text-[10px] text-gray-500 mt-2 text-center">
+                Opens print window - save as PDF
+              </p>
             </>
           )}
 
@@ -6207,11 +6031,11 @@ tradução juramentada | certified translation`}
                   </div>
                 )}
 
-                <div className="flex space-x-2">
+                <div className="flex flex-col space-y-2">
                   <select
                     value={selectedOrderId}
                     onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                    className="w-full px-2 py-1.5 text-xs border rounded"
                   >
                     <option value="">-- Select Order --</option>
                     {availableOrders.map(order => (
@@ -6220,13 +6044,25 @@ tradução juramentada | certified translation`}
                       </option>
                     ))}
                   </select>
-                  <button
-                    onClick={sendToProjects}
-                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                  >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                  </button>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => sendToProjects('pm')}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                      className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                    </button>
+                    {/* Only show "Send to Admin" for non-translators */}
+                    {user?.role !== 'translator' && (
+                      <button
+                        onClick={() => sendToProjects('admin')}
+                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {availableOrders.length === 0 && (
                   <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
@@ -6366,6 +6202,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     translate_from: 'Portuguese',
     translate_to: 'English',
     service_type: 'standard',
+    document_type: '',
     page_count: 1,
     word_count: 0,
     urgency: 'no',
@@ -6386,8 +6223,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     invoice_custom_date: ''
   });
 
+  // Document type filter state
+  const [documentTypeFilter, setDocumentTypeFilter] = useState('');
+
   const REVENUE_SOURCES = [
     { value: 'website', label: 'Website' },
+    { value: 'google', label: 'Google' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'facebook', label: 'Facebook' },
     { value: 'whatsapp', label: 'WhatsApp' },
     { value: 'social_media', label: 'Social Media' },
     { value: 'referral', label: 'Referral' },
@@ -6407,7 +6250,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     { value: 'bank_transfer', label: 'Bank Transfer' }
   ];
 
-  const LANGUAGES = ['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic'];
+  // Primary Languages first, then alphabetical
+  const PM_LANGUAGES = [
+    'English', 'Spanish', 'Portuguese',
+    'Afrikaans', 'Albanian', 'Amharic', 'Arabic', 'Armenian', 'Azerbaijani',
+    'Basque', 'Belarusian', 'Bengali', 'Bosnian', 'Bulgarian', 'Burmese',
+    'Catalan', 'Chinese', 'Croatian', 'Czech', 'Danish', 'Dutch',
+    'Estonian', 'Filipino', 'Finnish', 'French', 'Galician', 'Georgian',
+    'German', 'Greek', 'Gujarati', 'Haitian Creole', 'Hebrew', 'Hindi',
+    'Hungarian', 'Icelandic', 'Igbo', 'Indonesian', 'Irish', 'Italian',
+    'Japanese', 'Kazakh', 'Khmer', 'Korean', 'Lao', 'Latin', 'Latvian',
+    'Lithuanian', 'Luxembourgish', 'Macedonian', 'Malay', 'Maltese',
+    'Mongolian', 'Nepali', 'Norwegian', 'Papiamento', 'Persian', 'Polish',
+    'Punjabi', 'Romanian', 'Russian', 'Serbian', 'Slovak', 'Slovenian',
+    'Somali', 'Swahili', 'Swedish', 'Tamil', 'Telugu', 'Thai', 'Turkish',
+    'Ukrainian', 'Urdu', 'Uzbek', 'Vietnamese', 'Welsh', 'Yoruba', 'Zulu'
+  ];
 
   useEffect(() => {
     fetchOrders();
@@ -6690,7 +6548,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Upload document to order (Admin/PM only)
+  // Upload single document to order (Admin/PM only)
   const uploadDocumentToOrder = async (orderId, file) => {
     if (!file) return;
     setUploadingProjectDoc(true);
@@ -6709,7 +6567,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
         filename: file.name,
         file_data: base64Data,
-        content_type: file.type,
+        content_type: file.type || 'application/octet-stream',
         source: 'manual_upload'
       });
 
@@ -6718,6 +6576,68 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to upload document:', err);
       alert('Error uploading document');
+    } finally {
+      setUploadingProjectDoc(false);
+    }
+  };
+
+  // Upload multiple documents to order (Admin/PM only)
+  const uploadDocumentsToOrder = async (orderId, files) => {
+    if (!files || files.length === 0) return;
+    setUploadingProjectDoc(true);
+
+    const maxFileSize = 100 * 1024 * 1024; // 100MB max per file
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const file of files) {
+        // Check file size
+        if (file.size > maxFileSize) {
+          alert(`File "${file.name}" exceeds 100MB limit and was skipped.`);
+          errorCount++;
+          continue;
+        }
+
+        try {
+          const reader = new FileReader();
+          const base64Promise = new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const base64 = reader.result.split(',')[1];
+              resolve(base64);
+            };
+            reader.onerror = reject;
+          });
+          reader.readAsDataURL(file);
+          const base64Data = await base64Promise;
+
+          await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+            filename: file.name,
+            file_data: base64Data,
+            content_type: file.type || 'application/octet-stream',
+            source: 'manual_upload'
+          });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to upload ${file.name}:`, err);
+          errorCount++;
+        }
+      }
+
+      // Show summary
+      if (successCount > 0 && errorCount === 0) {
+        alert(`Successfully uploaded ${successCount} file(s)!`);
+      } else if (successCount > 0 && errorCount > 0) {
+        alert(`Uploaded ${successCount} file(s), ${errorCount} failed.`);
+      } else {
+        alert('Failed to upload files.');
+      }
+
+      // Refresh documents
+      viewOrderDocuments(viewingOrder);
+    } catch (err) {
+      console.error('Failed to upload documents:', err);
+      alert('Error uploading documents');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -7120,9 +7040,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     const matchSearch =
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
       o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
-      o.order_number?.toLowerCase().includes(search.toLowerCase());
+      o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
+      o.document_type?.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
+    return matchSearch && matchStatus && matchDocType;
   });
 
   const totalReceive = filtered.reduce((sum, o) => sum + (o.total_price || 0), 0);
@@ -7577,6 +7499,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </button>
             ))}
           </div>
+          {/* Document Type Filter */}
+          <select
+            value={documentTypeFilter}
+            onChange={(e) => setDocumentTypeFilter(e.target.value)}
+            className="px-2 py-1 text-[10px] border rounded bg-white"
+          >
+            <option value="">All Documents</option>
+            {DOCUMENT_TYPES.filter(d => d.value).map(doc => (
+              <option key={doc.value} value={doc.value}>{doc.label}</option>
+            ))}
+          </select>
         </div>
         <SearchBar value={search} onChange={setSearch} />
       </div>
@@ -7617,7 +7550,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, translate_from: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  {PM_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </div>
               <div>
@@ -7627,12 +7560,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, translate_to: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  {PM_LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-6 gap-3 mb-3">
+            {/* Document Type Row */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Type</label>
+                <select
+                  value={newProject.document_type}
+                  onChange={(e) => setNewProject({...newProject, document_type: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                >
+                  {DOCUMENT_TYPES.map(doc => <option key={doc.value} value={doc.value}>{doc.label}</option>)}
+                </select>
+              </div>
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
                 <select
@@ -7644,6 +7588,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   <option value="professional">Professional</option>
                 </select>
               </div>
+            </div>
+
+            <div className="grid grid-cols-5 gap-3 mb-3">
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Pages</label>
                 <input
@@ -7888,6 +7835,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
               <th className="px-2 py-2 text-left font-medium">Order Date</th>
               <th className="px-2 py-2 text-left font-medium">Client</th>
+              <th className="px-2 py-2 text-left font-medium">Doc Type</th>
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-2 py-2 text-left font-medium">PM</th>}
               <th className="px-2 py-2 text-left font-medium">Translator</th>
@@ -7943,6 +7891,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       )}
                     </div>
                   </td>
+                  {/* Document Type */}
+                  <td className="px-2 py-2">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">
+                      {DOCUMENT_TYPES.find(d => d.value === order.document_type)?.label?.split('/')[0]?.trim() || order.document_type || '-'}
+                    </span>
+                  </td>
                   {/* PM - Admin only */}
                   {isAdmin && (
                     <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
@@ -7956,8 +7910,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           onBlur={() => setAssigningPM(null)}
                         >
                           <option value="">Select...</option>
-                          {PROJECT_MANAGERS.map(pm => (
-                            <option key={pm.name} value={pm.name}>{pm.name}</option>
+                          {/* Use registered PMs from database, fallback to static list */}
+                          {(pmList.length > 0 ? pmList : PROJECT_MANAGERS).map(pm => (
+                            <option key={pm.id || pm.name} value={pm.name}>{pm.name}</option>
                           ))}
                         </select>
                       ) : (order.assigned_pm_name || order.assigned_pm) ? (
@@ -7993,8 +7948,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onBlur={() => setAssigningTranslator(null)}
                       >
                         <option value="">Select...</option>
-                        {TRANSLATORS.map(t => (
-                          <option key={t.name} value={t.name}>{t.name}</option>
+                        {/* Use registered translators from database, fallback to static list */}
+                        {(translatorList.length > 0 ? translatorList : TRANSLATORS).map(t => (
+                          <option key={t.id || t.name} value={t.name}>{t.name}</option>
                         ))}
                       </select>
                     ) : (order.assigned_translator_name || order.assigned_translator) ? (
@@ -8562,22 +8518,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {/* Upload Section - Admin/PM only */}
                   {(isAdmin || isPM) && (
                     <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Upload Document</div>
+                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Upload Documents (Multiple Files Allowed)</div>
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
                           id="project-doc-upload"
-                          accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                          onChange={(e) => uploadDocumentToOrder(viewingOrder.id, e.target.files[0])}
+                          multiple
+                          accept="*/*"
+                          onChange={(e) => uploadDocumentsToOrder(viewingOrder.id, Array.from(e.target.files))}
                           className="hidden"
                         />
                         <label
                           htmlFor="project-doc-upload"
                           className={`px-3 py-1.5 rounded text-xs cursor-pointer ${uploadingProjectDoc ? 'bg-gray-300 text-gray-500' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                         >
-                          {uploadingProjectDoc ? 'Uploading...' : 'Choose File'}
+                          {uploadingProjectDoc ? 'Uploading...' : 'Choose Files'}
                         </label>
-                        <span className="text-[10px] text-gray-500">PDF, DOC, DOCX, TXT, JPG, PNG</span>
+                        <span className="text-[10px] text-gray-500">All formats accepted • Max 100MB per file • Multiple files allowed</span>
                       </div>
                     </div>
                   )}
@@ -8903,451 +8860,6 @@ const TranslatorsPage = ({ adminKey }) => {
           </tbody>
         </table>
       </div>
-    </div>
-  );
-};
-
-// ==================== REVIEW PAGE - PM/Admin Translation Review & Security ====================
-const ReviewPage = ({ adminKey, user }) => {
-  const [activeSubTab, setActiveSubTab] = useState('pending');
-  const [pendingSubmissions, setPendingSubmissions] = useState([]);
-  const [loginAttempts, setLoginAttempts] = useState([]);
-  const [suspiciousUsers, setSuspiciousUsers] = useState([]);
-  const [selectedSubmission, setSelectedSubmission] = useState(null);
-  const [selectedUserIpHistory, setSelectedUserIpHistory] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  // Fetch pending submissions
-  const fetchPendingSubmissions = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API}/admin/translations/pending-review?admin_key=${adminKey}`);
-      setPendingSubmissions(response.data.submissions || []);
-    } catch (error) {
-      console.error('Error fetching pending submissions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch login attempts
-  const fetchLoginAttempts = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API}/admin/login-attempts?admin_key=${adminKey}&limit=100`);
-      setLoginAttempts(response.data.attempts || []);
-    } catch (error) {
-      console.error('Error fetching login attempts:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch suspicious users
-  const fetchSuspiciousUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(`${API}/admin/security/suspicious-users?admin_key=${adminKey}`);
-      setSuspiciousUsers(response.data.suspicious_users || []);
-    } catch (error) {
-      console.error('Error fetching suspicious users:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch user IP history
-  const fetchUserIpHistory = async (userId) => {
-    try {
-      const response = await axios.get(`${API}/admin/users/${userId}/ip-history?admin_key=${adminKey}`);
-      setSelectedUserIpHistory(response.data);
-    } catch (error) {
-      console.error('Error fetching IP history:', error);
-    }
-  };
-
-  // Get submission details
-  const viewSubmission = async (submissionId) => {
-    try {
-      const response = await axios.get(`${API}/admin/translations/submission/${submissionId}?admin_key=${adminKey}`);
-      setSelectedSubmission(response.data);
-    } catch (error) {
-      console.error('Error fetching submission:', error);
-    }
-  };
-
-  // Approve submission
-  const approveSubmission = async (submissionId) => {
-    setActionLoading(true);
-    try {
-      await axios.post(`${API}/admin/translations/submission/${submissionId}/approve?admin_key=${adminKey}`);
-      fetchPendingSubmissions();
-      setSelectedSubmission(null);
-      alert('Submission approved!');
-    } catch (error) {
-      console.error('Error approving submission:', error);
-      alert('Failed to approve submission');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Request revision
-  const requestRevision = async (submissionId) => {
-    const reason = prompt('Enter reason for revision request:');
-    if (!reason) return;
-
-    setActionLoading(true);
-    try {
-      await axios.post(`${API}/admin/translations/submission/${submissionId}/request-revision?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
-      fetchPendingSubmissions();
-      setSelectedSubmission(null);
-      alert('Revision requested!');
-    } catch (error) {
-      console.error('Error requesting revision:', error);
-      alert('Failed to request revision');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeSubTab === 'pending') fetchPendingSubmissions();
-    else if (activeSubTab === 'security') {
-      fetchLoginAttempts();
-      fetchSuspiciousUsers();
-    }
-  }, [activeSubTab]);
-
-  return (
-    <div className="p-4">
-      <h1 className="text-lg font-bold text-blue-600 mb-4">📥 REVIEW CENTER</h1>
-
-      {/* Sub-tabs */}
-      <div className="flex space-x-1 mb-4 border-b">
-        {[
-          { id: 'pending', label: 'Pending Translations', icon: '📄', count: pendingSubmissions.length },
-          { id: 'security', label: 'Security & IP', icon: '🔒' }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t flex items-center ${
-              activeSubTab === tab.id
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {tab.icon} {tab.label}
-            {tab.count > 0 && (
-              <span className="ml-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-[10px]">{tab.count}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* PENDING TRANSLATIONS */}
-      {activeSubTab === 'pending' && (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="text-center py-8 text-gray-500">Loading...</div>
-          ) : pendingSubmissions.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <div className="text-4xl mb-2">📭</div>
-              <div className="text-sm">No translations pending review</div>
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {pendingSubmissions.map(sub => (
-                <div key={sub.submission_id} className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-400">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-bold text-sm text-blue-700">{sub.order_number || 'No Order'}</div>
-                      <div className="text-xs text-gray-600">{sub.client_name}</div>
-                      <div className="text-[10px] text-gray-500 mt-1">
-                        Translator: <span className="font-medium">{sub.translator_name}</span> ({sub.translator_email})
-                      </div>
-                      <div className="text-[10px] text-gray-400">
-                        Submitted: {new Date(sub.submitted_at).toLocaleString('pt-BR')}
-                      </div>
-                      <div className="text-[10px] text-gray-400">IP: {sub.ip_address}</div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => viewSubmission(sub.submission_id)}
-                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-                      >
-                        👁️ View
-                      </button>
-                      <button
-                        onClick={() => approveSubmission(sub.submission_id)}
-                        disabled={actionLoading}
-                        className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300"
-                      >
-                        ✅ Approve
-                      </button>
-                      <button
-                        onClick={() => requestRevision(sub.submission_id)}
-                        disabled={actionLoading}
-                        className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-300"
-                      >
-                        ✏️ Revision
-                      </button>
-                    </div>
-                  </div>
-                  {sub.notes && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-[10px] text-gray-600">
-                      <strong>Notes:</strong> {sub.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Submission Detail Modal */}
-          {selectedSubmission && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-auto">
-                <div className="p-4 border-b flex items-center justify-between bg-blue-600 text-white rounded-t-lg">
-                  <h3 className="font-bold">Translation Submission Details</h3>
-                  <button onClick={() => setSelectedSubmission(null)} className="text-white hover:text-gray-200">✕</button>
-                </div>
-                <div className="p-4 space-y-4">
-                  {/* Order Info */}
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div>
-                      <strong>Order:</strong> {selectedSubmission.order_info?.order_number}
-                    </div>
-                    <div>
-                      <strong>Client:</strong> {selectedSubmission.order_info?.client_name}
-                    </div>
-                    <div>
-                      <strong>Languages:</strong> {selectedSubmission.order_info?.translate_from} → {selectedSubmission.order_info?.translate_to}
-                    </div>
-                    <div>
-                      <strong>Translator:</strong> {selectedSubmission.translator_name}
-                    </div>
-                  </div>
-
-                  {/* Translation HTML */}
-                  {selectedSubmission.translation_html && (
-                    <div className="border rounded p-4 max-h-96 overflow-auto">
-                      <h4 className="text-xs font-bold mb-2 text-gray-700">Translation Content:</h4>
-                      <div
-                        className="prose prose-sm max-w-none text-xs"
-                        dangerouslySetInnerHTML={{ __html: selectedSubmission.translation_html }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex justify-end space-x-3 pt-4 border-t">
-                    <button
-                      onClick={() => setSelectedSubmission(null)}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                    >
-                      Close
-                    </button>
-                    <button
-                      onClick={() => requestRevision(selectedSubmission.id)}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-300"
-                    >
-                      ✏️ Request Revision
-                    </button>
-                    <button
-                      onClick={() => approveSubmission(selectedSubmission.id)}
-                      disabled={actionLoading}
-                      className="px-4 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300"
-                    >
-                      ✅ Approve & Send to Client
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* SECURITY & IP TRACKING */}
-      {activeSubTab === 'security' && (
-        <div className="space-y-6">
-          {/* Suspicious Users Alert */}
-          {suspiciousUsers.length > 0 && (
-            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-red-700 mb-2">⚠️ Suspicious Activity Detected</h3>
-              <p className="text-[10px] text-red-600 mb-3">These users have logged in from multiple different IP addresses (possible link sharing)</p>
-              <div className="space-y-2">
-                {suspiciousUsers.map(u => (
-                  <div key={u.user_id} className="bg-white p-3 rounded border border-red-200">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-bold text-sm text-red-700">{u.name}</div>
-                        <div className="text-xs text-gray-600">{u.email}</div>
-                        <div className="text-[10px] text-red-600 mt-1">
-                          {u.unique_ip_count} different IPs detected
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => fetchUserIpHistory(u.user_id)}
-                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                      >
-                        View IPs
-                      </button>
-                    </div>
-                    <div className="mt-2 text-[9px] text-gray-500 flex flex-wrap gap-1">
-                      {u.unique_ips.slice(0, 5).map((ip, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-gray-100 rounded">{ip}</span>
-                      ))}
-                      {u.unique_ips.length > 5 && <span className="text-gray-400">+{u.unique_ips.length - 5} more</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Recent Login Attempts */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-3 border-b bg-gray-50">
-              <h3 className="text-sm font-bold text-gray-700">🔐 Recent Login Attempts</h3>
-            </div>
-            <div className="max-h-96 overflow-auto">
-              {loading ? (
-                <div className="p-4 text-center text-gray-500 text-xs">Loading...</div>
-              ) : loginAttempts.length === 0 ? (
-                <div className="p-4 text-center text-gray-400 text-xs">No login attempts recorded</div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-100 sticky top-0">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Time</th>
-                      <th className="px-3 py-2 text-left">User</th>
-                      <th className="px-3 py-2 text-left">IP Address</th>
-                      <th className="px-3 py-2 text-left">Status</th>
-                      <th className="px-3 py-2 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {loginAttempts.map((attempt, idx) => (
-                      <tr key={idx} className={attempt.success ? '' : 'bg-red-50'}>
-                        <td className="px-3 py-2 text-gray-600">{new Date(attempt.timestamp).toLocaleString('pt-BR')}</td>
-                        <td className="px-3 py-2">
-                          <div className="font-medium">{attempt.user_name || attempt.email}</div>
-                          <div className="text-[10px] text-gray-400">{attempt.role}</div>
-                        </td>
-                        <td className="px-3 py-2 font-mono text-[10px]">{attempt.ip_address}</td>
-                        <td className="px-3 py-2">
-                          {attempt.success ? (
-                            <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Success</span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[10px]">Failed: {attempt.reason}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          {attempt.user_id && (
-                            <button
-                              onClick={() => fetchUserIpHistory(attempt.user_id)}
-                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200"
-                            >
-                              View IP History
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-
-          {/* IP History Modal */}
-          {selectedUserIpHistory && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[80vh] overflow-auto">
-                <div className="p-4 border-b flex items-center justify-between bg-blue-600 text-white rounded-t-lg">
-                  <div>
-                    <h3 className="font-bold">IP History: {selectedUserIpHistory.user_name}</h3>
-                    <div className="text-xs opacity-80">{selectedUserIpHistory.user_email}</div>
-                  </div>
-                  <button onClick={() => setSelectedUserIpHistory(null)} className="text-white hover:text-gray-200 text-xl">✕</button>
-                </div>
-                <div className="p-4">
-                  {/* Summary */}
-                  <div className={`p-3 rounded mb-4 ${selectedUserIpHistory.suspicious ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-sm font-bold">{selectedUserIpHistory.unique_ip_count}</span>
-                        <span className="text-xs text-gray-600 ml-1">unique IPs</span>
-                      </div>
-                      {selectedUserIpHistory.suspicious ? (
-                        <span className="px-2 py-1 bg-red-500 text-white text-xs rounded">⚠️ Suspicious</span>
-                      ) : (
-                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded">✓ Normal</span>
-                      )}
-                    </div>
-                    <div className="mt-2 text-[10px] text-gray-600">
-                      Last login: {selectedUserIpHistory.last_login_ip} on{' '}
-                      {selectedUserIpHistory.last_login_at ? new Date(selectedUserIpHistory.last_login_at).toLocaleString('pt-BR') : 'N/A'}
-                    </div>
-                  </div>
-
-                  {/* Unique IPs */}
-                  <div className="mb-4">
-                    <h4 className="text-xs font-bold text-gray-700 mb-2">Unique IP Addresses:</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedUserIpHistory.unique_ips.map((ip, i) => (
-                        <span key={i} className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">{ip}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Login History */}
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-700 mb-2">Login History (last 50):</h4>
-                    <div className="max-h-64 overflow-auto border rounded">
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-100 sticky top-0">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Time</th>
-                            <th className="px-3 py-2 text-left">IP Address</th>
-                            <th className="px-3 py-2 text-left">Device</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {(selectedUserIpHistory.ip_history || []).slice().reverse().map((record, idx) => (
-                            <tr key={idx}>
-                              <td className="px-3 py-2 text-gray-600">
-                                {record.timestamp ? new Date(record.timestamp).toLocaleString('pt-BR') : 'N/A'}
-                              </td>
-                              <td className="px-3 py-2 font-mono">{record.ip_address}</td>
-                              <td className="px-3 py-2 text-[10px] text-gray-500 max-w-xs truncate" title={record.user_agent}>
-                                {record.user_agent?.substring(0, 50)}...
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-4 border-t flex justify-end">
-                  <button
-                    onClick={() => setSelectedUserIpHistory(null)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -10098,6 +9610,324 @@ const TranslationToolPage = ({ adminKey, onLogout, user }) => {
   );
 };
 
+// ==================== REVIEW PAGE (Pending Translations & Security) ====================
+const ReviewPage = ({ adminKey, user }) => {
+  const [pendingSubmissions, setPendingSubmissions] = useState([]);
+  const [suspiciousUsers, setSuspiciousUsers] = useState([]);
+  const [loginAttempts, setLoginAttempts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [selectedUserIpHistory, setSelectedUserIpHistory] = useState(null);
+  const [ipHistoryData, setIpHistoryData] = useState([]);
+  const [activeSection, setActiveSection] = useState('submissions'); // 'submissions' | 'security'
+  const [revisionNote, setRevisionNote] = useState('');
+
+  const isAdmin = user?.role === 'admin';
+
+  const fetchPendingSubmissions = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/translations/pending-review?admin_key=${adminKey}&token=${user?.token}`);
+      setPendingSubmissions(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pending submissions:', err);
+    }
+  };
+
+  const fetchSuspiciousUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/security/suspicious-users?admin_key=${adminKey}&token=${user?.token}`);
+      setSuspiciousUsers(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch suspicious users:', err);
+    }
+  };
+
+  const fetchLoginAttempts = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/login-attempts?admin_key=${adminKey}&token=${user?.token}&limit=50`);
+      setLoginAttempts(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch login attempts:', err);
+    }
+  };
+
+  const fetchUserIpHistory = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/ip-history?admin_key=${adminKey}&token=${user?.token}`);
+      setIpHistoryData(response.data || []);
+      setSelectedUserIpHistory(userId);
+    } catch (err) {
+      console.error('Failed to fetch IP history:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchPendingSubmissions(),
+        isAdmin && fetchSuspiciousUsers(),
+        isAdmin && fetchLoginAttempts()
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey, user?.token]);
+
+  const handleApproveSubmission = async (submissionId) => {
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/approve?admin_key=${adminKey}&token=${user?.token}`);
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      alert('Tradução aprovada e enviada ao cliente!');
+    } catch (err) {
+      alert('Erro ao aprovar: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRequestRevision = async (submissionId) => {
+    if (!revisionNote.trim()) {
+      alert('Por favor, adicione uma nota explicando as correções necessárias.');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/request-revision?admin_key=${adminKey}&token=${user?.token}`, {
+        note: revisionNote
+      });
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      setRevisionNote('');
+      alert('Revisão solicitada ao tradutor!');
+    } catch (err) {
+      alert('Erro: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-gray-500">Carregando...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h1 className="text-lg font-bold text-gray-800">👁️ Painel de Revisão</h1>
+        <p className="text-xs text-gray-500">Revisar traduções enviadas pelos tradutores e monitorar segurança</p>
+      </div>
+
+      {/* Tab navigation */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveSection('submissions')}
+          className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'submissions' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+        >
+          📥 Traduções Pendentes ({pendingSubmissions.length})
+        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveSection('security')}
+            className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'security' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+          >
+            🔒 Segurança {suspiciousUsers.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-xs">{suspiciousUsers.length}</span>}
+          </button>
+        )}
+      </div>
+
+      {/* Submissions Section */}
+      {activeSection === 'submissions' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Pending submissions list */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">📋 Traduções para Revisar</h2>
+            {pendingSubmissions.length === 0 ? (
+              <p className="text-gray-500 text-sm">Nenhuma tradução pendente de revisão.</p>
+            ) : (
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {pendingSubmissions.map((sub) => (
+                  <div
+                    key={sub._id}
+                    onClick={() => setSelectedSubmission(sub)}
+                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${selectedSubmission?._id === sub._id ? 'border-teal-500 bg-teal-50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{sub.order_number}</div>
+                        <div className="text-xs text-gray-500">Tradutor: {sub.translator_name}</div>
+                      </div>
+                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">
+                        Pendente
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Enviado: {new Date(sub.submitted_at).toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected submission details */}
+          <div className="bg-white rounded-lg shadow p-4">
+            {selectedSubmission ? (
+              <>
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📄 Detalhes: {selectedSubmission.order_number}</h2>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-gray-500">Tradutor:</span> {selectedSubmission.translator_name}</div>
+                    <div><span className="text-gray-500">Páginas:</span> {selectedSubmission.pages_count || 'N/A'}</div>
+                    <div><span className="text-gray-500">Enviado:</span> {new Date(selectedSubmission.submitted_at).toLocaleString('pt-BR')}</div>
+                    <div><span className="text-gray-500">Cliente:</span> {selectedSubmission.client_name || 'N/A'}</div>
+                  </div>
+
+                  {selectedSubmission.translator_notes && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <div className="text-xs text-gray-500 mb-1">Notas do tradutor:</div>
+                      <div className="text-sm">{selectedSubmission.translator_notes}</div>
+                    </div>
+                  )}
+
+                  {selectedSubmission.file_url && (
+                    <a
+                      href={selectedSubmission.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-center py-2 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+                    >
+                      📎 Ver Arquivo Traduzido
+                    </a>
+                  )}
+
+                  {/* Revision note input */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nota para revisão (se necessário):</label>
+                    <textarea
+                      value={revisionNote}
+                      onChange={(e) => setRevisionNote(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      rows={2}
+                      placeholder="Descreva as correções necessárias..."
+                    />
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveSubmission(selectedSubmission._id)}
+                      className="flex-1 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                    >
+                      ✅ Aprovar e Enviar ao Cliente
+                    </button>
+                    <button
+                      onClick={() => handleRequestRevision(selectedSubmission._id)}
+                      className="flex-1 py-2 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600"
+                    >
+                      🔄 Solicitar Revisão
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-gray-500 text-sm text-center py-8">
+                Selecione uma tradução para ver os detalhes
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Security Section (Admin only) */}
+      {activeSection === 'security' && isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Suspicious Users */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">⚠️ Usuários Suspeitos (Múltiplos IPs)</h2>
+            <p className="text-xs text-gray-500 mb-3">Usuários que acessaram de mais de 3 IPs diferentes.</p>
+            {suspiciousUsers.length === 0 ? (
+              <p className="text-gray-500 text-sm">Nenhum usuário suspeito detectado.</p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {suspiciousUsers.map((usr) => (
+                  <div
+                    key={usr._id}
+                    className="p-3 border rounded bg-red-50 border-red-200"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{usr.name}</div>
+                        <div className="text-xs text-gray-500">{usr.email}</div>
+                      </div>
+                      <span className="text-xs bg-red-200 text-red-700 px-2 py-0.5 rounded">
+                        {usr.unique_ips} IPs
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => fetchUserIpHistory(usr._id)}
+                      className="mt-2 text-xs text-blue-600 hover:underline"
+                    >
+                      Ver histórico de IPs →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* IP History / Login Attempts */}
+          <div className="bg-white rounded-lg shadow p-4">
+            {selectedUserIpHistory ? (
+              <>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-sm font-bold text-gray-700">📍 Histórico de IPs</h2>
+                  <button
+                    onClick={() => setSelectedUserIpHistory(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    ✕ Fechar
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {ipHistoryData.map((entry, idx) => (
+                    <div key={idx} className="p-2 border rounded text-xs">
+                      <div className="font-mono">{entry.ip}</div>
+                      <div className="text-gray-500">{entry.user_agent}</div>
+                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString('pt-BR')}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-sm font-bold text-gray-700 mb-3">🕐 Últimos Logins</h2>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {loginAttempts.map((attempt, idx) => (
+                    <div key={idx} className="p-2 border rounded text-xs flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{attempt.user_name || attempt.email}</div>
+                        <div className="font-mono text-gray-500">{attempt.ip}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-0.5 rounded ${attempt.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {attempt.success ? 'OK' : 'Falhou'}
+                        </span>
+                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString('pt-BR')}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== USERS MANAGEMENT PAGE ====================
 const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
@@ -10105,9 +9935,25 @@ const UsersPage = ({ adminKey, user }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
   const [creating, setCreating] = useState(false);
+  const [expandedUser, setExpandedUser] = useState(null);
+  const [userDocuments, setUserDocuments] = useState({});
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [search, setSearch] = useState('');
 
   const isAdmin = user?.role === 'admin';
   const isPM = user?.role === 'pm';
+
+  // Document types for translators
+  const TRANSLATOR_DOC_TYPES = [
+    { value: 'id_document', label: 'Documento de Identidade (RG/ID)' },
+    { value: 'cpf', label: 'CPF' },
+    { value: 'address_proof', label: 'Comprovante de Residência' },
+    { value: 'contract', label: 'Contrato de Prestação de Serviço' },
+    { value: 'bank_info', label: 'Dados Bancários' },
+    { value: 'certification', label: 'Certificação/Diploma' },
+    { value: 'portfolio', label: 'Portfólio/Amostras' },
+    { value: 'other', label: 'Outro Documento' }
+  ];
 
   const fetchUsers = async () => {
     try {
@@ -10121,6 +9967,76 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   useEffect(() => { fetchUsers(); }, [adminKey]);
+
+  // Fetch documents for a specific user
+  const fetchUserDocuments = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`);
+      setUserDocuments(prev => ({ ...prev, [userId]: response.data.documents || [] }));
+    } catch (err) {
+      console.error('Error fetching user documents:', err);
+      setUserDocuments(prev => ({ ...prev, [userId]: [] }));
+    }
+  };
+
+  // Upload document for a user
+  const handleUploadDocument = async (userId, file, docType) => {
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('document_type', docType);
+      await axios.post(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      await fetchUserDocuments(userId);
+      alert('Documento enviado com sucesso!');
+    } catch (err) {
+      console.error('Error uploading document:', err);
+      alert('Erro ao enviar documento');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  // Download document
+  const handleDownloadDocument = async (userId, docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/documents/${docId}/download?admin_key=${adminKey}`);
+      const link = document.createElement('a');
+      link.href = `data:${response.data.content_type};base64,${response.data.file_data}`;
+      link.download = filename;
+      link.click();
+    } catch (err) {
+      console.error('Error downloading document:', err);
+      alert('Erro ao baixar documento');
+    }
+  };
+
+  // Delete document
+  const handleDeleteDocument = async (userId, docId) => {
+    if (!window.confirm('Excluir este documento?')) return;
+    try {
+      await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
+      await fetchUserDocuments(userId);
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      alert('Erro ao excluir documento');
+    }
+  };
+
+  // Toggle expanded user profile
+  const toggleExpandUser = async (userId) => {
+    if (expandedUser === userId) {
+      setExpandedUser(null);
+    } else {
+      setExpandedUser(userId);
+      if (!userDocuments[userId]) {
+        await fetchUserDocuments(userId);
+      }
+    }
+  };
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -10174,7 +10090,14 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   // PM can only see translators
-  const filteredUsers = isPM ? users.filter(u => u.role === 'translator') : users;
+  const baseFilteredUsers = isPM ? users.filter(u => u.role === 'translator') : users;
+
+  // Apply search filter
+  const filteredUsers = baseFilteredUsers.filter(u =>
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.language_pairs?.toLowerCase().includes(search.toLowerCase())
+  );
 
   if (loading) return <div className="p-6 text-center">Loading users...</div>;
 
@@ -10185,12 +10108,25 @@ const UsersPage = ({ adminKey, user }) => {
           <h1 className="text-xl font-bold text-gray-800">{isPM ? '👥 Translators' : '👤 User Management'}</h1>
           {isPM && <p className="text-xs text-gray-500 mt-1">Register and manage translators</p>}
         </div>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
-        >
-          + {isPM ? 'Register Translator' : 'Create User'}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar por nome, email ou idiomas..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="px-3 py-2 text-sm border rounded-lg w-64 pl-8"
+            />
+            <SearchIcon className="w-4 h-4 absolute left-2 top-2.5 text-gray-400" />
+          </div>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
+          >
+            + {isPM ? 'Register Translator' : 'Create User'}
+          </button>
+        </div>
       </div>
 
       {/* Create User Form */}
@@ -10287,62 +10223,232 @@ const UsersPage = ({ adminKey, user }) => {
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
-              {!isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>}
-              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>}
-              {isPM && <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>}
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredUsers.map((u) => (
-              <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{u.name}</td>
-                <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                {!isPM && (
+              <React.Fragment key={u.id}>
+                <tr className={`hover:bg-gray-50 ${expandedUser === u.id ? 'bg-teal-50' : ''}`}>
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleExpandUser(u.id)}
+                        className={`text-gray-400 hover:text-teal-600 transition-transform ${expandedUser === u.id ? 'rotate-90' : ''}`}
+                      >
+                        ▶
+                      </button>
+                      {u.name}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">{u.email}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[u.role]}`}>
                       {u.role.toUpperCase()}
                     </span>
                   </td>
-                )}
-                {isPM && (
                   <td className="px-4 py-3 text-gray-600">
                     {u.rate_per_page ? `$${u.rate_per_page}` : '-'}
                   </td>
-                )}
-                {isPM && (
                   <td className="px-4 py-3 text-gray-600 text-xs">
                     {u.language_pairs || '-'}
                   </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {u.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button
+                      onClick={() => toggleExpandUser(u.id)}
+                      className="text-teal-600 hover:text-teal-800 text-xs"
+                    >
+                      {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleToggleActive(u.id)}
+                        className="text-blue-600 hover:text-blue-800 text-xs"
+                      >
+                        {u.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteUser(u.id, u.name)}
+                        className="text-red-600 hover:text-red-800 text-xs"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+
+                {/* Expanded Profile Section */}
+                {expandedUser === u.id && (
+                  <tr>
+                    <td colSpan="7" className="px-4 py-4 bg-gray-50">
+                      <div className="grid grid-cols-2 gap-6">
+                        {/* Profile Information */}
+                        <div className="bg-white rounded-lg p-4 border">
+                          <h4 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
+                            📋 Informações do Perfil
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-gray-500 text-xs">Nome Completo:</span>
+                              <div className="font-medium">{u.name}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Email:</span>
+                              <div className="font-medium">{u.email}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Função:</span>
+                              <div className="font-medium capitalize">{u.role}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Status:</span>
+                              <div className={`font-medium ${u.is_active ? 'text-green-600' : 'text-red-600'}`}>
+                                {u.is_active ? 'Ativo' : 'Inativo'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Valor por Página:</span>
+                              <div className="font-medium text-green-600">
+                                {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Não definido'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Valor por Palavra:</span>
+                              <div className="font-medium text-green-600">
+                                {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Não definido'}
+                              </div>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-500 text-xs">Pares de Idiomas:</span>
+                              <div className="font-medium">
+                                {u.language_pairs ? (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {u.language_pairs.split(',').map((pair, idx) => (
+                                      <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                        {pair.trim()}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : 'Não definido'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Páginas Traduzidas:</span>
+                              <div className="font-medium">{u.pages_translated || 0}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500 text-xs">Data de Cadastro:</span>
+                              <div className="font-medium">
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Documents Section */}
+                        <div className="bg-white rounded-lg p-4 border">
+                          <h4 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
+                            📁 Documentos Pessoais
+                          </h4>
+
+                          {/* Upload Section */}
+                          {isAdmin && (
+                            <div className="mb-4 p-3 bg-gray-50 rounded border-dashed border-2 border-gray-200">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  id={`doc-type-${u.id}`}
+                                  className="px-2 py-1.5 text-xs border rounded flex-1"
+                                  defaultValue=""
+                                >
+                                  <option value="" disabled>Tipo de documento...</option>
+                                  {TRANSLATOR_DOC_TYPES.map(dt => (
+                                    <option key={dt.value} value={dt.value}>{dt.label}</option>
+                                  ))}
+                                </select>
+                                <label className="px-3 py-1.5 bg-teal-500 text-white text-xs rounded cursor-pointer hover:bg-teal-600">
+                                  {uploadingDoc ? '⏳...' : '📤 Upload'}
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    disabled={uploadingDoc}
+                                    onChange={(e) => {
+                                      const docType = document.getElementById(`doc-type-${u.id}`).value;
+                                      if (!docType) {
+                                        alert('Selecione o tipo de documento primeiro');
+                                        e.target.value = '';
+                                        return;
+                                      }
+                                      handleUploadDocument(u.id, e.target.files[0], docType);
+                                      e.target.value = '';
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <p className="text-[10px] text-gray-400 mt-1">PDF, DOC, JPG, PNG (max 10MB)</p>
+                            </div>
+                          )}
+
+                          {/* Documents List */}
+                          <div className="space-y-2 max-h-48 overflow-auto">
+                            {userDocuments[u.id]?.length > 0 ? (
+                              userDocuments[u.id].map((doc) => (
+                                <div key={doc.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">
+                                      {doc.filename?.endsWith('.pdf') ? '📄' :
+                                       doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📎'}
+                                    </span>
+                                    <div>
+                                      <div className="font-medium">{doc.filename}</div>
+                                      <div className="text-gray-400">
+                                        {TRANSLATOR_DOC_TYPES.find(dt => dt.value === doc.document_type)?.label || doc.document_type}
+                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}`}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleDownloadDocument(u.id, doc.id, doc.filename)}
+                                      className="px-2 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                    >
+                                      ⬇️
+                                    </button>
+                                    {isAdmin && (
+                                      <button
+                                        onClick={() => handleDeleteDocument(u.id, doc.id)}
+                                        className="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                      >
+                                        🗑️
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-center py-4 text-gray-400 text-xs">
+                                <div className="text-2xl mb-1">📭</div>
+                                Nenhum documento enviado
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
                 )}
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {u.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 space-x-2">
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleToggleActive(u.id)}
-                      className="text-blue-600 hover:text-blue-800 text-xs"
-                    >
-                      {u.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                  )}
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDeleteUser(u.id, u.name)}
-                      className="text-red-600 hover:text-red-800 text-xs"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  {isPM && (
-                    <span className="text-gray-400 text-xs">View only</span>
-                  )}
-                </td>
-              </tr>
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -10816,28 +10922,14 @@ const FinancesPage = ({ adminKey }) => {
   const [paymentProofs, setPaymentProofs] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [proofFilter, setProofFilter] = useState('pending');
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-
-  // Translator Payments State
+  // Translator payments state
+  const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
-  const [selectedTranslatorPayment, setSelectedTranslatorPayment] = useState(null);
-  const [showPayTranslatorModal, setShowPayTranslatorModal] = useState(false);
-  const [showAddPagesModal, setShowAddPagesModal] = useState(false);
+  const [selectedTranslatorForPayment, setSelectedTranslatorForPayment] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
-  const [translatorPaymentForm, setTranslatorPaymentForm] = useState({
-    translator_id: '',
-    amount: 0,
-    pages_paid: 0,
-    payment_method: '',
-    reference: '',
-    notes: ''
-  });
-  const [addPagesForm, setAddPagesForm] = useState({
-    translator_id: '',
-    pages: 0,
-    order_id: '',
-    notes: ''
-  });
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -10862,6 +10954,9 @@ const FinancesPage = ({ adminKey }) => {
 
   const REVENUE_SOURCES = {
     website: { label: 'Website', color: '#3B82F6' },
+    google: { label: 'Google', color: '#EA4335' },
+    instagram: { label: 'Instagram', color: '#E4405F' },
+    facebook: { label: 'Facebook', color: '#1877F2' },
     whatsapp: { label: 'WhatsApp', color: '#22C55E' },
     social_media: { label: 'Social Media', color: '#A855F7' },
     referral: { label: 'Referral', color: '#F59E0B' },
@@ -10920,13 +11015,13 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
-  // Translator Payments Functions
-  const fetchTranslatorPayments = async () => {
+  // Translator payments functions
+  const fetchTranslatorsForPayment = async () => {
     try {
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
-      setTranslatorPayments(response.data.translators || []);
+      setTranslators(response.data || []);
     } catch (err) {
-      console.error('Error fetching translator payments:', err);
+      console.error('Error fetching translators:', err);
     }
   };
 
@@ -10942,56 +11037,33 @@ const FinancesPage = ({ adminKey }) => {
   const fetchTranslatorPaymentHistory = async (translatorId) => {
     try {
       const response = await axios.get(`${API}/admin/payments/translator/${translatorId}?admin_key=${adminKey}`);
-      setSelectedTranslatorPayment(response.data);
+      setTranslatorPayments(response.data.payments || []);
     } catch (err) {
-      console.error('Error fetching translator payment history:', err);
+      console.error('Error fetching translator payments:', err);
     }
   };
 
-  const openPayTranslatorModal = (translator) => {
-    setTranslatorPaymentForm({
-      translator_id: translator.translator_id,
-      amount: translator.pending_amount || 0,
-      pages_paid: translator.pages_pending_payment || 0,
-      payment_method: translator.payment_method || '',
-      reference: '',
-      notes: ''
-    });
-    setShowPayTranslatorModal(true);
-  };
-
-  const handleRegisterPayment = async (e) => {
-    e.preventDefault();
+  const handleRegisterPayment = async () => {
+    if (!selectedTranslatorForPayment || !paymentAmount) {
+      alert('Selecione um tradutor e informe o valor do pagamento');
+      return;
+    }
     try {
-      await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, translatorPaymentForm);
-      setShowPayTranslatorModal(false);
-      fetchTranslatorPayments();
-      fetchPaymentReport();
+      await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
+        translator_id: selectedTranslatorForPayment._id,
+        amount: parseFloat(paymentAmount),
+        note: paymentNote
+      });
       alert('Pagamento registrado com sucesso!');
+      setPaymentAmount('');
+      setPaymentNote('');
+      fetchTranslatorsForPayment();
+      fetchPaymentReport();
+      if (selectedTranslatorForPayment) {
+        fetchTranslatorPaymentHistory(selectedTranslatorForPayment._id);
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao registrar pagamento');
-    }
-  };
-
-  const openAddPagesModal = (translator) => {
-    setAddPagesForm({
-      translator_id: translator.translator_id,
-      pages: 0,
-      order_id: '',
-      notes: ''
-    });
-    setShowAddPagesModal(true);
-  };
-
-  const handleAddPages = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${API}/admin/payments/add-pages?admin_key=${adminKey}`, addPagesForm);
-      setShowAddPagesModal(false);
-      fetchTranslatorPayments();
-      alert('Páginas adicionadas com sucesso!');
-    } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao adicionar páginas');
+      alert('Erro ao registrar pagamento: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -11009,7 +11081,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchPaymentProofs();
     }
     if (activeView === 'translator-payments') {
-      fetchTranslatorPayments();
+      fetchTranslatorsForPayment();
       fetchPaymentReport();
     }
   }, [proofFilter, activeView]);
@@ -11152,9 +11224,9 @@ const FinancesPage = ({ adminKey }) => {
             </button>
             <button
               onClick={() => setActiveView('translator-payments')}
-              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'translator-payments' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'translator-payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              💵 Pagar Tradutores
+              💰 Pagar Tradutores
             </button>
           </div>
         </div>
@@ -11656,332 +11728,130 @@ const FinancesPage = ({ adminKey }) => {
         </div>
       )}
 
-      {/* ==================== TRANSLATOR PAYMENTS VIEW ==================== */}
+      {/* Translator Payments View */}
       {activeView === 'translator-payments' && (
-        <div className="space-y-6">
-          {/* Summary Cards */}
-          {paymentReport && (
-            <div className="grid grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="text-sm text-gray-500">Total Pago</div>
-                <div className="text-2xl font-bold text-green-600">{formatCurrency(paymentReport.total_paid)}</div>
-                <div className="text-xs text-gray-400">{paymentReport.payment_count} pagamentos</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="text-sm text-gray-500">Pendente</div>
-                <div className="text-2xl font-bold text-orange-600">{formatCurrency(paymentReport.total_pending)}</div>
-                <div className="text-xs text-gray-400">A pagar</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="text-sm text-gray-500">Páginas Pagas</div>
-                <div className="text-2xl font-bold text-blue-600">{paymentReport.total_pages_paid}</div>
-                <div className="text-xs text-gray-400">Total</div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="text-sm text-gray-500">Tradutores Ativos</div>
-                <div className="text-2xl font-bold text-purple-600">{translatorPayments.filter(t => t.is_active).length}</div>
-                <div className="text-xs text-gray-400">Com conta ativa</div>
-              </div>
-            </div>
-          )}
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Translators List */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-bold text-gray-700">💰 Pagamentos por Tradutor</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Tradutor</th>
-                    <th className="px-4 py-3 text-center">Rate/Página</th>
-                    <th className="px-4 py-3 text-center">Pág. Traduzidas</th>
-                    <th className="px-4 py-3 text-center">Pág. Pendentes</th>
-                    <th className="px-4 py-3 text-right">Valor Pendente</th>
-                    <th className="px-4 py-3 text-right">Total Pago</th>
-                    <th className="px-4 py-3 text-center">Método</th>
-                    <th className="px-4 py-3 text-center">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {translatorPayments.map(translator => (
-                    <tr key={translator.translator_id} className={!translator.is_active ? 'bg-gray-100 opacity-60' : ''}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{translator.name}</div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">👥 Tradutores</h2>
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {translators.length === 0 ? (
+                <p className="text-gray-500 text-sm">Nenhum tradutor encontrado.</p>
+              ) : (
+                translators.map((translator) => (
+                  <div
+                    key={translator._id}
+                    onClick={() => {
+                      setSelectedTranslatorForPayment(translator);
+                      fetchTranslatorPaymentHistory(translator._id);
+                    }}
+                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
+                      selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{translator.name}</div>
                         <div className="text-xs text-gray-500">{translator.email}</div>
-                      </td>
-                      <td className="px-4 py-3 text-center">{formatCurrency(translator.rate_per_page)}</td>
-                      <td className="px-4 py-3 text-center">{translator.pages_translated}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded ${translator.pages_pending_payment > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100'}`}>
-                          {translator.pages_pending_payment}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium text-orange-600">
-                        {formatCurrency(translator.pending_amount)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-green-600">{formatCurrency(translator.total_paid)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-xs px-2 py-1 bg-gray-100 rounded">
-                          {translator.payment_method === 'bank_transfer' ? '🏦 Bank' :
-                           translator.payment_method === 'paypal' ? '💳 PayPal' :
-                           translator.payment_method === 'zelle' ? '📱 Zelle' :
-                           translator.payment_method || '-'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center space-x-1">
-                          <button
-                            onClick={() => openAddPagesModal(translator)}
-                            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                            title="Adicionar páginas"
-                          >
-                            + Pág
-                          </button>
-                          <button
-                            onClick={() => openPayTranslatorModal(translator)}
-                            disabled={translator.pending_amount <= 0}
-                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Registrar pagamento"
-                          >
-                            💵 Pagar
-                          </button>
-                          <button
-                            onClick={() => fetchTranslatorPaymentHistory(translator.translator_id)}
-                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                            title="Ver histórico"
-                          >
-                            📋
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {translatorPayments.length === 0 && (
-                <div className="p-8 text-center text-gray-500">Nenhum tradutor cadastrado</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">Páginas pendentes</div>
+                        <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs text-gray-500">
+                      <span>Taxa: ${translator.rate_per_page || 25}/página</span>
+                      <span className="font-medium text-green-600">
+                        Total: ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>
 
-          {/* Register Payment Modal */}
-          {showPayTranslatorModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <div className="p-4 border-b bg-green-600 text-white rounded-t-lg flex justify-between items-center">
-                  <h3 className="font-bold">💵 Registrar Pagamento</h3>
-                  <button onClick={() => setShowPayTranslatorModal(false)} className="text-white hover:text-gray-200">✕</button>
-                </div>
-                <form onSubmit={handleRegisterPayment} className="p-4 space-y-4">
+          {/* Payment Form & History */}
+          <div className="space-y-4">
+            {/* Payment Form */}
+            {selectedTranslatorForPayment && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">💳 Registrar Pagamento: {selectedTranslatorForPayment.name}</h2>
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Valor ($)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Valor do Pagamento ($)</label>
                     <input
                       type="number"
                       step="0.01"
-                      required
-                      value={translatorPaymentForm.amount}
-                      onChange={(e) => setTranslatorPaymentForm({...translatorPaymentForm, amount: parseFloat(e.target.value)})}
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      placeholder={`Sugerido: $${((selectedTranslatorForPayment.pending_payment_pages || 0) * (selectedTranslatorForPayment.rate_per_page || 25)).toFixed(2)}`}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Páginas Pagas</label>
-                    <input
-                      type="number"
-                      required
-                      value={translatorPaymentForm.pages_paid}
-                      onChange={(e) => setTranslatorPaymentForm({...translatorPaymentForm, pages_paid: parseInt(e.target.value)})}
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
-                    <select
-                      value={translatorPaymentForm.payment_method}
-                      onChange={(e) => setTranslatorPaymentForm({...translatorPaymentForm, payment_method: e.target.value})}
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-green-500"
-                    >
-                      <option value="">Selecionar...</option>
-                      <option value="bank_transfer">Bank Transfer (ACH)</option>
-                      <option value="wire_transfer">Wire Transfer</option>
-                      <option value="paypal">PayPal</option>
-                      <option value="zelle">Zelle</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Referência/Confirmação</label>
-                    <input
-                      type="text"
-                      value={translatorPaymentForm.reference}
-                      onChange={(e) => setTranslatorPaymentForm({...translatorPaymentForm, reference: e.target.value})}
-                      className="w-full px-3 py-2 border rounded"
-                      placeholder="Número da transação, etc."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                    <label className="block text-xs text-gray-500 mb-1">Nota (opcional)</label>
                     <textarea
-                      value={translatorPaymentForm.notes}
-                      onChange={(e) => setTranslatorPaymentForm({...translatorPaymentForm, notes: e.target.value})}
-                      className="w-full px-3 py-2 border rounded"
-                      rows="2"
-                      placeholder="Observações opcionais"
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      rows={2}
+                      placeholder="Referência de pagamento, período, etc."
                     />
                   </div>
-                  <div className="flex justify-end space-x-2 pt-2">
-                    <button type="button" onClick={() => setShowPayTranslatorModal(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                      Cancelar
-                    </button>
-                    <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                      Registrar Pagamento
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Add Pages Modal */}
-          {showAddPagesModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <div className="p-4 border-b bg-blue-600 text-white rounded-t-lg flex justify-between items-center">
-                  <h3 className="font-bold">📄 Adicionar Páginas</h3>
-                  <button onClick={() => setShowAddPagesModal(false)} className="text-white hover:text-gray-200">✕</button>
-                </div>
-                <form onSubmit={handleAddPages} className="p-4 space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Páginas</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      value={addPagesForm.pages}
-                      onChange={(e) => setAddPagesForm({...addPagesForm, pages: parseInt(e.target.value)})}
-                      className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ID do Pedido (opcional)</label>
-                    <input
-                      type="text"
-                      value={addPagesForm.order_id}
-                      onChange={(e) => setAddPagesForm({...addPagesForm, order_id: e.target.value})}
-                      className="w-full px-3 py-2 border rounded"
-                      placeholder="Para referência"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-                    <textarea
-                      value={addPagesForm.notes}
-                      onChange={(e) => setAddPagesForm({...addPagesForm, notes: e.target.value})}
-                      className="w-full px-3 py-2 border rounded"
-                      rows="2"
-                      placeholder="Observações opcionais"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2 pt-2">
-                    <button type="button" onClick={() => setShowAddPagesModal(false)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                      Cancelar
-                    </button>
-                    <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                      Adicionar Páginas
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Payment History Modal */}
-          {selectedTranslatorPayment && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-auto">
-                <div className="p-4 border-b bg-gray-800 text-white rounded-t-lg flex justify-between items-center sticky top-0">
-                  <div>
-                    <h3 className="font-bold">📋 Histórico de Pagamentos</h3>
-                    <div className="text-sm opacity-80">{selectedTranslatorPayment.translator.name}</div>
-                  </div>
-                  <button onClick={() => setSelectedTranslatorPayment(null)} className="text-white hover:text-gray-200 text-xl">✕</button>
-                </div>
-                <div className="p-4">
-                  {/* Translator Info */}
-                  <div className="grid grid-cols-3 gap-4 mb-4 text-sm">
-                    <div className="bg-gray-50 p-3 rounded">
-                      <div className="text-gray-500">Rate/Página</div>
-                      <div className="font-bold">{formatCurrency(selectedTranslatorPayment.translator.rate_per_page)}</div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <div className="text-gray-500">Páginas Traduzidas</div>
-                      <div className="font-bold">{selectedTranslatorPayment.translator.pages_translated}</div>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <div className="text-gray-500">Total Pago</div>
-                      <div className="font-bold text-green-600">{formatCurrency(selectedTranslatorPayment.total_paid)}</div>
-                    </div>
-                  </div>
-
-                  {/* Payment Info */}
-                  <div className="mb-4 p-3 bg-blue-50 rounded text-sm">
-                    <div className="font-medium text-blue-700 mb-1">Dados para Pagamento:</div>
-                    <div className="text-blue-600">
-                      {selectedTranslatorPayment.translator.payment_method === 'bank_transfer' || selectedTranslatorPayment.translator.payment_method === 'wire_transfer' ? (
-                        <>
-                          <div>🏦 {selectedTranslatorPayment.translator.bank_name}</div>
-                          <div>👤 {selectedTranslatorPayment.translator.account_holder}</div>
-                          <div>Conta: {selectedTranslatorPayment.translator.account_number}</div>
-                          <div>Routing: {selectedTranslatorPayment.translator.routing_number}</div>
-                        </>
-                      ) : selectedTranslatorPayment.translator.payment_method === 'paypal' ? (
-                        <div>💳 PayPal: {selectedTranslatorPayment.translator.paypal_email}</div>
-                      ) : selectedTranslatorPayment.translator.payment_method === 'zelle' ? (
-                        <div>📱 Zelle: {selectedTranslatorPayment.translator.zelle_email}</div>
-                      ) : (
-                        <div>Método não configurado</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Payments List */}
-                  <h4 className="font-bold text-gray-700 mb-2">Pagamentos Realizados</h4>
-                  {selectedTranslatorPayment.payments.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500">Nenhum pagamento registrado</div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Data</th>
-                          <th className="px-3 py-2 text-right">Valor</th>
-                          <th className="px-3 py-2 text-center">Páginas</th>
-                          <th className="px-3 py-2 text-left">Método</th>
-                          <th className="px-3 py-2 text-left">Referência</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {selectedTranslatorPayment.payments.map((payment, idx) => (
-                          <tr key={idx}>
-                            <td className="px-3 py-2">{formatDate(payment.payment_date)}</td>
-                            <td className="px-3 py-2 text-right font-medium text-green-600">{formatCurrency(payment.amount)}</td>
-                            <td className="px-3 py-2 text-center">{payment.pages_paid}</td>
-                            <td className="px-3 py-2">{payment.payment_method}</td>
-                            <td className="px-3 py-2 text-gray-500">{payment.reference || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-                <div className="p-4 border-t flex justify-end">
-                  <button onClick={() => setSelectedTranslatorPayment(null)} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                    Fechar
+                  <button
+                    onClick={handleRegisterPayment}
+                    className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                  >
+                    ✅ Registrar Pagamento
                   </button>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Payment History */}
+            {selectedTranslatorForPayment && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📜 Histórico de Pagamentos</h2>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {translatorPayments.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Nenhum pagamento registrado.</p>
+                  ) : (
+                    translatorPayments.map((payment, idx) => (
+                      <div key={idx} className="p-2 border rounded text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-green-600">${payment.amount.toFixed(2)}</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                        {payment.note && (
+                          <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Payment Report Summary */}
+            {paymentReport && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📊 Resumo Geral</h2>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-3 bg-yellow-50 rounded">
+                    <div className="text-xs text-gray-500">Total Pendente</div>
+                    <div className="font-bold text-xl text-yellow-600">${paymentReport.total_pending?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded">
+                    <div className="text-xs text-gray-500">Total Pago (Mês)</div>
+                    <div className="font-bold text-xl text-green-600">${paymentReport.total_paid_month?.toFixed(2) || '0.00'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -12012,10 +11882,11 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const [zelleEmail, setZelleEmail] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedEthics, setAcceptedEthics] = useState(false);
+  const [acceptedProhibitedUse, setAcceptedProhibitedUse] = useState(false);
 
   const isTranslator = userInfo?.role === 'translator';
   const isPM = userInfo?.role === 'pm';
-  const needsTermsAcceptance = isTranslator || isPM;
+  const requiresTerms = isTranslator || isPM; // Both translators and PMs must accept terms
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -12046,7 +11917,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
     }
 
     // If translator or PM, go to step 2 for terms acceptance, otherwise submit directly
-    if (needsTermsAcceptance) {
+    if (requiresTerms) {
       setStep(2);
     } else {
       handleFinalSubmit();
@@ -12056,10 +11927,14 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const handleFinalSubmit = async () => {
     setError('');
 
-    // Validate terms acceptance for translator and PM
-    if (needsTermsAcceptance) {
+    // Validate terms acceptance for translators and PMs
+    if (requiresTerms) {
       if (!acceptedTerms) {
         setError('You must accept the terms and conditions');
+        return;
+      }
+      if (!acceptedProhibitedUse) {
+        setError('You must accept the prohibited use clause');
         return;
       }
       // Ethics only required for translators
@@ -12076,6 +11951,12 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         password: password
       };
 
+      // Add terms acceptance data for translators and PMs
+      if (requiresTerms) {
+        data.accepted_terms = acceptedTerms;
+        data.accepted_prohibited_use = acceptedProhibitedUse;
+      }
+
       // Add translator-specific data
       if (isTranslator) {
         data.language_pairs = languagePairs || null;
@@ -12088,7 +11969,6 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         data.routing_number = routingNumber || null;
         data.paypal_email = paypalEmail || null;
         data.zelle_email = zelleEmail || null;
-        data.accepted_terms = acceptedTerms;
         data.accepted_ethics = acceptedEthics;
       }
 
@@ -12136,14 +12016,14 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
     );
   }
 
-  // Step 2: Translator/PM onboarding form with terms acceptance
-  if (step === 2 && needsTermsAcceptance) {
+  // Step 2: Terms acceptance form (for translators and PMs)
+  if (step === 2 && requiresTerms) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center py-8">
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-4">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl text-white">{isTranslator ? '📋' : '👔'}</span>
+              <span className="text-xl text-white">📋</span>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Complete Your Profile</h1>
             <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
@@ -12163,7 +12043,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           )}
 
           <div className="space-y-4">
-            {/* Language & Rates Section - Only for Translators */}
+            {/* Language & Rates Section - Translator only */}
             {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Language & Rates</h3>
@@ -12207,7 +12087,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
             </div>
             )}
 
-            {/* Payment Section - Only for Translators */}
+            {/* Payment Section - Translator only */}
             {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Information</h3>
@@ -12305,43 +12185,39 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 
             {/* Terms & Ethics Section */}
             <div className="border rounded p-3 bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">
-                {isTranslator ? 'Terms & Ethics Agreement' : 'Terms & Conditions Agreement'}
-              </h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Terms Agreement</h3>
 
               <div className="space-y-3">
-                {/* Ethics Guidelines - Only for Translators */}
+                {/* Ethics Guidelines - Translator only */}
                 {isTranslator && (
-                  <>
-                    <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
-                      <strong>Translator Ethics Guidelines (ATA Standards)</strong>
-                      <ul className="list-disc ml-4 mt-2 space-y-1">
-                        <li>Maintain strict confidentiality of all client documents and information</li>
-                        <li>Provide accurate and faithful translations without additions or omissions</li>
-                        <li>Only accept work within your area of competence and language expertise</li>
-                        <li>Disclose any conflicts of interest before accepting assignments</li>
-                        <li>Meet agreed deadlines and communicate promptly about any delays</li>
-                        <li>Respect intellectual property rights and copyright laws</li>
-                        <li>Maintain professional development and stay current in your field</li>
-                        <li>Never use client materials for personal gain or share with third parties</li>
-                      </ul>
-                    </div>
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={acceptedEthics}
-                        onChange={(e) => setAcceptedEthics(e.target.checked)}
-                        className="mt-1"
-                      />
-                      <span className="text-xs text-gray-700">
-                        I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
-                      </span>
-                    </label>
-                  </>
+                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                  <strong>Translator Ethics Guidelines (ATA Standards)</strong>
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Maintain strict confidentiality of all client documents and information</li>
+                    <li>Provide accurate and faithful translations without additions or omissions</li>
+                    <li>Only accept work within your area of competence and language expertise</li>
+                    <li>Disclose any conflicts of interest before accepting assignments</li>
+                    <li>Meet agreed deadlines and communicate promptly about any delays</li>
+                    <li>Respect intellectual property rights and copyright laws</li>
+                    <li>Maintain professional development and stay current in your field</li>
+                    <li>Never use client materials for personal gain or share with third parties</li>
+                  </ul>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedEthics}
+                    onChange={(e) => setAcceptedEthics(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-gray-700">
+                    I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
+                  </span>
+                </label>
                 )}
 
                 {/* Terms and Conditions */}
-                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-48 overflow-y-auto">
+                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
                   <strong>Terms and Conditions</strong>
                   <ul className="list-disc ml-4 mt-2 space-y-1">
                     <li>Translations remain property of Legacy Translations until delivered to client</li>
@@ -12351,29 +12227,6 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <li>Non-compete for direct contact with clients for 12 months</li>
                     <li>Confidentiality obligations continue after contract termination</li>
                   </ul>
-
-                  <div className="mt-4 pt-3 border-t border-red-200 bg-red-50 p-2 rounded">
-                    <strong className="text-red-700">⚠️ PROHIBITED USE CLAUSE</strong>
-                    <p className="mt-1 text-red-700">
-                      This system, platform, and all associated tools are the exclusive property of Legacy Translations LLC.
-                      <strong> IT IS EXPRESSLY PROHIBITED</strong> to use this system for any purpose other than performing
-                      translation services directly for Legacy Translations. Any unauthorized use, including but not limited to:
-                    </p>
-                    <ul className="list-disc ml-4 mt-1 text-red-600 space-y-1">
-                      <li>Using this platform for personal projects or third-party work</li>
-                      <li>Sharing access credentials with any third party</li>
-                      <li>Copying, reproducing, or reverse-engineering any part of this system</li>
-                      <li>Using translation tools, templates, or AI features for external purposes</li>
-                    </ul>
-                    <p className="mt-2 text-red-700">
-                      Violations will result in immediate termination and may lead to legal action.
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-2 border-t text-center text-gray-500 text-[10px]">
-                    © {new Date().getFullYear()} Legacy Translations LLC. All rights reserved.<br/>
-                    <strong>legacytranslations.com</strong>
-                  </div>
                 </div>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input
@@ -12383,7 +12236,38 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     className="mt-1"
                   />
                   <span className="text-xs text-gray-700">
-                    I accept the Terms and Conditions and acknowledge that this system is for exclusive use with Legacy Translations. All rights reserved to legacytranslations.com *
+                    I accept the Terms and Conditions for working as a contractor with Legacy Translations *
+                  </span>
+                </label>
+
+                {/* Prohibited Use Clause */}
+                <div className="bg-red-50 p-3 rounded border border-red-200 text-xs text-gray-700 max-h-32 overflow-y-auto">
+                  <strong className="text-red-700">Prohibited Use Clause</strong>
+                  <p className="mt-2">
+                    It is expressly <strong>PROHIBITED</strong> to use the Legacy Translations platform, its tools,
+                    templates, and any company resources for any purposes other than those directly related to
+                    authorized work within the Legacy Translations system. This includes, but is not limited to:
+                  </p>
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Using company tools, templates, or resources for personal or third-party projects</li>
+                    <li>Sharing login credentials or access links with unauthorized persons</li>
+                    <li>Copying or distributing proprietary templates, formats, or methodologies</li>
+                    <li>Using the platform to conduct business outside of Legacy Translations</li>
+                    <li>Unauthorized access or sharing of client information</li>
+                  </ul>
+                  <p className="mt-2 font-medium text-red-700">
+                    All rights reserved. © {new Date().getFullYear()} Legacy Translations LLC - legacytranslations.com
+                  </p>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedProhibitedUse}
+                    onChange={(e) => setAcceptedProhibitedUse(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-gray-700">
+                    I understand and accept the Prohibited Use Clause. I agree not to use Legacy Translations resources for unauthorized purposes. *
                   </span>
                 </label>
               </div>
@@ -12400,7 +12284,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               <button
                 type="button"
                 onClick={handleFinalSubmit}
-                disabled={loading || success || !acceptedTerms || (isTranslator && !acceptedEthics)}
+                disabled={loading || success || !acceptedTerms || !acceptedProhibitedUse || (isTranslator && !acceptedEthics)}
                 className="flex-1 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
               >
                 {loading ? 'Setting up...' : 'Complete Setup'}
@@ -12423,7 +12307,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           <h1 className="text-xl font-bold text-gray-800">Set Up Your Account</h1>
           <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
           <p className="text-xs text-teal-600 mt-1">{userInfo?.role?.toUpperCase()}</p>
-          {isTranslator && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
+          {requiresTerms && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
         </div>
 
         {error && (
@@ -12468,7 +12352,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
             disabled={loading || success}
             className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
           >
-            {isTranslator ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
+            {requiresTerms ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
           </button>
         </form>
       </div>
@@ -12624,6 +12508,1513 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
   );
 };
 
+// ==================== PM DASHBOARD (EXCLUSIVE FOR PROJECT MANAGERS) ====================
+const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
+  // State
+  const [activeSection, setActiveSection] = useState('overview');
+  const [orders, setOrders] = useState([]);
+  const [translators, setTranslators] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [selectedTranslator, setSelectedTranslator] = useState(null);
+  const [reviewQueue, setReviewQueue] = useState([]);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [originalContent, setOriginalContent] = useState(null);
+  const [translatedContent, setTranslatedContent] = useState(null);
+  const [correctionNotes, setCorrectionNotes] = useState('');
+  const [sendingAction, setSendingAction] = useState(false);
+  const [stats, setStats] = useState({
+    totalProjects: 0,
+    inProgress: 0,
+    awaitingReview: 0,
+    completed: 0,
+    onTime: 0,
+    delayed: 0
+  });
+
+  // Quote generation state
+  const [quoteForm, setQuoteForm] = useState({
+    clientName: '',
+    clientEmail: '',
+    documentType: '',
+    sourceLanguage: 'Portuguese',
+    targetLanguage: 'English',
+    serviceType: 'standard',
+    pageCount: 1,
+    pricePerPage: 24.99,
+    discount: 0,
+    urgency: 'no',
+    notes: ''
+  });
+  const [quoteLanguage, setQuoteLanguage] = useState('en'); // en, pt, es
+  const [showQuotePreview, setShowQuotePreview] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
+
+  // Quote translations
+  const quoteTranslations = {
+    en: {
+      title: 'TRANSLATION QUOTE',
+      company: 'Legacy Translation Services',
+      tagline: 'Professional Certified Translation Services',
+      quoteNumber: 'Quote #',
+      date: 'Date',
+      validUntil: 'Valid Until',
+      clientInfo: 'Client Information',
+      name: 'Name',
+      email: 'Email',
+      serviceDetails: 'Service Details',
+      documentType: 'Document Type',
+      sourceLanguage: 'Source Language',
+      targetLanguage: 'Target Language',
+      serviceType: 'Service Type',
+      certified: 'Certified Translation',
+      professional: 'Professional Translation',
+      urgency: 'Urgency',
+      normal: 'Standard (2-3 business days)',
+      priority: 'Priority (24 hours)',
+      urgent: 'Urgent (12 hours)',
+      pricing: 'Pricing',
+      pages: 'Number of Pages',
+      pricePerPage: 'Price per Page',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Urgency Fee',
+      discount: 'Discount',
+      total: 'TOTAL',
+      notes: 'Notes',
+      terms: 'Terms & Conditions',
+      termsText: 'This quote is valid for 30 days. Payment is due upon completion. Certified translations include notarization.',
+      thankYou: 'Thank you for choosing Legacy Translation Services!',
+      contact: 'Contact us',
+      phone: 'Phone',
+      website: 'Website'
+    },
+    pt: {
+      title: 'ORÇAMENTO DE TRADUÇÃO',
+      company: 'Legacy Translation Services',
+      tagline: 'Serviços Profissionais de Tradução Juramentada',
+      quoteNumber: 'Orçamento #',
+      date: 'Data',
+      validUntil: 'Válido Até',
+      clientInfo: 'Informações do Cliente',
+      name: 'Nome',
+      email: 'E-mail',
+      serviceDetails: 'Detalhes do Serviço',
+      documentType: 'Tipo de Documento',
+      sourceLanguage: 'Idioma de Origem',
+      targetLanguage: 'Idioma de Destino',
+      serviceType: 'Tipo de Serviço',
+      certified: 'Tradução Juramentada',
+      professional: 'Tradução Profissional',
+      urgency: 'Urgência',
+      normal: 'Normal (2-3 dias úteis)',
+      priority: 'Prioritário (24 horas)',
+      urgent: 'Urgente (12 horas)',
+      pricing: 'Valores',
+      pages: 'Número de Páginas',
+      pricePerPage: 'Preço por Página',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Taxa de Urgência',
+      discount: 'Desconto',
+      total: 'TOTAL',
+      notes: 'Observações',
+      terms: 'Termos e Condições',
+      termsText: 'Este orçamento é válido por 30 dias. O pagamento é devido após a conclusão. Traduções juramentadas incluem reconhecimento de firma.',
+      thankYou: 'Obrigado por escolher a Legacy Translation Services!',
+      contact: 'Entre em contato',
+      phone: 'Telefone',
+      website: 'Website'
+    },
+    es: {
+      title: 'COTIZACIÓN DE TRADUCCIÓN',
+      company: 'Legacy Translation Services',
+      tagline: 'Servicios Profesionales de Traducción Certificada',
+      quoteNumber: 'Cotización #',
+      date: 'Fecha',
+      validUntil: 'Válido Hasta',
+      clientInfo: 'Información del Cliente',
+      name: 'Nombre',
+      email: 'Correo Electrónico',
+      serviceDetails: 'Detalles del Servicio',
+      documentType: 'Tipo de Documento',
+      sourceLanguage: 'Idioma de Origen',
+      targetLanguage: 'Idioma de Destino',
+      serviceType: 'Tipo de Servicio',
+      certified: 'Traducción Certificada',
+      professional: 'Traducción Profesional',
+      urgency: 'Urgencia',
+      normal: 'Estándar (2-3 días hábiles)',
+      priority: 'Prioritario (24 horas)',
+      urgent: 'Urgente (12 horas)',
+      pricing: 'Precios',
+      pages: 'Número de Páginas',
+      pricePerPage: 'Precio por Página',
+      subtotal: 'Subtotal',
+      urgencyFee: 'Tarifa de Urgencia',
+      discount: 'Descuento',
+      total: 'TOTAL',
+      notes: 'Notas',
+      terms: 'Términos y Condiciones',
+      termsText: 'Esta cotización es válida por 30 días. El pago se realiza al finalizar. Las traducciones certificadas incluyen notarización.',
+      thankYou: '¡Gracias por elegir Legacy Translation Services!',
+      contact: 'Contáctenos',
+      phone: 'Teléfono',
+      website: 'Sitio Web'
+    }
+  };
+
+  // Calculate quote totals
+  const calculateQuote = () => {
+    const basePrice = quoteForm.pageCount * quoteForm.pricePerPage;
+    let urgencyFee = 0;
+    if (quoteForm.urgency === 'priority') urgencyFee = basePrice * 0.25;
+    if (quoteForm.urgency === 'urgent') urgencyFee = basePrice * 1.0;
+    const discountAmount = basePrice * (quoteForm.discount / 100);
+    const total = basePrice + urgencyFee - discountAmount;
+    return { basePrice, urgencyFee, discountAmount, total };
+  };
+
+  // Send quote via email
+  const sendQuoteEmail = async () => {
+    if (!quoteForm.clientEmail) {
+      alert('Por favor, informe o email do cliente.');
+      return;
+    }
+    setSendingQuote(true);
+    try {
+      const t = quoteTranslations[quoteLanguage];
+      const prices = calculateQuote();
+      const quoteNumber = `LT-${Date.now().toString().slice(-6)}`;
+
+      await axios.post(`${API}/admin/send-quote-email?admin_key=${adminKey}`, {
+        to_email: quoteForm.clientEmail,
+        client_name: quoteForm.clientName,
+        quote_number: quoteNumber,
+        language: quoteLanguage,
+        quote_data: {
+          ...quoteForm,
+          ...prices,
+          quoteNumber,
+          date: new Date().toLocaleDateString(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+        }
+      });
+
+      alert(`✅ Orçamento enviado com sucesso para ${quoteForm.clientEmail}!`);
+      setShowQuotePreview(false);
+    } catch (err) {
+      console.error('Failed to send quote:', err);
+      alert('❌ Erro ao enviar orçamento. Tente novamente.');
+    } finally {
+      setSendingQuote(false);
+    }
+  };
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch orders assigned to this PM
+      const ordersRes = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const allOrders = ordersRes.data.orders || [];
+      const myOrders = allOrders.filter(o =>
+        o.assigned_pm_id === user?.id ||
+        o.assigned_pm_name === user?.name
+      );
+      setOrders(myOrders);
+
+      // Fetch translators
+      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
+      const allUsers = usersRes.data.users || [];
+      const translatorsList = allUsers.filter(u => u.role === 'translator');
+      setTranslators(translatorsList);
+
+      // Build review queue - orders with translation_status === 'review'
+      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      setReviewQueue(reviewOrders);
+
+      // Calculate stats
+      const now = new Date();
+      let onTime = 0;
+      let delayed = 0;
+      myOrders.forEach(o => {
+        if (o.deadline) {
+          const deadline = new Date(o.deadline);
+          if (deadline >= now || o.translation_status === 'delivered') {
+            onTime++;
+          } else {
+            delayed++;
+          }
+        }
+      });
+
+      setStats({
+        totalProjects: myOrders.length,
+        inProgress: myOrders.filter(o => o.translation_status === 'in_translation').length,
+        awaitingReview: reviewOrders.length,
+        completed: myOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).length,
+        onTime,
+        delayed
+      });
+
+      // Load messages from localStorage (simulated)
+      const savedMessages = localStorage.getItem(`pm_messages_${user?.id}`);
+      if (savedMessages) setMessages(JSON.parse(savedMessages));
+
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Send message to translator
+  const sendMessage = () => {
+    if (!newMessage.trim() || !selectedTranslator) return;
+
+    const msg = {
+      id: Date.now(),
+      from: user?.name,
+      to: selectedTranslator.name,
+      toId: selectedTranslator.id,
+      content: newMessage,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+
+    const updatedMessages = [...messages, msg];
+    setMessages(updatedMessages);
+    localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
+    setNewMessage('');
+  };
+
+  // Load review content
+  const loadReviewContent = async (order) => {
+    setSelectedReview(order);
+    setCorrectionNotes('');
+
+    try {
+      // Fetch documents for this order
+      const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      const docs = docsRes.data.documents || [];
+
+      // Find original and translated documents
+      const originalDoc = docs.find(d => d.document_type === 'original' || !d.document_type);
+      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+
+      if (originalDoc) {
+        const origData = await axios.get(`${API}/admin/order-documents/${originalDoc.id}/download?admin_key=${adminKey}`);
+        setOriginalContent({
+          filename: originalDoc.filename,
+          data: origData.data.file_data,
+          contentType: origData.data.content_type
+        });
+      }
+
+      if (translatedDoc) {
+        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+        setTranslatedContent({
+          filename: translatedDoc.filename,
+          data: transData.data.file_data,
+          contentType: transData.data.content_type,
+          html: transData.data.html_content
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load review content:', err);
+    }
+  };
+
+  // Approve translation
+  const approveTranslation = async (sendTo) => {
+    if (!selectedReview) return;
+    setSendingAction(true);
+
+    try {
+      const newStatus = sendTo === 'client_review' ? 'client_review' : 'ready';
+      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
+        translation_status: newStatus
+      });
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === selectedReview.id ? { ...o, translation_status: newStatus } : o
+      ));
+      setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
+      setSelectedReview(null);
+      setOriginalContent(null);
+      setTranslatedContent(null);
+
+      alert(sendTo === 'client_review'
+        ? '✅ Enviado para revisão do cliente!'
+        : '✅ Tradução final aprovada e enviada!');
+    } catch (err) {
+      console.error('Failed to approve:', err);
+      alert('❌ Erro ao aprovar tradução');
+    } finally {
+      setSendingAction(false);
+    }
+  };
+
+  // Request correction
+  const requestCorrection = async () => {
+    if (!selectedReview || !correctionNotes.trim()) {
+      alert('Por favor, adicione notas de correção.');
+      return;
+    }
+    setSendingAction(true);
+
+    try {
+      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        pm_notes: correctionNotes
+      });
+
+      // Add message to translator
+      const translator = translators.find(t =>
+        t.id === selectedReview.assigned_translator_id ||
+        t.name === selectedReview.assigned_translator
+      );
+
+      if (translator) {
+        const msg = {
+          id: Date.now(),
+          from: user?.name,
+          to: translator.name,
+          toId: translator.id,
+          content: `📝 Correção necessária para ${selectedReview.order_number}:\n${correctionNotes}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'correction'
+        };
+        const updatedMessages = [...messages, msg];
+        setMessages(updatedMessages);
+        localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
+      }
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === selectedReview.id ? { ...o, translation_status: 'in_translation' } : o
+      ));
+      setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
+      setSelectedReview(null);
+      setOriginalContent(null);
+      setTranslatedContent(null);
+      setCorrectionNotes('');
+
+      alert('📨 Solicitação de correção enviada ao tradutor!');
+    } catch (err) {
+      console.error('Failed to request correction:', err);
+      alert('❌ Erro ao solicitar correção');
+    } finally {
+      setSendingAction(false);
+    }
+  };
+
+  // Get upcoming deadlines for calendar
+  const getUpcomingDeadlines = () => {
+    const now = new Date();
+    const upcoming = orders
+      .filter(o => o.deadline && !['delivered', 'ready'].includes(o.translation_status))
+      .map(o => ({
+        ...o,
+        deadlineDate: new Date(o.deadline),
+        daysLeft: Math.ceil((new Date(o.deadline) - now) / (1000 * 60 * 60 * 24))
+      }))
+      .sort((a, b) => a.deadlineDate - b.deadlineDate);
+    return upcoming;
+  };
+
+  // Section navigation
+  const sections = [
+    { id: 'overview', label: 'Visão Geral', icon: '📊' },
+    { id: 'quote', label: 'Gerar Orçamento', icon: '💰' },
+    { id: 'review', label: 'Revisar Traduções', icon: '✅' },
+    { id: 'team', label: 'Minha Equipe', icon: '👥' },
+    { id: 'calendar', label: 'Agenda', icon: '📅' },
+    { id: 'reports', label: 'Relatórios', icon: '📈' },
+    { id: 'messages', label: 'Mensagens', icon: '💬' }
+  ];
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+        <span className="ml-3 text-gray-600">Carregando dashboard...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4">
+      {/* Header */}
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">🎯 PM Dashboard</h1>
+          <p className="text-sm text-gray-500">Bem-vindo(a), {user?.name}</p>
+        </div>
+        <button
+          onClick={fetchDashboardData}
+          className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1"
+        >
+          <RefreshIcon className="w-3 h-3" /> Atualizar
+        </button>
+      </div>
+
+      {/* Section Navigation */}
+      <div className="flex space-x-1 mb-4 bg-white rounded-lg shadow p-1">
+        {sections.map(section => (
+          <button
+            key={section.id}
+            onClick={() => setActiveSection(section.id)}
+            className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-colors ${
+              activeSection === section.id
+                ? 'bg-teal-500 text-white'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <span className="mr-1">{section.icon}</span>
+            {section.label}
+            {section.id === 'review' && reviewQueue.length > 0 && (
+              <span className="ml-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {reviewQueue.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* OVERVIEW SECTION */}
+      {activeSection === 'overview' && (
+        <div className="space-y-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-6 gap-3">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-[10px] text-gray-500 uppercase">Total Projetos</div>
+              <div className="text-2xl font-bold text-gray-800">{stats.totalProjects}</div>
+            </div>
+            <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Em Andamento</div>
+              <div className="text-2xl font-bold">{stats.inProgress}</div>
+            </div>
+            <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Aguardando Revisão</div>
+              <div className="text-2xl font-bold">{stats.awaitingReview}</div>
+            </div>
+            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Concluídos</div>
+              <div className="text-2xl font-bold">{stats.completed}</div>
+            </div>
+            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">No Prazo</div>
+              <div className="text-2xl font-bold">{stats.onTime}</div>
+            </div>
+            <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
+              <div className="text-[10px] uppercase opacity-80">Atrasados</div>
+              <div className="text-2xl font-bold">{stats.delayed}</div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Ações Rápidas</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveSection('review')}
+                className="px-4 py-2 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center gap-2"
+              >
+                ✅ Revisar Traduções ({reviewQueue.length})
+              </button>
+              <button
+                onClick={() => setActiveSection('team')}
+                className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-2"
+              >
+                👥 Ver Equipe
+              </button>
+              <button
+                onClick={() => setActiveSection('calendar')}
+                className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 flex items-center gap-2"
+              >
+                📅 Ver Prazos
+              </button>
+            </div>
+          </div>
+
+          {/* Recent Projects */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Projetos Recentes</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-2">Código</th>
+                    <th className="text-left py-2 px-2">Cliente</th>
+                    <th className="text-left py-2 px-2">Idiomas</th>
+                    <th className="text-left py-2 px-2">Tradutor</th>
+                    <th className="text-left py-2 px-2">Status</th>
+                    <th className="text-left py-2 px-2">Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.slice(0, 10).map(order => (
+                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-2 font-mono text-blue-600">{order.order_number}</td>
+                      <td className="py-2 px-2">{order.client_name}</td>
+                      <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
+                      <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
+                      <td className="py-2 px-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                          {order.translation_status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2">
+                        {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUOTE SECTION - Professional Quote Generator */}
+      {activeSection === 'quote' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {/* Quote Form */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-bold text-gray-800 mb-4">💰 Gerar Orçamento Profissional</h3>
+
+              <div className="space-y-3">
+                {/* Client Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nome do Cliente *</label>
+                    <input
+                      type="text"
+                      value={quoteForm.clientName}
+                      onChange={(e) => setQuoteForm({...quoteForm, clientName: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Email do Cliente *</label>
+                    <input
+                      type="email"
+                      value={quoteForm.clientEmail}
+                      onChange={(e) => setQuoteForm({...quoteForm, clientEmail: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                      placeholder="client@email.com"
+                    />
+                  </div>
+                </div>
+
+                {/* Document Type */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Documento</label>
+                  <select
+                    value={quoteForm.documentType}
+                    onChange={(e) => setQuoteForm({...quoteForm, documentType: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    {DOCUMENT_TYPES.map(doc => <option key={doc.value} value={doc.value}>{doc.label}</option>)}
+                  </select>
+                </div>
+
+                {/* Languages */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Origem</label>
+                    <select
+                      value={quoteForm.sourceLanguage}
+                      onChange={(e) => setQuoteForm({...quoteForm, sourceLanguage: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Destino</label>
+                    <select
+                      value={quoteForm.targetLanguage}
+                      onChange={(e) => setQuoteForm({...quoteForm, targetLanguage: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Service Type & Urgency */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Serviço</label>
+                    <select
+                      value={quoteForm.serviceType}
+                      onChange={(e) => setQuoteForm({
+                        ...quoteForm,
+                        serviceType: e.target.value,
+                        pricePerPage: e.target.value === 'standard' ? 24.99 : 19.50
+                      })}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="standard">Tradução Juramentada (Certified)</option>
+                      <option value="professional">Tradução Profissional (Professional)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Urgência</label>
+                    <select
+                      value={quoteForm.urgency}
+                      onChange={(e) => setQuoteForm({...quoteForm, urgency: e.target.value})}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="no">Normal (2-3 dias úteis)</option>
+                      <option value="priority">Prioritário (24 horas) +25%</option>
+                      <option value="urgent">Urgente (12 horas) +100%</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nº de Páginas</label>
+                    <input
+                      type="number"
+                      value={quoteForm.pageCount}
+                      onChange={(e) => setQuoteForm({...quoteForm, pageCount: parseInt(e.target.value) || 1})}
+                      min="1"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Preço por Página ($)</label>
+                    <input
+                      type="number"
+                      value={quoteForm.pricePerPage}
+                      onChange={(e) => setQuoteForm({...quoteForm, pricePerPage: parseFloat(e.target.value) || 0})}
+                      min="0"
+                      step="0.01"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Desconto (%)</label>
+                    <input
+                      type="number"
+                      value={quoteForm.discount}
+                      onChange={(e) => setQuoteForm({...quoteForm, discount: parseFloat(e.target.value) || 0})}
+                      min="0"
+                      max="100"
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Observações</label>
+                  <textarea
+                    value={quoteForm.notes}
+                    onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                    rows="2"
+                    placeholder="Observações adicionais para o orçamento..."
+                  />
+                </div>
+
+                {/* Quote Language Selection */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma do Orçamento</label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'en', label: '🇺🇸 English' },
+                      { value: 'pt', label: '🇧🇷 Português' },
+                      { value: 'es', label: '🇪🇸 Español' }
+                    ].map(lang => (
+                      <button
+                        key={lang.value}
+                        onClick={() => setQuoteLanguage(lang.value)}
+                        className={`px-3 py-1.5 text-xs rounded ${
+                          quoteLanguage === lang.value
+                            ? 'bg-teal-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview Button */}
+                <div className="pt-2">
+                  <button
+                    onClick={() => setShowQuotePreview(true)}
+                    className="w-full px-4 py-2 bg-teal-500 text-white rounded text-sm font-medium hover:bg-teal-600"
+                  >
+                    👁️ Visualizar Orçamento
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Summary Card */}
+            <div className="space-y-4">
+              {/* Price Summary */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3">📊 Resumo do Orçamento</h3>
+                {(() => {
+                  const prices = calculateQuote();
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">{quoteForm.pageCount} página(s) × ${quoteForm.pricePerPage.toFixed(2)}</span>
+                        <span className="font-medium">${prices.basePrice.toFixed(2)}</span>
+                      </div>
+                      {prices.urgencyFee > 0 && (
+                        <div className="flex justify-between text-sm text-orange-600">
+                          <span>Taxa de Urgência ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
+                          <span>+${prices.urgencyFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {prices.discountAmount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Desconto ({quoteForm.discount}%)</span>
+                          <span>-${prices.discountAmount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-2 mt-2">
+                        <div className="flex justify-between text-lg font-bold">
+                          <span>TOTAL</span>
+                          <span className="text-teal-600">${prices.total.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Recent Clients */}
+              <div className="bg-white rounded-lg shadow p-4">
+                <h3 className="text-sm font-bold text-gray-800 mb-3">👤 Clientes Recentes</h3>
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {orders.slice(0, 5).map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => setQuoteForm({
+                        ...quoteForm,
+                        clientName: order.client_name,
+                        clientEmail: order.client_email
+                      })}
+                      className="p-2 border rounded cursor-pointer hover:bg-teal-50 text-xs"
+                    >
+                      <div className="font-medium">{order.client_name}</div>
+                      <div className="text-gray-500">{order.client_email}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quote Preview Modal */}
+          {showQuotePreview && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+                {/* Quote Document */}
+                <div className="p-8" id="quote-preview">
+                  {(() => {
+                    const t = quoteTranslations[quoteLanguage];
+                    const prices = calculateQuote();
+                    const quoteNumber = `LT-${Date.now().toString().slice(-6)}`;
+                    const today = new Date().toLocaleDateString(quoteLanguage === 'pt' ? 'pt-BR' : quoteLanguage === 'es' ? 'es-ES' : 'en-US');
+                    const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(quoteLanguage === 'pt' ? 'pt-BR' : quoteLanguage === 'es' ? 'es-ES' : 'en-US');
+
+                    return (
+                      <>
+                        {/* Header with Logo */}
+                        <div className="text-center border-b pb-4 mb-6">
+                          <div className="text-3xl font-bold text-teal-600 mb-1">LEGACY</div>
+                          <div className="text-sm text-gray-500">{t.tagline}</div>
+                        </div>
+
+                        {/* Quote Title */}
+                        <div className="text-center mb-6">
+                          <h1 className="text-2xl font-bold text-gray-800">{t.title}</h1>
+                          <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+                            <div>
+                              <span className="text-gray-500">{t.quoteNumber}</span>
+                              <div className="font-bold text-teal-600">{quoteNumber}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.date}</span>
+                              <div className="font-medium">{today}</div>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.validUntil}</span>
+                              <div className="font-medium">{validUntil}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Client Info */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                          <h3 className="font-bold text-gray-700 mb-2">{t.clientInfo}</h3>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <span className="text-gray-500">{t.name}:</span>
+                              <span className="ml-2 font-medium">{quoteForm.clientName || '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">{t.email}:</span>
+                              <span className="ml-2 font-medium">{quoteForm.clientEmail || '-'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Service Details */}
+                        <div className="mb-6">
+                          <h3 className="font-bold text-gray-700 mb-3">{t.serviceDetails}</h3>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.documentType}:</span>
+                              <span className="font-medium">{DOCUMENT_TYPES.find(d => d.value === quoteForm.documentType)?.label || '-'}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.serviceType}:</span>
+                              <span className="font-medium">{quoteForm.serviceType === 'standard' ? t.certified : t.professional}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.sourceLanguage}:</span>
+                              <span className="font-medium">{quoteForm.sourceLanguage}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2">
+                              <span className="text-gray-500">{t.targetLanguage}:</span>
+                              <span className="font-medium">{quoteForm.targetLanguage}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-2 col-span-2">
+                              <span className="text-gray-500">{t.urgency}:</span>
+                              <span className="font-medium">
+                                {quoteForm.urgency === 'no' ? t.normal : quoteForm.urgency === 'priority' ? t.priority : t.urgent}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Pricing Table */}
+                        <div className="mb-6">
+                          <h3 className="font-bold text-gray-700 mb-3">{t.pricing}</h3>
+                          <table className="w-full text-sm">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.pages}</td>
+                                <td className="py-2 text-right">{quoteForm.pageCount}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.pricePerPage}</td>
+                                <td className="py-2 text-right">${quoteForm.pricePerPage.toFixed(2)}</td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 text-gray-600">{t.subtotal}</td>
+                                <td className="py-2 text-right">${prices.basePrice.toFixed(2)}</td>
+                              </tr>
+                              {prices.urgencyFee > 0 && (
+                                <tr className="border-b text-orange-600">
+                                  <td className="py-2">{t.urgencyFee}</td>
+                                  <td className="py-2 text-right">+${prices.urgencyFee.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              {prices.discountAmount > 0 && (
+                                <tr className="border-b text-green-600">
+                                  <td className="py-2">{t.discount} ({quoteForm.discount}%)</td>
+                                  <td className="py-2 text-right">-${prices.discountAmount.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              <tr className="bg-teal-50 font-bold text-lg">
+                                <td className="py-3 text-teal-700">{t.total}</td>
+                                <td className="py-3 text-right text-teal-700">${prices.total.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Notes */}
+                        {quoteForm.notes && (
+                          <div className="mb-6 bg-yellow-50 rounded-lg p-4">
+                            <h3 className="font-bold text-gray-700 mb-2">{t.notes}</h3>
+                            <p className="text-sm text-gray-600">{quoteForm.notes}</p>
+                          </div>
+                        )}
+
+                        {/* Terms */}
+                        <div className="mb-6 text-xs text-gray-500 border-t pt-4">
+                          <h4 className="font-bold mb-1">{t.terms}</h4>
+                          <p>{t.termsText}</p>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="text-center border-t pt-4">
+                          <p className="font-medium text-teal-600 mb-3 text-base">{t.thankYou}</p>
+                          <div className="bg-gray-50 rounded-lg p-4 inline-block">
+                            <p className="text-gray-700 font-medium mb-1">Legacy Translation Services</p>
+                            <p className="text-gray-600 text-sm">legacytranslations.com | {t.phone}: +1(857)316-7770</p>
+                            <p className="text-gray-600 text-sm">{t.website}: www.legacytranslation.com</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Modal Actions */}
+                <div className="border-t p-4 flex justify-between items-center bg-gray-50">
+                  <button
+                    onClick={() => setShowQuotePreview(false)}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                  >
+                    ← Voltar
+                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 flex items-center gap-1"
+                    >
+                      🖨️ Imprimir
+                    </button>
+                    <button
+                      onClick={sendQuoteEmail}
+                      disabled={sendingQuote || !quoteForm.clientEmail}
+                      className="px-4 py-2 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 disabled:bg-gray-400 flex items-center gap-1"
+                    >
+                      {sendingQuote ? '⏳ Enviando...' : '📧 Enviar por Email'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* REVIEW SECTION - Side by Side View */}
+      {activeSection === 'review' && (
+        <div className="space-y-4">
+          {!selectedReview ? (
+            /* Review Queue List */
+            <div className="bg-white rounded-lg shadow p-4">
+              <h3 className="text-sm font-bold text-gray-800 mb-3">📥 Fila de Revisão ({reviewQueue.length})</h3>
+              {reviewQueue.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">✅</div>
+                  <p>Nenhuma tradução aguardando revisão</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {reviewQueue.map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => loadReviewContent(order)}
+                      className="p-3 border rounded-lg hover:bg-teal-50 cursor-pointer transition-colors flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
+                        <div className="text-xs text-gray-500">{order.client_name}</div>
+                        <div className="text-[10px] text-gray-400">
+                          {order.translate_from} → {order.translate_to} • Tradutor: {order.assigned_translator || 'N/A'}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-600">
+                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                        </div>
+                        <button className="mt-1 px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600">
+                          Revisar →
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Side-by-Side Review View */
+            <div className="bg-white rounded-lg shadow">
+              {/* Review Header */}
+              <div className="p-4 border-b flex justify-between items-center">
+                <div>
+                  <button
+                    onClick={() => { setSelectedReview(null); setOriginalContent(null); setTranslatedContent(null); }}
+                    className="text-gray-500 hover:text-gray-700 text-sm mb-1"
+                  >
+                    ← Voltar para fila
+                  </button>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Revisão: {selectedReview.order_number}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Cliente: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={requestCorrection}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    ❌ Solicitar Correção
+                  </button>
+                  <button
+                    onClick={() => approveTranslation('client_review')}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    👁️ Review p/ Cliente
+                  </button>
+                  <button
+                    onClick={() => approveTranslation('ready')}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    ✅ Final p/ Cliente & Admin
+                  </button>
+                </div>
+              </div>
+
+              {/* Side by Side Content */}
+              <div className="grid grid-cols-2 divide-x" style={{ height: 'calc(100vh - 300px)' }}>
+                {/* Original Document */}
+                <div className="p-4 overflow-auto">
+                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
+                    📄 Documento Original
+                  </h4>
+                  {originalContent ? (
+                    originalContent.contentType?.includes('image') ? (
+                      <img
+                        src={`data:${originalContent.contentType};base64,${originalContent.data}`}
+                        alt="Original"
+                        className="max-w-full border rounded"
+                      />
+                    ) : originalContent.contentType?.includes('pdf') ? (
+                      <iframe
+                        src={`data:application/pdf;base64,${originalContent.data}`}
+                        className="w-full h-full border rounded"
+                        title="Original PDF"
+                      />
+                    ) : (
+                      <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
+                        {atob(originalContent.data)}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-2xl mb-2">📄</div>
+                      <p className="text-xs">Documento original não encontrado</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Translated Document */}
+                <div className="p-4 overflow-auto">
+                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
+                    ✍️ Tradução
+                  </h4>
+                  {translatedContent ? (
+                    translatedContent.html ? (
+                      <div
+                        className="border rounded p-4 bg-white"
+                        dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                      />
+                    ) : translatedContent.contentType?.includes('image') ? (
+                      <img
+                        src={`data:${translatedContent.contentType};base64,${translatedContent.data}`}
+                        alt="Translation"
+                        className="max-w-full border rounded"
+                      />
+                    ) : translatedContent.contentType?.includes('pdf') ? (
+                      <iframe
+                        src={`data:application/pdf;base64,${translatedContent.data}`}
+                        className="w-full h-full border rounded"
+                        title="Translation PDF"
+                      />
+                    ) : (
+                      <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
+                        {atob(translatedContent.data)}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-gray-400">
+                      <div className="text-2xl mb-2">✍️</div>
+                      <p className="text-xs">Tradução não encontrada</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Correction Notes */}
+              <div className="p-4 border-t bg-gray-50">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  📝 Notas de Correção (para enviar ao tradutor):
+                </label>
+                <textarea
+                  value={correctionNotes}
+                  onChange={(e) => setCorrectionNotes(e.target.value)}
+                  placeholder="Descreva as correções necessárias..."
+                  className="w-full p-2 border rounded text-xs h-20 resize-none"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TEAM SECTION */}
+      {activeSection === 'team' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">👥 Minha Equipe de Tradutores</h3>
+            <div className="grid grid-cols-3 gap-3">
+              {translators.map(translator => {
+                const translatorOrders = orders.filter(o =>
+                  o.assigned_translator_id === translator.id ||
+                  o.assigned_translator === translator.name
+                );
+                const activeOrders = translatorOrders.filter(o =>
+                  ['in_translation', 'review'].includes(o.translation_status)
+                );
+                const completedOrders = translatorOrders.filter(o =>
+                  ['ready', 'delivered'].includes(o.translation_status)
+                );
+                const isBusy = activeOrders.length > 0;
+
+                return (
+                  <div
+                    key={translator.id}
+                    className={`p-4 rounded-lg border-2 ${isBusy ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-2 ${isBusy ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                        <span className="font-medium text-sm">{translator.name}</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${isBusy ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white'}`}>
+                        {isBusy ? 'Ocupado' : 'Disponível'}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-gray-500 mb-2">{translator.email}</div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center mt-3">
+                      <div className="bg-white rounded p-2">
+                        <div className="text-lg font-bold text-yellow-600">{activeOrders.length}</div>
+                        <div className="text-[9px] text-gray-500">Em Andamento</div>
+                      </div>
+                      <div className="bg-white rounded p-2">
+                        <div className="text-lg font-bold text-green-600">{completedOrders.length}</div>
+                        <div className="text-[9px] text-gray-500">Concluídos</div>
+                      </div>
+                    </div>
+
+                    {activeOrders.length > 0 && (
+                      <div className="mt-3 pt-2 border-t">
+                        <div className="text-[10px] font-medium text-gray-600 mb-1">Projetos Ativos:</div>
+                        {activeOrders.slice(0, 3).map((order, idx) => (
+                          <div key={idx} className="flex justify-between text-[10px] py-0.5">
+                            <span className="text-blue-600 font-mono">{order.order_number}</span>
+                            <span className="text-gray-500">
+                              {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => { setSelectedTranslator(translator); setActiveSection('messages'); }}
+                      className="mt-3 w-full px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                    >
+                      💬 Enviar Mensagem
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CALENDAR SECTION */}
+      {activeSection === 'calendar' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📅 Agenda de Prazos</h3>
+            <div className="space-y-2">
+              {getUpcomingDeadlines().map(order => (
+                <div
+                  key={order.id}
+                  className={`p-3 rounded-lg border flex justify-between items-center ${
+                    order.daysLeft < 0 ? 'bg-red-50 border-red-200' :
+                    order.daysLeft <= 2 ? 'bg-orange-50 border-orange-200' :
+                    order.daysLeft <= 5 ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-green-50 border-green-200'
+                  }`}
+                >
+                  <div>
+                    <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
+                    <div className="text-xs text-gray-600">{order.client_name}</div>
+                    <div className="text-[10px] text-gray-500">
+                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'Sem tradutor'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-lg font-bold ${
+                      order.daysLeft < 0 ? 'text-red-600' :
+                      order.daysLeft <= 2 ? 'text-orange-600' :
+                      order.daysLeft <= 5 ? 'text-yellow-600' :
+                      'text-green-600'
+                    }`}>
+                      {order.daysLeft < 0
+                        ? `${Math.abs(order.daysLeft)} dias atrasado`
+                        : order.daysLeft === 0
+                        ? 'HOJE'
+                        : `${order.daysLeft} dias`
+                      }
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {order.deadlineDate.toLocaleDateString('pt-BR')}
+                    </div>
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
+                      {order.translation_status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {getUpcomingDeadlines().length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">📅</div>
+                  <p>Nenhum prazo pendente</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REPORTS SECTION */}
+      {activeSection === 'reports' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📈 Relatórios do PM</h3>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-blue-600">{stats.totalProjects}</div>
+                <div className="text-xs text-gray-600">Total de Projetos</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-green-600">
+                  {stats.totalProjects > 0 ? Math.round((stats.completed / stats.totalProjects) * 100) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Taxa de Conclusão</div>
+              </div>
+              <div className="bg-teal-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-teal-600">
+                  {stats.totalProjects > 0 ? Math.round((stats.onTime / stats.totalProjects) * 100) : 0}%
+                </div>
+                <div className="text-xs text-gray-600">Entregas no Prazo</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-purple-600">{translators.length}</div>
+                <div className="text-xs text-gray-600">Tradutores na Equipe</div>
+              </div>
+            </div>
+
+            {/* Status Distribution */}
+            <div className="mb-6">
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Distribuição por Status</h4>
+              <div className="flex h-6 rounded-lg overflow-hidden">
+                {[
+                  { status: 'received', color: 'bg-gray-400', count: orders.filter(o => o.translation_status === 'received').length },
+                  { status: 'in_translation', color: 'bg-yellow-500', count: stats.inProgress },
+                  { status: 'review', color: 'bg-purple-500', count: stats.awaitingReview },
+                  { status: 'ready', color: 'bg-green-500', count: orders.filter(o => o.translation_status === 'ready').length },
+                  { status: 'delivered', color: 'bg-teal-500', count: orders.filter(o => o.translation_status === 'delivered').length }
+                ].map(item => (
+                  item.count > 0 && (
+                    <div
+                      key={item.status}
+                      className={`${item.color} flex items-center justify-center text-white text-[10px]`}
+                      style={{ width: `${(item.count / stats.totalProjects) * 100}%` }}
+                      title={`${item.status}: ${item.count}`}
+                    >
+                      {item.count}
+                    </div>
+                  )
+                ))}
+              </div>
+              <div className="flex justify-between text-[9px] text-gray-500 mt-1">
+                <span>Recebido</span>
+                <span>Em Tradução</span>
+                <span>Revisão</span>
+                <span>Pronto</span>
+                <span>Entregue</span>
+              </div>
+            </div>
+
+            {/* Translator Performance */}
+            <div>
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Desempenho dos Tradutores</h4>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-gray-50">
+                    <th className="text-left py-2 px-2">Tradutor</th>
+                    <th className="text-center py-2 px-2">Ativos</th>
+                    <th className="text-center py-2 px-2">Concluídos</th>
+                    <th className="text-center py-2 px-2">No Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {translators.map(translator => {
+                    const tOrders = orders.filter(o =>
+                      o.assigned_translator_id === translator.id ||
+                      o.assigned_translator === translator.name
+                    );
+                    const active = tOrders.filter(o => ['in_translation', 'review'].includes(o.translation_status)).length;
+                    const completed = tOrders.filter(o => ['ready', 'delivered'].includes(o.translation_status)).length;
+                    const onTimeCount = tOrders.filter(o => {
+                      if (!o.deadline) return true;
+                      return new Date(o.deadline) >= new Date() || ['ready', 'delivered'].includes(o.translation_status);
+                    }).length;
+
+                    return (
+                      <tr key={translator.id} className="border-b hover:bg-gray-50">
+                        <td className="py-2 px-2">{translator.name}</td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded">{active}</span>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">{completed}</span>
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded">
+                            {tOrders.length > 0 ? Math.round((onTimeCount / tOrders.length) * 100) : 100}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MESSAGES SECTION */}
+      {activeSection === 'messages' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Tradutores</h3>
+
+            <div className="grid grid-cols-3 gap-4">
+              {/* Translator List */}
+              <div className="border rounded-lg p-3">
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
+                <div className="space-y-1">
+                  {translators.map(translator => (
+                    <button
+                      key={translator.id}
+                      onClick={() => setSelectedTranslator(translator)}
+                      className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                        selectedTranslator?.id === translator.id
+                          ? 'bg-teal-500 text-white'
+                          : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="font-medium">{translator.name}</div>
+                      <div className="text-[10px] opacity-70">{translator.email}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Message Area */}
+              <div className="col-span-2 border rounded-lg p-3">
+                {selectedTranslator ? (
+                  <>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">
+                      Conversa com {selectedTranslator.name}
+                    </h4>
+
+                    {/* Messages */}
+                    <div className="h-64 overflow-y-auto border rounded p-2 mb-2 bg-gray-50">
+                      {messages
+                        .filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name)
+                        .map(msg => (
+                          <div
+                            key={msg.id}
+                            className={`mb-2 p-2 rounded text-xs ${
+                              msg.from === user?.name
+                                ? 'bg-teal-100 ml-8'
+                                : 'bg-white mr-8 border'
+                            }`}
+                          >
+                            <div className="font-medium text-[10px] text-gray-500 mb-1">
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                            </div>
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                        ))}
+                      {messages.filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name).length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-xs">
+                          Nenhuma mensagem ainda
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Send Message */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Digite sua mensagem..."
+                        className="flex-1 px-3 py-2 border rounded text-xs"
+                      />
+                      <button
+                        onClick={sendMessage}
+                        className="px-4 py-2 bg-teal-500 text-white rounded text-xs hover:bg-teal-600"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">👈</div>
+                      <p className="text-xs">Selecione um tradutor para iniciar conversa</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
@@ -12675,6 +14066,8 @@ function AdminApp() {
     // Set default tab based on role
     if (userData.role === 'translator') {
       setActiveTab('translation');
+    } else if (userData.role === 'pm') {
+      setActiveTab('pm-dashboard');
     }
   };
 
@@ -12710,6 +14103,10 @@ function AdminApp() {
     const userRole = user?.role || 'admin';
 
     switch (activeTab) {
+      case 'pm-dashboard':
+        return userRole === 'admin'
+          ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
