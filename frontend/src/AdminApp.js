@@ -6,8 +6,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-const API = `${BACKEND_URL}/api`;
+const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
@@ -2075,7 +2074,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     try {
       // Save to backend (shared with all users)
-      await axios.post(`${BACKEND_URL}/api/admin/settings/api-key?admin_key=${adminKey}`, {
+      await axios.post(`${API}/admin/settings/api-key?admin_key=${adminKey}`, {
         api_key: claudeApiKey
       });
 
@@ -2094,7 +2093,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const loadSharedApiKey = async () => {
     try {
       // First try to get from backend
-      const response = await axios.get(`${BACKEND_URL}/api/settings/api-key/use?token=${adminKey}`);
+      const response = await axios.get(`${API}/settings/api-key/use?token=${adminKey}`);
       if (response.data?.api_key) {
         setClaudeApiKey(response.data.api_key);
         localStorage.setItem('claude_api_key', response.data.api_key);
@@ -9289,8 +9288,8 @@ const SettingsPage = ({ adminKey }) => {
           <h2 className="text-sm font-bold text-gray-800 mb-3">API Configuration</h2>
           <div className="space-y-2 text-xs">
             <div>
-              <label className="block text-gray-500 mb-1">Backend URL</label>
-              <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={BACKEND_URL} readOnly />
+              <label className="block text-gray-500 mb-1">API URL</label>
+              <input type="text" className="w-full px-2 py-1.5 border rounded bg-gray-50" value={API} readOnly />
             </div>
             <div>
               <label className="block text-gray-500 mb-1">Admin Key</label>
