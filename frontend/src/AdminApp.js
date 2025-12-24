@@ -5710,24 +5710,139 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* Download Button */}
-              <button
-                onClick={handleQuickPackageDownload}
-                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {quickPackageLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Generating...
-                  </>
-                ) : (
-                  '📦 Generate Complete Package (Print/PDF)'
+              {/* Approval Checklist - Same as Normal Flow */}
+              <div className={`p-4 rounded mb-4 ${
+                isApprovalComplete
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-purple-50 border-2 border-purple-300'
+              }`}>
+                <h3 className="text-sm font-bold text-purple-700 mb-1">
+                  📋 Translation Approval Checklist <span className="text-red-500">*</span>
+                </h3>
+                <p className="text-[10px] text-purple-600 mb-3">⚠️ All items must be checked before sending</p>
+                <div className="space-y-2">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.projectNumber}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you include the correct project number?</span>
+                    {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.languageCorrect ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.languageCorrect}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Is the source and target language correct?</span>
+                    {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.proofread ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.proofread}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you proofread the entire document carefully?</span>
+                    {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                </div>
+                {!isApprovalComplete && (
+                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                    ⚠️ Complete all checklist items to enable sending
+                  </p>
                 )}
-              </button>
-              <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Opens print window - save as PDF
-              </p>
+                {isApprovalComplete && (
+                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                    ✅ All checks completed - Ready to download and send!
+                  </p>
+                )}
+              </div>
+
+              {/* Download Button */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-2">📥 Step 1: Download & Save as PDF</h3>
+                <p className="text-[10px] text-blue-600 mb-3">Generate the package, then use Print → Save as PDF</p>
+                <button
+                  onClick={handleQuickPackageDownload}
+                  disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading || !isApprovalComplete}
+                  className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {quickPackageLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    '📦 Generate Complete Package (Print/PDF)'
+                  )}
+                </button>
+                {!isApprovalComplete && (
+                  <p className="text-[10px] text-red-500 mt-2 text-center">
+                    ⚠️ Complete the checklist above to enable download
+                  </p>
+                )}
+              </div>
+
+              {/* Send to PM/Admin */}
+              <div className={`p-4 rounded mb-4 ${
+                isApprovalComplete && documentType.trim()
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <h3 className="text-sm font-bold text-green-700 mb-2">📤 Step 2: Send to PM/Admin for Review</h3>
+                <p className="text-[10px] text-gray-600 mb-3">After saving the PDF, send this translation for final review and delivery.</p>
+
+                {/* Validation warnings */}
+                {(!isApprovalComplete || !documentType.trim()) && (
+                  <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                    <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                      {!documentType.trim() && <li>Fill in "Translation of" field (Document Type)</li>}
+                      {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex space-x-2">
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => setSelectedOrderId(e.target.value)}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option value="">-- Select Project --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_number} - {order.client_name} ({order.translation_status})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={sendToProjects}
+                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                    className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                  </button>
+                </div>
+                {availableOrders.length === 0 && (
+                  <p className="text-[10px] text-yellow-600 mt-2">No projects available. Ask your PM to assign a project first.</p>
+                )}
+                {isApprovalComplete && documentType.trim() && selectedOrderId && (
+                  <p className="text-[10px] text-green-600 mt-2">✅ Ready to send! Click "Send to PM" when your PDF is saved.</p>
+                )}
+              </div>
             </>
           )}
 
