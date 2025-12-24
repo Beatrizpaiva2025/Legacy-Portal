@@ -5724,6 +5724,104 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
+              {/* Approval Checklist for Quick Package - Required before submitting */}
+              <div className={`p-4 rounded mb-4 ${
+                isApprovalComplete
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-purple-50 border-2 border-purple-300'
+              }`}>
+                <h3 className="text-sm font-bold text-purple-700 mb-1">
+                  📋 Translation Checklist <span className="text-red-500">*</span>
+                </h3>
+                <p className="text-[10px] text-purple-600 mb-3">⚠️ Complete all items before submitting</p>
+                <div className="space-y-2">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.projectNumber}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you include the correct project number?</span>
+                    {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.languageCorrect ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.languageCorrect}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Is the source and target language correct?</span>
+                    {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.proofread ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.proofread}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you proofread the entire document carefully?</span>
+                    {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                </div>
+                {!isApprovalComplete && (
+                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                    ⚠️ Complete all checklist items to enable submission
+                  </p>
+                )}
+                {isApprovalComplete && (
+                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                    ✅ All checks completed - Ready to submit!
+                  </p>
+                )}
+              </div>
+
+              {/* Submit for Review - For Translators */}
+              {user?.role === 'translator' && (
+                <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-teal-700 mb-2">📤 Submit for Review</h3>
+                  <p className="text-[10px] text-teal-600 mb-3">Send your translation to Admin/PM for review and approval</p>
+
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="">-- Select Order --</option>
+                      {availableOrders.map(order => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number} - {order.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={() => sendToProjects('review')}
+                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="w-full py-2 bg-teal-600 text-white text-sm font-bold rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Submit for Admin/PM Review'}
+                  </button>
+
+                  {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                    <p className="text-[10px] text-orange-600 mt-2">
+                      ⚠️ Fill document type and upload translation first
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Download Button */}
               <button
                 onClick={handleQuickPackageDownload}
