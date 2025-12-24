@@ -501,6 +501,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'review', label: 'Review', icon: '📥', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
@@ -1975,7 +1976,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    if (translationResults.length === 0) {
+    // Check if we have content (either normal flow or Quick Package)
+    const hasNormalContent = translationResults.length > 0;
+    const hasQuickPackageContent = quickTranslationHtml || quickTranslationFiles.length > 0;
+
+    if (!hasNormalContent && !hasQuickPackageContent) {
       alert('No translation to send');
       return;
     }
@@ -1984,13 +1989,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
-      const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
-      const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
-      // Build translation HTML (simplified for storage)
-      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      // Build translation HTML
+      let translationHTML = '';
+      if (quickPackageMode && (quickTranslationHtml || quickTranslationFiles.length > 0)) {
+        // Quick Package mode
+        translationHTML = quickTranslationHtml || '<p>See attached file(s)</p>';
+      } else {
+        // Normal flow
+        translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      }
 
-      // Send to backend
+      // Create submission for PM/Admin review
+      const formData = new FormData();
+      formData.append('token', user?.token || adminKey);
+      formData.append('order_id', selectedOrderId);
+      formData.append('translation_html', translationHTML);
+      formData.append('notes', `Document Type: ${documentType}\nTranslator: ${translator?.name || selectedTranslator}\nDate: ${translationDate}`);
+
+      // Submit for review
+      const submitResponse = await axios.post(`${API}/admin/translations/submit`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      // Also update the order with translation data
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
         translation_html: translationHTML,
         source_language: sourceLanguage,
@@ -2007,8 +2029,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_stamp: logoStamp
       });
 
-      if (response.data.status === 'success' || response.data.success) {
-        setProcessingStatus('✅ Translation sent to Projects! Returning to Projects...');
+      if ((response.data.status === 'success' || response.data.success) && submitResponse.data.status === 'success') {
+        setProcessingStatus('✅ Translation sent for PM/Admin review! Returning to Projects...');
         setSelectedOrderId('');
 
         // Navigate back to Projects after a short delay
@@ -8885,6 +8907,451 @@ const TranslatorsPage = ({ adminKey }) => {
   );
 };
 
+// ==================== REVIEW PAGE - PM/Admin Translation Review & Security ====================
+const ReviewPage = ({ adminKey, user }) => {
+  const [activeSubTab, setActiveSubTab] = useState('pending');
+  const [pendingSubmissions, setPendingSubmissions] = useState([]);
+  const [loginAttempts, setLoginAttempts] = useState([]);
+  const [suspiciousUsers, setSuspiciousUsers] = useState([]);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [selectedUserIpHistory, setSelectedUserIpHistory] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Fetch pending submissions
+  const fetchPendingSubmissions = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/translations/pending-review?admin_key=${adminKey}`);
+      setPendingSubmissions(response.data.submissions || []);
+    } catch (error) {
+      console.error('Error fetching pending submissions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch login attempts
+  const fetchLoginAttempts = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/login-attempts?admin_key=${adminKey}&limit=100`);
+      setLoginAttempts(response.data.attempts || []);
+    } catch (error) {
+      console.error('Error fetching login attempts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch suspicious users
+  const fetchSuspiciousUsers = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/security/suspicious-users?admin_key=${adminKey}`);
+      setSuspiciousUsers(response.data.suspicious_users || []);
+    } catch (error) {
+      console.error('Error fetching suspicious users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch user IP history
+  const fetchUserIpHistory = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/ip-history?admin_key=${adminKey}`);
+      setSelectedUserIpHistory(response.data);
+    } catch (error) {
+      console.error('Error fetching IP history:', error);
+    }
+  };
+
+  // Get submission details
+  const viewSubmission = async (submissionId) => {
+    try {
+      const response = await axios.get(`${API}/admin/translations/submission/${submissionId}?admin_key=${adminKey}`);
+      setSelectedSubmission(response.data);
+    } catch (error) {
+      console.error('Error fetching submission:', error);
+    }
+  };
+
+  // Approve submission
+  const approveSubmission = async (submissionId) => {
+    setActionLoading(true);
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/approve?admin_key=${adminKey}`);
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      alert('Submission approved!');
+    } catch (error) {
+      console.error('Error approving submission:', error);
+      alert('Failed to approve submission');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Request revision
+  const requestRevision = async (submissionId) => {
+    const reason = prompt('Enter reason for revision request:');
+    if (!reason) return;
+
+    setActionLoading(true);
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/request-revision?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      alert('Revision requested!');
+    } catch (error) {
+      console.error('Error requesting revision:', error);
+      alert('Failed to request revision');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'pending') fetchPendingSubmissions();
+    else if (activeSubTab === 'security') {
+      fetchLoginAttempts();
+      fetchSuspiciousUsers();
+    }
+  }, [activeSubTab]);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-bold text-blue-600 mb-4">📥 REVIEW CENTER</h1>
+
+      {/* Sub-tabs */}
+      <div className="flex space-x-1 mb-4 border-b">
+        {[
+          { id: 'pending', label: 'Pending Translations', icon: '📄', count: pendingSubmissions.length },
+          { id: 'security', label: 'Security & IP', icon: '🔒' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-4 py-2 text-xs font-medium rounded-t flex items-center ${
+              activeSubTab === tab.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {tab.icon} {tab.label}
+            {tab.count > 0 && (
+              <span className="ml-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-[10px]">{tab.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* PENDING TRANSLATIONS */}
+      {activeSubTab === 'pending' && (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="text-center py-8 text-gray-500">Loading...</div>
+          ) : pendingSubmissions.length === 0 ? (
+            <div className="text-center py-8 text-gray-400">
+              <div className="text-4xl mb-2">📭</div>
+              <div className="text-sm">No translations pending review</div>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {pendingSubmissions.map(sub => (
+                <div key={sub.submission_id} className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-400">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-sm text-blue-700">{sub.order_number || 'No Order'}</div>
+                      <div className="text-xs text-gray-600">{sub.client_name}</div>
+                      <div className="text-[10px] text-gray-500 mt-1">
+                        Translator: <span className="font-medium">{sub.translator_name}</span> ({sub.translator_email})
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        Submitted: {new Date(sub.submitted_at).toLocaleString('pt-BR')}
+                      </div>
+                      <div className="text-[10px] text-gray-400">IP: {sub.ip_address}</div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => viewSubmission(sub.submission_id)}
+                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                      >
+                        👁️ View
+                      </button>
+                      <button
+                        onClick={() => approveSubmission(sub.submission_id)}
+                        disabled={actionLoading}
+                        className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300"
+                      >
+                        ✅ Approve
+                      </button>
+                      <button
+                        onClick={() => requestRevision(sub.submission_id)}
+                        disabled={actionLoading}
+                        className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-300"
+                      >
+                        ✏️ Revision
+                      </button>
+                    </div>
+                  </div>
+                  {sub.notes && (
+                    <div className="mt-2 p-2 bg-gray-50 rounded text-[10px] text-gray-600">
+                      <strong>Notes:</strong> {sub.notes}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Submission Detail Modal */}
+          {selectedSubmission && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] overflow-auto">
+                <div className="p-4 border-b flex items-center justify-between bg-blue-600 text-white rounded-t-lg">
+                  <h3 className="font-bold">Translation Submission Details</h3>
+                  <button onClick={() => setSelectedSubmission(null)} className="text-white hover:text-gray-200">✕</button>
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Order Info */}
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <strong>Order:</strong> {selectedSubmission.order_info?.order_number}
+                    </div>
+                    <div>
+                      <strong>Client:</strong> {selectedSubmission.order_info?.client_name}
+                    </div>
+                    <div>
+                      <strong>Languages:</strong> {selectedSubmission.order_info?.translate_from} → {selectedSubmission.order_info?.translate_to}
+                    </div>
+                    <div>
+                      <strong>Translator:</strong> {selectedSubmission.translator_name}
+                    </div>
+                  </div>
+
+                  {/* Translation HTML */}
+                  {selectedSubmission.translation_html && (
+                    <div className="border rounded p-4 max-h-96 overflow-auto">
+                      <h4 className="text-xs font-bold mb-2 text-gray-700">Translation Content:</h4>
+                      <div
+                        className="prose prose-sm max-w-none text-xs"
+                        dangerouslySetInnerHTML={{ __html: selectedSubmission.translation_html }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex justify-end space-x-3 pt-4 border-t">
+                    <button
+                      onClick={() => setSelectedSubmission(null)}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => requestRevision(selectedSubmission.id)}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 disabled:bg-gray-300"
+                    >
+                      ✏️ Request Revision
+                    </button>
+                    <button
+                      onClick={() => approveSubmission(selectedSubmission.id)}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300"
+                    >
+                      ✅ Approve & Send to Client
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SECURITY & IP TRACKING */}
+      {activeSubTab === 'security' && (
+        <div className="space-y-6">
+          {/* Suspicious Users Alert */}
+          {suspiciousUsers.length > 0 && (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+              <h3 className="text-sm font-bold text-red-700 mb-2">⚠️ Suspicious Activity Detected</h3>
+              <p className="text-[10px] text-red-600 mb-3">These users have logged in from multiple different IP addresses (possible link sharing)</p>
+              <div className="space-y-2">
+                {suspiciousUsers.map(u => (
+                  <div key={u.user_id} className="bg-white p-3 rounded border border-red-200">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-bold text-sm text-red-700">{u.name}</div>
+                        <div className="text-xs text-gray-600">{u.email}</div>
+                        <div className="text-[10px] text-red-600 mt-1">
+                          {u.unique_ip_count} different IPs detected
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => fetchUserIpHistory(u.user_id)}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                      >
+                        View IPs
+                      </button>
+                    </div>
+                    <div className="mt-2 text-[9px] text-gray-500 flex flex-wrap gap-1">
+                      {u.unique_ips.slice(0, 5).map((ip, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-gray-100 rounded">{ip}</span>
+                      ))}
+                      {u.unique_ips.length > 5 && <span className="text-gray-400">+{u.unique_ips.length - 5} more</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent Login Attempts */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-3 border-b bg-gray-50">
+              <h3 className="text-sm font-bold text-gray-700">🔐 Recent Login Attempts</h3>
+            </div>
+            <div className="max-h-96 overflow-auto">
+              {loading ? (
+                <div className="p-4 text-center text-gray-500 text-xs">Loading...</div>
+              ) : loginAttempts.length === 0 ? (
+                <div className="p-4 text-center text-gray-400 text-xs">No login attempts recorded</div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Time</th>
+                      <th className="px-3 py-2 text-left">User</th>
+                      <th className="px-3 py-2 text-left">IP Address</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {loginAttempts.map((attempt, idx) => (
+                      <tr key={idx} className={attempt.success ? '' : 'bg-red-50'}>
+                        <td className="px-3 py-2 text-gray-600">{new Date(attempt.timestamp).toLocaleString('pt-BR')}</td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium">{attempt.user_name || attempt.email}</div>
+                          <div className="text-[10px] text-gray-400">{attempt.role}</div>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[10px]">{attempt.ip_address}</td>
+                        <td className="px-3 py-2">
+                          {attempt.success ? (
+                            <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Success</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded text-[10px]">Failed: {attempt.reason}</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {attempt.user_id && (
+                            <button
+                              onClick={() => fetchUserIpHistory(attempt.user_id)}
+                              className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200"
+                            >
+                              View IP History
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* IP History Modal */}
+          {selectedUserIpHistory && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[80vh] overflow-auto">
+                <div className="p-4 border-b flex items-center justify-between bg-blue-600 text-white rounded-t-lg">
+                  <div>
+                    <h3 className="font-bold">IP History: {selectedUserIpHistory.user_name}</h3>
+                    <div className="text-xs opacity-80">{selectedUserIpHistory.user_email}</div>
+                  </div>
+                  <button onClick={() => setSelectedUserIpHistory(null)} className="text-white hover:text-gray-200 text-xl">✕</button>
+                </div>
+                <div className="p-4">
+                  {/* Summary */}
+                  <div className={`p-3 rounded mb-4 ${selectedUserIpHistory.suspicious ? 'bg-red-50 border border-red-200' : 'bg-green-50 border border-green-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-bold">{selectedUserIpHistory.unique_ip_count}</span>
+                        <span className="text-xs text-gray-600 ml-1">unique IPs</span>
+                      </div>
+                      {selectedUserIpHistory.suspicious ? (
+                        <span className="px-2 py-1 bg-red-500 text-white text-xs rounded">⚠️ Suspicious</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded">✓ Normal</span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-[10px] text-gray-600">
+                      Last login: {selectedUserIpHistory.last_login_ip} on{' '}
+                      {selectedUserIpHistory.last_login_at ? new Date(selectedUserIpHistory.last_login_at).toLocaleString('pt-BR') : 'N/A'}
+                    </div>
+                  </div>
+
+                  {/* Unique IPs */}
+                  <div className="mb-4">
+                    <h4 className="text-xs font-bold text-gray-700 mb-2">Unique IP Addresses:</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedUserIpHistory.unique_ips.map((ip, i) => (
+                        <span key={i} className="px-2 py-1 bg-gray-100 rounded text-xs font-mono">{ip}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Login History */}
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-700 mb-2">Login History (last 50):</h4>
+                    <div className="max-h-64 overflow-auto border rounded">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-100 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Time</th>
+                            <th className="px-3 py-2 text-left">IP Address</th>
+                            <th className="px-3 py-2 text-left">Device</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {(selectedUserIpHistory.ip_history || []).slice().reverse().map((record, idx) => (
+                            <tr key={idx}>
+                              <td className="px-3 py-2 text-gray-600">
+                                {record.timestamp ? new Date(record.timestamp).toLocaleString('pt-BR') : 'N/A'}
+                              </td>
+                              <td className="px-3 py-2 font-mono">{record.ip_address}</td>
+                              <td className="px-3 py-2 text-[10px] text-gray-500 max-w-xs truncate" title={record.user_agent}>
+                                {record.user_agent?.substring(0, 50)}...
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t flex justify-end">
+                  <button
+                    onClick={() => setSelectedUserIpHistory(null)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
   const [exporting, setExporting] = useState(false);
@@ -11789,6 +12256,10 @@ function AdminApp() {
       case 'users':
         return ['admin', 'pm'].includes(userRole)
           ? <UsersPage adminKey={adminKey} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'review':
+        return ['admin', 'pm'].includes(userRole)
+          ? <ReviewPage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
