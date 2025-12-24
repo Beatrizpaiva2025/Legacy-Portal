@@ -650,6 +650,13 @@ class EmailNotificationRequest(BaseModel):
     partner_email: EmailStr
     send_to_company: bool = True
 
+class SupportRequest(BaseModel):
+    issue_type: str
+    description: str
+    customer_email: Optional[str] = "Not provided"
+    customer_name: Optional[str] = "Not provided"
+    files_count: int = 0
+
 # Partner Models
 class Partner(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2046,6 +2053,82 @@ async def send_email_notification(request: EmailNotificationRequest, background_
     except Exception as e:
         logger.error(f"Error sending email notification: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send email notification")
+
+# Support request endpoint
+@api_router.post("/send-support-request")
+async def send_support_request(request: SupportRequest):
+    """Send support request email to contact@legacytranslations.com"""
+    try:
+        # Map issue types to readable names
+        issue_type_labels = {
+            "translation": "Translation Problem",
+            "payment": "Payment Issue",
+            "upload": "Document Upload Problem",
+            "delivery": "Delivery Delay",
+            "quote": "Quote/Pricing Question",
+            "technical": "Technical Issue",
+            "other": "Other"
+        }
+
+        issue_label = issue_type_labels.get(request.issue_type, request.issue_type)
+
+        # Build email content
+        subject = f"Customer Support Request: {issue_label}"
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0d9488; border-bottom: 2px solid #0d9488; padding-bottom: 10px;">
+                Customer Support Request
+            </h2>
+
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Issue Type:</strong> {issue_label}</p>
+                <p><strong>Customer Name:</strong> {request.customer_name}</p>
+                <p><strong>Customer Email:</strong> {request.customer_email}</p>
+                <p><strong>Attachments:</strong> {request.files_count} file(s)</p>
+            </div>
+
+            <div style="background: #fff; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px;">
+                <h3 style="color: #374151; margin-top: 0;">Description:</h3>
+                <p style="white-space: pre-wrap; color: #4b5563;">{request.description}</p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+            <p style="color: #9ca3af; font-size: 12px;">
+                This support request was submitted from the Legacy Translations Customer Portal.
+            </p>
+        </div>
+        """
+
+        # Send email to support
+        await email_service.send_email(
+            to="contact@legacytranslations.com",
+            subject=subject,
+            content=html_content,
+            content_type="html"
+        )
+
+        # Also save to database for tracking
+        support_ticket = {
+            "id": str(uuid.uuid4()),
+            "issue_type": request.issue_type,
+            "description": request.description,
+            "customer_email": request.customer_email,
+            "customer_name": request.customer_name,
+            "files_count": request.files_count,
+            "status": "new",
+            "created_at": datetime.utcnow()
+        }
+        await db.support_tickets.insert_one(support_ticket)
+
+        logger.info(f"Support request received from {request.customer_email}: {issue_label}")
+
+        return {"status": "success", "message": "Support request sent successfully"}
+
+    except Exception as e:
+        logger.error(f"Error sending support request: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send support request")
 
 # ==================== PARTNER AUTHENTICATION ====================
 
