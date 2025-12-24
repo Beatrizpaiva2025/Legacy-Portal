@@ -2029,16 +2029,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
-        send_to: destination // 'pm' or 'admin'
+        send_to: destination, // 'pm', 'admin', or 'review'
+        submitted_by: user?.name || 'Unknown',
+        submitted_by_role: user?.role || 'unknown'
       });
 
-      const destinationLabel = destination === 'pm' ? 'PM' : 'Admin';
+      const destinationLabel = destination === 'pm' ? 'PM' : destination === 'review' ? 'Admin/PM for Review' : 'Admin';
       if (response.data.status === 'success' || response.data.success) {
         // Check if user is a translator (they can't access Projects page)
         const isTranslator = user?.role === 'translator';
 
         if (isTranslator) {
-          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! You can start a new translation.`);
+          setProcessingStatus(`✅ Translation submitted for review! Admin/PM will review and send to client.`);
         } else {
           setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
         }
@@ -6045,22 +6047,32 @@ tradução juramentada | certified translation`}
                     ))}
                   </select>
                   <div className="flex space-x-2">
-                    <button
-                      onClick={() => sendToProjects('pm')}
-                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                      className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                    </button>
-                    {/* Only show "Send to Admin" for non-translators */}
-                    {user?.role !== 'translator' && (
+                    {/* Translator: Submit for Review button */}
+                    {user?.role === 'translator' ? (
                       <button
-                        onClick={() => sendToProjects('admin')}
+                        onClick={() => sendToProjects('review')}
                         disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        className="flex-1 px-4 py-2 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                       >
-                        {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                        {sendingToProjects ? '⏳ Sending...' : '📤 Submit for Review (Admin/PM)'}
                       </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => sendToProjects('pm')}
+                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                          className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                        </button>
+                        <button
+                          onClick={() => sendToProjects('admin')}
+                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>

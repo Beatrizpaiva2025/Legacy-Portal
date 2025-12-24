@@ -5111,7 +5111,9 @@ class TranslationData(BaseModel):
     logo_left: Optional[str] = None
     logo_right: Optional[str] = None
     logo_stamp: Optional[str] = None
-    send_to: str = "admin"  # 'pm' or 'admin'
+    send_to: str = "admin"  # 'pm', 'admin', or 'review'
+    submitted_by: Optional[str] = None
+    submitted_by_role: Optional[str] = None
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
@@ -5137,6 +5139,9 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     if destination == "pm":
         new_status = "pending_pm_review"
         status_message = "Translation saved and sent to PM for review"
+    elif destination == "review":
+        new_status = "pending_review"
+        status_message = "Translation submitted for Admin/PM review"
     else:
         new_status = "review"
         status_message = "Translation saved and sent to Admin for review"
@@ -5162,7 +5167,8 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_sent_to": destination,
             "translation_ready": True,
             "translation_ready_at": datetime.utcnow().isoformat(),
-            "translation_submitted_by": current_user.get("name") if current_user else "Admin"
+            "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
+            "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin")
         }}
     )
 
