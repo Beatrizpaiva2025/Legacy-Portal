@@ -9744,7 +9744,11 @@ const ReviewPage = ({ adminKey, user }) => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <h1 className="text-lg font-bold text-gray-800">👁️ Painel de Revisão</h1>
-        <p className="text-xs text-gray-500">Revisar traduções enviadas pelos tradutores e monitorar segurança</p>
+        <p className="text-xs text-gray-500">
+          {isAdmin
+            ? 'Revisar traduções enviadas pelos tradutores e monitorar segurança'
+            : 'Revisar traduções enviadas pelos tradutores'}
+        </p>
       </div>
 
       {/* Tab navigation */}
@@ -12218,30 +12222,32 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               <div className="space-y-3">
                 {/* Ethics Guidelines - Translator only */}
                 {isTranslator && (
-                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
-                  <strong>Translator Ethics Guidelines (ATA Standards)</strong>
-                  <ul className="list-disc ml-4 mt-2 space-y-1">
-                    <li>Maintain strict confidentiality of all client documents and information</li>
-                    <li>Provide accurate and faithful translations without additions or omissions</li>
-                    <li>Only accept work within your area of competence and language expertise</li>
-                    <li>Disclose any conflicts of interest before accepting assignments</li>
-                    <li>Meet agreed deadlines and communicate promptly about any delays</li>
-                    <li>Respect intellectual property rights and copyright laws</li>
-                    <li>Maintain professional development and stay current in your field</li>
-                    <li>Never use client materials for personal gain or share with third parties</li>
-                  </ul>
-                </div>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={acceptedEthics}
-                    onChange={(e) => setAcceptedEthics(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span className="text-xs text-gray-700">
-                    I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
-                  </span>
-                </label>
+                  <>
+                    <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                      <strong>Translator Ethics Guidelines (ATA Standards)</strong>
+                      <ul className="list-disc ml-4 mt-2 space-y-1">
+                        <li>Maintain strict confidentiality of all client documents and information</li>
+                        <li>Provide accurate and faithful translations without additions or omissions</li>
+                        <li>Only accept work within your area of competence and language expertise</li>
+                        <li>Disclose any conflicts of interest before accepting assignments</li>
+                        <li>Meet agreed deadlines and communicate promptly about any delays</li>
+                        <li>Respect intellectual property rights and copyright laws</li>
+                        <li>Maintain professional development and stay current in your field</li>
+                        <li>Never use client materials for personal gain or share with third parties</li>
+                      </ul>
+                    </div>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={acceptedEthics}
+                        onChange={(e) => setAcceptedEthics(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span className="text-xs text-gray-700">
+                        I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
+                      </span>
+                    </label>
+                  </>
                 )}
 
                 {/* Terms and Conditions */}
@@ -12269,8 +12275,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 </label>
 
                 {/* Prohibited Use Clause */}
-                <div className="bg-red-50 p-3 rounded border border-red-200 text-xs text-gray-700 max-h-32 overflow-y-auto">
-                  <strong className="text-red-700">Prohibited Use Clause</strong>
+                <div className="bg-red-50 p-3 rounded border border-red-200 text-xs text-gray-700 max-h-48 overflow-y-auto">
+                  <strong className="text-red-700">Prohibited Use Clause / Cláusula de Uso Proibido</strong>
                   <p className="mt-2">
                     It is expressly <strong>PROHIBITED</strong> to use the Legacy Translations platform, its tools,
                     templates, and any company resources for any purposes other than those directly related to
@@ -12283,6 +12289,19 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <li>Using the platform to conduct business outside of Legacy Translations</li>
                     <li>Unauthorized access or sharing of client information</li>
                   </ul>
+                  <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded">
+                    <strong className="text-red-800">⚠️ IMMEDIATE TERMINATION CLAUSE / CLÁUSULA DE DESLIGAMENTO IMEDIATO:</strong>
+                    <p className="mt-1 text-red-800">
+                      If any unauthorized use of the platform is detected, the contractor will be <strong>IMMEDIATELY TERMINATED</strong> without
+                      prior notice or any notice period requirement. Legacy Translations reserves the right to pursue legal action for any
+                      damages or losses resulting from such violations.
+                    </p>
+                    <p className="mt-1 text-red-800">
+                      <em>Se for detectado qualquer uso não autorizado da plataforma, o contratado será <strong>IMEDIATAMENTE DESLIGADO</strong> sem
+                      aviso prévio ou necessidade de cumprimento de prazo para desligamento. A Legacy Translations reserva-se o direito de
+                      tomar medidas legais por quaisquer danos ou perdas resultantes de tais violações.</em>
+                    </p>
+                  </div>
                   <p className="mt-2 font-medium text-red-700">
                     All rights reserved. © {new Date().getFullYear()} Legacy Translations LLC - legacytranslations.com
                   </p>
@@ -12295,7 +12314,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     className="mt-1"
                   />
                   <span className="text-xs text-gray-700">
-                    I understand and accept the Prohibited Use Clause. I agree not to use Legacy Translations resources for unauthorized purposes. *
+                    I understand and accept the Prohibited Use Clause, including the Immediate Termination Clause. I acknowledge that unauthorized
+                    use of the platform will result in immediate termination without notice. *
                   </span>
                 </label>
               </div>
