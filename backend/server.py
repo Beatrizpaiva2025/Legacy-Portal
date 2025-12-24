@@ -7274,6 +7274,89 @@ async def create_guest_order(order_data: GuestOrderCreate):
         raise HTTPException(status_code=500, detail="Failed to create order")
 
 
+# ============ SHARED API KEY MANAGEMENT ============
+# Allows admin to set a shared Claude API key that all translators can use
+
+@api_router.get("/admin/settings/api-key")
+async def get_shared_api_key(admin_key: str):
+    """Get the shared Claude API key (masked for security)"""
+    await validate_admin_or_user_token(admin_key)
+
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    if settings and settings.get("value"):
+        # Return masked key for display (show only last 8 chars)
+        full_key = settings["value"]
+        masked = "*" * (len(full_key) - 8) + full_key[-8:] if len(full_key) > 8 else "****"
+        return {
+            "configured": True,
+            "masked_key": masked,
+            "updated_at": settings.get("updated_at")
+        }
+    return {"configured": False, "masked_key": None}
+
+@api_router.post("/admin/settings/api-key")
+async def save_shared_api_key(admin_key: str, api_key: str = Body(..., embed=True)):
+    """Save a shared Claude API key for all users"""
+    await validate_admin_or_user_token(admin_key)
+
+    # Validate key format (basic check)
+    if not api_key or not api_key.startswith("sk-"):
+        raise HTTPException(status_code=400, detail="Invalid API key format")
+
+    await db.app_settings.update_one(
+        {"key": "shared_claude_api_key"},
+        {
+            "$set": {
+                "key": "shared_claude_api_key",
+                "value": api_key,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        },
+        upsert=True
+    )
+
+    logger.info("Shared Claude API key updated")
+    return {"status": "success", "message": "API key saved successfully"}
+
+@api_router.delete("/admin/settings/api-key")
+async def delete_shared_api_key(admin_key: str):
+    """Remove the shared Claude API key"""
+    await validate_admin_or_user_token(admin_key)
+
+    await db.app_settings.delete_one({"key": "shared_claude_api_key"})
+    logger.info("Shared Claude API key deleted")
+    return {"status": "success", "message": "API key removed"}
+
+@api_router.get("/settings/api-key/check")
+async def check_shared_api_key_available():
+    """Public endpoint to check if a shared API key is configured (for translators)"""
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    return {"available": bool(settings and settings.get("value"))}
+
+@api_router.get("/settings/api-key/use")
+async def get_api_key_for_translation(token: str = None):
+    """Get the actual API key for translation (requires authentication)"""
+    # Validate that user is authenticated (either admin or partner/translator)
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Check if token is valid (either admin token or partner token)
+    try:
+        # Try admin token first
+        await validate_admin_or_user_token(token)
+    except:
+        # Try partner token
+        partner = await db.partners.find_one({"token": token})
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+    settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+    if settings and settings.get("value"):
+        return {"api_key": settings["value"]}
+
+    raise HTTPException(status_code=404, detail="No shared API key configured")
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
