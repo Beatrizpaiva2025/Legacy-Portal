@@ -3159,6 +3159,333 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
         logger.error(f"Error requesting revision: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to request revision")
 
+# ==================== TRANSLATOR PAYMENTS ====================
+
+@api_router.get("/admin/payments/translators")
+async def get_translators_payment_summary(admin_key: str):
+    """Get payment summary for all translators (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get all translators
+        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+
+        result = []
+        for translator in translators:
+            # Get payment history
+            payments = await db.translator_payments.find(
+                {"translator_id": translator["id"]}
+            ).sort("payment_date", -1).to_list(100)
+
+            total_paid = sum(p.get("amount", 0) for p in payments)
+
+            # Calculate pending amount based on rate and pages
+            rate_per_page = translator.get("rate_per_page", 0) or 0
+            pages_pending = translator.get("pages_pending_payment", 0) or 0
+            pending_amount = rate_per_page * pages_pending
+
+            result.append({
+                "translator_id": translator["id"],
+                "name": translator.get("name", ""),
+                "email": translator.get("email", ""),
+                "rate_per_page": rate_per_page,
+                "rate_per_word": translator.get("rate_per_word", 0) or 0,
+                "pages_translated": translator.get("pages_translated", 0) or 0,
+                "pages_pending_payment": pages_pending,
+                "pending_amount": round(pending_amount, 2),
+                "total_paid": round(total_paid, 2),
+                "payment_method": translator.get("payment_method", ""),
+                "bank_name": translator.get("bank_name", ""),
+                "paypal_email": translator.get("paypal_email", ""),
+                "zelle_email": translator.get("zelle_email", ""),
+                "last_payment": payments[0] if payments else None,
+                "is_active": translator.get("is_active", True)
+            })
+
+        return {"translators": result, "total": len(result)}
+    except Exception as e:
+        logger.error(f"Error getting translator payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment data")
+
+@api_router.get("/admin/payments/translator/{translator_id}")
+async def get_translator_payment_history(translator_id: str, admin_key: str):
+    """Get payment history for a specific translator (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+
+        payments = await db.translator_payments.find(
+            {"translator_id": translator_id}
+        ).sort("payment_date", -1).to_list(100)
+
+        # Convert for JSON serialization
+        for payment in payments:
+            if "_id" in payment:
+                payment["_id"] = str(payment["_id"])
+            if payment.get("payment_date"):
+                payment["payment_date"] = payment["payment_date"].isoformat()
+            if payment.get("created_at"):
+                payment["created_at"] = payment["created_at"].isoformat()
+
+        return {
+            "translator": {
+                "id": translator["id"],
+                "name": translator.get("name", ""),
+                "email": translator.get("email", ""),
+                "rate_per_page": translator.get("rate_per_page", 0),
+                "pages_translated": translator.get("pages_translated", 0),
+                "pages_pending_payment": translator.get("pages_pending_payment", 0),
+                "payment_method": translator.get("payment_method", ""),
+                "bank_name": translator.get("bank_name", ""),
+                "account_holder": translator.get("account_holder", ""),
+                "account_number": translator.get("account_number", ""),
+                "routing_number": translator.get("routing_number", ""),
+                "paypal_email": translator.get("paypal_email", ""),
+                "zelle_email": translator.get("zelle_email", "")
+            },
+            "payments": payments,
+            "total_paid": sum(p.get("amount", 0) for p in payments)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting translator payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment history")
+
+@api_router.post("/admin/payments/register")
+async def register_payment(
+    admin_key: str,
+    translator_id: str = Body(...),
+    amount: float = Body(...),
+    pages_paid: int = Body(0),
+    payment_method: str = Body(""),
+    reference: str = Body(""),
+    notes: str = Body("")
+):
+    """Register a payment made to a translator (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+
+        payment_id = str(uuid.uuid4())
+        payment = {
+            "id": payment_id,
+            "translator_id": translator_id,
+            "translator_name": translator.get("name", ""),
+            "amount": amount,
+            "pages_paid": pages_paid,
+            "payment_method": payment_method or translator.get("payment_method", ""),
+            "reference": reference,
+            "notes": notes,
+            "payment_date": datetime.utcnow(),
+            "created_at": datetime.utcnow(),
+            "status": "completed"
+        }
+
+        await db.translator_payments.insert_one(payment)
+
+        # Update translator's pending pages (subtract paid pages)
+        current_pending = translator.get("pages_pending_payment", 0) or 0
+        new_pending = max(0, current_pending - pages_paid)
+
+        await db.admin_users.update_one(
+            {"id": translator_id},
+            {"$set": {"pages_pending_payment": new_pending}}
+        )
+
+        logger.info(f"Payment registered: ${amount} to {translator.get('name')} for {pages_paid} pages")
+
+        return {
+            "status": "success",
+            "payment_id": payment_id,
+            "message": f"Payment of ${amount:.2f} registered successfully",
+            "new_pending_pages": new_pending
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register payment")
+
+@api_router.post("/admin/payments/add-pages")
+async def add_translator_pages(
+    admin_key: str,
+    translator_id: str = Body(...),
+    pages: int = Body(...),
+    order_id: str = Body(""),
+    notes: str = Body("")
+):
+    """Add pages to a translator's pending payment count (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+
+        current_translated = translator.get("pages_translated", 0) or 0
+        current_pending = translator.get("pages_pending_payment", 0) or 0
+
+        await db.admin_users.update_one(
+            {"id": translator_id},
+            {
+                "$set": {
+                    "pages_translated": current_translated + pages,
+                    "pages_pending_payment": current_pending + pages
+                }
+            }
+        )
+
+        # Log the page addition
+        await db.translator_page_log.insert_one({
+            "translator_id": translator_id,
+            "pages": pages,
+            "order_id": order_id,
+            "notes": notes,
+            "created_at": datetime.utcnow()
+        })
+
+        return {
+            "status": "success",
+            "message": f"Added {pages} pages to {translator.get('name')}",
+            "new_total_translated": current_translated + pages,
+            "new_pending_payment": current_pending + pages
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding pages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add pages")
+
+@api_router.delete("/admin/payments/{payment_id}")
+async def delete_payment(payment_id: str, admin_key: str):
+    """Delete a payment record (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        payment = await db.translator_payments.find_one({"id": payment_id})
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        # Restore pages to pending
+        translator_id = payment.get("translator_id")
+        pages_paid = payment.get("pages_paid", 0)
+
+        if translator_id and pages_paid > 0:
+            translator = await db.admin_users.find_one({"id": translator_id})
+            if translator:
+                current_pending = translator.get("pages_pending_payment", 0) or 0
+                await db.admin_users.update_one(
+                    {"id": translator_id},
+                    {"$set": {"pages_pending_payment": current_pending + pages_paid}}
+                )
+
+        await db.translator_payments.delete_one({"id": payment_id})
+
+        return {"status": "success", "message": "Payment deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete payment")
+
+@api_router.get("/admin/payments/report")
+async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
+    """Get payment report with totals (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        query = {}
+        if start_date:
+            query["payment_date"] = {"$gte": datetime.fromisoformat(start_date)}
+        if end_date:
+            if "payment_date" in query:
+                query["payment_date"]["$lte"] = datetime.fromisoformat(end_date)
+            else:
+                query["payment_date"] = {"$lte": datetime.fromisoformat(end_date)}
+
+        payments = await db.translator_payments.find(query).sort("payment_date", -1).to_list(500)
+
+        # Calculate totals
+        total_paid = sum(p.get("amount", 0) for p in payments)
+        total_pages = sum(p.get("pages_paid", 0) for p in payments)
+
+        # Group by translator
+        by_translator = {}
+        for p in payments:
+            tid = p.get("translator_id", "unknown")
+            if tid not in by_translator:
+                by_translator[tid] = {
+                    "name": p.get("translator_name", "Unknown"),
+                    "total_paid": 0,
+                    "total_pages": 0,
+                    "payment_count": 0
+                }
+            by_translator[tid]["total_paid"] += p.get("amount", 0)
+            by_translator[tid]["total_pages"] += p.get("pages_paid", 0)
+            by_translator[tid]["payment_count"] += 1
+
+        # Get pending amounts
+        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+        total_pending = 0
+        for t in translators:
+            rate = t.get("rate_per_page", 0) or 0
+            pending_pages = t.get("pages_pending_payment", 0) or 0
+            total_pending += rate * pending_pages
+
+        return {
+            "total_paid": round(total_paid, 2),
+            "total_pages_paid": total_pages,
+            "total_pending": round(total_pending, 2),
+            "payment_count": len(payments),
+            "by_translator": by_translator
+        }
+    except Exception as e:
+        logger.error(f"Error getting payment report: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get report")
+
 # ==================== TRANSLATION ORDERS ====================
 
 @api_router.post("/orders/create")
