@@ -162,6 +162,32 @@ const CUSTOMER_TRANSLATIONS = {
     // Contact
     questionsAboutPricing: 'Questions about your pricing?',
     requestQuoteInstead: 'Request a quote instead',
+    contactOptions: 'How would you like to contact us?',
+    sendEmail: 'Send Email',
+    chatWhatsApp: 'Chat on WhatsApp',
+    orText: 'or',
+    formDataRestored: 'Your previous form data has been restored.',
+
+    // Support Modal
+    needHelpGetSupport: 'NEED HELP? GET SUPPORT HERE',
+    getSupport: 'Get Support',
+    supportDescription: 'Share details about your issue and our team will respond via email.',
+    whatHelpWith: 'What do you need help with?',
+    selectIssueType: 'Select an issue type',
+    problemsWithUpload: 'Problems with upload',
+    notSureWhatTranslation: "I'm not sure what type of translation to order",
+    otherIssue: 'Other',
+    describeIssue: 'Describe the issue',
+    issuePlaceholder: 'Include relevant order numbers, run IDs, or any other context so we can help faster.',
+    provideDetail: 'Provide as much detail as possible.',
+    attachments: 'Attachments (optional)',
+    chooseFiles: 'CHOOSE FILES',
+    noFileSelected: 'No file selected',
+    attachInfo: 'Attach screenshots or PDFs (max 5 files, 10 MB each).',
+    cancel: 'CANCEL',
+    sendRequest: 'SEND REQUEST',
+    supportSent: 'Support request sent! We will respond to your email shortly.',
+    supportError: 'Error sending request. Please try again.',
 
     // Exit Popup
     waitSpecialOffer: 'Wait! Special Offer!',
@@ -321,6 +347,32 @@ const CUSTOMER_TRANSLATIONS = {
     // Contact
     questionsAboutPricing: '¿Preguntas sobre tu precio?',
     requestQuoteInstead: 'Solicitar una cotización en su lugar',
+    contactOptions: '¿Cómo te gustaría contactarnos?',
+    sendEmail: 'Enviar Email',
+    chatWhatsApp: 'Chatear por WhatsApp',
+    orText: 'o',
+    formDataRestored: 'Tus datos del formulario anterior han sido restaurados.',
+
+    // Support Modal
+    needHelpGetSupport: '¿NECESITAS AYUDA? OBTÉN SOPORTE AQUÍ',
+    getSupport: 'Obtener Soporte',
+    supportDescription: 'Comparte detalles sobre tu problema y nuestro equipo responderá por email.',
+    whatHelpWith: '¿Con qué necesitas ayuda?',
+    selectIssueType: 'Selecciona un tipo de problema',
+    problemsWithUpload: 'Problemas al subir documento',
+    notSureWhatTranslation: 'No estoy seguro qué tipo de traducción pedir',
+    otherIssue: 'Otro',
+    describeIssue: 'Describe el problema',
+    issuePlaceholder: 'Incluye números de pedido, IDs o cualquier contexto para ayudarte más rápido.',
+    provideDetail: 'Proporciona el mayor detalle posible.',
+    attachments: 'Adjuntos (opcional)',
+    chooseFiles: 'ELEGIR ARCHIVOS',
+    noFileSelected: 'Ningún archivo seleccionado',
+    attachInfo: 'Adjunta capturas o PDFs (máx 5 archivos, 10 MB cada uno).',
+    cancel: 'CANCELAR',
+    sendRequest: 'ENVIAR SOLICITUD',
+    supportSent: '¡Solicitud de soporte enviada! Responderemos a tu email pronto.',
+    supportError: 'Error al enviar solicitud. Por favor intenta de nuevo.',
 
     // Exit Popup
     waitSpecialOffer: '¡Espera! ¡Oferta Especial!',
@@ -480,6 +532,32 @@ const CUSTOMER_TRANSLATIONS = {
     // Contact
     questionsAboutPricing: 'Dúvidas sobre seu preço?',
     requestQuoteInstead: 'Solicitar um orçamento em vez disso',
+    contactOptions: 'Como você gostaria de nos contatar?',
+    sendEmail: 'Enviar Email',
+    chatWhatsApp: 'Conversar no WhatsApp',
+    orText: 'ou',
+    formDataRestored: 'Seus dados do formulário anterior foram restaurados.',
+
+    // Support Modal
+    needHelpGetSupport: 'PRECISA DE AJUDA? OBTENHA SUPORTE AQUI',
+    getSupport: 'Obter Suporte',
+    supportDescription: 'Compartilhe detalhes sobre seu problema e nossa equipe responderá por email.',
+    whatHelpWith: 'Com o que você precisa de ajuda?',
+    selectIssueType: 'Selecione um tipo de problema',
+    problemsWithUpload: 'Problemas ao enviar documento',
+    notSureWhatTranslation: 'Não tenho certeza qual tipo de tradução pedir',
+    otherIssue: 'Outro',
+    describeIssue: 'Descreva o problema',
+    issuePlaceholder: 'Inclua números de pedido, IDs ou qualquer contexto para ajudarmos mais rápido.',
+    provideDetail: 'Forneça o máximo de detalhes possível.',
+    attachments: 'Anexos (opcional)',
+    chooseFiles: 'ESCOLHER ARQUIVOS',
+    noFileSelected: 'Nenhum arquivo selecionado',
+    attachInfo: 'Anexe capturas de tela ou PDFs (máx 5 arquivos, 10 MB cada).',
+    cancel: 'CANCELAR',
+    sendRequest: 'ENVIAR SOLICITAÇÃO',
+    supportSent: 'Solicitação de suporte enviada! Responderemos ao seu email em breve.',
+    supportError: 'Erro ao enviar solicitação. Por favor tente novamente.',
 
     // Exit Popup
     waitSpecialOffer: 'Espere! Oferta Especial!',
@@ -756,6 +834,17 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [exitPopupShown, setExitPopupShown] = useState(() => {
     return sessionStorage.getItem('exitPopupShown') === 'true';
   });
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [formRestored, setFormRestored] = useState(false);
+
+  // Support form states
+  const [supportIssueType, setSupportIssueType] = useState('');
+  const [supportDescription, setSupportDescription] = useState('');
+  const [supportFiles, setSupportFiles] = useState([]);
+  const [sendingSupport, setSendingSupport] = useState(false);
+  const [supportSuccess, setSupportSuccess] = useState('');
+  const [supportError, setSupportError] = useState('');
+  const supportFileInputRef = useRef(null);
 
 
   // Certification options
@@ -792,9 +881,31 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
     if (paymentSuccess === 'true' && sessionId) {
       setSuccess('Payment successful! Your order has been confirmed. Check your email for details.');
+      // Clear saved form data on success
+      sessionStorage.removeItem('pendingOrderData');
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (paymentCanceled === 'true') {
+      // Restore saved form data
+      const savedData = sessionStorage.getItem('pendingOrderData');
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed.formData) setFormData(parsed.formData);
+          if (parsed.guestName) setGuestName(parsed.guestName);
+          if (parsed.guestEmail) setGuestEmail(parsed.guestEmail);
+          if (parsed.certifications) setCertifications(parsed.certifications);
+          if (parsed.needsPhysicalCopy !== undefined) setNeedsPhysicalCopy(parsed.needsPhysicalCopy);
+          if (parsed.shippingAddress) setShippingAddress(parsed.shippingAddress);
+          if (parsed.uploadedFiles) setUploadedFiles(parsed.uploadedFiles);
+          if (parsed.wordCount) setWordCount(parsed.wordCount);
+          if (parsed.discountCode) setDiscountCode(parsed.discountCode);
+          if (parsed.appliedDiscount) setAppliedDiscount(parsed.appliedDiscount);
+          setFormRestored(true);
+        } catch (e) {
+          console.error('Error restoring form data:', e);
+        }
+      }
       setError('Payment was canceled. Your order has been saved - you can complete payment later.');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -1087,7 +1198,22 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         origin_url: window.location.origin + '/customer'
       });
 
-      // Step 3: Redirect to Stripe checkout
+      // Step 3: Save form data before redirecting to Stripe
+      const pendingOrderData = {
+        formData,
+        guestName,
+        guestEmail,
+        certifications,
+        needsPhysicalCopy,
+        shippingAddress,
+        uploadedFiles,
+        wordCount,
+        discountCode,
+        appliedDiscount
+      };
+      sessionStorage.setItem('pendingOrderData', JSON.stringify(pendingOrderData));
+
+      // Step 4: Redirect to Stripe checkout
       if (checkoutResponse.data.checkout_url) {
         window.location.href = checkoutResponse.data.checkout_url;
       } else {
@@ -1097,6 +1223,50 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     } catch (err) {
       setError(err.response?.data?.detail || t.failedToProcess);
       setSubmitting(false);
+    }
+  };
+
+  // Handle support file selection
+  const handleSupportFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    const validFiles = files.filter(f => f.size <= 10 * 1024 * 1024).slice(0, 5);
+    setSupportFiles(validFiles);
+  };
+
+  // Handle support form submission
+  const handleSupportSubmit = async () => {
+    if (!supportIssueType || !supportDescription.trim()) {
+      setSupportError(t.supportError);
+      return;
+    }
+
+    setSendingSupport(true);
+    setSupportError('');
+
+    try {
+      // Send support request to backend
+      await axios.post(`${API}/send-support-request`, {
+        issue_type: supportIssueType,
+        description: supportDescription,
+        customer_email: guestEmail || 'Not provided',
+        customer_name: guestName || 'Not provided',
+        files_count: supportFiles.length
+      });
+
+      setSupportSuccess(t.supportSent);
+      // Reset form
+      setSupportIssueType('');
+      setSupportDescription('');
+      setSupportFiles([]);
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowContactModal(false);
+        setSupportSuccess('');
+      }, 2000);
+    } catch (err) {
+      setSupportError(t.supportError);
+    } finally {
+      setSendingSupport(false);
     }
   };
 
@@ -1143,6 +1313,117 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         </div>
       )}
 
+      {/* Contact Options Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center relative">
+            <button
+              onClick={() => setShowContactModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">{t.getSupport}</h2>
+            <p className="text-gray-600 text-sm mb-6">{t.supportDescription}</p>
+
+            {supportSuccess ? (
+              <div className="p-4 bg-green-100 text-green-700 rounded-md">
+                {supportSuccess}
+              </div>
+            ) : (
+              <div className="space-y-4 text-left">
+                {/* Issue Type Dropdown */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t.whatHelpWith}</label>
+                  <select
+                    value={supportIssueType}
+                    onChange={(e) => setSupportIssueType(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">{t.selectIssueType}</option>
+                    <option value="upload">{t.problemsWithUpload}</option>
+                    <option value="translation_type">{t.notSureWhatTranslation}</option>
+                    <option value="other">{t.otherIssue}</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t.describeIssue}</label>
+                  <textarea
+                    value={supportDescription}
+                    onChange={(e) => setSupportDescription(e.target.value.slice(0, 2000))}
+                    placeholder={t.issuePlaceholder}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md h-32 resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>{t.provideDetail}</span>
+                    <span>{supportDescription.length}/2000</span>
+                  </div>
+                </div>
+
+                {/* File Attachments */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t.attachments}</label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => supportFileInputRef.current?.click()}
+                      className="px-4 py-2 border-2 border-teal-600 text-teal-600 rounded-md font-semibold hover:bg-teal-50 transition-colors"
+                    >
+                      {t.chooseFiles}
+                    </button>
+                    <span className="text-gray-500 text-sm">
+                      {supportFiles.length > 0 ? `${supportFiles.length} file(s) selected` : t.noFileSelected}
+                    </span>
+                    <input
+                      ref={supportFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={handleSupportFileChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">{t.attachInfo}</p>
+                </div>
+
+                {supportError && (
+                  <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">
+                    {supportError}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactModal(false);
+                      setSupportIssueType('');
+                      setSupportDescription('');
+                      setSupportFiles([]);
+                      setSupportError('');
+                    }}
+                    className="px-6 py-2 text-gray-600 font-semibold hover:text-gray-800"
+                  >
+                    {t.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSupportSubmit}
+                    disabled={sendingSupport || !supportIssueType || !supportDescription.trim()}
+                    className="px-6 py-2 bg-amber-200 text-gray-800 rounded-md font-semibold hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
+                  >
+                    {sendingSupport ? '...' : t.sendRequest}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold text-gray-800 mb-6">{t.requestTranslation}</h1>
 
       {error && (
@@ -1150,6 +1431,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       )}
       {success && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{success}</div>
+      )}
+      {formRestored && (
+        <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded-md flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {t.formDataRestored}
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1558,15 +1847,18 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               />
             </div>
 
-            {/* Questions about pricing? - Contact */}
-            <div className="bg-gray-50 p-5 rounded-lg text-center">
-              <p className="text-gray-600 mb-3">{t.questionsAboutPricing}</p>
-              <a
-                href="mailto:contact@legacytranslations.com?subject=Quote Request"
-                className="inline-block px-6 py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-white hover:border-gray-400 transition-colors font-medium"
+            {/* Need Help? Get Support */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-5 rounded-lg text-center border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowContactModal(true)}
+                className="inline-flex items-center gap-2 px-6 py-3 text-teal-700 hover:text-teal-800 font-semibold text-lg transition-colors"
               >
-                {t.requestQuoteInstead}
-              </a>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {t.needHelpGetSupport}
+              </button>
             </div>
 
             {/* Continue to Payment Button */}
