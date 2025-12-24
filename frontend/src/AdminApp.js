@@ -4792,14 +4792,72 @@ tradução juramentada | certified translation`}
               </div>
 
               {translationResults.length > 0 && (
-                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded flex justify-between items-center">
-                  <p className="text-xs text-green-700">✅ Translation complete!</p>
-                  <button
-                    onClick={() => setActiveSubTab('review')}
-                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                  >
-                    Go to Review →
-                  </button>
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-xs text-green-700 font-medium">✅ Translation complete!</p>
+                    <button
+                      onClick={() => setActiveSubTab('review')}
+                      className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                    >
+                      Go to Review →
+                    </button>
+                  </div>
+
+                  {/* Download Options */}
+                  <div className="flex gap-2 pt-2 border-t border-green-200">
+                    <button
+                      onClick={() => {
+                        // Download Original
+                        originalImages.forEach((img, idx) => {
+                          const link = document.createElement('a');
+                          link.href = img.data;
+                          link.download = `original_${idx + 1}_${img.filename || 'document'}`;
+                          link.click();
+                        });
+                      }}
+                      className="flex-1 px-3 py-2 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 flex items-center justify-center gap-1"
+                    >
+                      📄 Download Original ({originalImages.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Download Translation as HTML
+                        const htmlContent = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Translation - ${documentType || 'Document'}</title>
+<style>body{font-family:Georgia,serif;max-width:800px;margin:0 auto;padding:40px;line-height:1.8;}</style></head>
+<body>${translationResults.map((r, i) => `<div style="margin-bottom:30px;"><h3>Page ${i + 1}</h3>${r.translatedText}</div>`).join('')}</body></html>`;
+                        const blob = new Blob([htmlContent], { type: 'text/html' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `translation_${orderNumber || 'document'}.html`;
+                        link.click();
+                      }}
+                      className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 flex items-center justify-center gap-1"
+                    >
+                      🌐 Download Translation (HTML)
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Download Translation as TXT
+                        const extractText = (html) => {
+                          const temp = document.createElement('div');
+                          temp.innerHTML = html;
+                          return temp.textContent || temp.innerText || '';
+                        };
+                        const txtContent = translationResults.map((r, i) =>
+                          `=== PAGE ${i + 1} ===\n\n${extractText(r.translatedText)}\n\n`
+                        ).join('');
+                        const blob = new Blob([txtContent], { type: 'text/plain' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `translation_${orderNumber || 'document'}.txt`;
+                        link.click();
+                      }}
+                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center justify-center gap-1"
+                    >
+                      📝 Download Translation (TXT)
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -5708,20 +5766,125 @@ tradução juramentada | certified translation`}
 
               {/* Translation Memory Option */}
               <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
-                <label className="flex items-center text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={saveToTM}
-                    onChange={(e) => setSaveToTM(e.target.checked)}
-                    className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                  />
-                  <div>
-                    <span className="font-medium">💾 Save to Translation Memory</span>
-                    <p className="text-[10px] text-teal-600 mt-0.5">
-                      Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveToTM}
+                      onChange={(e) => setSaveToTM(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="font-medium">💾 Save to Translation Memory</span>
+                      <p className="text-[10px] text-teal-600 mt-0.5">
+                        Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
+                      </p>
+                    </div>
+                  </label>
+                  <span className="text-[10px] bg-teal-200 text-teal-800 px-2 py-0.5 rounded">
+                    {glossaries.filter(g => g.name?.startsWith('TM -')).length} TMs saved
+                  </span>
+                </div>
+
+                {/* View Saved TMs */}
+                {glossaries.filter(g => g.name?.startsWith('TM -')).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-teal-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-medium text-teal-700">📚 Saved Translation Memories:</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            // Download all TMs as JSON
+                            const tms = glossaries.filter(g => g.name?.startsWith('TM -'));
+                            const blob = new Blob([JSON.stringify(tms, null, 2)], { type: 'application/json' });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.json`;
+                            link.click();
+                          }}
+                          className="px-2 py-1 text-[9px] bg-teal-600 text-white rounded hover:bg-teal-700"
+                        >
+                          📥 Export All (JSON)
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Download all TMs as TMX
+                            const tms = glossaries.filter(g => g.name?.startsWith('TM -'));
+                            let tmxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tmx SYSTEM "tmx14.dtd">
+<tmx version="1.4">
+  <header creationtool="Legacy Translations TM" creationtoolversion="1.0" datatype="plaintext" segtype="sentence" adminlang="en-US" srclang="*all*"/>
+  <body>
+`;
+                            tms.forEach(tm => {
+                              (tm.terms || []).forEach(term => {
+                                tmxContent += `    <tu>
+      <tuv xml:lang="${tm.sourceLang || 'pt-BR'}">
+        <seg>${term.source?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}</seg>
+      </tuv>
+      <tuv xml:lang="${tm.targetLang || 'en-US'}">
+        <seg>${term.target?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}</seg>
+      </tuv>
+    </tu>
+`;
+                              });
+                            });
+                            tmxContent += `  </body>
+</tmx>`;
+                            const blob = new Blob([tmxContent], { type: 'application/xml' });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.tmx`;
+                            link.click();
+                          }}
+                          className="px-2 py-1 text-[9px] bg-purple-600 text-white rounded hover:bg-purple-700"
+                        >
+                          📥 Export All (TMX)
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-32 overflow-auto space-y-1">
+                      {glossaries.filter(g => g.name?.startsWith('TM -')).map((tm, idx) => (
+                        <div key={tm.id || idx} className="flex items-center justify-between p-2 bg-white rounded border text-[10px]">
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-700">{tm.name}</span>
+                            <span className="text-gray-400 ml-2">({tm.terms?.length || 0} segments)</span>
+                            <span className="text-gray-400 ml-1">{tm.sourceLang} → {tm.targetLang}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                // Download single TM as JSON
+                                const blob = new Blob([JSON.stringify(tm, null, 2)], { type: 'application/json' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = `${tm.name?.replace(/[^a-z0-9]/gi, '_') || 'tm'}.json`;
+                                link.click();
+                              }}
+                              className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                              title="Download JSON"
+                            >
+                              📥
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete "${tm.name}"?`)) {
+                                  const updated = glossaries.filter(g => g.id !== tm.id);
+                                  setGlossaries(updated);
+                                  localStorage.setItem('glossaries', JSON.stringify(updated));
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </label>
+                )}
               </div>
 
               {/* Download Options */}
