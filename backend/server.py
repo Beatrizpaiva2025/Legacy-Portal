@@ -2499,16 +2499,39 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to create user")
 
 @api_router.post("/admin/auth/login")
-async def login_admin_user(login_data: AdminUserLogin):
+async def login_admin_user(login_data: AdminUserLogin, request: Request):
     """Login admin user and return token with role"""
     try:
+        # Get client IP address
+        client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.client.host
+        user_agent = request.headers.get("User-Agent", "Unknown")
+
         # Find user by email
         user = await db.admin_users.find_one({"email": login_data.email})
         if not user:
+            # Log failed attempt
+            await db.login_attempts.insert_one({
+                "email": login_data.email,
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "timestamp": datetime.utcnow(),
+                "success": False,
+                "reason": "invalid_email"
+            })
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         # Verify password
         if not verify_password(login_data.password, user["password_hash"]):
+            # Log failed attempt
+            await db.login_attempts.insert_one({
+                "email": login_data.email,
+                "user_id": user["id"],
+                "ip_address": client_ip,
+                "user_agent": user_agent,
+                "timestamp": datetime.utcnow(),
+                "success": False,
+                "reason": "invalid_password"
+            })
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         # Check if invitation is pending
@@ -2518,6 +2541,34 @@ async def login_admin_user(login_data: AdminUserLogin):
         # Check if active
         if not user.get("is_active", True):
             raise HTTPException(status_code=401, detail="Account is deactivated")
+
+        # Log successful login with IP tracking
+        login_record = {
+            "ip_address": client_ip,
+            "user_agent": user_agent,
+            "timestamp": datetime.utcnow()
+        }
+
+        # Track IP history for the user (for detecting link sharing)
+        await db.admin_users.update_one(
+            {"id": user["id"]},
+            {
+                "$push": {"ip_history": {"$each": [login_record], "$slice": -50}},
+                "$set": {"last_login_ip": client_ip, "last_login_at": datetime.utcnow()}
+            }
+        )
+
+        # Also log to login_attempts for admin monitoring
+        await db.login_attempts.insert_one({
+            "email": login_data.email,
+            "user_id": user["id"],
+            "user_name": user.get("name", ""),
+            "role": user.get("role", ""),
+            "ip_address": client_ip,
+            "user_agent": user_agent,
+            "timestamp": datetime.utcnow(),
+            "success": True
+        })
 
         # Generate token
         token = generate_token()
@@ -3005,6 +3056,489 @@ async def delete_user_document(user_id: str, doc_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting user document: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete document")
+
+# ==================== IP TRACKING & SECURITY ====================
+
+@api_router.get("/admin/users/{user_id}/ip-history")
+async def get_user_ip_history(user_id: str, admin_key: str):
+    """Get IP history for a specific user (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        user = await db.admin_users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        ip_history = user.get("ip_history", [])
+        unique_ips = set()
+        for record in ip_history:
+            if record.get("ip_address"):
+                unique_ips.add(record["ip_address"])
+
+        return {
+            "user_id": user_id,
+            "user_name": user.get("name", ""),
+            "user_email": user.get("email", ""),
+            "last_login_ip": user.get("last_login_ip", ""),
+            "last_login_at": user.get("last_login_at", ""),
+            "unique_ip_count": len(unique_ips),
+            "unique_ips": list(unique_ips),
+            "ip_history": ip_history,
+            "suspicious": len(unique_ips) > 3
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting IP history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get IP history")
+
+@api_router.get("/admin/login-attempts")
+async def get_login_attempts(admin_key: str, limit: int = 100, user_id: str = None):
+    """Get login attempts log (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+
+        attempts = await db.login_attempts.find(query).sort("timestamp", -1).limit(limit).to_list(limit)
+        for attempt in attempts:
+            if "_id" in attempt:
+                attempt["_id"] = str(attempt["_id"])
+            if "timestamp" in attempt and attempt["timestamp"]:
+                attempt["timestamp"] = attempt["timestamp"].isoformat()
+
+        return {"attempts": attempts, "total": len(attempts)}
+    except Exception as e:
+        logger.error(f"Error getting login attempts: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get login attempts")
+
+@api_router.get("/admin/security/suspicious-users")
+async def get_suspicious_users(admin_key: str):
+    """Get list of users with suspicious IP activity (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        users = await db.admin_users.find({"role": "translator"}).to_list(100)
+        suspicious = []
+        for user in users:
+            ip_history = user.get("ip_history", [])
+            unique_ips = set()
+            for record in ip_history:
+                if record.get("ip_address"):
+                    unique_ips.add(record["ip_address"])
+            if len(unique_ips) > 3:
+                suspicious.append({
+                    "user_id": user["id"],
+                    "name": user.get("name", ""),
+                    "email": user.get("email", ""),
+                    "role": user.get("role", ""),
+                    "unique_ip_count": len(unique_ips),
+                    "unique_ips": list(unique_ips),
+                    "last_login_ip": user.get("last_login_ip", ""),
+                    "last_login_at": user.get("last_login_at", "").isoformat() if user.get("last_login_at") else ""
+                })
+        return {"suspicious_users": suspicious, "total": len(suspicious)}
+    except Exception as e:
+        logger.error(f"Error getting suspicious users: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get suspicious users")
+
+# ==================== TRANSLATOR SUBMISSIONS ====================
+
+@api_router.post("/admin/translations/submit")
+async def submit_translation(
+    request: Request,
+    token: str = Form(...),
+    order_id: str = Form(...),
+    translation_html: str = Form(None),
+    notes: str = Form(None),
+    translation_file: UploadFile = File(None),
+    original_file: UploadFile = File(None)
+):
+    """Submit completed translation for PM/Admin review"""
+    user = await get_current_admin_user(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or request.client.host
+        submission_id = str(uuid.uuid4())
+        submission = {
+            "id": submission_id,
+            "order_id": order_id,
+            "translator_id": user["id"],
+            "translator_name": user.get("name", ""),
+            "translator_email": user.get("email", ""),
+            "submitted_at": datetime.utcnow(),
+            "status": "pending_review",
+            "translation_html": translation_html,
+            "notes": notes,
+            "ip_address": client_ip
+        }
+        if translation_file:
+            file_content = await translation_file.read()
+            submission["translation_file"] = {
+                "filename": translation_file.filename,
+                "content_type": translation_file.content_type,
+                "data": base64.b64encode(file_content).decode('utf-8'),
+                "size": len(file_content)
+            }
+        if original_file:
+            file_content = await original_file.read()
+            submission["original_file"] = {
+                "filename": original_file.filename,
+                "content_type": original_file.content_type,
+                "data": base64.b64encode(file_content).decode('utf-8'),
+                "size": len(file_content)
+            }
+        await db.translation_submissions.insert_one(submission)
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {"translation_status": "ready_for_review", "submission_id": submission_id, "submitted_at": datetime.utcnow(), "submitted_by": user["id"]}}
+        )
+        logger.info(f"Translation submitted: {submission_id} by {user.get('name', user['id'])}")
+        return {"status": "success", "submission_id": submission_id, "message": "Translation submitted for review"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting translation: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit translation")
+
+@api_router.get("/admin/translations/pending-review")
+async def get_pending_translations(admin_key: str):
+    """Get translations pending PM/Admin review"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        submissions = await db.translation_submissions.find({"status": "pending_review"}).sort("submitted_at", -1).to_list(100)
+        result = []
+        for sub in submissions:
+            order = await db.translation_orders.find_one({"id": sub["order_id"]})
+            result.append({
+                "submission_id": sub["id"],
+                "order_id": sub["order_id"],
+                "order_number": order.get("order_number", "") if order else "",
+                "client_name": order.get("client_name", "") if order else "",
+                "translator_name": sub.get("translator_name", ""),
+                "translator_email": sub.get("translator_email", ""),
+                "submitted_at": sub["submitted_at"].isoformat() if sub.get("submitted_at") else "",
+                "has_translation_file": "translation_file" in sub,
+                "has_original_file": "original_file" in sub,
+                "notes": sub.get("notes", ""),
+                "ip_address": sub.get("ip_address", "")
+            })
+        return {"submissions": result, "total": len(result)}
+    except Exception as e:
+        logger.error(f"Error getting pending translations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pending translations")
+
+@api_router.get("/admin/translations/submission/{submission_id}")
+async def get_submission_details(submission_id: str, admin_key: str):
+    """Get full details of a translation submission"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        submission = await db.translation_submissions.find_one({"id": submission_id})
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        order = await db.translation_orders.find_one({"id": submission["order_id"]})
+        if "_id" in submission:
+            submission["_id"] = str(submission["_id"])
+        if submission.get("submitted_at"):
+            submission["submitted_at"] = submission["submitted_at"].isoformat()
+        submission["order_info"] = {
+            "order_number": order.get("order_number", "") if order else "",
+            "client_name": order.get("client_name", "") if order else "",
+            "client_email": order.get("client_email", "") if order else "",
+            "translate_from": order.get("translate_from", "") if order else "",
+            "translate_to": order.get("translate_to", "") if order else ""
+        }
+        return submission
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting submission: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get submission")
+
+@api_router.post("/admin/translations/submission/{submission_id}/approve")
+async def approve_submission(submission_id: str, admin_key: str):
+    """Approve a translation submission"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        submission = await db.translation_submissions.find_one({"id": submission_id})
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        await db.translation_submissions.update_one({"id": submission_id}, {"$set": {"status": "approved", "approved_at": datetime.utcnow()}})
+        await db.translation_orders.update_one({"id": submission["order_id"]}, {"$set": {"translation_status": "approved", "approved_at": datetime.utcnow()}})
+        return {"status": "success", "message": "Submission approved"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving submission: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to approve submission")
+
+@api_router.post("/admin/translations/submission/{submission_id}/request-revision")
+async def request_revision(submission_id: str, admin_key: str, reason: str = ""):
+    """Request revision for a translation submission"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        submission = await db.translation_submissions.find_one({"id": submission_id})
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        await db.translation_submissions.update_one({"id": submission_id}, {"$set": {"status": "revision_requested", "revision_requested_at": datetime.utcnow(), "revision_reason": reason}})
+        await db.translation_orders.update_one({"id": submission["order_id"]}, {"$set": {"translation_status": "revision_requested"}})
+        return {"status": "success", "message": "Revision requested"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error requesting revision: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to request revision")
+
+# ==================== TRANSLATOR PAYMENTS ====================
+
+@api_router.get("/admin/payments/translators")
+async def get_translators_payment_summary(admin_key: str):
+    """Get payment summary for all translators (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+        result = []
+        for translator in translators:
+            payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
+            total_paid = sum(p.get("amount", 0) for p in payments)
+            rate_per_page = translator.get("rate_per_page", 0) or 0
+            pages_pending = translator.get("pages_pending_payment", 0) or 0
+            pending_amount = rate_per_page * pages_pending
+            result.append({
+                "translator_id": translator["id"],
+                "name": translator.get("name", ""),
+                "email": translator.get("email", ""),
+                "rate_per_page": rate_per_page,
+                "rate_per_word": translator.get("rate_per_word", 0) or 0,
+                "pages_translated": translator.get("pages_translated", 0) or 0,
+                "pages_pending_payment": pages_pending,
+                "pending_amount": round(pending_amount, 2),
+                "total_paid": round(total_paid, 2),
+                "payment_method": translator.get("payment_method", ""),
+                "bank_name": translator.get("bank_name", ""),
+                "paypal_email": translator.get("paypal_email", ""),
+                "zelle_email": translator.get("zelle_email", ""),
+                "last_payment": payments[0] if payments else None,
+                "is_active": translator.get("is_active", True)
+            })
+        return {"translators": result, "total": len(result)}
+    except Exception as e:
+        logger.error(f"Error getting translator payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment data")
+
+@api_router.get("/admin/payments/translator/{translator_id}")
+async def get_translator_payment_history(translator_id: str, admin_key: str):
+    """Get payment history for a specific translator (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+        payments = await db.translator_payments.find({"translator_id": translator_id}).sort("payment_date", -1).to_list(100)
+        for payment in payments:
+            if "_id" in payment:
+                payment["_id"] = str(payment["_id"])
+            if payment.get("payment_date"):
+                payment["payment_date"] = payment["payment_date"].isoformat()
+            if payment.get("created_at"):
+                payment["created_at"] = payment["created_at"].isoformat()
+        return {
+            "translator": {
+                "id": translator["id"],
+                "name": translator.get("name", ""),
+                "email": translator.get("email", ""),
+                "rate_per_page": translator.get("rate_per_page", 0),
+                "pages_translated": translator.get("pages_translated", 0),
+                "pages_pending_payment": translator.get("pages_pending_payment", 0),
+                "payment_method": translator.get("payment_method", ""),
+                "bank_name": translator.get("bank_name", ""),
+                "account_holder": translator.get("account_holder", ""),
+                "account_number": translator.get("account_number", ""),
+                "routing_number": translator.get("routing_number", ""),
+                "paypal_email": translator.get("paypal_email", ""),
+                "zelle_email": translator.get("zelle_email", "")
+            },
+            "payments": payments,
+            "total_paid": sum(p.get("amount", 0) for p in payments)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting translator payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get payment history")
+
+@api_router.post("/admin/payments/register")
+async def register_payment(admin_key: str, translator_id: str = Body(...), amount: float = Body(...), pages_paid: int = Body(0), payment_method: str = Body(""), reference: str = Body(""), notes: str = Body("")):
+    """Register a payment made to a translator (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+        payment_id = str(uuid.uuid4())
+        payment = {
+            "id": payment_id,
+            "translator_id": translator_id,
+            "translator_name": translator.get("name", ""),
+            "amount": amount,
+            "pages_paid": pages_paid,
+            "payment_method": payment_method or translator.get("payment_method", ""),
+            "reference": reference,
+            "notes": notes,
+            "payment_date": datetime.utcnow(),
+            "created_at": datetime.utcnow(),
+            "status": "completed"
+        }
+        await db.translator_payments.insert_one(payment)
+        current_pending = translator.get("pages_pending_payment", 0) or 0
+        new_pending = max(0, current_pending - pages_paid)
+        await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_pending_payment": new_pending}})
+        logger.info(f"Payment registered: ${amount} to {translator.get('name')} for {pages_paid} pages")
+        return {"status": "success", "payment_id": payment_id, "message": f"Payment of ${amount:.2f} registered successfully", "new_pending_pages": new_pending}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to register payment")
+
+@api_router.post("/admin/payments/add-pages")
+async def add_translator_pages(admin_key: str, translator_id: str = Body(...), pages: int = Body(...), order_id: str = Body(""), notes: str = Body("")):
+    """Add pages to a translator's pending payment count (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Translator not found")
+        current_translated = translator.get("pages_translated", 0) or 0
+        current_pending = translator.get("pages_pending_payment", 0) or 0
+        await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_translated": current_translated + pages, "pages_pending_payment": current_pending + pages}})
+        await db.translator_page_log.insert_one({"translator_id": translator_id, "pages": pages, "order_id": order_id, "notes": notes, "created_at": datetime.utcnow()})
+        return {"status": "success", "message": f"Added {pages} pages to {translator.get('name')}", "new_total_translated": current_translated + pages, "new_pending_payment": current_pending + pages}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding pages: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add pages")
+
+@api_router.get("/admin/payments/report")
+async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
+    """Get payment report with totals (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        query = {}
+        if start_date:
+            query["payment_date"] = {"$gte": datetime.fromisoformat(start_date)}
+        if end_date:
+            if "payment_date" in query:
+                query["payment_date"]["$lte"] = datetime.fromisoformat(end_date)
+            else:
+                query["payment_date"] = {"$lte": datetime.fromisoformat(end_date)}
+        payments = await db.translator_payments.find(query).sort("payment_date", -1).to_list(500)
+        total_paid = sum(p.get("amount", 0) for p in payments)
+        total_pages = sum(p.get("pages_paid", 0) for p in payments)
+        by_translator = {}
+        for p in payments:
+            tid = p.get("translator_id", "unknown")
+            if tid not in by_translator:
+                by_translator[tid] = {"name": p.get("translator_name", "Unknown"), "total_paid": 0, "total_pages": 0, "payment_count": 0}
+            by_translator[tid]["total_paid"] += p.get("amount", 0)
+            by_translator[tid]["total_pages"] += p.get("pages_paid", 0)
+            by_translator[tid]["payment_count"] += 1
+        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+        total_pending = 0
+        for t in translators:
+            rate = t.get("rate_per_page", 0) or 0
+            pending_pages = t.get("pages_pending_payment", 0) or 0
+            total_pending += rate * pending_pages
+        return {"total_paid": round(total_paid, 2), "total_pages_paid": total_pages, "total_pending": round(total_pending, 2), "payment_count": len(payments), "by_translator": by_translator}
+    except Exception as e:
+        logger.error(f"Error getting payment report: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get report")
 
 # ==================== TRANSLATION ORDERS ====================
 

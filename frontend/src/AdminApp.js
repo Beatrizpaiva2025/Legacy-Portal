@@ -517,6 +517,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
@@ -9609,6 +9610,324 @@ const TranslationToolPage = ({ adminKey, onLogout, user }) => {
   );
 };
 
+// ==================== REVIEW PAGE (Pending Translations & Security) ====================
+const ReviewPage = ({ adminKey, user }) => {
+  const [pendingSubmissions, setPendingSubmissions] = useState([]);
+  const [suspiciousUsers, setSuspiciousUsers] = useState([]);
+  const [loginAttempts, setLoginAttempts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSubmission, setSelectedSubmission] = useState(null);
+  const [selectedUserIpHistory, setSelectedUserIpHistory] = useState(null);
+  const [ipHistoryData, setIpHistoryData] = useState([]);
+  const [activeSection, setActiveSection] = useState('submissions'); // 'submissions' | 'security'
+  const [revisionNote, setRevisionNote] = useState('');
+
+  const isAdmin = user?.role === 'admin';
+
+  const fetchPendingSubmissions = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/translations/pending-review?admin_key=${adminKey}&token=${user?.token}`);
+      setPendingSubmissions(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch pending submissions:', err);
+    }
+  };
+
+  const fetchSuspiciousUsers = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/security/suspicious-users?admin_key=${adminKey}&token=${user?.token}`);
+      setSuspiciousUsers(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch suspicious users:', err);
+    }
+  };
+
+  const fetchLoginAttempts = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/login-attempts?admin_key=${adminKey}&token=${user?.token}&limit=50`);
+      setLoginAttempts(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch login attempts:', err);
+    }
+  };
+
+  const fetchUserIpHistory = async (userId) => {
+    try {
+      const response = await axios.get(`${API}/admin/users/${userId}/ip-history?admin_key=${adminKey}&token=${user?.token}`);
+      setIpHistoryData(response.data || []);
+      setSelectedUserIpHistory(userId);
+    } catch (err) {
+      console.error('Failed to fetch IP history:', err);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchPendingSubmissions(),
+        isAdmin && fetchSuspiciousUsers(),
+        isAdmin && fetchLoginAttempts()
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [adminKey, user?.token]);
+
+  const handleApproveSubmission = async (submissionId) => {
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/approve?admin_key=${adminKey}&token=${user?.token}`);
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      alert('Tradução aprovada e enviada ao cliente!');
+    } catch (err) {
+      alert('Erro ao aprovar: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRequestRevision = async (submissionId) => {
+    if (!revisionNote.trim()) {
+      alert('Por favor, adicione uma nota explicando as correções necessárias.');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/translations/submission/${submissionId}/request-revision?admin_key=${adminKey}&token=${user?.token}`, {
+        note: revisionNote
+      });
+      fetchPendingSubmissions();
+      setSelectedSubmission(null);
+      setRevisionNote('');
+      alert('Revisão solicitada ao tradutor!');
+    } catch (err) {
+      alert('Erro: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="text-gray-500">Carregando...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h1 className="text-lg font-bold text-gray-800">👁️ Painel de Revisão</h1>
+        <p className="text-xs text-gray-500">Revisar traduções enviadas pelos tradutores e monitorar segurança</p>
+      </div>
+
+      {/* Tab navigation */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveSection('submissions')}
+          className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'submissions' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+        >
+          📥 Traduções Pendentes ({pendingSubmissions.length})
+        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setActiveSection('security')}
+            className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'security' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+          >
+            🔒 Segurança {suspiciousUsers.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-xs">{suspiciousUsers.length}</span>}
+          </button>
+        )}
+      </div>
+
+      {/* Submissions Section */}
+      {activeSection === 'submissions' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Pending submissions list */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">📋 Traduções para Revisar</h2>
+            {pendingSubmissions.length === 0 ? (
+              <p className="text-gray-500 text-sm">Nenhuma tradução pendente de revisão.</p>
+            ) : (
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {pendingSubmissions.map((sub) => (
+                  <div
+                    key={sub._id}
+                    onClick={() => setSelectedSubmission(sub)}
+                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${selectedSubmission?._id === sub._id ? 'border-teal-500 bg-teal-50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{sub.order_number}</div>
+                        <div className="text-xs text-gray-500">Tradutor: {sub.translator_name}</div>
+                      </div>
+                      <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">
+                        Pendente
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Enviado: {new Date(sub.submitted_at).toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Selected submission details */}
+          <div className="bg-white rounded-lg shadow p-4">
+            {selectedSubmission ? (
+              <>
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📄 Detalhes: {selectedSubmission.order_number}</h2>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><span className="text-gray-500">Tradutor:</span> {selectedSubmission.translator_name}</div>
+                    <div><span className="text-gray-500">Páginas:</span> {selectedSubmission.pages_count || 'N/A'}</div>
+                    <div><span className="text-gray-500">Enviado:</span> {new Date(selectedSubmission.submitted_at).toLocaleString('pt-BR')}</div>
+                    <div><span className="text-gray-500">Cliente:</span> {selectedSubmission.client_name || 'N/A'}</div>
+                  </div>
+
+                  {selectedSubmission.translator_notes && (
+                    <div className="bg-gray-50 p-2 rounded">
+                      <div className="text-xs text-gray-500 mb-1">Notas do tradutor:</div>
+                      <div className="text-sm">{selectedSubmission.translator_notes}</div>
+                    </div>
+                  )}
+
+                  {selectedSubmission.file_url && (
+                    <a
+                      href={selectedSubmission.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-center py-2 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+                    >
+                      📎 Ver Arquivo Traduzido
+                    </a>
+                  )}
+
+                  {/* Revision note input */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nota para revisão (se necessário):</label>
+                    <textarea
+                      value={revisionNote}
+                      onChange={(e) => setRevisionNote(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      rows={2}
+                      placeholder="Descreva as correções necessárias..."
+                    />
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApproveSubmission(selectedSubmission._id)}
+                      className="flex-1 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                    >
+                      ✅ Aprovar e Enviar ao Cliente
+                    </button>
+                    <button
+                      onClick={() => handleRequestRevision(selectedSubmission._id)}
+                      className="flex-1 py-2 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600"
+                    >
+                      🔄 Solicitar Revisão
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-gray-500 text-sm text-center py-8">
+                Selecione uma tradução para ver os detalhes
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Security Section (Admin only) */}
+      {activeSection === 'security' && isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Suspicious Users */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">⚠️ Usuários Suspeitos (Múltiplos IPs)</h2>
+            <p className="text-xs text-gray-500 mb-3">Usuários que acessaram de mais de 3 IPs diferentes.</p>
+            {suspiciousUsers.length === 0 ? (
+              <p className="text-gray-500 text-sm">Nenhum usuário suspeito detectado.</p>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {suspiciousUsers.map((usr) => (
+                  <div
+                    key={usr._id}
+                    className="p-3 border rounded bg-red-50 border-red-200"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{usr.name}</div>
+                        <div className="text-xs text-gray-500">{usr.email}</div>
+                      </div>
+                      <span className="text-xs bg-red-200 text-red-700 px-2 py-0.5 rounded">
+                        {usr.unique_ips} IPs
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => fetchUserIpHistory(usr._id)}
+                      className="mt-2 text-xs text-blue-600 hover:underline"
+                    >
+                      Ver histórico de IPs →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* IP History / Login Attempts */}
+          <div className="bg-white rounded-lg shadow p-4">
+            {selectedUserIpHistory ? (
+              <>
+                <div className="flex justify-between items-center mb-3">
+                  <h2 className="text-sm font-bold text-gray-700">📍 Histórico de IPs</h2>
+                  <button
+                    onClick={() => setSelectedUserIpHistory(null)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    ✕ Fechar
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {ipHistoryData.map((entry, idx) => (
+                    <div key={idx} className="p-2 border rounded text-xs">
+                      <div className="font-mono">{entry.ip}</div>
+                      <div className="text-gray-500">{entry.user_agent}</div>
+                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString('pt-BR')}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-sm font-bold text-gray-700 mb-3">🕐 Últimos Logins</h2>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {loginAttempts.map((attempt, idx) => (
+                    <div key={idx} className="p-2 border rounded text-xs flex justify-between items-center">
+                      <div>
+                        <div className="font-medium">{attempt.user_name || attempt.email}</div>
+                        <div className="font-mono text-gray-500">{attempt.ip}</div>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-0.5 rounded ${attempt.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {attempt.success ? 'OK' : 'Falhou'}
+                        </span>
+                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString('pt-BR')}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== USERS MANAGEMENT PAGE ====================
 const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
@@ -10599,10 +10918,17 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs, translator-payments
   const [paymentProofs, setPaymentProofs] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [proofFilter, setProofFilter] = useState('pending');
+  // Translator payments state
+  const [translators, setTranslators] = useState([]);
+  const [translatorPayments, setTranslatorPayments] = useState([]);
+  const [selectedTranslatorForPayment, setSelectedTranslatorForPayment] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentReport, setPaymentReport] = useState(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
@@ -10689,6 +11015,58 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Translator payments functions
+  const fetchTranslatorsForPayment = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
+      setTranslators(response.data || []);
+    } catch (err) {
+      console.error('Error fetching translators:', err);
+    }
+  };
+
+  const fetchPaymentReport = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/payments/report?admin_key=${adminKey}`);
+      setPaymentReport(response.data);
+    } catch (err) {
+      console.error('Error fetching payment report:', err);
+    }
+  };
+
+  const fetchTranslatorPaymentHistory = async (translatorId) => {
+    try {
+      const response = await axios.get(`${API}/admin/payments/translator/${translatorId}?admin_key=${adminKey}`);
+      setTranslatorPayments(response.data.payments || []);
+    } catch (err) {
+      console.error('Error fetching translator payments:', err);
+    }
+  };
+
+  const handleRegisterPayment = async () => {
+    if (!selectedTranslatorForPayment || !paymentAmount) {
+      alert('Selecione um tradutor e informe o valor do pagamento');
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
+        translator_id: selectedTranslatorForPayment._id,
+        amount: parseFloat(paymentAmount),
+        note: paymentNote
+      });
+      alert('Pagamento registrado com sucesso!');
+      setPaymentAmount('');
+      setPaymentNote('');
+      fetchTranslatorsForPayment();
+      fetchPaymentReport();
+      if (selectedTranslatorForPayment) {
+        fetchTranslatorPaymentHistory(selectedTranslatorForPayment._id);
+      }
+    } catch (err) {
+      alert('Erro ao registrar pagamento: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -10701,6 +11079,10 @@ const FinancesPage = ({ adminKey }) => {
   useEffect(() => {
     if (activeView === 'payment-proofs') {
       fetchPaymentProofs();
+    }
+    if (activeView === 'translator-payments') {
+      fetchTranslatorsForPayment();
+      fetchPaymentReport();
     }
   }, [proofFilter, activeView]);
 
@@ -10839,6 +11221,12 @@ const FinancesPage = ({ adminKey }) => {
                   {paymentProofs.filter(p => p.status === 'pending').length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveView('translator-payments')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'translator-payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              💰 Pagar Tradutores
             </button>
           </div>
         </div>
@@ -11339,6 +11727,133 @@ const FinancesPage = ({ adminKey }) => {
           </div>
         </div>
       )}
+
+      {/* Translator Payments View */}
+      {activeView === 'translator-payments' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Translators List */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">👥 Tradutores</h2>
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {translators.length === 0 ? (
+                <p className="text-gray-500 text-sm">Nenhum tradutor encontrado.</p>
+              ) : (
+                translators.map((translator) => (
+                  <div
+                    key={translator._id}
+                    onClick={() => {
+                      setSelectedTranslatorForPayment(translator);
+                      fetchTranslatorPaymentHistory(translator._id);
+                    }}
+                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
+                      selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-sm">{translator.name}</div>
+                        <div className="text-xs text-gray-500">{translator.email}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-xs text-gray-500">Páginas pendentes</div>
+                        <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs text-gray-500">
+                      <span>Taxa: ${translator.rate_per_page || 25}/página</span>
+                      <span className="font-medium text-green-600">
+                        Total: ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Payment Form & History */}
+          <div className="space-y-4">
+            {/* Payment Form */}
+            {selectedTranslatorForPayment && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">💳 Registrar Pagamento: {selectedTranslatorForPayment.name}</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Valor do Pagamento ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      placeholder={`Sugerido: $${((selectedTranslatorForPayment.pending_payment_pages || 0) * (selectedTranslatorForPayment.rate_per_page || 25)).toFixed(2)}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nota (opcional)</label>
+                    <textarea
+                      value={paymentNote}
+                      onChange={(e) => setPaymentNote(e.target.value)}
+                      className="w-full border rounded p-2 text-sm"
+                      rows={2}
+                      placeholder="Referência de pagamento, período, etc."
+                    />
+                  </div>
+                  <button
+                    onClick={handleRegisterPayment}
+                    className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                  >
+                    ✅ Registrar Pagamento
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Payment History */}
+            {selectedTranslatorForPayment && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📜 Histórico de Pagamentos</h2>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {translatorPayments.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Nenhum pagamento registrado.</p>
+                  ) : (
+                    translatorPayments.map((payment, idx) => (
+                      <div key={idx} className="p-2 border rounded text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-green-600">${payment.amount.toFixed(2)}</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                        {payment.note && (
+                          <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Payment Report Summary */}
+            {paymentReport && (
+              <div className="bg-white rounded-lg shadow p-4">
+                <h2 className="text-sm font-bold text-gray-700 mb-3">📊 Resumo Geral</h2>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-3 bg-yellow-50 rounded">
+                    <div className="text-xs text-gray-500">Total Pendente</div>
+                    <div className="font-bold text-xl text-yellow-600">${paymentReport.total_pending?.toFixed(2) || '0.00'}</div>
+                  </div>
+                  <div className="p-3 bg-green-50 rounded">
+                    <div className="text-xs text-gray-500">Total Pago (Mês)</div>
+                    <div className="font-bold text-xl text-green-600">${paymentReport.total_paid_month?.toFixed(2) || '0.00'}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -11367,8 +11882,11 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const [zelleEmail, setZelleEmail] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedEthics, setAcceptedEthics] = useState(false);
+  const [acceptedProhibitedUse, setAcceptedProhibitedUse] = useState(false);
 
   const isTranslator = userInfo?.role === 'translator';
+  const isPM = userInfo?.role === 'pm';
+  const requiresTerms = isTranslator || isPM; // Both translators and PMs must accept terms
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -11398,8 +11916,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       return;
     }
 
-    // If translator, go to step 2, otherwise submit directly
-    if (isTranslator) {
+    // If translator or PM, go to step 2 for terms acceptance, otherwise submit directly
+    if (requiresTerms) {
       setStep(2);
     } else {
       handleFinalSubmit();
@@ -11409,13 +11927,18 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const handleFinalSubmit = async () => {
     setError('');
 
-    // Validate translator-specific requirements
-    if (isTranslator) {
+    // Validate terms acceptance for translators and PMs
+    if (requiresTerms) {
       if (!acceptedTerms) {
         setError('You must accept the terms and conditions');
         return;
       }
-      if (!acceptedEthics) {
+      if (!acceptedProhibitedUse) {
+        setError('You must accept the prohibited use clause');
+        return;
+      }
+      // Ethics only required for translators
+      if (isTranslator && !acceptedEthics) {
         setError('You must accept the translator ethics guidelines');
         return;
       }
@@ -11427,6 +11950,12 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         token: inviteToken,
         password: password
       };
+
+      // Add terms acceptance data for translators and PMs
+      if (requiresTerms) {
+        data.accepted_terms = acceptedTerms;
+        data.accepted_prohibited_use = acceptedProhibitedUse;
+      }
 
       // Add translator-specific data
       if (isTranslator) {
@@ -11440,7 +11969,6 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         data.routing_number = routingNumber || null;
         data.paypal_email = paypalEmail || null;
         data.zelle_email = zelleEmail || null;
-        data.accepted_terms = acceptedTerms;
         data.accepted_ethics = acceptedEthics;
       }
 
@@ -11488,8 +12016,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
     );
   }
 
-  // Step 2: Translator onboarding form
-  if (step === 2 && isTranslator) {
+  // Step 2: Terms acceptance form (for translators and PMs)
+  if (step === 2 && requiresTerms) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center py-8">
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-4">
@@ -11499,7 +12027,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
             </div>
             <h1 className="text-xl font-bold text-gray-800">Complete Your Profile</h1>
             <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
-            <p className="text-xs text-teal-600">Step 2 of 2 - Translator Information</p>
+            <p className="text-xs text-teal-600">Step 2 of 2 - {isTranslator ? 'Translator Information' : 'Terms Acceptance'}</p>
           </div>
 
           {error && (
@@ -11515,7 +12043,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           )}
 
           <div className="space-y-4">
-            {/* Language & Rates Section */}
+            {/* Language & Rates Section - Translator only */}
+            {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Language & Rates</h3>
               <div className="space-y-3">
@@ -11556,8 +12085,10 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Payment Section */}
+            {/* Payment Section - Translator only */}
+            {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Information</h3>
               <div className="space-y-3">
@@ -11650,13 +12181,15 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 )}
               </div>
             </div>
+            )}
 
             {/* Terms & Ethics Section */}
             <div className="border rounded p-3 bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Terms & Ethics Agreement</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Terms Agreement</h3>
 
               <div className="space-y-3">
-                {/* Ethics Guidelines */}
+                {/* Ethics Guidelines - Translator only */}
+                {isTranslator && (
                 <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
                   <strong>Translator Ethics Guidelines (ATA Standards)</strong>
                   <ul className="list-disc ml-4 mt-2 space-y-1">
@@ -11681,6 +12214,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
                   </span>
                 </label>
+                )}
 
                 {/* Terms and Conditions */}
                 <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
@@ -11705,6 +12239,37 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     I accept the Terms and Conditions for working as a contractor with Legacy Translations *
                   </span>
                 </label>
+
+                {/* Prohibited Use Clause */}
+                <div className="bg-red-50 p-3 rounded border border-red-200 text-xs text-gray-700 max-h-32 overflow-y-auto">
+                  <strong className="text-red-700">Prohibited Use Clause</strong>
+                  <p className="mt-2">
+                    It is expressly <strong>PROHIBITED</strong> to use the Legacy Translations platform, its tools,
+                    templates, and any company resources for any purposes other than those directly related to
+                    authorized work within the Legacy Translations system. This includes, but is not limited to:
+                  </p>
+                  <ul className="list-disc ml-4 mt-2 space-y-1">
+                    <li>Using company tools, templates, or resources for personal or third-party projects</li>
+                    <li>Sharing login credentials or access links with unauthorized persons</li>
+                    <li>Copying or distributing proprietary templates, formats, or methodologies</li>
+                    <li>Using the platform to conduct business outside of Legacy Translations</li>
+                    <li>Unauthorized access or sharing of client information</li>
+                  </ul>
+                  <p className="mt-2 font-medium text-red-700">
+                    All rights reserved. © {new Date().getFullYear()} Legacy Translations LLC - legacytranslations.com
+                  </p>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedProhibitedUse}
+                    onChange={(e) => setAcceptedProhibitedUse(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-gray-700">
+                    I understand and accept the Prohibited Use Clause. I agree not to use Legacy Translations resources for unauthorized purposes. *
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -11719,7 +12284,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               <button
                 type="button"
                 onClick={handleFinalSubmit}
-                disabled={loading || success || !acceptedTerms || !acceptedEthics}
+                disabled={loading || success || !acceptedTerms || !acceptedProhibitedUse || (isTranslator && !acceptedEthics)}
                 className="flex-1 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
               >
                 {loading ? 'Setting up...' : 'Complete Setup'}
@@ -11742,7 +12307,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           <h1 className="text-xl font-bold text-gray-800">Set Up Your Account</h1>
           <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
           <p className="text-xs text-teal-600 mt-1">{userInfo?.role?.toUpperCase()}</p>
-          {isTranslator && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
+          {requiresTerms && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
         </div>
 
         {error && (
@@ -11787,7 +12352,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
             disabled={loading || success}
             className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
           >
-            {isTranslator ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
+            {requiresTerms ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
           </button>
         </form>
       </div>
@@ -13559,6 +14124,10 @@ function AdminApp() {
       case 'users':
         return ['admin', 'pm'].includes(userRole)
           ? <UsersPage adminKey={adminKey} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'review':
+        return ['admin', 'pm'].includes(userRole)
+          ? <ReviewPage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
