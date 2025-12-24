@@ -514,7 +514,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -2025,11 +2025,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const destinationLabel = destination === 'pm' ? 'PM' : 'Admin';
       if (response.data.status === 'success' || response.data.success) {
-        setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
+        // Check if user is a translator (they can't access Projects page)
+        const isTranslator = user?.role === 'translator';
+
+        if (isTranslator) {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! You can start a new translation.`);
+        } else {
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
+        }
         setSelectedOrderId('');
 
-        // Navigate back to Projects after a short delay
-        if (onBack) {
+        // Navigate back to Projects after a short delay (only for non-translators)
+        if (onBack && !isTranslator) {
           setTimeout(() => {
             onBack();
           }, 1500);
@@ -5991,13 +5998,16 @@ tradução juramentada | certified translation`}
                     >
                       {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
                     </button>
-                    <button
-                      onClick={() => sendToProjects('admin')}
-                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
-                    </button>
+                    {/* Only show "Send to Admin" for non-translators */}
+                    {user?.role !== 'translator' && (
+                      <button
+                        onClick={() => sendToProjects('admin')}
+                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                      </button>
+                    )}
                   </div>
                 </div>
                 {availableOrders.length === 0 && (
@@ -12834,10 +12844,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </div>
 
                         {/* Footer */}
-                        <div className="text-center border-t pt-4 text-sm text-gray-500">
-                          <p className="font-medium text-teal-600 mb-2">{t.thankYou}</p>
-                          <p>{t.contact}: info@legacytranslation.com | {t.phone}: (555) 123-4567</p>
-                          <p>{t.website}: www.legacytranslation.com</p>
+                        <div className="text-center border-t pt-4">
+                          <p className="font-medium text-teal-600 mb-3 text-base">{t.thankYou}</p>
+                          <div className="bg-gray-50 rounded-lg p-4 inline-block">
+                            <p className="text-gray-700 font-medium mb-1">Legacy Translation Services</p>
+                            <p className="text-gray-600 text-sm">legacytranslations.com | {t.phone}: +1(857)316-7770</p>
+                            <p className="text-gray-600 text-sm">{t.website}: www.legacytranslation.com</p>
+                          </div>
                         </div>
                       </>
                     );
@@ -13473,9 +13486,9 @@ function AdminApp() {
 
     switch (activeTab) {
       case 'pm-dashboard':
-        return userRole === 'pm'
+        return userRole === 'admin'
           ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
-          : <div className="p-6 text-center text-gray-500">Access denied - PM only</div>;
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
