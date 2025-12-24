@@ -611,10 +611,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   });
 
   // Predefined certificate templates with body text only (header, logos, signature are separate)
+  // Template Categories for organization
+  const TEMPLATE_CATEGORIES = {
+    'certificates': { name: 'Certificates', icon: '📜', description: 'Standard translation certificates' },
+    'rmv-forms': { name: 'RMV / DMV Forms', icon: '🚗', description: 'Motor vehicle forms' },
+    'brazil-docs': { name: 'Brazilian Documents', icon: '🇧🇷', description: 'Brazilian official documents' },
+    'education': { name: 'Education', icon: '🎓', description: 'Academic documents' }
+  };
+
   const CERTIFICATE_TEMPLATES = {
     'default': {
-      name: 'Default - Standard',
-      description: 'Standard Certificate of Translation',
+      name: 'Default',
+      description: 'Standard Certificate',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {{targetLanguage}} (United States) translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.',
@@ -623,8 +632,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'rmv-ma': {
-      name: 'RMV - Massachusetts',
-      description: 'Driver\'s License - MA Registry',
+      name: 'RMV Massachusetts',
+      description: 'MA Registry',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>Massachusetts Registry of Motor Vehicles (RMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the Commonwealth of Massachusetts.',
@@ -634,8 +644,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'dmv-fl': {
-      name: 'DMV - Florida',
-      description: 'Driver\'s License - FL DMV',
+      name: 'DMV Florida',
+      description: 'FL DMV',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>Florida Department of Highway Safety and Motor Vehicles (FLHSMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the State of Florida.',
@@ -645,8 +656,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'uscis': {
-      name: 'USCIS - Immigration',
-      description: 'Immigration Documents',
+      name: 'USCIS Immigration',
+      description: 'Immigration',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>United States Citizenship and Immigration Services (USCIS)</strong> and complies with the USCIS translation requirements as specified in 8 CFR 103.2(b)(3).',
@@ -656,8 +668,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'education': {
-      name: 'Education - WES/ECE',
-      description: 'Academic Documents',
+      name: 'WES/ECE',
+      description: 'Academic Eval',
+      category: 'education',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>academic document(s)</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is suitable for submission to <strong>credential evaluation services</strong> such as World Education Services (WES), Educational Credential Evaluators (ECE), and similar organizations, as well as educational institutions in the United States.',
@@ -667,8 +680,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'rmv-foreign-dl': {
-      name: "RMV_Foreign Driver's License Form",
-      description: 'Official MA RMV Form LIC114',
+      name: "Foreign DL Form",
+      description: 'LIC114',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px;">
@@ -831,8 +845,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-formulario': {
-      name: "RMV-Formulario",
-      description: 'Formulário RMV - Tradução CNH',
+      name: "RMV Formulário",
+      description: 'Tradução CNH',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px; background: #fff;">
@@ -998,8 +1013,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-documents': {
-      name: "RMV-Documents",
-      description: 'Certification of Translation Accuracy',
+      name: "RMV Certification",
+      description: 'Translation Accuracy',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 2; max-width: 700px; margin: 0 auto; padding: 60px 50px; background: #fff;">
@@ -1045,8 +1061,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'historico-escolar-sp': {
-      name: "Histórico Escolar - SP",
-      description: 'Escola Pública de São Paulo',
+      name: "Histórico Escolar SP",
+      description: 'Ensino Fundamental',
+      category: 'education',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 15px; background: #fff; border: 1px solid #000;">
@@ -1364,8 +1381,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'cnh-brasil': {
-      name: "CNH - Carteira Nacional de Habilitação",
-      description: 'Brazilian Driver License',
+      name: "CNH Brasil",
+      description: 'Driver License',
+      category: 'brazil-docs',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 0; background: #fff;">
@@ -4255,42 +4273,19 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
-          {/* Certificate Template Selector */}
-          <div className="bg-white rounded shadow p-4">
-            <h3 className="text-sm font-bold mb-3">📜 Certificate Template</h3>
-            <p className="text-xs text-gray-500 mb-3">Select a certificate template or upload a custom one. Headers, logos, and signatures are applied automatically.</p>
-
-            {/* Predefined Templates */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
-              {Object.entries(CERTIFICATE_TEMPLATES).map(([key, template]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setSelectedCertificateTemplate(key);
-                    localStorage.setItem('selected_certificate_template', key);
-                  }}
-                  className={`p-3 text-xs rounded border-2 transition-all ${selectedCertificateTemplate === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <div className="font-bold">{template.name}</div>
-                  <div className="text-[10px] text-gray-500">{template.description}</div>
-                </button>
-              ))}
-
-              {/* Upload Custom Template Button */}
+          {/* Certificate Template Selector - Organized by Category */}
+          <div className="bg-white rounded shadow p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-bold">📜 Certificate Template</h3>
               <button
                 onClick={() => {
-                  const name = prompt('Enter template name (e.g., "State Court - NY"):');
+                  const name = prompt('Template name:');
                   if (name) {
-                    const templateText = prompt('Enter the certificate body paragraphs (use {{sourceLanguage}} and {{targetLanguage}} for language placeholders). Separate paragraphs with ||:');
+                    const templateText = prompt('Certificate paragraphs (use {{sourceLanguage}}, {{targetLanguage}}). Separate with ||:');
                     if (templateText) {
                       const paragraphs = templateText.split('||').map(p => p.trim()).filter(p => p);
                       if (paragraphs.length > 0) {
-                        const newTemplate = {
-                          id: Date.now(),
-                          name,
-                          description: 'Custom Template',
-                          bodyParagraphs: paragraphs
-                        };
+                        const newTemplate = { id: Date.now(), name, description: 'Custom', bodyParagraphs: paragraphs };
                         const updated = [...customCertificateTemplates, newTemplate];
                         setCustomCertificateTemplates(updated);
                         localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
@@ -4300,50 +4295,89 @@ tradução juramentada | certified translation`}
                     }
                   }
                 }}
-                className="p-3 text-xs rounded border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                className="text-[10px] px-2 py-1 rounded border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
               >
-                <div className="font-bold text-blue-600">+ Add Custom</div>
-                <div className="text-[10px] text-gray-500">Create your template</div>
+                + Custom
               </button>
             </div>
 
-            {/* Custom Templates List */}
-            {customCertificateTemplates.length > 0 && (
-              <div className="border-t pt-3">
-                <p className="text-xs font-medium text-gray-600 mb-2">Custom Templates:</p>
-                <div className="flex flex-wrap gap-2">
-                  {customCertificateTemplates.map(tpl => (
-                    <div key={tpl.id} className="flex items-center">
-                      <button
-                        onClick={() => {
-                          setSelectedCertificateTemplate(`custom-${tpl.id}`);
-                          localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
-                        }}
-                        className={`px-3 py-1.5 text-xs rounded-l border ${selectedCertificateTemplate === `custom-${tpl.id}` ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200'}`}
-                      >
-                        {tpl.name}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Delete template "${tpl.name}"?`)) {
-                            const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
-                            setCustomCertificateTemplates(updated);
-                            localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
-                            if (selectedCertificateTemplate === `custom-${tpl.id}`) {
-                              setSelectedCertificateTemplate('default');
-                              localStorage.setItem('selected_certificate_template', 'default');
-                            }
-                          }
-                        }}
-                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-l-0 border-red-200 rounded-r hover:bg-red-100"
-                      >
-                        🗑️
-                      </button>
+            {/* Templates by Category */}
+            <div className="space-y-2">
+              {Object.entries(TEMPLATE_CATEGORIES).map(([catKey, category]) => {
+                const templatesInCategory = Object.entries(CERTIFICATE_TEMPLATES).filter(([_, t]) => t.category === catKey);
+                if (templatesInCategory.length === 0) return null;
+                return (
+                  <div key={catKey} className="border rounded p-2">
+                    <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                      <span>{category.icon}</span>
+                      <span>{category.name}</span>
+                      <span className="text-[9px] text-gray-400 font-normal">({templatesInCategory.length})</span>
                     </div>
-                  ))}
+                    <div className="flex flex-wrap gap-1">
+                      {templatesInCategory.map(([key, template]) => (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            setSelectedCertificateTemplate(key);
+                            localStorage.setItem('selected_certificate_template', key);
+                          }}
+                          className={`px-2 py-1 text-[9px] rounded transition-all ${selectedCertificateTemplate === key
+                            ? 'bg-blue-500 text-white font-medium'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          title={template.description}
+                        >
+                          {template.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Custom Templates */}
+              {customCertificateTemplates.length > 0 && (
+                <div className="border rounded p-2 border-dashed">
+                  <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                    <span>⭐</span>
+                    <span>Custom Templates</span>
+                    <span className="text-[9px] text-gray-400 font-normal">({customCertificateTemplates.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {customCertificateTemplates.map(tpl => (
+                      <div key={tpl.id} className="flex items-center">
+                        <button
+                          onClick={() => {
+                            setSelectedCertificateTemplate(`custom-${tpl.id}`);
+                            localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
+                          }}
+                          className={`px-2 py-1 text-[9px] rounded-l transition-all ${selectedCertificateTemplate === `custom-${tpl.id}`
+                            ? 'bg-blue-500 text-white font-medium'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                        >
+                          {tpl.name}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete "${tpl.name}"?`)) {
+                              const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
+                              setCustomCertificateTemplates(updated);
+                              localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                              if (selectedCertificateTemplate === `custom-${tpl.id}`) {
+                                setSelectedCertificateTemplate('default');
+                                localStorage.setItem('selected_certificate_template', 'default');
+                              }
+                            }
+                          }}
+                          className="px-1 py-1 text-[9px] bg-red-100 text-red-600 rounded-r hover:bg-red-200"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Certificate Preview - LIVE with Editable Fields */}
