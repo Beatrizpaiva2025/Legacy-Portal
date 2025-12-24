@@ -11579,6 +11579,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const [acceptedEthics, setAcceptedEthics] = useState(false);
 
   const isTranslator = userInfo?.role === 'translator';
+  const isPM = userInfo?.role === 'pm';
+  const needsTermsAcceptance = isTranslator || isPM;
 
   useEffect(() => {
     const verifyToken = async () => {
@@ -11608,8 +11610,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       return;
     }
 
-    // If translator, go to step 2, otherwise submit directly
-    if (isTranslator) {
+    // If translator or PM, go to step 2 for terms acceptance, otherwise submit directly
+    if (needsTermsAcceptance) {
       setStep(2);
     } else {
       handleFinalSubmit();
@@ -11619,13 +11621,14 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const handleFinalSubmit = async () => {
     setError('');
 
-    // Validate translator-specific requirements
-    if (isTranslator) {
+    // Validate terms acceptance for translator and PM
+    if (needsTermsAcceptance) {
       if (!acceptedTerms) {
         setError('You must accept the terms and conditions');
         return;
       }
-      if (!acceptedEthics) {
+      // Ethics only required for translators
+      if (isTranslator && !acceptedEthics) {
         setError('You must accept the translator ethics guidelines');
         return;
       }
@@ -11698,18 +11701,18 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
     );
   }
 
-  // Step 2: Translator onboarding form
-  if (step === 2 && isTranslator) {
+  // Step 2: Translator/PM onboarding form with terms acceptance
+  if (step === 2 && needsTermsAcceptance) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center py-8">
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-4">
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
-              <span className="text-xl text-white">📋</span>
+              <span className="text-xl text-white">{isTranslator ? '📋' : '👔'}</span>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Complete Your Profile</h1>
             <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
-            <p className="text-xs text-teal-600">Step 2 of 2 - Translator Information</p>
+            <p className="text-xs text-teal-600">Step 2 of 2 - {isTranslator ? 'Translator Information' : 'Terms Acceptance'}</p>
           </div>
 
           {error && (
@@ -11725,7 +11728,8 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           )}
 
           <div className="space-y-4">
-            {/* Language & Rates Section */}
+            {/* Language & Rates Section - Only for Translators */}
+            {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Language & Rates</h3>
               <div className="space-y-3">
@@ -11766,8 +11770,10 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Payment Section */}
+            {/* Payment Section - Only for Translators */}
+            {isTranslator && (
             <div className="border rounded p-3 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Payment Information</h3>
               <div className="space-y-3">
@@ -11860,40 +11866,47 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 )}
               </div>
             </div>
+            )}
 
             {/* Terms & Ethics Section */}
             <div className="border rounded p-3 bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Terms & Ethics Agreement</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-3">
+                {isTranslator ? 'Terms & Ethics Agreement' : 'Terms & Conditions Agreement'}
+              </h3>
 
               <div className="space-y-3">
-                {/* Ethics Guidelines */}
-                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
-                  <strong>Translator Ethics Guidelines (ATA Standards)</strong>
-                  <ul className="list-disc ml-4 mt-2 space-y-1">
-                    <li>Maintain strict confidentiality of all client documents and information</li>
-                    <li>Provide accurate and faithful translations without additions or omissions</li>
-                    <li>Only accept work within your area of competence and language expertise</li>
-                    <li>Disclose any conflicts of interest before accepting assignments</li>
-                    <li>Meet agreed deadlines and communicate promptly about any delays</li>
-                    <li>Respect intellectual property rights and copyright laws</li>
-                    <li>Maintain professional development and stay current in your field</li>
-                    <li>Never use client materials for personal gain or share with third parties</li>
-                  </ul>
-                </div>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={acceptedEthics}
-                    onChange={(e) => setAcceptedEthics(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span className="text-xs text-gray-700">
-                    I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
-                  </span>
-                </label>
+                {/* Ethics Guidelines - Only for Translators */}
+                {isTranslator && (
+                  <>
+                    <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                      <strong>Translator Ethics Guidelines (ATA Standards)</strong>
+                      <ul className="list-disc ml-4 mt-2 space-y-1">
+                        <li>Maintain strict confidentiality of all client documents and information</li>
+                        <li>Provide accurate and faithful translations without additions or omissions</li>
+                        <li>Only accept work within your area of competence and language expertise</li>
+                        <li>Disclose any conflicts of interest before accepting assignments</li>
+                        <li>Meet agreed deadlines and communicate promptly about any delays</li>
+                        <li>Respect intellectual property rights and copyright laws</li>
+                        <li>Maintain professional development and stay current in your field</li>
+                        <li>Never use client materials for personal gain or share with third parties</li>
+                      </ul>
+                    </div>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={acceptedEthics}
+                        onChange={(e) => setAcceptedEthics(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span className="text-xs text-gray-700">
+                        I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
+                      </span>
+                    </label>
+                  </>
+                )}
 
                 {/* Terms and Conditions */}
-                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-48 overflow-y-auto">
                   <strong>Terms and Conditions</strong>
                   <ul className="list-disc ml-4 mt-2 space-y-1">
                     <li>Translations remain property of Legacy Translations until delivered to client</li>
@@ -11903,6 +11916,29 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <li>Non-compete for direct contact with clients for 12 months</li>
                     <li>Confidentiality obligations continue after contract termination</li>
                   </ul>
+
+                  <div className="mt-4 pt-3 border-t border-red-200 bg-red-50 p-2 rounded">
+                    <strong className="text-red-700">⚠️ PROHIBITED USE CLAUSE</strong>
+                    <p className="mt-1 text-red-700">
+                      This system, platform, and all associated tools are the exclusive property of Legacy Translations LLC.
+                      <strong> IT IS EXPRESSLY PROHIBITED</strong> to use this system for any purpose other than performing
+                      translation services directly for Legacy Translations. Any unauthorized use, including but not limited to:
+                    </p>
+                    <ul className="list-disc ml-4 mt-1 text-red-600 space-y-1">
+                      <li>Using this platform for personal projects or third-party work</li>
+                      <li>Sharing access credentials with any third party</li>
+                      <li>Copying, reproducing, or reverse-engineering any part of this system</li>
+                      <li>Using translation tools, templates, or AI features for external purposes</li>
+                    </ul>
+                    <p className="mt-2 text-red-700">
+                      Violations will result in immediate termination and may lead to legal action.
+                    </p>
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t text-center text-gray-500 text-[10px]">
+                    © {new Date().getFullYear()} Legacy Translations LLC. All rights reserved.<br/>
+                    <strong>legacytranslations.com</strong>
+                  </div>
                 </div>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input
@@ -11912,7 +11948,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     className="mt-1"
                   />
                   <span className="text-xs text-gray-700">
-                    I accept the Terms and Conditions for working as a contractor with Legacy Translations *
+                    I accept the Terms and Conditions and acknowledge that this system is for exclusive use with Legacy Translations. All rights reserved to legacytranslations.com *
                   </span>
                 </label>
               </div>
@@ -11929,7 +11965,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               <button
                 type="button"
                 onClick={handleFinalSubmit}
-                disabled={loading || success || !acceptedTerms || !acceptedEthics}
+                disabled={loading || success || !acceptedTerms || (isTranslator && !acceptedEthics)}
                 className="flex-1 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
               >
                 {loading ? 'Setting up...' : 'Complete Setup'}
