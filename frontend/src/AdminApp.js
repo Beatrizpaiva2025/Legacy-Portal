@@ -12190,30 +12190,32 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               <div className="space-y-3">
                 {/* Ethics Guidelines - Translator only */}
                 {isTranslator && (
-                <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
-                  <strong>Translator Ethics Guidelines (ATA Standards)</strong>
-                  <ul className="list-disc ml-4 mt-2 space-y-1">
-                    <li>Maintain strict confidentiality of all client documents and information</li>
-                    <li>Provide accurate and faithful translations without additions or omissions</li>
-                    <li>Only accept work within your area of competence and language expertise</li>
-                    <li>Disclose any conflicts of interest before accepting assignments</li>
-                    <li>Meet agreed deadlines and communicate promptly about any delays</li>
-                    <li>Respect intellectual property rights and copyright laws</li>
-                    <li>Maintain professional development and stay current in your field</li>
-                    <li>Never use client materials for personal gain or share with third parties</li>
-                  </ul>
-                </div>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={acceptedEthics}
-                    onChange={(e) => setAcceptedEthics(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span className="text-xs text-gray-700">
-                    I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
-                  </span>
-                </label>
+                  <>
+                    <div className="bg-white p-3 rounded border text-xs text-gray-600 max-h-32 overflow-y-auto">
+                      <strong>Translator Ethics Guidelines (ATA Standards)</strong>
+                      <ul className="list-disc ml-4 mt-2 space-y-1">
+                        <li>Maintain strict confidentiality of all client documents and information</li>
+                        <li>Provide accurate and faithful translations without additions or omissions</li>
+                        <li>Only accept work within your area of competence and language expertise</li>
+                        <li>Disclose any conflicts of interest before accepting assignments</li>
+                        <li>Meet agreed deadlines and communicate promptly about any delays</li>
+                        <li>Respect intellectual property rights and copyright laws</li>
+                        <li>Maintain professional development and stay current in your field</li>
+                        <li>Never use client materials for personal gain or share with third parties</li>
+                      </ul>
+                    </div>
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={acceptedEthics}
+                        onChange={(e) => setAcceptedEthics(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <span className="text-xs text-gray-700">
+                        I have read and agree to follow the Translator Ethics Guidelines based on ATA (American Translators Association) standards *
+                      </span>
+                    </label>
+                  </>
                 )}
 
                 {/* Terms and Conditions */}
