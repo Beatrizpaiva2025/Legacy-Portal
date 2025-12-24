@@ -1362,6 +1362,252 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         </div>
       `
+    },
+    'cnh-brasil': {
+      name: "CNH - Carteira Nacional de Habilitação",
+      description: 'Brazilian Driver License',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 0; background: #fff;">
+
+          <!-- Green Header -->
+          <div style="background: linear-gradient(135deg, #006847 0%, #004d35 100%); color: #fff; padding: 8px 15px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 14px; font-weight: bold;">REPÚBLICA FEDERATIVA DO BRASIL</div>
+              <div style="font-size: 9px;">MINISTÉRIO DOS TRANSPORTES</div>
+              <div style="font-size: 9px;">SECRETARIA NACIONAL DE TRÂNSITO - SENATRAN</div>
+            </div>
+            <div style="font-size: 16px; font-weight: bold; color: #ffdf00;">gov.br</div>
+          </div>
+
+          <!-- Main Card -->
+          <div style="border: 2px solid #006847; margin: 10px; padding: 0;">
+
+            <!-- Card Header -->
+            <div style="background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%); padding: 8px 10px; border-bottom: 2px solid #006847; display: flex; align-items: center; justify-content: space-between;">
+              <div style="text-align: center; flex: 1;">
+                <div style="font-size: 9px; font-weight: bold;">REPÚBLICA FEDERATIVA DO BRASIL</div>
+                <div style="font-size: 8px;">MINISTÉRIO DOS TRANSPORTES</div>
+                <div style="font-size: 8px;">SECRETARIA NACIONAL DE TRÂNSITO</div>
+              </div>
+              <div style="background: #006847; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; font-size: 12px;">BR</div>
+            </div>
+
+            <!-- Title -->
+            <div style="background: #006847; color: #fff; text-align: center; padding: 5px; font-size: 10px; font-weight: bold;">
+              CARTEIRA NACIONAL DE HABILITAÇÃO / DRIVER LICENSE / PERMISO DE CONDUCCIÓN
+            </div>
+
+            <!-- Main Content -->
+            <div style="display: flex; padding: 10px; gap: 10px;">
+
+              <!-- Left: Photo and Barcode -->
+              <div style="width: 120px;">
+                <div style="border: 1px solid #000; height: 150px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; margin-bottom: 8px;">
+                  <span style="font-size: 8px; color: #666; text-align: center;">Photo<br/>3x4</span>
+                </div>
+                <div style="writing-mode: vertical-rl; text-orientation: mixed; font-size: 8px; background: #000; color: #fff; padding: 3px; text-align: center;">
+                  VÁLIDO EM TODO O TERRITÓRIO NACIONAL
+                </div>
+                <div style="margin-top: 5px; font-size: 9px; text-align: center;" contenteditable="true">5005512811</div>
+              </div>
+
+              <!-- Right: Information Fields -->
+              <div style="flex: 1;">
+
+                <!-- Row 1: Name and First License -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 2;">
+                    <div style="font-size: 7px; color: #666;">2+9 NOME E SOBRENOME / NAME AND SURNAME / NOMBRE Y APELLIDOS</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-weight: bold; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 80px;">
+                    <div style="font-size: 7px; color: #666;">1ª HABILITAÇÃO / FIRST LICENSE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                </div>
+
+                <!-- Row 2: Birth Date/Place -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">3 DATA, LOCAL E UF DE NASCIMENTO / DATE AND PLACE OF BIRTH</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 3: Issue Date, Validity, ACC -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4a DATA EMISSÃO / ISSUE DATE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4b VALIDADE / EXPIRY DATE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px; color: #c00;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 60px;">
+                    <div style="font-size: 7px; color: #666;">ACC</div>
+                    <div style="border: 1px solid #000; padding: 2px; font-size: 10px; text-align: center; background: #f0f0f0;" contenteditable="true">P</div>
+                  </div>
+                </div>
+
+                <!-- Row 4: ID Document -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">4c DOC IDENTIDADE / ORG EMISSOR / UF - ID DOCUMENT / ISSUING AUTHORITY</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 5: CPF, Registration, Category -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4d CPF</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">5 Nº REGISTRO / REGISTRATION NUMBER</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px; color: #c00;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 50px;">
+                    <div style="font-size: 7px; color: #666;">9 CAT/HAB</div>
+                    <div style="border: 1px solid #c00; padding: 2px; font-size: 12px; text-align: center; font-weight: bold; color: #c00; background: #fff0f0;" contenteditable="true">B</div>
+                  </div>
+                </div>
+
+                <!-- Row 6: Nationality -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">10 NACIONALIDADE / NATIONALITY</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true">BRASILEIRO(A) / BRAZILIAN</div>
+                </div>
+
+                <!-- Row 7: Parents -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">8 FILIAÇÃO / PARENTS</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 8: Signature -->
+                <div>
+                  <div style="font-size: 7px; color: #666;">7 ASSINATURA DO PORTADOR / HOLDER'S SIGNATURE</div>
+                  <div style="border: 1px solid #ccc; height: 30px; background: #fafafa;"></div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Categories Table -->
+            <div style="padding: 10px; border-top: 1px solid #ccc;">
+              <div style="display: flex; gap: 20px;">
+                <table style="border-collapse: collapse; font-size: 8px; flex: 1;">
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">ACC</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">BE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A2</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">CE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">B</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C1E</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">B1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">DE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D1E</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;"></td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;"></td>
+                  </tr>
+                </table>
+
+                <!-- Observations -->
+                <div style="flex: 1;">
+                  <div style="font-size: 7px; color: #666; margin-bottom: 3px;">12 OBSERVAÇÕES / OBSERVATIONS / OBSERVACIONES</div>
+                  <div style="border: 1px solid #ccc; min-height: 80px; padding: 5px; font-size: 9px;" contenteditable="true">EAR</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer with Location -->
+            <div style="display: flex; justify-content: space-between; padding: 8px 10px; border-top: 1px solid #ccc; background: #f5f5f5;">
+              <div>
+                <div style="font-size: 7px; color: #666;">LOCAL / PLACE</div>
+                <div style="font-size: 10px;" contenteditable="true">SÃO PAULO, SP</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 7px; color: #666;">ASSINADO DIGITALMENTE / DIGITALLY SIGNED</div>
+                <div style="font-size: 8px;">DEPARTAMENTO ESTADUAL DE TRÂNSITO</div>
+                <div style="font-size: 9px;" contenteditable="true">15575604402</div>
+                <div style="font-size: 9px;" contenteditable="true">SP027650816</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- State Name -->
+          <div style="text-align: center; margin: 10px 0;">
+            <div style="font-size: 18px; font-weight: bold;" contenteditable="true">SÃO PAULO</div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div style="margin: 10px; padding: 15px; border: 1px solid #ccc; display: flex; gap: 20px;">
+            <div>
+              <div style="font-weight: bold; margin-bottom: 10px;">QR-CODE</div>
+              <div style="width: 120px; height: 120px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #666;">
+                QR Code<br/>Area
+              </div>
+            </div>
+            <div style="flex: 1; font-size: 9px; line-height: 1.5;">
+              <p>Documento assinado com certificado digital em conformidade com a Medida Provisória nº 2200-2/2001. Sua validade poderá ser confirmada por meio do programa Assinador Serpro.</p>
+              <p style="margin-top: 10px;">As orientações para instalar o Assinador Serpro e realizar a validação do documento digital estão disponíveis em:<br/>
+              <strong>https://www.serpro.gov.br/assinador-digital</strong></p>
+              <div style="margin-top: 15px; text-align: right;">
+                <span style="font-weight: bold; color: #006847;">SERPRO</span> / <span style="font-weight: bold;">SENATRAN</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div style="margin: 10px; padding: 10px; background: #f5f5f5; font-size: 7px; line-height: 1.6; border: 1px solid #ddd;">
+            <div><strong>2+9.</strong> Nome e Sobrenome / Name and Surname / Nombre y Apellidos - <strong>1ª Habilitação</strong> - Primeira Habilitação / First Driver License / Primera Licencia de Conducir - <strong>3.</strong> Data e Local de Nascimento / Date and Place of Birth (DD/MM/YYYY) / Fecha y Lugar de Nacimiento - <strong>4a.</strong> Data de Emissão / Issuing Date (DD/MM/YYYY) / Fecha de Emisión - <strong>4b.</strong> Data de Validade / Expiration Date (DD/MM/YYYY) / Válido Hasta - <strong>ACC</strong> - Autorização para Conduzir Ciclomotor / Moped Authorization / Autorización Ciclomotor - <strong>4c.</strong> Documento de Identificação / Identity Document / Documento de Identificación - Órgão emissor / Issuing Authority / Autoridad Emisora - <strong>4d.</strong> CPF - <strong>5.</strong> Número de registro da CNH / Driver License Number / Número de Permiso de Conducir - <strong>9.</strong> Categoria de Veículos de Carteira de Habilitação / Driver license Class / Categoría de Permiso de Conducir - Nacionalidade / Nationality / Nacionalidad - <strong>8.</strong> Filiação / Filiation / Filiación - <strong>12.</strong> Observações / Observations / Observaciones - Local / Place / Lugar</div>
+          </div>
+
+          <!-- MRZ Code -->
+          <div style="margin: 10px; padding: 10px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px; border: 1px solid #000;">
+            <div contenteditable="true">I&lt;BRA0897718O1&lt;218&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+            <div contenteditable="true">0501068F2604228BRA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;4</div>
+            <div contenteditable="true">SURNAME&lt;&lt;GIVEN&lt;NAMES&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+          </div>
+
+        </div>
+      `
     }
   };
 
