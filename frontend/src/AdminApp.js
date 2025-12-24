@@ -6134,7 +6134,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [pmList, setPmList] = useState([]);
   const [translatorList, setTranslatorList] = useState([]);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [documentFile, setDocumentFile] = useState(null);
+  const [documentFiles, setDocumentFiles] = useState([]);
 
   // Document viewer state
   const [viewingOrder, setViewingOrder] = useState(null);
@@ -6974,20 +6974,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       projectData.page_count = parseInt(projectData.page_count) || 1;
       projectData.word_count = parseInt(projectData.word_count) || 0;
 
-      // Convert document to base64 if provided
-      if (documentFile) {
-        const reader = new FileReader();
-        const base64Promise = new Promise((resolve, reject) => {
-          reader.onload = () => {
-            const base64 = reader.result.split(',')[1]; // Remove data:...;base64, prefix
-            resolve(base64);
-          };
-          reader.onerror = reject;
-        });
-        reader.readAsDataURL(documentFile);
-        const base64Data = await base64Promise;
-        projectData.document_data = base64Data;
-        projectData.document_filename = documentFile.name;
+      // Convert documents to base64 if provided (multiple files support)
+      if (documentFiles.length > 0) {
+        const documentsArray = [];
+        for (const file of documentFiles) {
+          const reader = new FileReader();
+          const base64Promise = new Promise((resolve, reject) => {
+            reader.onload = () => {
+              const base64 = reader.result.split(',')[1]; // Remove data:...;base64, prefix
+              resolve(base64);
+            };
+            reader.onerror = reject;
+          });
+          reader.readAsDataURL(file);
+          const base64Data = await base64Promise;
+          documentsArray.push({
+            filename: file.name,
+            data: base64Data,
+            content_type: file.type || 'application/octet-stream'
+          });
+        }
+        projectData.documents = documentsArray;
+        // Keep backwards compatibility - first file as main document
+        projectData.document_data = documentsArray[0].data;
+        projectData.document_filename = documentsArray[0].filename;
       }
 
       // Set payment status based on received flag
@@ -7024,7 +7034,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         invoice_terms: '30_days',
         invoice_custom_date: ''
       });
-      setDocumentFile(null);
+      setDocumentFiles([]);
       fetchOrders();
     } catch (err) {
       console.error('Error creating project:', err.response?.data || err);
@@ -7740,21 +7750,39 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               )}
             </div>
 
-            {/* Document Upload */}
+            {/* Document Upload - Multiple Files */}
             <div className="mb-3">
-              <label className="block text-[10px] font-medium text-gray-600 mb-1">Document to Translate</label>
+              <label className="block text-[10px] font-medium text-gray-600 mb-1">Documents to Translate (Multiple allowed)</label>
               <div className="flex items-center space-x-2">
                 <input
                   type="file"
-                  onChange={(e) => setDocumentFile(e.target.files[0])}
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                  multiple
+                  onChange={(e) => setDocumentFiles(Array.from(e.target.files))}
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.tiff,.bmp,.gif"
                   className="text-xs"
                 />
-                {documentFile && (
-                  <span className="text-xs text-green-600">✓ {documentFile.name}</span>
+                {documentFiles.length > 0 && (
+                  <span className="text-xs text-green-600">✓ {documentFiles.length} file(s) selected</span>
                 )}
               </div>
-              <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG</p>
+              {documentFiles.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {documentFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-xs">
+                      <span className="truncate max-w-xs">{file.name}</span>
+                      <span className="text-gray-400 ml-2">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      <button
+                        type="button"
+                        onClick={() => setDocumentFiles(documentFiles.filter((_, i) => i !== idx))}
+                        className="ml-2 text-red-500 hover:text-red-700"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG, TIFF, BMP, GIF - Max 100MB per file</p>
             </div>
 
             <div className="grid grid-cols-4 gap-3 mb-3">
@@ -11955,7 +11983,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
   const [selectedReview, setSelectedReview] = useState(null);
-  const [originalContent, setOriginalContent] = useState(null);
+  const [originalContents, setOriginalContents] = useState([]);  // Array for multiple documents
+  const [currentDocIndex, setCurrentDocIndex] = useState(0);  // Current document index
   const [translatedContent, setTranslatedContent] = useState(null);
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
@@ -12231,25 +12260,37 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const loadReviewContent = async (order) => {
     setSelectedReview(order);
     setCorrectionNotes('');
+    setCurrentDocIndex(0);
+    setOriginalContents([]);
 
     try {
       // Fetch documents for this order
       const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       const docs = docsRes.data.documents || [];
 
-      // Find original and translated documents
-      const originalDoc = docs.find(d => d.document_type === 'original' || !d.document_type);
-      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+      // Load ALL original documents (not just the first one)
+      const originalDocs = docs.filter(d => d.document_type === 'original' || !d.document_type || d.source === 'manual_upload' || d.source === 'partner_upload');
+      const loadedDocs = [];
 
-      if (originalDoc) {
-        const origData = await axios.get(`${API}/admin/order-documents/${originalDoc.id}/download?admin_key=${adminKey}`);
-        setOriginalContent({
-          filename: originalDoc.filename,
-          data: origData.data.file_data,
-          contentType: origData.data.content_type
-        });
+      for (const doc of originalDocs) {
+        try {
+          const origData = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+          if (origData.data.file_data) {
+            loadedDocs.push({
+              id: doc.id,
+              filename: doc.filename || origData.data.filename,
+              data: origData.data.file_data,
+              contentType: origData.data.content_type || 'application/pdf'
+            });
+          }
+        } catch (e) {
+          console.error('Failed to load document:', doc.id, e);
+        }
       }
+      setOriginalContents(loadedDocs);
 
+      // Find and load translated document
+      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
       if (translatedDoc) {
         const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
         setTranslatedContent({
@@ -12281,7 +12322,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       ));
       setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
       setSelectedReview(null);
-      setOriginalContent(null);
+      setOriginalContents([]);
       setTranslatedContent(null);
 
       alert(sendTo === 'client_review'
@@ -12337,7 +12378,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       ));
       setReviewQueue(prev => prev.filter(o => o.id !== selectedReview.id));
       setSelectedReview(null);
-      setOriginalContent(null);
+      setOriginalContents([]);
       setTranslatedContent(null);
       setCorrectionNotes('');
 
@@ -12987,7 +13028,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               <div className="p-4 border-b flex justify-between items-center">
                 <div>
                   <button
-                    onClick={() => { setSelectedReview(null); setOriginalContent(null); setTranslatedContent(null); }}
+                    onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
                     className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                   >
                     ← Voltar para fila
@@ -13026,27 +13067,55 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
               {/* Side by Side Content */}
               <div className="grid grid-cols-2 divide-x" style={{ height: 'calc(100vh - 300px)' }}>
-                {/* Original Document */}
+                {/* Original Document(s) */}
                 <div className="p-4 overflow-auto">
-                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
-                    📄 Documento Original
-                  </h4>
-                  {originalContent ? (
-                    originalContent.contentType?.includes('image') ? (
+                  <div className="sticky top-0 bg-white py-1 z-10">
+                    <h4 className="text-sm font-bold text-gray-700 mb-2">
+                      📄 Documentos Originais ({originalContents.length})
+                    </h4>
+                    {originalContents.length > 1 && (
+                      <div className="flex items-center justify-between mb-2 bg-gray-100 rounded p-2">
+                        <button
+                          onClick={() => setCurrentDocIndex(Math.max(0, currentDocIndex - 1))}
+                          disabled={currentDocIndex === 0}
+                          className="px-2 py-1 text-xs bg-white rounded border disabled:opacity-50"
+                        >
+                          ◀ Anterior
+                        </button>
+                        <span className="text-xs font-medium">
+                          {currentDocIndex + 1} / {originalContents.length}
+                        </span>
+                        <button
+                          onClick={() => setCurrentDocIndex(Math.min(originalContents.length - 1, currentDocIndex + 1))}
+                          disabled={currentDocIndex >= originalContents.length - 1}
+                          className="px-2 py-1 text-xs bg-white rounded border disabled:opacity-50"
+                        >
+                          Próximo ▶
+                        </button>
+                      </div>
+                    )}
+                    {originalContents[currentDocIndex] && (
+                      <p className="text-xs text-gray-500 mb-2 truncate">
+                        📎 {originalContents[currentDocIndex].filename}
+                      </p>
+                    )}
+                  </div>
+                  {originalContents.length > 0 && originalContents[currentDocIndex] ? (
+                    originalContents[currentDocIndex].contentType?.includes('image') ? (
                       <img
-                        src={`data:${originalContent.contentType};base64,${originalContent.data}`}
+                        src={`data:${originalContents[currentDocIndex].contentType};base64,${originalContents[currentDocIndex].data}`}
                         alt="Original"
                         className="max-w-full border rounded"
                       />
-                    ) : originalContent.contentType?.includes('pdf') ? (
+                    ) : originalContents[currentDocIndex].contentType?.includes('pdf') ? (
                       <iframe
-                        src={`data:application/pdf;base64,${originalContent.data}`}
+                        src={`data:application/pdf;base64,${originalContents[currentDocIndex].data}`}
                         className="w-full h-full border rounded"
                         title="Original PDF"
                       />
                     ) : (
                       <div className="p-4 bg-gray-50 rounded border text-sm whitespace-pre-wrap">
-                        {atob(originalContent.data)}
+                        {atob(originalContents[currentDocIndex].data)}
                       </div>
                     )
                   ) : (
