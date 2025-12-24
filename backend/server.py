@@ -5816,6 +5816,47 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
 
     return {"documents": all_docs, "count": len(all_docs)}
 
+class OrderDocumentUpload(BaseModel):
+    filename: str
+    file_data: str  # Base64 encoded
+    content_type: Optional[str] = "application/pdf"
+    source: Optional[str] = "manual_upload"
+
+@api_router.post("/admin/orders/{order_id}/documents")
+async def admin_upload_order_document(order_id: str, doc_data: OrderDocumentUpload, admin_key: str):
+    """Admin/PM: Upload a document to an existing order"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Verify order exists
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    try:
+        doc_record = {
+            "id": str(uuid.uuid4()),
+            "order_id": order_id,
+            "filename": doc_data.filename,
+            "data": doc_data.file_data,
+            "content_type": doc_data.content_type,
+            "source": doc_data.source,
+            "uploaded_at": datetime.utcnow()
+        }
+        await db.order_documents.insert_one(doc_record)
+        logger.info(f"Document '{doc_data.filename}' uploaded to order {order_id}")
+
+        return {
+            "status": "success",
+            "message": f"Document '{doc_data.filename}' uploaded successfully",
+            "document_id": doc_record["id"]
+        }
+    except Exception as e:
+        logger.error(f"Error uploading document to order {order_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+
 @api_router.get("/admin/order-documents/{doc_id}/download")
 async def admin_download_order_document(doc_id: str, admin_key: str):
     """Admin/PM/Translator: Download a document from order_documents collection"""
