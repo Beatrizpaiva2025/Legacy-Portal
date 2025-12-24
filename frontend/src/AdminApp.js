@@ -634,10 +634,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   });
 
   // Predefined certificate templates with body text only (header, logos, signature are separate)
+  // Template Categories for organization
+  const TEMPLATE_CATEGORIES = {
+    'certificates': { name: 'Certificates', icon: '📜', description: 'Standard translation certificates' },
+    'rmv-forms': { name: 'RMV / DMV Forms', icon: '🚗', description: 'Motor vehicle forms' },
+    'brazil-docs': { name: 'Brazilian Documents', icon: '🇧🇷', description: 'Brazilian official documents' },
+    'education': { name: 'Education', icon: '🎓', description: 'Academic documents' }
+  };
+
   const CERTIFICATE_TEMPLATES = {
     'default': {
-      name: 'Default - Standard',
-      description: 'Standard Certificate of Translation',
+      name: 'Default',
+      description: 'Standard Certificate',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {{targetLanguage}} (United States) translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.',
@@ -646,8 +655,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'rmv-ma': {
-      name: 'RMV - Massachusetts',
-      description: 'Driver\'s License - MA Registry',
+      name: 'RMV Massachusetts',
+      description: 'MA Registry',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>Massachusetts Registry of Motor Vehicles (RMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the Commonwealth of Massachusetts.',
@@ -657,8 +667,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'dmv-fl': {
-      name: 'DMV - Florida',
-      description: 'Driver\'s License - FL DMV',
+      name: 'DMV Florida',
+      description: 'FL DMV',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>Florida Department of Highway Safety and Motor Vehicles (FLHSMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the State of Florida.',
@@ -668,8 +679,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'uscis': {
-      name: 'USCIS - Immigration',
-      description: 'Immigration Documents',
+      name: 'USCIS Immigration',
+      description: 'Immigration',
+      category: 'certificates',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is being provided for use with the <strong>United States Citizenship and Immigration Services (USCIS)</strong> and complies with the USCIS translation requirements as specified in 8 CFR 103.2(b)(3).',
@@ -679,8 +691,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'education': {
-      name: 'Education - WES/ECE',
-      description: 'Academic Documents',
+      name: 'WES/ECE',
+      description: 'Academic Eval',
+      category: 'education',
       bodyParagraphs: [
         'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>academic document(s)</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This translation is suitable for submission to <strong>credential evaluation services</strong> such as World Education Services (WES), Educational Credential Evaluators (ECE), and similar organizations, as well as educational institutions in the United States.',
@@ -690,8 +703,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ]
     },
     'rmv-foreign-dl': {
-      name: "RMV_Foreign Driver's License Form",
-      description: 'Official MA RMV Form LIC114',
+      name: "Foreign DL Form",
+      description: 'LIC114',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px;">
@@ -854,8 +868,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-formulario': {
-      name: "RMV-Formulario",
-      description: 'Formulário RMV - Tradução CNH',
+      name: "RMV Formulário",
+      description: 'Tradução CNH',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: Arial, sans-serif; font-size: 11px; line-height: 1.4; max-width: 750px; margin: 0 auto; padding: 20px; background: #fff;">
@@ -1021,8 +1036,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       `
     },
     'rmv-documents': {
-      name: "RMV-Documents",
-      description: 'Certification of Translation Accuracy',
+      name: "RMV Certification",
+      description: 'Translation Accuracy',
+      category: 'rmv-forms',
       isForm: true,
       formHTML: `
         <div style="font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 2; max-width: 700px; margin: 0 auto; padding: 60px 50px; background: #fff;">
@@ -1062,6 +1078,573 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <strong>Translator's Signature:</strong> <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 250px; height: 22px;">&nbsp;</span>
               <strong style="margin-left: 40px;">Date:</strong><span style="border-bottom: 1px solid #000; display: inline-block; min-width: 150px; padding: 0 5px;" contenteditable="true">&nbsp;</span>
             </p>
+          </div>
+
+        </div>
+      `
+    },
+    'historico-escolar-sp': {
+      name: "Histórico Escolar SP",
+      description: 'Ensino Fundamental',
+      category: 'education',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 15px; background: #fff; border: 1px solid #000;">
+
+          <!-- Header -->
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #000;">
+            <div style="text-align: center; width: 80px;">
+              <div style="width: 60px; height: 60px; border: 1px solid #000; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 7px;">
+                State of<br/>São Paulo<br/>Coat of Arms
+              </div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+              <div style="font-size: 11px; font-weight: bold;">SECRETARIA DA EDUCAÇÃO DO ESTADO DE SÃO PAULO</div>
+              <div style="font-size: 10px; font-weight: bold;">DEPARTMENT OF EDUCATION OF THE STATE OF SÃO PAULO</div>
+              <div style="font-size: 13px; font-weight: bold; margin-top: 5px;">HISTÓRICO ESCOLAR / SCHOOL TRANSCRIPT</div>
+              <div style="font-size: 9px;">ENSINO FUNDAMENTAL / ELEMENTARY AND MIDDLE SCHOOL</div>
+            </div>
+            <div style="text-align: center; width: 80px;">
+              <div style="width: 60px; height: 60px; border: 1px solid #000; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 7px;">
+                School<br/>Logo
+              </div>
+            </div>
+          </div>
+
+          <!-- School Information -->
+          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px; background: #f5f5f5;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">ESTABELECIMENTO DE ENSINO / EDUCATIONAL INSTITUTION:</div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <div style="flex: 2;">
+                <span style="font-size: 8px;">Nome/Name:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Código CIE:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+              <div style="flex: 2;">
+                <span style="font-size: 8px;">Endereço/Address:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Município/City:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="width: 80px;">
+                <span style="font-size: 8px;">UF/State:</span>
+                <input type="text" value="SP" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Student Information -->
+          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">IDENTIFICAÇÃO DO ALUNO / STUDENT IDENTIFICATION:</div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <div style="flex: 2;">
+                <span style="font-size: 8px;">Nome Completo/Full Name:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">RA (Registro do Aluno):</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+              <div style="width: 120px;">
+                <span style="font-size: 8px;">Data de Nascimento/DOB:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Naturalidade/Place of Birth:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="width: 100px;">
+                <span style="font-size: 8px;">Nacionalidade/Nationality:</span>
+                <input type="text" value="Brasileira/Brazilian" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Filiação - Pai/Father:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Mãe/Mother:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
+              <div style="width: 150px;">
+                <span style="font-size: 8px;">RG/ID Number:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="width: 150px;">
+                <span style="font-size: 8px;">CPF:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+              <div style="flex: 1;">
+                <span style="font-size: 8px;">Certidão de Nascimento/Birth Certificate:</span>
+                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Grades Table -->
+          <div style="margin-bottom: 8px;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">APROVEITAMENTO ESCOLAR / ACADEMIC RECORD:</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+              <thead>
+                <tr style="background: #e0e0e0;">
+                  <th style="border: 1px solid #000; padding: 4px; text-align: left; width: 180px;">COMPONENTES CURRICULARES<br/><span style="font-size: 7px; font-weight: normal;">SUBJECTS</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">1º Ano<br/><span style="font-size: 7px;">1st Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">2º Ano<br/><span style="font-size: 7px;">2nd Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">3º Ano<br/><span style="font-size: 7px;">3rd Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">4º Ano<br/><span style="font-size: 7px;">4th Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">5º Ano<br/><span style="font-size: 7px;">5th Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">6º Ano<br/><span style="font-size: 7px;">6th Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">7º Ano<br/><span style="font-size: 7px;">7th Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">8º Ano<br/><span style="font-size: 7px;">8th Grade</span></th>
+                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">9º Ano<br/><span style="font-size: 7px;">9th Grade</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Língua Portuguesa / Portuguese</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Matemática / Mathematics</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Ciências / Science</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">História / History</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Geografia / Geography</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Educação Física / Physical Ed.</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Arte / Art</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Língua Inglesa / English</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr style="background: #f0f0f0;">
+                  <td style="border: 1px solid #000; padding: 3px; font-weight: bold;">RESULTADO / RESULT</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Carga Horária / Hours</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Dias Letivos / School Days</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+                <tr>
+                  <td style="border: 1px solid #000; padding: 3px;">Frequência % / Attendance %</td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="font-size: 8px; margin-top: 3px; color: #555;">
+              <strong>Legenda / Legend:</strong> A = Aprovado/Passed | R = Retido/Retained | AP = Aprovado por Progressão/Passed by Progression | T = Transferido/Transferred
+            </div>
+          </div>
+
+          <!-- Observations -->
+          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px;">
+            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">OBSERVAÇÕES / OBSERVATIONS:</div>
+            <div style="min-height: 40px; border: 1px dashed #ccc; padding: 5px; font-size: 9px;" contenteditable="true">
+              Escala de notas: 0 a 10 (Média para aprovação: 5,0) / Grading scale: 0 to 10 (Passing grade: 5.0)
+            </div>
+          </div>
+
+          <!-- Signatures -->
+          <div style="display: flex; gap: 20px; margin-top: 15px;">
+            <div style="flex: 1; text-align: center;">
+              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
+                <div style="font-size: 9px;">Local e Data / Place and Date</div>
+                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
+                <div style="font-size: 9px;">Secretário(a) Escolar / School Secretary</div>
+                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
+              </div>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
+                <div style="font-size: 9px;">Diretor(a) / Principal</div>
+                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="margin-top: 15px; padding-top: 8px; border-top: 1px solid #000; font-size: 8px; text-align: center; color: #666;">
+            <div>Este documento não contém emendas ou rasuras / This document contains no amendments or erasures</div>
+            <div style="margin-top: 3px;">Documento válido em todo território nacional conforme Lei nº 9.394/96 (LDB)</div>
+            <div>Valid document throughout national territory according to Law No. 9,394/96 (LDB)</div>
+          </div>
+
+        </div>
+      `
+    },
+    'cnh-brasil': {
+      name: "CNH Brasil",
+      description: 'Driver License',
+      category: 'brazil-docs',
+      isForm: true,
+      formHTML: `
+        <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 0; background: #fff;">
+
+          <!-- Green Header -->
+          <div style="background: linear-gradient(135deg, #006847 0%, #004d35 100%); color: #fff; padding: 8px 15px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 14px; font-weight: bold;">REPÚBLICA FEDERATIVA DO BRASIL</div>
+              <div style="font-size: 9px;">MINISTÉRIO DOS TRANSPORTES</div>
+              <div style="font-size: 9px;">SECRETARIA NACIONAL DE TRÂNSITO - SENATRAN</div>
+            </div>
+            <div style="font-size: 16px; font-weight: bold; color: #ffdf00;">gov.br</div>
+          </div>
+
+          <!-- Main Card -->
+          <div style="border: 2px solid #006847; margin: 10px; padding: 0;">
+
+            <!-- Card Header -->
+            <div style="background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%); padding: 8px 10px; border-bottom: 2px solid #006847; display: flex; align-items: center; justify-content: space-between;">
+              <div style="text-align: center; flex: 1;">
+                <div style="font-size: 9px; font-weight: bold;">REPÚBLICA FEDERATIVA DO BRASIL</div>
+                <div style="font-size: 8px;">MINISTÉRIO DOS TRANSPORTES</div>
+                <div style="font-size: 8px;">SECRETARIA NACIONAL DE TRÂNSITO</div>
+              </div>
+              <div style="background: #006847; color: #fff; padding: 5px 10px; border-radius: 3px; font-weight: bold; font-size: 12px;">BR</div>
+            </div>
+
+            <!-- Title -->
+            <div style="background: #006847; color: #fff; text-align: center; padding: 5px; font-size: 10px; font-weight: bold;">
+              CARTEIRA NACIONAL DE HABILITAÇÃO / DRIVER LICENSE / PERMISO DE CONDUCCIÓN
+            </div>
+
+            <!-- Main Content -->
+            <div style="display: flex; padding: 10px; gap: 10px;">
+
+              <!-- Left: Photo and Barcode -->
+              <div style="width: 120px;">
+                <div style="border: 1px solid #000; height: 150px; display: flex; align-items: center; justify-content: center; background: #f9f9f9; margin-bottom: 8px;">
+                  <span style="font-size: 8px; color: #666; text-align: center;">Photo<br/>3x4</span>
+                </div>
+                <div style="writing-mode: vertical-rl; text-orientation: mixed; font-size: 8px; background: #000; color: #fff; padding: 3px; text-align: center;">
+                  VÁLIDO EM TODO O TERRITÓRIO NACIONAL
+                </div>
+                <div style="margin-top: 5px; font-size: 9px; text-align: center;" contenteditable="true">5005512811</div>
+              </div>
+
+              <!-- Right: Information Fields -->
+              <div style="flex: 1;">
+
+                <!-- Row 1: Name and First License -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 2;">
+                    <div style="font-size: 7px; color: #666;">2+9 NOME E SOBRENOME / NAME AND SURNAME / NOMBRE Y APELLIDOS</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-weight: bold; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 80px;">
+                    <div style="font-size: 7px; color: #666;">1ª HABILITAÇÃO / FIRST LICENSE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                </div>
+
+                <!-- Row 2: Birth Date/Place -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">3 DATA, LOCAL E UF DE NASCIMENTO / DATE AND PLACE OF BIRTH</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 3: Issue Date, Validity, ACC -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4a DATA EMISSÃO / ISSUE DATE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4b VALIDADE / EXPIRY DATE</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px; color: #c00;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 60px;">
+                    <div style="font-size: 7px; color: #666;">ACC</div>
+                    <div style="border: 1px solid #000; padding: 2px; font-size: 10px; text-align: center; background: #f0f0f0;" contenteditable="true">P</div>
+                  </div>
+                </div>
+
+                <!-- Row 4: ID Document -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">4c DOC IDENTIDADE / ORG EMISSOR / UF - ID DOCUMENT / ISSUING AUTHORITY</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 5: CPF, Registration, Category -->
+                <div style="display: flex; gap: 10px; margin-bottom: 6px;">
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">4d CPF</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  </div>
+                  <div style="flex: 1;">
+                    <div style="font-size: 7px; color: #666;">5 Nº REGISTRO / REGISTRATION NUMBER</div>
+                    <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px; color: #c00;" contenteditable="true"></div>
+                  </div>
+                  <div style="width: 50px;">
+                    <div style="font-size: 7px; color: #666;">9 CAT/HAB</div>
+                    <div style="border: 1px solid #c00; padding: 2px; font-size: 12px; text-align: center; font-weight: bold; color: #c00; background: #fff0f0;" contenteditable="true">B</div>
+                  </div>
+                </div>
+
+                <!-- Row 6: Nationality -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">10 NACIONALIDADE / NATIONALITY</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true">BRASILEIRO(A) / BRAZILIAN</div>
+                </div>
+
+                <!-- Row 7: Parents -->
+                <div style="margin-bottom: 6px;">
+                  <div style="font-size: 7px; color: #666;">8 FILIAÇÃO / PARENTS</div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                  <div style="border-bottom: 1px solid #ccc; padding: 2px; font-size: 10px;" contenteditable="true"></div>
+                </div>
+
+                <!-- Row 8: Signature -->
+                <div>
+                  <div style="font-size: 7px; color: #666;">7 ASSINATURA DO PORTADOR / HOLDER'S SIGNATURE</div>
+                  <div style="border: 1px solid #ccc; height: 30px; background: #fafafa;"></div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Categories Table -->
+            <div style="padding: 10px; border-top: 1px solid #ccc;">
+              <div style="display: flex; gap: 20px;">
+                <table style="border-collapse: collapse; font-size: 8px; flex: 1;">
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">ACC</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">BE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">A2</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">CE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">B</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C1E</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">B1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">DE</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">D1E</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                  </tr>
+                  <tr>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;">C1</td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;" contenteditable="true"></td>
+                    <td style="border: 1px solid #000; padding: 2px 5px; background: #f0f0f0;"></td>
+                    <td style="border: 1px solid #000; padding: 2px 10px;"></td>
+                  </tr>
+                </table>
+
+                <!-- Observations -->
+                <div style="flex: 1;">
+                  <div style="font-size: 7px; color: #666; margin-bottom: 3px;">12 OBSERVAÇÕES / OBSERVATIONS / OBSERVACIONES</div>
+                  <div style="border: 1px solid #ccc; min-height: 80px; padding: 5px; font-size: 9px;" contenteditable="true">EAR</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer with Location -->
+            <div style="display: flex; justify-content: space-between; padding: 8px 10px; border-top: 1px solid #ccc; background: #f5f5f5;">
+              <div>
+                <div style="font-size: 7px; color: #666;">LOCAL / PLACE</div>
+                <div style="font-size: 10px;" contenteditable="true">SÃO PAULO, SP</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 7px; color: #666;">ASSINADO DIGITALMENTE / DIGITALLY SIGNED</div>
+                <div style="font-size: 8px;">DEPARTAMENTO ESTADUAL DE TRÂNSITO</div>
+                <div style="font-size: 9px;" contenteditable="true">15575604402</div>
+                <div style="font-size: 9px;" contenteditable="true">SP027650816</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- State Name -->
+          <div style="text-align: center; margin: 10px 0;">
+            <div style="font-size: 18px; font-weight: bold;" contenteditable="true">SÃO PAULO</div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div style="margin: 10px; padding: 15px; border: 1px solid #ccc; display: flex; gap: 20px;">
+            <div>
+              <div style="font-weight: bold; margin-bottom: 10px;">QR-CODE</div>
+              <div style="width: 120px; height: 120px; border: 1px solid #000; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #666;">
+                QR Code<br/>Area
+              </div>
+            </div>
+            <div style="flex: 1; font-size: 9px; line-height: 1.5;">
+              <p>Documento assinado com certificado digital em conformidade com a Medida Provisória nº 2200-2/2001. Sua validade poderá ser confirmada por meio do programa Assinador Serpro.</p>
+              <p style="margin-top: 10px;">As orientações para instalar o Assinador Serpro e realizar a validação do documento digital estão disponíveis em:<br/>
+              <strong>https://www.serpro.gov.br/assinador-digital</strong></p>
+              <div style="margin-top: 15px; text-align: right;">
+                <span style="font-weight: bold; color: #006847;">SERPRO</span> / <span style="font-weight: bold;">SENATRAN</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div style="margin: 10px; padding: 10px; background: #f5f5f5; font-size: 7px; line-height: 1.6; border: 1px solid #ddd;">
+            <div><strong>2+9.</strong> Nome e Sobrenome / Name and Surname / Nombre y Apellidos - <strong>1ª Habilitação</strong> - Primeira Habilitação / First Driver License / Primera Licencia de Conducir - <strong>3.</strong> Data e Local de Nascimento / Date and Place of Birth (DD/MM/YYYY) / Fecha y Lugar de Nacimiento - <strong>4a.</strong> Data de Emissão / Issuing Date (DD/MM/YYYY) / Fecha de Emisión - <strong>4b.</strong> Data de Validade / Expiration Date (DD/MM/YYYY) / Válido Hasta - <strong>ACC</strong> - Autorização para Conduzir Ciclomotor / Moped Authorization / Autorización Ciclomotor - <strong>4c.</strong> Documento de Identificação / Identity Document / Documento de Identificación - Órgão emissor / Issuing Authority / Autoridad Emisora - <strong>4d.</strong> CPF - <strong>5.</strong> Número de registro da CNH / Driver License Number / Número de Permiso de Conducir - <strong>9.</strong> Categoria de Veículos de Carteira de Habilitação / Driver license Class / Categoría de Permiso de Conducir - Nacionalidade / Nationality / Nacionalidad - <strong>8.</strong> Filiação / Filiation / Filiación - <strong>12.</strong> Observações / Observations / Observaciones - Local / Place / Lugar</div>
+          </div>
+
+          <!-- MRZ Code -->
+          <div style="margin: 10px; padding: 10px; background: #fff; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 1px; border: 1px solid #000;">
+            <div contenteditable="true">I&lt;BRA0897718O1&lt;218&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+            <div contenteditable="true">0501068F2604228BRA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;4</div>
+            <div contenteditable="true">SURNAME&lt;&lt;GIVEN&lt;NAMES&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
           </div>
 
         </div>
@@ -3238,92 +3821,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             )}
           </div>
 
-          {/* Cover Letter Template Selector */}
-          <div className="bg-white rounded shadow p-4">
-            <h3 className="text-sm font-bold mb-3">📋 Cover Letter Template</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-              <button
-                onClick={() => setSelectedCoverLetter('default')}
-                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'default' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <div className="font-bold">Default</div>
-                <div className="text-[10px] text-gray-500">Standard Certificate</div>
-              </button>
-              <button
-                onClick={() => setSelectedCoverLetter('rmv-ma')}
-                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'rmv-ma' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <div className="font-bold">RMV - Massachusetts</div>
-                <div className="text-[10px] text-gray-500">Driver's License</div>
-              </button>
-              <button
-                onClick={() => setSelectedCoverLetter('dmv-fl')}
-                className={`p-3 text-xs rounded border-2 transition-all ${selectedCoverLetter === 'dmv-fl' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-              >
-                <div className="font-bold">DMV - Florida</div>
-                <div className="text-[10px] text-gray-500">Driver's License</div>
-              </button>
-              <button
-                onClick={() => {
-                  const name = prompt('Enter template name:');
-                  if (name) {
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = '.pdf,.doc,.docx,.html';
-                    input.onchange = (e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => {
-                          const newTemplate = { id: Date.now(), name, content: ev.target.result, type: file.type };
-                          const updated = [...customCoverLetters, newTemplate];
-                          setCustomCoverLetters(updated);
-                          localStorage.setItem('custom_cover_letters', JSON.stringify(updated));
-                          setSelectedCoverLetter(`custom-${newTemplate.id}`);
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    };
-                    input.click();
-                  }
-                }}
-                className="p-3 text-xs rounded border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
-              >
-                <div className="font-bold text-blue-600">+ Upload Custom</div>
-                <div className="text-[10px] text-gray-500">Add your template</div>
-              </button>
-            </div>
-            {/* Custom Templates */}
-            {customCoverLetters.length > 0 && (
-              <div className="border-t pt-3">
-                <p className="text-xs font-medium text-gray-600 mb-2">Custom Templates:</p>
-                <div className="flex flex-wrap gap-2">
-                  {customCoverLetters.map(tpl => (
-                    <div key={tpl.id} className="flex items-center">
-                      <button
-                        onClick={() => setSelectedCoverLetter(`custom-${tpl.id}`)}
-                        className={`px-3 py-1.5 text-xs rounded-l border ${selectedCoverLetter === `custom-${tpl.id}` ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200'}`}
-                      >
-                        {tpl.name}
-                      </button>
-                      <button
-                        onClick={() => {
-                          const updated = customCoverLetters.filter(t => t.id !== tpl.id);
-                          setCustomCoverLetters(updated);
-                          localStorage.setItem('custom_cover_letters', JSON.stringify(updated));
-                          if (selectedCoverLetter === `custom-${tpl.id}`) setSelectedCoverLetter('default');
-                        }}
-                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-l-0 border-red-200 rounded-r hover:bg-red-100"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Glossaries & Translation Memories Section - Collapsible */}
           <div className="bg-white rounded shadow">
             <div className="p-4 border-b flex items-center justify-between">
@@ -3792,42 +4289,19 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
-          {/* Certificate Template Selector */}
-          <div className="bg-white rounded shadow p-4">
-            <h3 className="text-sm font-bold mb-3">📜 Certificate Template</h3>
-            <p className="text-xs text-gray-500 mb-3">Select a certificate template or upload a custom one. Headers, logos, and signatures are applied automatically.</p>
-
-            {/* Predefined Templates */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
-              {Object.entries(CERTIFICATE_TEMPLATES).map(([key, template]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setSelectedCertificateTemplate(key);
-                    localStorage.setItem('selected_certificate_template', key);
-                  }}
-                  className={`p-3 text-xs rounded border-2 transition-all ${selectedCertificateTemplate === key ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                >
-                  <div className="font-bold">{template.name}</div>
-                  <div className="text-[10px] text-gray-500">{template.description}</div>
-                </button>
-              ))}
-
-              {/* Upload Custom Template Button */}
+          {/* Certificate Template Selector - Organized by Category */}
+          <div className="bg-white rounded shadow p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-bold">📜 Certificate Template</h3>
               <button
                 onClick={() => {
-                  const name = prompt('Enter template name (e.g., "State Court - NY"):');
+                  const name = prompt('Template name:');
                   if (name) {
-                    const templateText = prompt('Enter the certificate body paragraphs (use {{sourceLanguage}} and {{targetLanguage}} for language placeholders). Separate paragraphs with ||:');
+                    const templateText = prompt('Certificate paragraphs (use {{sourceLanguage}}, {{targetLanguage}}). Separate with ||:');
                     if (templateText) {
                       const paragraphs = templateText.split('||').map(p => p.trim()).filter(p => p);
                       if (paragraphs.length > 0) {
-                        const newTemplate = {
-                          id: Date.now(),
-                          name,
-                          description: 'Custom Template',
-                          bodyParagraphs: paragraphs
-                        };
+                        const newTemplate = { id: Date.now(), name, description: 'Custom', bodyParagraphs: paragraphs };
                         const updated = [...customCertificateTemplates, newTemplate];
                         setCustomCertificateTemplates(updated);
                         localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
@@ -3837,50 +4311,89 @@ tradução juramentada | certified translation`}
                     }
                   }
                 }}
-                className="p-3 text-xs rounded border-2 border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-all"
+                className="text-[10px] px-2 py-1 rounded border border-dashed border-blue-400 text-blue-600 hover:bg-blue-50"
               >
-                <div className="font-bold text-blue-600">+ Add Custom</div>
-                <div className="text-[10px] text-gray-500">Create your template</div>
+                + Custom
               </button>
             </div>
 
-            {/* Custom Templates List */}
-            {customCertificateTemplates.length > 0 && (
-              <div className="border-t pt-3">
-                <p className="text-xs font-medium text-gray-600 mb-2">Custom Templates:</p>
-                <div className="flex flex-wrap gap-2">
-                  {customCertificateTemplates.map(tpl => (
-                    <div key={tpl.id} className="flex items-center">
-                      <button
-                        onClick={() => {
-                          setSelectedCertificateTemplate(`custom-${tpl.id}`);
-                          localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
-                        }}
-                        className={`px-3 py-1.5 text-xs rounded-l border ${selectedCertificateTemplate === `custom-${tpl.id}` ? 'bg-blue-100 border-blue-500' : 'bg-gray-50 border-gray-200'}`}
-                      >
-                        {tpl.name}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Delete template "${tpl.name}"?`)) {
-                            const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
-                            setCustomCertificateTemplates(updated);
-                            localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
-                            if (selectedCertificateTemplate === `custom-${tpl.id}`) {
-                              setSelectedCertificateTemplate('default');
-                              localStorage.setItem('selected_certificate_template', 'default');
-                            }
-                          }
-                        }}
-                        className="px-2 py-1.5 text-xs bg-red-50 text-red-600 border border-l-0 border-red-200 rounded-r hover:bg-red-100"
-                      >
-                        🗑️
-                      </button>
+            {/* Templates by Category */}
+            <div className="space-y-2">
+              {Object.entries(TEMPLATE_CATEGORIES).map(([catKey, category]) => {
+                const templatesInCategory = Object.entries(CERTIFICATE_TEMPLATES).filter(([_, t]) => t.category === catKey);
+                if (templatesInCategory.length === 0) return null;
+                return (
+                  <div key={catKey} className="border rounded p-2">
+                    <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                      <span>{category.icon}</span>
+                      <span>{category.name}</span>
+                      <span className="text-[9px] text-gray-400 font-normal">({templatesInCategory.length})</span>
                     </div>
-                  ))}
+                    <div className="flex flex-wrap gap-1">
+                      {templatesInCategory.map(([key, template]) => (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            setSelectedCertificateTemplate(key);
+                            localStorage.setItem('selected_certificate_template', key);
+                          }}
+                          className={`px-2 py-1 text-[9px] rounded transition-all ${selectedCertificateTemplate === key
+                            ? 'bg-blue-500 text-white font-medium'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          title={template.description}
+                        >
+                          {template.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Custom Templates */}
+              {customCertificateTemplates.length > 0 && (
+                <div className="border rounded p-2 border-dashed">
+                  <div className="text-[10px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1">
+                    <span>⭐</span>
+                    <span>Custom Templates</span>
+                    <span className="text-[9px] text-gray-400 font-normal">({customCertificateTemplates.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {customCertificateTemplates.map(tpl => (
+                      <div key={tpl.id} className="flex items-center">
+                        <button
+                          onClick={() => {
+                            setSelectedCertificateTemplate(`custom-${tpl.id}`);
+                            localStorage.setItem('selected_certificate_template', `custom-${tpl.id}`);
+                          }}
+                          className={`px-2 py-1 text-[9px] rounded-l transition-all ${selectedCertificateTemplate === `custom-${tpl.id}`
+                            ? 'bg-blue-500 text-white font-medium'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                        >
+                          {tpl.name}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete "${tpl.name}"?`)) {
+                              const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
+                              setCustomCertificateTemplates(updated);
+                              localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                              if (selectedCertificateTemplate === `custom-${tpl.id}`) {
+                                setSelectedCertificateTemplate('default');
+                                localStorage.setItem('selected_certificate_template', 'default');
+                              }
+                            }
+                          }}
+                          className="px-1 py-1 text-[9px] bg-red-100 text-red-600 rounded-r hover:bg-red-200"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Certificate Preview - LIVE with Editable Fields */}
@@ -4295,14 +4808,72 @@ tradução juramentada | certified translation`}
               </div>
 
               {translationResults.length > 0 && (
-                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded flex justify-between items-center">
-                  <p className="text-xs text-green-700">✅ Translation complete!</p>
-                  <button
-                    onClick={() => setActiveSubTab('review')}
-                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                  >
-                    Go to Review →
-                  </button>
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-xs text-green-700 font-medium">✅ Translation complete!</p>
+                    <button
+                      onClick={() => setActiveSubTab('review')}
+                      className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                    >
+                      Go to Review →
+                    </button>
+                  </div>
+
+                  {/* Download Options */}
+                  <div className="flex gap-2 pt-2 border-t border-green-200">
+                    <button
+                      onClick={() => {
+                        // Download Original
+                        originalImages.forEach((img, idx) => {
+                          const link = document.createElement('a');
+                          link.href = img.data;
+                          link.download = `original_${idx + 1}_${img.filename || 'document'}`;
+                          link.click();
+                        });
+                      }}
+                      className="flex-1 px-3 py-2 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 flex items-center justify-center gap-1"
+                    >
+                      📄 Download Original ({originalImages.length})
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Download Translation as HTML
+                        const htmlContent = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Translation - ${documentType || 'Document'}</title>
+<style>body{font-family:Georgia,serif;max-width:800px;margin:0 auto;padding:40px;line-height:1.8;}</style></head>
+<body>${translationResults.map((r, i) => `<div style="margin-bottom:30px;"><h3>Page ${i + 1}</h3>${r.translatedText}</div>`).join('')}</body></html>`;
+                        const blob = new Blob([htmlContent], { type: 'text/html' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `translation_${orderNumber || 'document'}.html`;
+                        link.click();
+                      }}
+                      className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 flex items-center justify-center gap-1"
+                    >
+                      🌐 Download Translation (HTML)
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Download Translation as TXT
+                        const extractText = (html) => {
+                          const temp = document.createElement('div');
+                          temp.innerHTML = html;
+                          return temp.textContent || temp.innerText || '';
+                        };
+                        const txtContent = translationResults.map((r, i) =>
+                          `=== PAGE ${i + 1} ===\n\n${extractText(r.translatedText)}\n\n`
+                        ).join('');
+                        const blob = new Blob([txtContent], { type: 'text/plain' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `translation_${orderNumber || 'document'}.txt`;
+                        link.click();
+                      }}
+                      className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center justify-center gap-1"
+                    >
+                      📝 Download Translation (TXT)
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -5211,20 +5782,125 @@ tradução juramentada | certified translation`}
 
               {/* Translation Memory Option */}
               <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
-                <label className="flex items-center text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={saveToTM}
-                    onChange={(e) => setSaveToTM(e.target.checked)}
-                    className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                  />
-                  <div>
-                    <span className="font-medium">💾 Save to Translation Memory</span>
-                    <p className="text-[10px] text-teal-600 mt-0.5">
-                      Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
-                    </p>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveToTM}
+                      onChange={(e) => setSaveToTM(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                    />
+                    <div>
+                      <span className="font-medium">💾 Save to Translation Memory</span>
+                      <p className="text-[10px] text-teal-600 mt-0.5">
+                        Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
+                      </p>
+                    </div>
+                  </label>
+                  <span className="text-[10px] bg-teal-200 text-teal-800 px-2 py-0.5 rounded">
+                    {glossaries.filter(g => g.name?.startsWith('TM -')).length} TMs saved
+                  </span>
+                </div>
+
+                {/* View Saved TMs */}
+                {glossaries.filter(g => g.name?.startsWith('TM -')).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-teal-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-medium text-teal-700">📚 Saved Translation Memories:</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            // Download all TMs as JSON
+                            const tms = glossaries.filter(g => g.name?.startsWith('TM -'));
+                            const blob = new Blob([JSON.stringify(tms, null, 2)], { type: 'application/json' });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.json`;
+                            link.click();
+                          }}
+                          className="px-2 py-1 text-[9px] bg-teal-600 text-white rounded hover:bg-teal-700"
+                        >
+                          📥 Export All (JSON)
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Download all TMs as TMX
+                            const tms = glossaries.filter(g => g.name?.startsWith('TM -'));
+                            let tmxContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tmx SYSTEM "tmx14.dtd">
+<tmx version="1.4">
+  <header creationtool="Legacy Translations TM" creationtoolversion="1.0" datatype="plaintext" segtype="sentence" adminlang="en-US" srclang="*all*"/>
+  <body>
+`;
+                            tms.forEach(tm => {
+                              (tm.terms || []).forEach(term => {
+                                tmxContent += `    <tu>
+      <tuv xml:lang="${tm.sourceLang || 'pt-BR'}">
+        <seg>${term.source?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}</seg>
+      </tuv>
+      <tuv xml:lang="${tm.targetLang || 'en-US'}">
+        <seg>${term.target?.replace(/</g, '&lt;').replace(/>/g, '&gt;') || ''}</seg>
+      </tuv>
+    </tu>
+`;
+                              });
+                            });
+                            tmxContent += `  </body>
+</tmx>`;
+                            const blob = new Blob([tmxContent], { type: 'application/xml' });
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.tmx`;
+                            link.click();
+                          }}
+                          className="px-2 py-1 text-[9px] bg-purple-600 text-white rounded hover:bg-purple-700"
+                        >
+                          📥 Export All (TMX)
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-32 overflow-auto space-y-1">
+                      {glossaries.filter(g => g.name?.startsWith('TM -')).map((tm, idx) => (
+                        <div key={tm.id || idx} className="flex items-center justify-between p-2 bg-white rounded border text-[10px]">
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-700">{tm.name}</span>
+                            <span className="text-gray-400 ml-2">({tm.terms?.length || 0} segments)</span>
+                            <span className="text-gray-400 ml-1">{tm.sourceLang} → {tm.targetLang}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => {
+                                // Download single TM as JSON
+                                const blob = new Blob([JSON.stringify(tm, null, 2)], { type: 'application/json' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = `${tm.name?.replace(/[^a-z0-9]/gi, '_') || 'tm'}.json`;
+                                link.click();
+                              }}
+                              className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                              title="Download JSON"
+                            >
+                              📥
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Delete "${tm.name}"?`)) {
+                                  const updated = glossaries.filter(g => g.id !== tm.id);
+                                  setGlossaries(updated);
+                                  localStorage.setItem('glossaries', JSON.stringify(updated));
+                                }
+                              }}
+                              className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                              title="Delete"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </label>
+                )}
               </div>
 
               {/* Download Options */}
