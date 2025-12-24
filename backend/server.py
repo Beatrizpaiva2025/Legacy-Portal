@@ -52,6 +52,10 @@ db = client[os.environ['DB_NAME']]
 
 # Configure Stripe
 stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+# Detect if running in test mode (test keys start with sk_test_)
+STRIPE_TEST_MODE = stripe.api_key.startswith('sk_test_') if stripe.api_key else True
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -1805,29 +1809,53 @@ async def get_payment_status(session_id: str):
 
 @api_router.post("/stripe-webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhooks"""
-    
+    """Handle Stripe webhooks with proper signature verification"""
+
     try:
         payload = await request.body()
         sig_header = request.headers.get('stripe-signature')
-        
-        if not sig_header:
-            raise HTTPException(status_code=400, detail="Missing Stripe signature")
-        
-        # For now, we'll skip webhook verification in test mode
-        # In production, you should verify the webhook signature
-        
-        event = stripe.Event.construct_from(
-            json.loads(payload.decode('utf-8')), stripe.api_key
-        )
-        
+
+        # Verify webhook signature
+        if STRIPE_WEBHOOK_SECRET:
+            # Production mode: verify webhook signature
+            if not sig_header:
+                logger.warning("Missing Stripe signature header")
+                raise HTTPException(status_code=400, detail="Missing Stripe signature")
+
+            try:
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, STRIPE_WEBHOOK_SECRET
+                )
+                logger.info(f"Webhook signature verified for event: {event['type']}")
+            except stripe.error.SignatureVerificationError as e:
+                logger.error(f"Webhook signature verification failed: {str(e)}")
+                raise HTTPException(status_code=400, detail="Invalid signature")
+        else:
+            # Test mode without webhook secret: parse event without verification
+            # Log warning to encourage setting up webhook secret even in test mode
+            if STRIPE_TEST_MODE:
+                logger.warning("Webhook secret not configured - processing without signature verification (test mode)")
+            else:
+                logger.error("Webhook secret not configured in production mode - rejecting request")
+                raise HTTPException(status_code=400, detail="Webhook secret not configured")
+
+            try:
+                event = stripe.Event.construct_from(
+                    json.loads(payload.decode('utf-8')), stripe.api_key
+                )
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse webhook payload: {str(e)}")
+                raise HTTPException(status_code=400, detail="Invalid payload")
+
         # Handle the event
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             session_id = session['id']
-            
+
+            logger.info(f"Processing checkout.session.completed for session: {session_id}")
+
             # Update payment status
-            await db.payment_transactions.update_one(
+            result = await db.payment_transactions.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
@@ -1837,17 +1865,30 @@ async def stripe_webhook(request: Request):
                     }
                 }
             )
-            
+
+            if result.matched_count == 0:
+                logger.warning(f"No transaction found for session_id: {session_id}")
+
             # Get transaction and handle success
             transaction = await db.payment_transactions.find_one({"session_id": session_id})
             if transaction:
                 await handle_successful_payment(session_id, transaction)
-        
-        return {"status": "success"}
-        
+                logger.info(f"Successfully processed payment for session: {session_id}")
+        else:
+            logger.info(f"Received unhandled webhook event type: {event['type']}")
+
+        # Return 200 OK to acknowledge receipt of the event
+        return {"status": "success", "received": True}
+
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error handling webhook: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
     except Exception as e:
-        logger.error(f"Error handling webhook: {str(e)}")
-        raise HTTPException(status_code=400, detail="Webhook error")
+        logger.error(f"Unexpected error handling webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 async def handle_successful_payment(session_id: str, payment_transaction: dict):
     """Handle successful payment by sending confirmation emails and creating Protemos project"""
