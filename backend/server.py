@@ -5063,6 +5063,13 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
+    # Get API key: use provided key, or fall back to shared key from database
+    ocr_api_key = request.claude_api_key
+    if not ocr_api_key:
+        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+        if settings and settings.get("value"):
+            ocr_api_key = settings["value"]
+
     try:
         # Decode base64 file
         file_content = base64.b64decode(request.file_base64)
@@ -5077,11 +5084,11 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
         text = ""
 
         # Use Claude for OCR if requested
-        if request.use_claude and request.claude_api_key:
+        if request.use_claude and ocr_api_key:
             logger.info("Using Claude AI for OCR with layout preservation...")
             try:
                 import anthropic
-                client = anthropic.Anthropic(api_key=request.claude_api_key)
+                client = anthropic.Anthropic(api_key=ocr_api_key)
 
                 # Prepare the image for Claude
                 image_data = base64.b64encode(file_content).decode('utf-8')
@@ -5261,8 +5268,17 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    if not request.claude_api_key:
-        raise HTTPException(status_code=400, detail="Claude API key is required")
+    # Get API key: use provided key, or fall back to shared key from database
+    api_key_to_use = request.claude_api_key
+    if not api_key_to_use:
+        # Try to get shared API key from database
+        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+        if settings and settings.get("value"):
+            api_key_to_use = settings["value"]
+            logger.info("Using shared Claude API key for translation")
+
+    if not api_key_to_use:
+        raise HTTPException(status_code=400, detail="No API key configured. Please ask your administrator to configure the shared API key.")
 
     try:
         # Build the prompt based on action
@@ -5510,7 +5526,7 @@ CRITICAL: Your HTML output MUST match the visual layout of the original document
             response = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key": request.claude_api_key,
+                    "x-api-key": api_key_to_use,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json"
                 },

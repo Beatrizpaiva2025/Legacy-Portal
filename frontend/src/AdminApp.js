@@ -1771,12 +1771,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     fetchAvailableOrders();
   }, []);
 
-  // Load shared API key from backend when adminKey is available
+  // Load shared API key from backend when adminKey is available (admin only)
   useEffect(() => {
-    if (adminKey) {
+    if (adminKey && user?.role === 'admin') {
       loadSharedApiKey();
     }
-  }, [adminKey]);
+  }, [adminKey, user?.role]);
 
   // Pre-fill from selectedOrder when coming from Projects
   useEffect(() => {
@@ -3817,46 +3817,58 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </p>
           </div>
 
-          {/* API Key - Collapsible (Shared with all translators) */}
-          <div className="bg-white rounded shadow">
-            <button
-              onClick={() => setShowApiKey(!showApiKey)}
-              className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
-            >
+          {/* API Key - Only visible to Admin (translators use shared key automatically) */}
+          {user?.role === 'admin' ? (
+            <div className="bg-white rounded shadow">
+              <button
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
+              >
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">🔑</span>
+                  <span className="text-sm font-medium">API Key Settings</span>
+                  {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
+                  <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
+                </div>
+                <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
+              </button>
+              {showApiKey && (
+                <div className="p-4 border-t">
+                  <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
+                    <p className="text-xs text-blue-700">
+                      <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <input
+                      type="password"
+                      value={claudeApiKey}
+                      onChange={(e) => setClaudeApiKey(e.target.value)}
+                      placeholder="sk-ant-api03-..."
+                      className="flex-1 px-3 py-2 text-xs border rounded"
+                    />
+                    <button
+                      onClick={saveApiKey}
+                      className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                    >
+                      💾 Save & Share
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* For translators: show status only, no API key visible */
+            <div className="bg-white rounded shadow p-3">
               <div className="flex items-center space-x-2">
                 <span className="text-lg">🔑</span>
-                <span className="text-sm font-medium">API Key Settings</span>
-                {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
-                <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
+                <span className="text-sm font-medium">API Key</span>
+                <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Provided by Admin</span>
               </div>
-              <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
-            </button>
-            {showApiKey && (
-              <div className="p-4 border-t">
-                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
-                  </p>
-                </div>
-                <div className="flex space-x-2">
-                  <input
-                    type="password"
-                    value={claudeApiKey}
-                    onChange={(e) => setClaudeApiKey(e.target.value)}
-                    placeholder="sk-ant-api03-..."
-                    className="flex-1 px-3 py-2 text-xs border rounded"
-                  />
-                  <button
-                    onClick={saveApiKey}
-                    className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
-                  >
-                    💾 Save & Share
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
-              </div>
-            )}
-          </div>
+              <p className="text-[10px] text-gray-500 mt-1">Your translation requests use the shared API key configured by your administrator.</p>
+            </div>
+          )}
 
           {/* Glossaries & Translation Memories Section - Collapsible */}
           <div className="bg-white rounded shadow">
