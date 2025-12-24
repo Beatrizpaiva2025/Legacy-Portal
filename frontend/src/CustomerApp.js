@@ -1195,7 +1195,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         quote_id: quoteId,
         customer_email: guestEmail,
         customer_name: guestName,
-        origin_url: window.location.origin + '/customer'
+        origin_url: window.location.origin + '/#/customer'
       });
 
       // Step 3: Save form data before redirecting to Stripe

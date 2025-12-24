@@ -14283,7 +14283,7 @@ function AdminApp() {
     setUser(null);
     localStorage.removeItem('admin_key');
     localStorage.removeItem('admin_user');
-    window.location.href = '/admin';
+    window.location.href = '/#/admin';
   };
 
   // Navigate to translation with order
