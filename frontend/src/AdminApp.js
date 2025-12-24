@@ -9716,7 +9716,11 @@ const ReviewPage = ({ adminKey, user }) => {
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <h1 className="text-lg font-bold text-gray-800">👁️ Painel de Revisão</h1>
-        <p className="text-xs text-gray-500">Revisar traduções enviadas pelos tradutores e monitorar segurança</p>
+        <p className="text-xs text-gray-500">
+          {isAdmin
+            ? 'Revisar traduções enviadas pelos tradutores e monitorar segurança'
+            : 'Revisar traduções enviadas pelos tradutores'}
+        </p>
       </div>
 
       {/* Tab navigation */}
