@@ -1743,9 +1743,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
-    const savedKey = localStorage.getItem('claude_api_key');
-    if (savedKey) setClaudeApiKey(savedKey);
-
     // Load saved logos
     const savedLogoLeft = localStorage.getItem('logo_left');
     const savedLogoRight = localStorage.getItem('logo_right');
@@ -1766,9 +1763,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (savedPageFormat) setPageFormat(savedPageFormat);
     if (savedTranslationType) setTranslationType(savedTranslationType);
 
+    // Load API key from localStorage first (will be replaced by backend key if available)
+    const savedKey = localStorage.getItem('claude_api_key');
+    if (savedKey) setClaudeApiKey(savedKey);
+
     fetchResources();
     fetchAvailableOrders();
   }, []);
+
+  // Load shared API key from backend when adminKey is available
+  useEffect(() => {
+    if (adminKey) {
+      loadSharedApiKey();
+    }
+  }, [adminKey]);
 
   // Pre-fill from selectedOrder when coming from Projects
   useEffect(() => {
@@ -2023,10 +2031,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Save API key
-  const saveApiKey = () => {
-    localStorage.setItem('claude_api_key', claudeApiKey);
-    setProcessingStatus('✅ API Key saved!');
+  // Save API key (to backend for sharing with all users)
+  const saveApiKey = async () => {
+    if (!claudeApiKey) {
+      setProcessingStatus('❌ Please enter an API key');
+      return;
+    }
+
+    try {
+      // Save to backend (shared with all users)
+      await axios.post(`${BACKEND_URL}/api/admin/settings/api-key?admin_key=${adminKey}`, {
+        api_key: claudeApiKey
+      });
+
+      // Also save locally as backup
+      localStorage.setItem('claude_api_key', claudeApiKey);
+      setProcessingStatus('✅ API Key saved! All translators can now use it.');
+    } catch (err) {
+      console.error('Failed to save API key to backend:', err);
+      // Fallback to localStorage only
+      localStorage.setItem('claude_api_key', claudeApiKey);
+      setProcessingStatus('⚠️ API Key saved locally only. Backend save failed.');
+    }
+  };
+
+  // Load shared API key from backend
+  const loadSharedApiKey = async () => {
+    try {
+      // First try to get from backend
+      const response = await axios.get(`${BACKEND_URL}/api/settings/api-key/use?token=${adminKey}`);
+      if (response.data?.api_key) {
+        setClaudeApiKey(response.data.api_key);
+        localStorage.setItem('claude_api_key', response.data.api_key);
+        return true;
+      }
+    } catch (err) {
+      // If backend fails, try localStorage
+      const savedKey = localStorage.getItem('claude_api_key');
+      if (savedKey) {
+        setClaudeApiKey(savedKey);
+        return true;
+      }
+    }
+    return false;
   };
 
   // Save general instructions
@@ -3770,7 +3817,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </p>
           </div>
 
-          {/* API Key - Collapsible */}
+          {/* API Key - Collapsible (Shared with all translators) */}
           <div className="bg-white rounded shadow">
             <button
               onClick={() => setShowApiKey(!showApiKey)}
@@ -3780,11 +3827,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="text-lg">🔑</span>
                 <span className="text-sm font-medium">API Key Settings</span>
                 {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
+                <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
               </div>
               <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
             </button>
             {showApiKey && (
               <div className="p-4 border-t">
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
+                  <p className="text-xs text-blue-700">
+                    <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
+                  </p>
+                </div>
                 <div className="flex space-x-2">
                   <input
                     type="password"
@@ -3797,7 +3850,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     onClick={saveApiKey}
                     className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
                   >
-                    Save
+                    💾 Save & Share
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
