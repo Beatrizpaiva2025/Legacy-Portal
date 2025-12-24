@@ -174,12 +174,8 @@ const CUSTOMER_TRANSLATIONS = {
     supportDescription: 'Share details about your issue and our team will respond via email.',
     whatHelpWith: 'What do you need help with?',
     selectIssueType: 'Select an issue type',
-    translationProblem: 'Translation problem',
-    paymentIssue: 'Payment issue',
-    documentUpload: 'Document upload problem',
-    deliveryDelay: 'Delivery delay',
-    quoteQuestion: 'Quote/pricing question',
-    technicalIssue: 'Technical issue',
+    problemsWithUpload: 'Problems with upload',
+    notSureWhatTranslation: "I'm not sure what type of translation to order",
     otherIssue: 'Other',
     describeIssue: 'Describe the issue',
     issuePlaceholder: 'Include relevant order numbers, run IDs, or any other context so we can help faster.',
@@ -363,12 +359,8 @@ const CUSTOMER_TRANSLATIONS = {
     supportDescription: 'Comparte detalles sobre tu problema y nuestro equipo responderá por email.',
     whatHelpWith: '¿Con qué necesitas ayuda?',
     selectIssueType: 'Selecciona un tipo de problema',
-    translationProblem: 'Problema con traducción',
-    paymentIssue: 'Problema con pago',
-    documentUpload: 'Problema al subir documento',
-    deliveryDelay: 'Retraso en la entrega',
-    quoteQuestion: 'Pregunta sobre cotización/precio',
-    technicalIssue: 'Problema técnico',
+    problemsWithUpload: 'Problemas al subir documento',
+    notSureWhatTranslation: 'No estoy seguro qué tipo de traducción pedir',
     otherIssue: 'Otro',
     describeIssue: 'Describe el problema',
     issuePlaceholder: 'Incluye números de pedido, IDs o cualquier contexto para ayudarte más rápido.',
@@ -552,12 +544,8 @@ const CUSTOMER_TRANSLATIONS = {
     supportDescription: 'Compartilhe detalhes sobre seu problema e nossa equipe responderá por email.',
     whatHelpWith: 'Com o que você precisa de ajuda?',
     selectIssueType: 'Selecione um tipo de problema',
-    translationProblem: 'Problema com tradução',
-    paymentIssue: 'Problema com pagamento',
-    documentUpload: 'Problema ao enviar documento',
-    deliveryDelay: 'Atraso na entrega',
-    quoteQuestion: 'Dúvida sobre orçamento/preço',
-    technicalIssue: 'Problema técnico',
+    problemsWithUpload: 'Problemas ao enviar documento',
+    notSureWhatTranslation: 'Não tenho certeza qual tipo de tradução pedir',
     otherIssue: 'Outro',
     describeIssue: 'Descreva o problema',
     issuePlaceholder: 'Inclua números de pedido, IDs ou qualquer contexto para ajudarmos mais rápido.',
@@ -1353,12 +1341,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   >
                     <option value="">{t.selectIssueType}</option>
-                    <option value="translation">{t.translationProblem}</option>
-                    <option value="payment">{t.paymentIssue}</option>
-                    <option value="upload">{t.documentUpload}</option>
-                    <option value="delivery">{t.deliveryDelay}</option>
-                    <option value="quote">{t.quoteQuestion}</option>
-                    <option value="technical">{t.technicalIssue}</option>
+                    <option value="upload">{t.problemsWithUpload}</option>
+                    <option value="translation_type">{t.notSureWhatTranslation}</option>
                     <option value="other">{t.otherIssue}</option>
                   </select>
                 </div>

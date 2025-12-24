@@ -2061,12 +2061,8 @@ async def send_support_request(request: SupportRequest):
     try:
         # Map issue types to readable names
         issue_type_labels = {
-            "translation": "Translation Problem",
-            "payment": "Payment Issue",
-            "upload": "Document Upload Problem",
-            "delivery": "Delivery Delay",
-            "quote": "Quote/Pricing Question",
-            "technical": "Technical Issue",
+            "upload": "Problems with Upload",
+            "translation_type": "Not Sure What Type of Translation to Order",
             "other": "Other"
         }
 
