@@ -7792,10 +7792,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
                 <select
                   value={assignmentDetails.translator_id}
-                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                  onChange={(e) => {
+                    if (e.target.value === 'AI_PIPELINE') {
+                      // Switch to AI Pipeline modal
+                      setAssigningTranslatorModal(null);
+                      openAIPipelineModal(assigningTranslatorModal);
+                    } else {
+                      setAssignmentDetails({...assignmentDetails, translator_id: e.target.value});
+                    }
+                  }}
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
                   <option value="">-- Choose Translator --</option>
+                  <option value="AI_PIPELINE" className="bg-purple-100 font-medium">🤖 AI Translation Pipeline (Automatic)</option>
+                  <option disabled className="text-gray-400">───────────────────</option>
                   {translatorList.filter(t => t.role === 'translator' && t.is_active !== false).map(t => (
                     <option key={t.id} value={t.id}>
                       {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
@@ -8672,14 +8682,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {order.client_name}
                         <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
                       </div>
-                      {/* Send translation button - shows when ready or review */}
-                      {['ready', 'review'].includes(order.translation_status) && (isAdmin || isPM) && (
+                      {/* Send translation button - shows when ready, review, or delivered (for resend) */}
+                      {['ready', 'review', 'delivered'].includes(order.translation_status) && (isAdmin || isPM) && (
                         <button
                           onClick={() => openSendToClientModal(order)}
-                          className="px-1 py-0.5 bg-teal-500 text-white rounded text-[9px] hover:bg-teal-600"
-                          title="Send translation to client"
+                          className={`px-1 py-0.5 rounded text-[9px] ${
+                            order.translation_status === 'delivered'
+                              ? 'bg-blue-500 text-white hover:bg-blue-600'
+                              : 'bg-teal-500 text-white hover:bg-teal-600'
+                          }`}
+                          title={order.translation_status === 'delivered' ? 'Resend translation' : 'Send translation to client'}
                         >
-                          📤
+                          {order.translation_status === 'delivered' ? '🔄' : '📤'}
                         </button>
                       )}
                     </div>
@@ -9523,15 +9537,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {sendingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-4 border-b flex justify-between items-center bg-teal-600 text-white rounded-t-lg">
+            <div className={`p-4 border-b flex justify-between items-center rounded-t-lg ${
+              sendingOrder.translation_status === 'delivered' ? 'bg-blue-600' : 'bg-teal-600'
+            } text-white`}>
               <div>
-                <h3 className="font-bold">📤 Send to Client</h3>
+                <h3 className="font-bold">
+                  {sendingOrder.translation_status === 'delivered' ? '🔄 Resend Translation' : '📤 Send to Client'}
+                </h3>
                 <p className="text-xs opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
               </div>
               <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             <div className="p-4">
+              {/* Resend notice for delivered orders */}
+              {sendingOrder.translation_status === 'delivered' && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <div className="text-xs text-blue-700">
+                    <strong>ℹ️ Resending:</strong> This translation was already delivered
+                    {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString()}`}.
+                    You can upload a new file below before resending.
+                  </div>
+                </div>
+              )}
+
               {/* Client Info */}
               <div className="mb-4 p-3 bg-gray-50 rounded border">
                 <div className="text-xs font-medium text-gray-600 mb-1">Client:</div>
@@ -9653,9 +9682,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button
                 onClick={() => sendTranslationToClient(sendingOrder.id)}
                 disabled={sendingToClient}
-                className="px-4 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 disabled:bg-gray-400"
+                className={`px-4 py-1.5 text-white rounded text-xs disabled:bg-gray-400 ${
+                  sendingOrder.translation_status === 'delivered'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-teal-600 hover:bg-teal-700'
+                }`}
               >
-                {sendingToClient ? 'Sending...' : '📤 Send to Client'}
+                {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend to Client' : '📤 Send to Client')}
               </button>
             </div>
           </div>
