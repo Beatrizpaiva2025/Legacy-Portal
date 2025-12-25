@@ -515,6 +515,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const allMenuItems = [
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -9005,6 +9006,445 @@ const TranslatorsPage = ({ adminKey }) => {
   );
 };
 
+// ==================== NEW QUOTE PAGE ====================
+const NewQuotePage = ({ adminKey, user }) => {
+  const [formData, setFormData] = useState({
+    client_name: '',
+    client_email: '',
+    client_phone: '',
+    translate_from: 'Portuguese',
+    translate_to: 'English',
+    service_type: 'certified',
+    turnaround: 'standard',
+    special_instructions: ''
+  });
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const LANGUAGES = ['Portuguese', 'Spanish', 'English', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Russian'];
+
+  const SERVICE_TYPES = {
+    certified: { name: 'Certified Translation', price: 24.99, description: 'Official documents, legal, immigration' },
+    standard: { name: 'Standard Translation', price: 19.99, description: 'General use, no certification' }
+  };
+
+  const TURNAROUND = {
+    standard: { name: '2-3 business days', multiplier: 1.0 }
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    setUploading(true);
+    const newFiles = [];
+
+    for (const file of files) {
+      const reader = new FileReader();
+      await new Promise((resolve) => {
+        reader.onload = (e) => {
+          newFiles.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            data: e.target.result.split(',')[1], // base64
+            pages: 1 // Default, would need OCR/PDF parsing for actual count
+          });
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
+    setUploading(false);
+    setQuote(null); // Reset quote when files change
+  };
+
+  // Remove file
+  const removeFile = (index) => {
+    const newFiles = [...uploadedFiles];
+    newFiles.splice(index, 1);
+    setUploadedFiles(newFiles);
+    setQuote(null);
+  };
+
+  // Calculate quote
+  const calculateQuote = () => {
+    if (uploadedFiles.length === 0) {
+      setError('Please upload at least one document');
+      return;
+    }
+
+    setCalculating(true);
+    setError('');
+
+    // Calculate total pages (simplified - 1 page per file for now)
+    const totalPages = uploadedFiles.length;
+    const basePrice = SERVICE_TYPES[formData.service_type].price;
+    const turnaroundMultiplier = TURNAROUND[formData.turnaround].multiplier;
+
+    const subtotal = totalPages * basePrice;
+    const turnaroundFee = subtotal * (turnaroundMultiplier - 1);
+    const total = subtotal + turnaroundFee;
+
+    setTimeout(() => {
+      setQuote({
+        pages: totalPages,
+        base_price: basePrice,
+        subtotal: subtotal,
+        turnaround_fee: turnaroundFee,
+        total: total,
+        service: SERVICE_TYPES[formData.service_type].name,
+        turnaround: TURNAROUND[formData.turnaround].name
+      });
+      setCalculating(false);
+    }, 500);
+  };
+
+  // Send quote to client
+  const sendQuote = async () => {
+    if (!quote) {
+      setError('Please calculate the quote first');
+      return;
+    }
+
+    if (!formData.client_email || !formData.client_name) {
+      setError('Please fill in client name and email');
+      return;
+    }
+
+    setSending(true);
+    setError('');
+
+    try {
+      // Create order in backend
+      const orderData = {
+        client_name: formData.client_name,
+        client_email: formData.client_email,
+        client_phone: formData.client_phone,
+        translate_from: formData.translate_from,
+        translate_to: formData.translate_to,
+        service_type: formData.service_type,
+        turnaround: formData.turnaround,
+        special_instructions: formData.special_instructions,
+        pages: quote.pages,
+        total_price: quote.total,
+        status: 'Quote',
+        created_by: user?.name || 'Admin',
+        files: uploadedFiles.map(f => ({ filename: f.name, data: f.data, content_type: f.type }))
+      };
+
+      const response = await axios.post(`${API}/admin/create-quote?admin_key=${adminKey}`, orderData);
+
+      if (response.data.success || response.data.id) {
+        setSuccess(true);
+        // Reset form
+        setFormData({
+          client_name: '',
+          client_email: '',
+          client_phone: '',
+          translate_from: 'Portuguese',
+          translate_to: 'English',
+          service_type: 'certified',
+          turnaround: 'standard',
+          special_instructions: ''
+        });
+        setUploadedFiles([]);
+        setQuote(null);
+      } else {
+        throw new Error(response.data.error || 'Failed to create quote');
+      }
+    } catch (err) {
+      console.error('Failed to send quote:', err);
+      setError(err.response?.data?.detail || err.message || 'Failed to send quote');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+          <div className="text-6xl mb-4">✅</div>
+          <h2 className="text-2xl font-bold text-green-700 mb-2">Quote Sent Successfully!</h2>
+          <p className="text-gray-600 mb-6">
+            The quote has been sent to {formData.client_email || 'the client'}
+          </p>
+          <button
+            onClick={() => setSuccess(false)}
+            className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+          >
+            Create Another Quote
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Create New Quote</h1>
+        <p className="text-gray-600">Create a quote for a client and send it via email</p>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{error}</div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Form */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Client Information */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Client Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  value={formData.client_name}
+                  onChange={(e) => setFormData({...formData, client_name: e.target.value})}
+                  placeholder="John Smith"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  value={formData.client_email}
+                  onChange={(e) => setFormData({...formData, client_email: e.target.value})}
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+                <input
+                  type="tel"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  value={formData.client_phone}
+                  onChange={(e) => setFormData({...formData, client_phone: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Translation Details */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Translation Details</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From Language</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  value={formData.translate_from}
+                  onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
+                >
+                  {LANGUAGES.map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">To Language</label>
+                <select
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  value={formData.translate_to}
+                  onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
+                >
+                  {LANGUAGES.map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Service Type */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Service Type</label>
+              <div className="space-y-2">
+                {Object.entries(SERVICE_TYPES).map(([key, service]) => (
+                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.service_type === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="service_type"
+                      value={key}
+                      checked={formData.service_type === key}
+                      onChange={(e) => { setFormData({...formData, service_type: e.target.value}); setQuote(null); }}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{service.name}</div>
+                      <div className="text-sm text-gray-500">{service.description}</div>
+                    </div>
+                    <div className="font-bold text-teal-600">${service.price}/page</div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Turnaround */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Turnaround Time</label>
+              <div className="space-y-2">
+                {Object.entries(TURNAROUND).map(([key, option]) => (
+                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.turnaround === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="turnaround"
+                      value={key}
+                      checked={formData.turnaround === key}
+                      onChange={(e) => { setFormData({...formData, turnaround: e.target.value}); setQuote(null); }}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{option.name}</div>
+                    </div>
+                    {option.multiplier > 1 && (
+                      <div className="text-sm text-orange-600">+{((option.multiplier - 1) * 100).toFixed(0)}%</div>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Documents */}
+          <div className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Documents</h2>
+
+            {/* Upload Area */}
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-500 transition-colors">
+              <input
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              />
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <div className="text-4xl mb-2">📄</div>
+                <div className="font-medium text-gray-700">Click to upload documents</div>
+                <div className="text-sm text-gray-500">PDF, DOC, DOCX, JPG, PNG</div>
+              </label>
+            </div>
+
+            {/* Uploaded Files */}
+            {uploadedFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {uploadedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">📎</span>
+                      <div>
+                        <div className="font-medium text-sm">{file.name}</div>
+                        <div className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeFile(index)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Special Instructions */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
+              <textarea
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                rows={3}
+                value={formData.special_instructions}
+                onChange={(e) => setFormData({...formData, special_instructions: e.target.value})}
+                placeholder="Any special requirements or notes..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Quote Summary */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-xl shadow p-6 sticky top-6">
+            <h2 className="text-lg font-bold text-teal-700 mb-4">Quote Summary</h2>
+
+            {quote ? (
+              <>
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Service</span>
+                    <span className="font-medium">{quote.service}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Pages</span>
+                    <span className="font-medium">{quote.pages}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Turnaround</span>
+                    <span className="font-medium">{quote.turnaround}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span>${quote.subtotal.toFixed(2)}</span>
+                  </div>
+                  {quote.turnaround_fee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Rush Fee</span>
+                      <span>${quote.turnaround_fee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="border-t pt-3 flex justify-between">
+                    <span className="font-bold">Total</span>
+                    <span className="font-bold text-2xl text-teal-600">${quote.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={sendQuote}
+                  disabled={sending}
+                  className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 font-medium"
+                >
+                  {sending ? 'Sending...' : '📧 Send Quote to Client'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-center text-gray-500 py-8">
+                  <div className="text-4xl mb-2">📊</div>
+                  <p>Upload documents and click Calculate to see the quote</p>
+                </div>
+
+                <button
+                  onClick={calculateQuote}
+                  disabled={calculating || uploadedFiles.length === 0}
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                >
+                  {calculating ? 'Calculating...' : '🔢 Calculate Quote'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
   const [exporting, setExporting] = useState(false);
@@ -14312,6 +14752,10 @@ function AdminApp() {
       case 'projects':
         return userRole !== 'translator'
           ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'new-quote':
+        return userRole !== 'translator'
+          ? <NewQuotePage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'translation':
         return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;

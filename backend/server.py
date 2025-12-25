@@ -2459,7 +2459,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
 
         role_display = {
             'admin': 'Administrator',
@@ -2628,7 +2628,7 @@ async def admin_forgot_password(request: AdminForgotPassword):
 
             # Get frontend URL
             frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-            reset_link = f"{frontend_url}/admin?reset_token={reset_token}"
+            reset_link = f"{frontend_url}/#/admin?reset_token={reset_token}"
 
             # Send email
             subject = "Reset Your Password - Legacy Translations Admin"
@@ -3972,6 +3972,150 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
     except Exception as e:
         logger.error(f"Error creating manual order: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
+
+class CreateQuoteRequest(BaseModel):
+    client_name: str
+    client_email: str
+    client_phone: Optional[str] = None
+    translate_from: str = "Portuguese"
+    translate_to: str = "English"
+    service_type: str = "certified"
+    turnaround: str = "standard"
+    special_instructions: Optional[str] = None
+    pages: int = 1
+    total_price: float = 0.0
+    created_by: Optional[str] = "Admin"
+    files: Optional[List[dict]] = []
+
+@api_router.post("/admin/create-quote")
+async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
+    """Create a quote and send it to the client via email"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Generate order number
+        order_number = f"Q{datetime.now().strftime('%y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
+
+        # Turnaround: 2-3 business days
+        turnaround_days = 3
+
+        # Create the order as a quote
+        order_data = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "partner_id": "admin_quote",
+            "partner_company": "Admin Created",
+            "client_name": quote_data.client_name,
+            "client_email": quote_data.client_email,
+            "client_phone": quote_data.client_phone,
+            "service_type": quote_data.service_type,
+            "translate_from": quote_data.translate_from,
+            "translate_to": quote_data.translate_to,
+            "page_count": quote_data.pages,
+            "turnaround": quote_data.turnaround,
+            "special_instructions": quote_data.special_instructions,
+            "total_price": quote_data.total_price,
+            "base_price": quote_data.total_price,
+            "translation_status": "Quote",
+            "payment_status": "pending",
+            "source_type": "admin_quote",
+            "created_by": quote_data.created_by,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "due_date": datetime.utcnow() + timedelta(days=turnaround_days)
+        }
+
+        # Insert order
+        await db.translation_orders.insert_one(order_data)
+        logger.info(f"Quote created: {order_number}")
+
+        # Save documents if provided
+        if quote_data.files:
+            for file_data in quote_data.files:
+                doc_record = {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_data["id"],
+                    "filename": file_data.get("filename", "document.pdf"),
+                    "data": file_data.get("data"),
+                    "content_type": file_data.get("content_type", "application/pdf"),
+                    "uploaded_at": datetime.utcnow()
+                }
+                await db.order_documents.insert_one(doc_record)
+            logger.info(f"Saved {len(quote_data.files)} documents for quote {order_number}")
+
+        # Send quote email to client
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+        turnaround_display = "2-3 business days"
+
+        service_display = "Certified Translation" if quote_data.service_type == "certified" else "Standard Translation"
+
+        subject = f"Your Translation Quote - {order_number}"
+        content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
+            <h2 style="color: #0d9488;">Your Translation Quote</h2>
+            <p>Hello {quote_data.client_name},</p>
+            <p>Thank you for your interest in our translation services. Here is your quote:</p>
+
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <p><strong>Quote Number:</strong> {order_number}</p>
+                <p><strong>Service:</strong> {service_display}</p>
+                <p><strong>Languages:</strong> {quote_data.translate_from} → {quote_data.translate_to}</p>
+                <p><strong>Pages:</strong> {quote_data.pages}</p>
+                <p><strong>Turnaround:</strong> {turnaround_display}</p>
+                <p style="font-size: 24px; color: #0d9488; font-weight: bold;">Total: ${quote_data.total_price:.2f}</p>
+            </div>
+
+            <h3 style="color: #0d9488; margin-top: 30px;">Payment Options</h3>
+
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bbf7d0;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 1: Zelle (Instant)</strong></p>
+                <p style="margin: 0; color: #666;">Send to: <strong>857-208-1139</strong></p>
+                <p style="margin: 0; color: #666;">Business Name: <strong>Legacy Translations Inc</strong></p>
+            </div>
+
+            <div style="background: #eff6ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bfdbfe;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 2: Venmo</strong></p>
+                <p style="margin: 0; color: #666;">Username: <strong>@legacytranslations</strong></p>
+            </div>
+
+            <div style="background: #faf5ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #e9d5ff;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 3: Credit/Debit Card</strong></p>
+                <p style="margin: 0; color: #666;">Click the button below to pay securely online:</p>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="{frontend_url}/#/customer" style="background: #7c3aed; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pay with Card</a>
+                </div>
+            </div>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>Important:</strong> Please include your quote number <strong>{order_number}</strong> in the payment reference/memo.
+            </p>
+
+            <p style="color: #666; font-size: 14px;">This quote is valid for 30 days. If you have any questions, please reply to this email.</p>
+
+            <p>Best regards,<br>Legacy Translations Team</p>
+        </div>
+        """
+
+        try:
+            await email_service.send_email(quote_data.client_email, subject, content)
+            logger.info(f"Quote email sent to {quote_data.client_email}")
+        except Exception as email_err:
+            logger.error(f"Failed to send quote email: {email_err}")
+
+        return {
+            "success": True,
+            "id": order_data["id"],
+            "order_number": order_number,
+            "message": f"Quote {order_number} created and sent to {quote_data.client_email}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating quote: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create quote: {str(e)}")
 
 @api_router.get("/admin/users/by-role/{role}")
 async def get_users_by_role(role: str, admin_key: str):
@@ -5344,7 +5488,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
 @api_router.get("/admin/orders/{order_id}/translated-document")
 async def get_translated_document(order_id: str, admin_key: str):
-    """Get translated document info for an order (admin/PM only)"""
+    """Get translated document info and content for an order (admin/PM only)"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
@@ -5356,7 +5500,7 @@ async def get_translated_document(order_id: str, admin_key: str):
     has_file = bool(order.get("translated_file"))
     has_html = bool(order.get("translation_html"))
 
-    return {
+    response = {
         "has_translated_document": has_file or has_html,
         "translated_filename": order.get("translated_filename"),
         "translated_file_type": order.get("translated_file_type"),
@@ -5369,6 +5513,24 @@ async def get_translated_document(order_id: str, admin_key: str):
         "client_email": order.get("client_email"),
         "order_number": order.get("order_number")
     }
+
+    # Include translation content for review
+    if has_html:
+        response["translation_html"] = order.get("translation_html")
+        response["translation_settings"] = {
+            "source_language": order.get("translation_source_language"),
+            "target_language": order.get("translation_target_language"),
+            "document_type": order.get("translation_document_type"),
+            "translator_name": order.get("translation_translator_name"),
+            "translation_date": order.get("translation_date"),
+            "submitted_by": order.get("translation_submitted_by"),
+            "submitted_by_role": order.get("translation_submitted_by_role")
+        }
+    elif has_file:
+        response["file_data"] = order.get("translated_file")
+        response["content_type"] = order.get("translated_file_type", "application/pdf")
+
+    return response
 
 @api_router.get("/admin/orders/{order_id}/download-translation")
 async def download_translated_document(order_id: str, admin_key: str):
@@ -7485,7 +7647,7 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
                 <p>Ready to proceed? Click the button below to complete your order:</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{frontend_url}/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+                    <a href="{frontend_url}/#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
                 </div>
 
                 <p style="color: #666; font-size: 14px;">If you have any questions, please reply to this email or contact us at info@legacytranslations.com</p>

@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App";
 import AdminApp from "./AdminApp";
 import CustomerApp from "./CustomerApp";
+import B2BLandingPage from "./B2BLandingPage";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -15,7 +16,9 @@ root.render(
         <Route path="/admin/*" element={<AdminApp />} />
         {/* Customer Portal - /#/customer */}
         <Route path="/customer/*" element={<CustomerApp />} />
-        {/* Partner Portal - / (default) */}
+        {/* B2B Landing Page - /#/b2b */}
+        <Route path="/b2b" element={<B2BLandingPage />} />
+        {/* Partner Portal - /#/partner */}
         <Route path="/partner/*" element={<App />} />
         <Route path="/*" element={<App />} />
       </Routes>
