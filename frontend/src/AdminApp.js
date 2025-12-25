@@ -6757,6 +6757,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewCurrentPage, setReviewCurrentPage] = useState(0);
 
+  // AI Pipeline Quick Start state
+  const [aiPipelineModal, setAiPipelineModal] = useState(null); // Order for AI Pipeline
+  const [startingAIPipeline, setStartingAIPipeline] = useState(false);
+  const [aiPipelineQuickConfig, setAiPipelineQuickConfig] = useState({
+    convert_currency: false,
+    source_currency: 'BRL',
+    target_currency: 'USD',
+    use_glossary: true,
+    page_format: 'letter',
+    custom_instructions: ''
+  });
+
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
@@ -7475,6 +7487,61 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Open AI Pipeline modal for an order
+  const openAIPipelineModal = (order) => {
+    setAiPipelineModal(order);
+    setAiPipelineQuickConfig({
+      convert_currency: order.document_type?.toLowerCase().includes('bank') || order.document_type?.toLowerCase().includes('financial'),
+      source_currency: order.translate_from === 'Portuguese' ? 'BRL' : 'USD',
+      target_currency: order.translate_to === 'English' ? 'USD' : 'BRL',
+      use_glossary: true,
+      page_format: 'letter',
+      custom_instructions: ''
+    });
+  };
+
+  // Quick start AI Pipeline from projects list
+  const quickStartAIPipeline = async () => {
+    if (!aiPipelineModal) return;
+
+    setStartingAIPipeline(true);
+    try {
+      // First, we need to get the document and do OCR or use existing text
+      // The pipeline will handle this - we just start it
+      const response = await axios.post(`${API}/admin/ai-pipeline/start?admin_key=${adminKey}`, {
+        order_id: aiPipelineModal.id,
+        source_language: aiPipelineModal.translate_from || 'Portuguese',
+        target_language: aiPipelineModal.translate_to || 'English',
+        document_type: aiPipelineModal.document_type || 'General Document',
+        original_text: '', // Will be extracted from documents
+        convert_currency: aiPipelineQuickConfig.convert_currency,
+        source_currency: aiPipelineQuickConfig.source_currency,
+        target_currency: aiPipelineQuickConfig.target_currency,
+        page_format: aiPipelineQuickConfig.page_format,
+        use_glossary: aiPipelineQuickConfig.use_glossary,
+        custom_instructions: aiPipelineQuickConfig.custom_instructions,
+        quick_start: true // Flag to indicate quick start - backend will fetch docs
+      });
+
+      // Update order status
+      await axios.put(`${API}/admin/orders/${aiPipelineModal.id}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        ai_pipeline_id: response.data.pipeline_id
+      });
+
+      alert(`🤖 AI Pipeline iniciado para ${aiPipelineModal.order_number}!\n\nO processo irá:\n1. Traduzir automaticamente\n2. Revisar layout\n3. Verificar terminologia\n4. Aguardar revisão humana\n\nAcesse a Translation Tool para acompanhar.`);
+
+      setAiPipelineModal(null);
+      fetchOrders();
+
+    } catch (error) {
+      console.error('AI Pipeline quick start error:', error);
+      alert(`Erro ao iniciar AI Pipeline: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setStartingAIPipeline(false);
+    }
+  };
+
   // Start translation - navigate to Translation Tool with order
   const startTranslation = (order) => {
     if (onTranslate) {
@@ -7793,6 +7860,143 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
               >
                 {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Pipeline Quick Start Modal */}
+      {aiPipelineModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">🤖 AI Translation Pipeline</h3>
+                <p className="text-xs opacity-80">{aiPipelineModal.order_number} - {aiPipelineModal.client_name}</p>
+              </div>
+              <button onClick={() => setAiPipelineModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Order Info */}
+              <div className="bg-purple-50 p-3 rounded-lg">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-500">Languages:</span>
+                    <span className="ml-1 font-medium">{aiPipelineModal.translate_from} → {aiPipelineModal.translate_to}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Document:</span>
+                    <span className="ml-1 font-medium">{aiPipelineModal.document_type || 'General'}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Pages:</span>
+                    <span className="ml-1 font-medium">{aiPipelineModal.page_count || 1}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pipeline Stages Preview */}
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="text-xs font-medium text-gray-700 mb-2">Pipeline Stages:</div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">🌐</div>
+                    <span className="mt-1">Translator</span>
+                  </div>
+                  <div className="flex-1 h-0.5 bg-gray-300 mx-1"></div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">📐</div>
+                    <span className="mt-1">Layout</span>
+                  </div>
+                  <div className="flex-1 h-0.5 bg-gray-300 mx-1"></div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">✍️</div>
+                    <span className="mt-1">Proofreader</span>
+                  </div>
+                  <div className="flex-1 h-0.5 bg-gray-300 mx-1"></div>
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">👤</div>
+                    <span className="mt-1">Review</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Configuration Options */}
+              <div className="space-y-3">
+                <div className="text-xs font-medium text-gray-700">Configuration:</div>
+
+                {/* Currency Conversion */}
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiPipelineQuickConfig.convert_currency}
+                    onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, convert_currency: e.target.checked})}
+                    className="rounded text-purple-600"
+                  />
+                  <span>Convert currency values</span>
+                  {aiPipelineQuickConfig.convert_currency && (
+                    <span className="text-gray-500">
+                      ({aiPipelineQuickConfig.source_currency} → {aiPipelineQuickConfig.target_currency})
+                    </span>
+                  )}
+                </label>
+
+                {/* Glossary */}
+                <label className="flex items-center gap-2 text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiPipelineQuickConfig.use_glossary}
+                    onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, use_glossary: e.target.checked})}
+                    className="rounded text-purple-600"
+                  />
+                  <span>Use terminology glossary</span>
+                </label>
+
+                {/* Page Format */}
+                <div className="flex items-center gap-2 text-xs">
+                  <span>Page format:</span>
+                  <select
+                    value={aiPipelineQuickConfig.page_format}
+                    onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, page_format: e.target.value})}
+                    className="px-2 py-1 border rounded text-xs"
+                  >
+                    <option value="letter">US Letter</option>
+                    <option value="a4">A4</option>
+                  </select>
+                </div>
+
+                {/* Custom Instructions */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Custom instructions (optional):</label>
+                  <textarea
+                    value={aiPipelineQuickConfig.custom_instructions}
+                    onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, custom_instructions: e.target.value})}
+                    placeholder="E.g., Keep company name in original language..."
+                    className="w-full px-2 py-1.5 border rounded text-xs h-16 resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-between items-center rounded-b-lg">
+              <button
+                onClick={() => setAiPipelineModal(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={quickStartAIPipeline}
+                disabled={startingAIPipeline}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded text-sm hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {startingAIPipeline ? (
+                  <>⏳ Starting...</>
+                ) : (
+                  <>🚀 Start AI Pipeline</>
+                )}
               </button>
             </div>
           </div>
@@ -8578,12 +8782,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         )}
                       </div>
                     ) : (isAdmin || isPM) ? (
-                      <button
-                        onClick={() => openAssignTranslatorModal(order)}
-                        className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] hover:bg-gray-200 flex items-center gap-0.5"
-                      >
-                        <AssignIcon className="w-3 h-3" /> Assign
-                      </button>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => openAssignTranslatorModal(order)}
+                          className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] hover:bg-gray-200 flex items-center gap-0.5"
+                        >
+                          <AssignIcon className="w-3 h-3" /> Translator
+                        </button>
+                        <button
+                          onClick={() => openAIPipelineModal(order)}
+                          className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200 flex items-center gap-0.5"
+                          title="Send to AI Pipeline"
+                        >
+                          🤖 AI Pipeline
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-[10px] text-gray-400">-</span>
                     )}
