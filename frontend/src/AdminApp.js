@@ -9437,6 +9437,71 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* AI Pipeline Status (if applicable) */}
+                  {viewingOrder.ai_pipeline_id && (
+                    <div className="mt-4 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                      <div className="text-xs font-medium text-indigo-700 mb-2">🤖 AI Pipeline</div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                          viewingOrder.ai_pipeline_status === 'completed' ? 'bg-green-100 text-green-700' :
+                          viewingOrder.ai_pipeline_status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                          viewingOrder.ai_pipeline_status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {viewingOrder.ai_pipeline_status || 'pending'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-1">
+                        Pipeline ID: {viewingOrder.ai_pipeline_id.slice(0, 8)}...
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delivery Info & Resend Option */}
+                  {viewingOrder.translation_status === 'delivered' && (
+                    <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
+                      <div className="text-xs font-medium text-teal-700 mb-2">📤 Delivery Information</div>
+                      {viewingOrder.delivered_at && (
+                        <div className="text-xs text-gray-600 mb-2">
+                          Delivered: {new Date(viewingOrder.delivered_at).toLocaleString()}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-600 mb-3">
+                        Sent to: {viewingOrder.client_email}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setViewingOrder(null);
+                          openSendToClientModal(viewingOrder);
+                        }}
+                        className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
+                      >
+                        🔄 Resend Translation
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Translation Ready - option to send */}
+                  {viewingOrder.translation_ready && viewingOrder.translation_status !== 'delivered' && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="text-xs font-medium text-green-700 mb-2">✅ Translation Ready</div>
+                      <div className="text-xs text-gray-600 mb-3">
+                        {viewingOrder.translation_ready_at && (
+                          <span>Completed: {new Date(viewingOrder.translation_ready_at).toLocaleString()}</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setViewingOrder(null);
+                          openSendToClientModal(viewingOrder);
+                        }}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
+                      >
+                        📤 Send to Client
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

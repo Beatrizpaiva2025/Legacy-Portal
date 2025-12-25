@@ -434,6 +434,126 @@ def get_delivery_email_template(client_name: str) -> str:
                             </p>'''
     return get_email_header() + content + get_email_footer(include_review_button=True)
 
+def generate_translation_html_for_email(order: dict) -> str:
+    """Generate a formatted HTML document from translation_html for email attachment"""
+    translation_text = order.get("translation_html", "")
+    translator_name = order.get("translation_translator_name", "Legacy Translations")
+    translation_date = order.get("translation_date", datetime.utcnow().strftime("%m/%d/%Y"))
+    document_type = order.get("translation_document_type") or order.get("document_type", "Document")
+    source_lang = order.get("translation_source_language") or order.get("translate_from", "Portuguese")
+    target_lang = order.get("translation_target_language") or order.get("translate_to", "English")
+    order_number = order.get("order_number", "")
+
+    # Format the translation text with proper paragraphs
+    formatted_text = translation_text.replace('\n\n---\n\n', '<hr style="margin: 30px 0; border: none; border-top: 1px solid #ccc;">')
+    formatted_text = formatted_text.replace('\n\n', '</p><p style="margin: 10px 0; line-height: 1.6;">')
+    formatted_text = formatted_text.replace('\n', '<br>')
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Translation - {order_number}</title>
+    <style>
+        @page {{ size: Letter; margin: 0.75in; }}
+        body {{
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 40px;
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 2px solid #1a365d;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .company-name {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a365d;
+            margin-bottom: 5px;
+        }}
+        .company-info {{
+            font-size: 11px;
+            color: #666;
+        }}
+        .document-info {{
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            font-size: 11px;
+        }}
+        .document-info strong {{
+            color: #1a365d;
+        }}
+        .translation-content {{
+            margin-top: 20px;
+        }}
+        .translation-content p {{
+            margin: 10px 0;
+            text-align: justify;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }}
+        .certification {{
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #1a365d;
+            background: #fafafa;
+        }}
+        .signature {{
+            margin-top: 20px;
+            font-style: italic;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">Legacy Translations</div>
+        <div class="company-info">
+            867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+            (857) 316-7770 · contact@legacytranslations.com
+        </div>
+    </div>
+
+    <div class="document-info">
+        <strong>Order:</strong> {order_number} &nbsp;|&nbsp;
+        <strong>Document Type:</strong> {document_type} &nbsp;|&nbsp;
+        <strong>Languages:</strong> {source_lang} → {target_lang} &nbsp;|&nbsp;
+        <strong>Date:</strong> {translation_date}
+    </div>
+
+    <div class="translation-content">
+        <p style="margin: 10px 0; line-height: 1.6;">{formatted_text}</p>
+    </div>
+
+    <div class="certification">
+        <p>I, {translator_name}, certify that the above translation is a true and accurate representation of the original document.</p>
+        <div class="signature">
+            <p>{translator_name}<br>
+            Legacy Translations<br>
+            Date: {translation_date}</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Legacy Translations Inc. · ATA Member #275993 · www.legacytranslations.com</p>
+    </div>
+</body>
+</html>'''
+    return html
+
 def get_order_confirmation_email_template(client_name: str, order_details: dict) -> str:
     """Generate professional order confirmation email template"""
     content = f'''
@@ -5553,8 +5673,29 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
     # Send emails
     try:
-        # Check if translated file exists
-        has_attachment = order.get("translated_file") and order.get("translated_filename")
+        # Check if translated file exists (uploaded PDF) or translation_html (from workspace)
+        has_file_attachment = order.get("translated_file") and order.get("translated_filename")
+        has_html_translation = order.get("translation_html")
+
+        # Prepare attachment data
+        attachment_data = None
+        attachment_filename = None
+        attachment_type = None
+
+        if has_file_attachment:
+            # Use uploaded file
+            attachment_data = order["translated_file"]
+            attachment_filename = order["translated_filename"]
+            attachment_type = order.get("translated_file_type", "application/pdf")
+        elif has_html_translation:
+            # Generate HTML file from translation_html
+            translation_html_content = generate_translation_html_for_email(order)
+            # Convert to base64
+            attachment_data = base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8')
+            attachment_filename = f"Translation_{order['order_number']}.html"
+            attachment_type = "text/html"
+
+        has_attachment = attachment_data is not None
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
@@ -5565,9 +5706,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 order["client_email"],
                 f"Your Translation is Ready - {order['order_number']}",
                 email_html,
-                order["translated_file"],
-                order["translated_filename"],
-                order.get("translated_file_type", "application/pdf")
+                attachment_data,
+                attachment_filename,
+                attachment_type
             )
         else:
             # Send to client WITHOUT attachment
@@ -5592,9 +5733,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                         bcc_email,
                         bcc_subject,
                         bcc_html,
-                        order["translated_file"],
-                        order["translated_filename"],
-                        order.get("translated_file_type", "application/pdf")
+                        attachment_data,
+                        attachment_filename,
+                        attachment_type
                     )
                 else:
                     await email_service.send_email(bcc_email, bcc_subject, bcc_html)
