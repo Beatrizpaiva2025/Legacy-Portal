@@ -1114,10 +1114,10 @@ class AIPipelineCreate(BaseModel):
     source_language: str
     target_language: str
     document_type: str
-    original_text: str
+    original_text: str = ""  # Can be empty if quick_start=True
     original_document_base64: Optional[str] = None
     original_filename: Optional[str] = None
-    claude_api_key: str
+    claude_api_key: Optional[str] = None  # Optional - will use shared key if not provided
     # Optional settings
     convert_currency: bool = False
     source_currency: Optional[str] = None
@@ -1125,6 +1125,7 @@ class AIPipelineCreate(BaseModel):
     page_format: str = "letter"
     use_glossary: bool = True
     custom_instructions: Optional[str] = None
+    quick_start: bool = False  # If true, fetch documents from order automatically
 
 class AIPipelineStageApproval(BaseModel):
     """Request to approve/reject a stage and move to next"""
@@ -9215,6 +9216,88 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
     if existing and existing.get("overall_status") not in ["completed", "failed"]:
         raise HTTPException(status_code=400, detail="Active pipeline already exists for this order")
 
+    # Get Claude API key - use shared key if not provided
+    claude_api_key = request.claude_api_key
+    if not claude_api_key:
+        settings = await db.app_settings.find_one({"key": "shared_claude_api_key"})
+        if settings and settings.get("value"):
+            claude_api_key = settings["value"]
+        else:
+            raise HTTPException(status_code=400, detail="No Claude API key provided and no shared key configured. Please configure the shared API key in Settings.")
+
+    # Handle quick_start - fetch documents from order
+    original_text = request.original_text
+    original_document_base64 = request.original_document_base64
+    original_filename = request.original_filename
+
+    if request.quick_start and not original_text:
+        # Fetch documents for this order
+        order_docs = await db.documents.find({"order_id": request.order_id, "document_type": "original"}).to_list(100)
+
+        if not order_docs:
+            raise HTTPException(status_code=400, detail="No documents found for this order. Please upload documents first.")
+
+        # Extract text from documents using Claude Vision
+        extracted_texts = []
+        for doc in order_docs:
+            if doc.get("file_data"):
+                # Use Claude to extract text from the document
+                try:
+                    client = anthropic.Anthropic(api_key=claude_api_key)
+
+                    # Determine media type
+                    filename = doc.get("filename", "").lower()
+                    if filename.endswith(".pdf"):
+                        media_type = "application/pdf"
+                    elif filename.endswith(".png"):
+                        media_type = "image/png"
+                    elif filename.endswith(".jpg") or filename.endswith(".jpeg"):
+                        media_type = "image/jpeg"
+                    else:
+                        media_type = "image/png"  # Default
+
+                    # Clean base64 data
+                    file_data = doc["file_data"]
+                    if "," in file_data:
+                        file_data = file_data.split(",")[1]
+
+                    response = client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=8000,
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": media_type,
+                                        "data": file_data
+                                    }
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "Extract ALL text from this document exactly as it appears. Preserve the layout and formatting. Include all visible text."
+                                }
+                            ]
+                        }]
+                    )
+
+                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n{response.content[0].text}")
+
+                    if not original_document_base64:
+                        original_document_base64 = file_data
+                        original_filename = doc.get("filename")
+
+                except Exception as e:
+                    print(f"Error extracting text from document: {e}")
+                    extracted_texts.append(f"--- Document: {doc.get('filename', 'unknown')} ---\n[Error extracting text: {str(e)}]")
+
+        if extracted_texts:
+            original_text = "\n\n".join(extracted_texts)
+        else:
+            raise HTTPException(status_code=400, detail="Could not extract text from any documents. Please check document format.")
+
     # Create pipeline configuration
     config = AIPipelineConfig(
         source_language=request.source_language,
@@ -9233,14 +9316,14 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
         order_id=request.order_id,
         order_number=order.get("order_number"),
         config=config,
-        original_text=request.original_text,
-        original_document_base64=request.original_document_base64,
-        original_filename=request.original_filename,
+        original_text=original_text,
+        original_document_base64=original_document_base64,
+        original_filename=original_filename,
         started_by_id=user.get("id"),
         started_by_name=user.get("name"),
         started_at=datetime.utcnow(),
         overall_status="in_progress",
-        claude_api_key_used=request.claude_api_key[:10] + "..." if request.claude_api_key else None
+        claude_api_key_used=claude_api_key[:10] + "..." if claude_api_key else None
     )
 
     pipeline_dict = pipeline.dict()
@@ -9272,7 +9355,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
     )
 
     # Run Stage 1
-    result = await run_ai_translator_stage(pipeline_dict, request.claude_api_key)
+    result = await run_ai_translator_stage(pipeline_dict, claude_api_key)
 
     if result["success"]:
         await db.ai_pipelines.update_one(
@@ -9290,7 +9373,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
         )
 
         # Run Stage 2: Layout Review
-        layout_result = await run_ai_layout_stage(pipeline_dict, result["result"], request.claude_api_key)
+        layout_result = await run_ai_layout_stage(pipeline_dict, result["result"], claude_api_key)
 
         if layout_result["success"]:
             await db.ai_pipelines.update_one(
@@ -9309,7 +9392,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
             )
 
             # Run Stage 3: Proofreading
-            proofread_result = await run_ai_proofreader_stage(pipeline_dict, layout_result["result"], request.claude_api_key)
+            proofread_result = await run_ai_proofreader_stage(pipeline_dict, layout_result["result"], claude_api_key)
 
             if proofread_result["success"]:
                 total_tokens = result.get("tokens_used", 0) + layout_result.get("tokens_used", 0) + proofread_result.get("tokens_used", 0)
