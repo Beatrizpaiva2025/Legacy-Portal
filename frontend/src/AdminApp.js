@@ -7500,45 +7500,27 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     });
   };
 
-  // Quick start AI Pipeline from projects list
+  // Quick start AI Pipeline from projects list - redirects to Translation Tool
   const quickStartAIPipeline = async () => {
     if (!aiPipelineModal) return;
 
-    setStartingAIPipeline(true);
-    try {
-      // First, we need to get the document and do OCR or use existing text
-      // The pipeline will handle this - we just start it
-      const response = await axios.post(`${API}/admin/ai-pipeline/start?admin_key=${adminKey}`, {
-        order_id: aiPipelineModal.id,
-        source_language: aiPipelineModal.translate_from || 'Portuguese',
-        target_language: aiPipelineModal.translate_to || 'English',
-        document_type: aiPipelineModal.document_type || 'General Document',
-        original_text: '', // Will be extracted from documents
-        convert_currency: aiPipelineQuickConfig.convert_currency,
-        source_currency: aiPipelineQuickConfig.source_currency,
-        target_currency: aiPipelineQuickConfig.target_currency,
-        page_format: aiPipelineQuickConfig.page_format,
-        use_glossary: aiPipelineQuickConfig.use_glossary,
-        custom_instructions: aiPipelineQuickConfig.custom_instructions,
-        quick_start: true // Flag to indicate quick start - backend will fetch docs
-      });
+    // Instead of calling API directly, redirect to Translation Tool with AI Pipeline tab
+    // This ensures the user can use the full Translation Tool features
+    const confirmed = window.confirm(
+      `🤖 Iniciar AI Pipeline para ${aiPipelineModal.order_number}?\n\n` +
+      `Você será redirecionado para a Translation Tool onde poderá:\n` +
+      `1. Fazer upload/OCR dos documentos\n` +
+      `2. Configurar e iniciar o AI Pipeline\n` +
+      `3. Acompanhar o progresso em tempo real\n\n` +
+      `Continuar?`
+    );
 
-      // Update order status
-      await axios.put(`${API}/admin/orders/${aiPipelineModal.id}?admin_key=${adminKey}`, {
-        translation_status: 'in_translation',
-        ai_pipeline_id: response.data.pipeline_id
-      });
-
-      alert(`🤖 AI Pipeline iniciado para ${aiPipelineModal.order_number}!\n\nO processo irá:\n1. Traduzir automaticamente\n2. Revisar layout\n3. Verificar terminologia\n4. Aguardar revisão humana\n\nAcesse a Translation Tool para acompanhar.`);
-
+    if (confirmed) {
       setAiPipelineModal(null);
-      fetchOrders();
-
-    } catch (error) {
-      console.error('AI Pipeline quick start error:', error);
-      alert(`Erro ao iniciar AI Pipeline: ${error.response?.data?.detail || error.message}`);
-    } finally {
-      setStartingAIPipeline(false);
+      // Call onTranslate to navigate to Translation Tool with this order
+      if (onTranslate) {
+        onTranslate(aiPipelineModal);
+      }
     }
   };
 
@@ -7999,14 +7981,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </button>
               <button
                 onClick={quickStartAIPipeline}
-                disabled={startingAIPipeline}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded text-sm hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded text-sm hover:from-purple-700 hover:to-indigo-700 flex items-center gap-2"
               >
-                {startingAIPipeline ? (
-                  <>⏳ Starting...</>
-                ) : (
-                  <>🚀 Start AI Pipeline</>
-                )}
+                🚀 Go to Translation Tool
               </button>
             </div>
           </div>
