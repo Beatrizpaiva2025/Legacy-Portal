@@ -5344,7 +5344,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
 @api_router.get("/admin/orders/{order_id}/translated-document")
 async def get_translated_document(order_id: str, admin_key: str):
-    """Get translated document info for an order (admin/PM only)"""
+    """Get translated document info and content for an order (admin/PM only)"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
@@ -5356,7 +5356,7 @@ async def get_translated_document(order_id: str, admin_key: str):
     has_file = bool(order.get("translated_file"))
     has_html = bool(order.get("translation_html"))
 
-    return {
+    response = {
         "has_translated_document": has_file or has_html,
         "translated_filename": order.get("translated_filename"),
         "translated_file_type": order.get("translated_file_type"),
@@ -5369,6 +5369,24 @@ async def get_translated_document(order_id: str, admin_key: str):
         "client_email": order.get("client_email"),
         "order_number": order.get("order_number")
     }
+
+    # Include translation content for review
+    if has_html:
+        response["translation_html"] = order.get("translation_html")
+        response["translation_settings"] = {
+            "source_language": order.get("translation_source_language"),
+            "target_language": order.get("translation_target_language"),
+            "document_type": order.get("translation_document_type"),
+            "translator_name": order.get("translation_translator_name"),
+            "translation_date": order.get("translation_date"),
+            "submitted_by": order.get("translation_submitted_by"),
+            "submitted_by_role": order.get("translation_submitted_by_role")
+        }
+    elif has_file:
+        response["file_data"] = order.get("translated_file")
+        response["content_type"] = order.get("translated_file_type", "application/pdf")
+
+    return response
 
 @api_router.get("/admin/orders/{order_id}/download-translation")
 async def download_translated_document(order_id: str, admin_key: str):
