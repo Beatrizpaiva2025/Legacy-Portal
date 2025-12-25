@@ -2169,6 +2169,90 @@ async def send_support_request(request: SupportRequest):
         logger.error(f"Error sending support request: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send support request")
 
+# B2B Partnership Interest endpoint
+class B2BInterestRequest(BaseModel):
+    company_name: str
+    contact_name: str
+    email: str
+    phone: str = ""
+    estimated_volume: str = ""
+    message: str = ""
+
+@api_router.post("/b2b-interest")
+async def submit_b2b_interest(request: B2BInterestRequest):
+    """Handle B2B partnership interest form submissions"""
+    try:
+        # Build email content
+        subject = f"New B2B Partnership Interest: {request.company_name}"
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 10px;">
+                🤝 New B2B Partnership Interest
+            </h2>
+
+            <div style="background: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1e3a5f;">
+                <h3 style="color: #1e3a5f; margin-top: 0;">Company Information</h3>
+                <p><strong>Company Name:</strong> {request.company_name}</p>
+                <p><strong>Contact Name:</strong> {request.contact_name}</p>
+                <p><strong>Email:</strong> <a href="mailto:{request.email}">{request.email}</a></p>
+                <p><strong>Phone:</strong> {request.phone or 'Not provided'}</p>
+            </div>
+
+            <div style="background: #fff; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #374151; margin-top: 0;">Business Details</h3>
+                <p><strong>Estimated Monthly Volume:</strong> {request.estimated_volume or 'Not specified'}</p>
+            </div>
+
+            <div style="background: #fafafa; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px;">
+                <h3 style="color: #374151; margin-top: 0;">Message</h3>
+                <p style="white-space: pre-wrap; color: #4b5563;">{request.message or 'No additional message provided.'}</p>
+            </div>
+
+            <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <p style="color: #2e7d32; margin: 0;">
+                    <strong>📋 Next Steps:</strong> Please respond to this inquiry within 24 hours to discuss partnership opportunities.
+                </p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+            <p style="color: #9ca3af; font-size: 12px;">
+                This B2B partnership inquiry was submitted from the Legacy Translations Partner Portal.
+            </p>
+        </div>
+        """
+
+        # Send email to sales/admin
+        await email_service.send_email(
+            to="contact@legacytranslations.com",
+            subject=subject,
+            content=html_content,
+            content_type="html"
+        )
+
+        # Save to database for tracking
+        b2b_inquiry = {
+            "id": str(uuid.uuid4()),
+            "company_name": request.company_name,
+            "contact_name": request.contact_name,
+            "email": request.email,
+            "phone": request.phone,
+            "estimated_volume": request.estimated_volume,
+            "message": request.message,
+            "status": "new",
+            "created_at": datetime.utcnow()
+        }
+        await db.b2b_inquiries.insert_one(b2b_inquiry)
+
+        logger.info(f"B2B interest received from {request.company_name} ({request.email})")
+
+        return {"status": "success", "message": "Thank you for your interest! We will contact you within 24 hours."}
+
+    except Exception as e:
+        logger.error(f"Error processing B2B interest: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit partnership interest")
+
 # ==================== PARTNER AUTHENTICATION ====================
 
 @api_router.post("/auth/register")
