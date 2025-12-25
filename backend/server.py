@@ -2459,7 +2459,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
 
         role_display = {
             'admin': 'Administrator',
@@ -2628,7 +2628,7 @@ async def admin_forgot_password(request: AdminForgotPassword):
 
             # Get frontend URL
             frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-            reset_link = f"{frontend_url}/admin?reset_token={reset_token}"
+            reset_link = f"{frontend_url}/#/admin?reset_token={reset_token}"
 
             # Send email
             subject = "Reset Your Password - Legacy Translations Admin"
@@ -7503,7 +7503,7 @@ async def save_abandoned_quote(quote_data: AbandonedQuoteCreate):
                 <p>Ready to proceed? Click the button below to complete your order:</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{frontend_url}/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+                    <a href="{frontend_url}/#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
                 </div>
 
                 <p style="color: #666; font-size: 14px;">If you have any questions, please reply to this email or contact us at info@legacytranslations.com</p>
