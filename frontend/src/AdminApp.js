@@ -1688,6 +1688,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [applyingCorrection, setApplyingCorrection] = useState(false);
   const [claudeNotes, setClaudeNotes] = useState(''); // Notes/changes made by Claude
 
+  // AI Pipeline state
+  const [aiPipeline, setAiPipeline] = useState(null);
+  const [aiPipelineLoading, setAiPipelineLoading] = useState(false);
+  const [aiPipelineConfig, setAiPipelineConfig] = useState({
+    convertCurrency: false,
+    sourceCurrency: 'BRL',
+    targetCurrency: 'USD',
+    useGlossary: true,
+    customInstructions: ''
+  });
+
   // Send to Projects state
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -2707,6 +2718,120 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // ==================== AI PIPELINE FUNCTIONS ====================
+
+  // Start AI Translation Pipeline
+  const startAIPipeline = async () => {
+    if (!selectedOrderId || !claudeApiKey) {
+      alert('Please select an order and configure your API Key first');
+      return;
+    }
+
+    // Need OCR text first
+    let originalText = '';
+    if (ocrResults.length > 0) {
+      originalText = ocrResults.map(r => r.text).join('\n\n--- PAGE BREAK ---\n\n');
+    } else if (originalImages.length > 0) {
+      // Try to get text from translation results if available
+      if (translationResults.length > 0) {
+        originalText = translationResults.map(r => r.translatedText).join('\n\n');
+      } else {
+        alert('Please run OCR or translate the document first to extract text.');
+        return;
+      }
+    }
+
+    setAiPipelineLoading(true);
+    setProcessingStatus('🤖 Starting AI Translation Pipeline...');
+
+    try {
+      const response = await axios.post(`${API}/admin/ai-pipeline/start?admin_key=${adminKey}`, {
+        order_id: selectedOrderId,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        document_type: documentType,
+        original_text: originalText,
+        original_document_base64: originalImages.length > 0 ? originalImages[0].data : null,
+        original_filename: originalImages.length > 0 ? originalImages[0].filename : null,
+        claude_api_key: claudeApiKey,
+        convert_currency: aiPipelineConfig.convertCurrency,
+        source_currency: aiPipelineConfig.sourceCurrency,
+        target_currency: aiPipelineConfig.targetCurrency,
+        page_format: pageFormat,
+        use_glossary: aiPipelineConfig.useGlossary,
+        custom_instructions: aiPipelineConfig.customInstructions
+      });
+
+      setAiPipeline(response.data);
+      setProcessingStatus(`✅ AI Pipeline ${response.data.status}: ${response.data.message}`);
+
+      // Fetch full pipeline details
+      await fetchAIPipelineStatus();
+
+    } catch (error) {
+      console.error('AI Pipeline error:', error);
+      setProcessingStatus(`❌ Pipeline failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setAiPipelineLoading(false);
+    }
+  };
+
+  // Fetch AI Pipeline status
+  const fetchAIPipelineStatus = async () => {
+    if (!selectedOrderId) return;
+
+    try {
+      const response = await axios.get(`${API}/admin/ai-pipeline/order/${selectedOrderId}?admin_key=${adminKey}`);
+      setAiPipeline(response.data);
+    } catch (error) {
+      // Pipeline might not exist yet
+      console.log('No pipeline found for this order');
+      setAiPipeline(null);
+    }
+  };
+
+  // Approve pipeline stage
+  const approveAIPipelineStage = async (stageName, action = 'approve', editedContent = null) => {
+    if (!aiPipeline) return;
+
+    setAiPipelineLoading(true);
+    try {
+      const response = await axios.post(`${API}/admin/ai-pipeline/approve?admin_key=${adminKey}`, {
+        pipeline_id: aiPipeline.id,
+        stage_name: stageName,
+        action: action,
+        edited_content: editedContent,
+        reviewer_notes: `Approved by ${user?.name || 'Admin'}`
+      });
+
+      setProcessingStatus(`✅ ${response.data.message}`);
+
+      // Refresh pipeline status
+      await fetchAIPipelineStatus();
+
+      // If completed, load translation into results
+      if (response.data.pipeline_status === 'completed') {
+        const updatedPipeline = await axios.get(`${API}/admin/ai-pipeline/order/${selectedOrderId}?admin_key=${adminKey}`);
+        if (updatedPipeline.data.final_translation) {
+          setTranslationResults([{ translatedText: updatedPipeline.data.final_translation }]);
+          setActiveSubTab('review');
+        }
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      setProcessingStatus(`❌ Approval failed: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setAiPipelineLoading(false);
+    }
+  };
+
+  // Load pipeline when order changes
+  useEffect(() => {
+    if (selectedOrderId) {
+      fetchAIPipelineStatus();
+    }
+  }, [selectedOrderId]);
+
   // Direct translation - Claude sees image directly, no OCR needed
   const handleDirectTranslate = async () => {
     if (originalImages.length === 0) {
@@ -3685,6 +3810,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         {[
           { id: 'start', label: 'START', icon: '📝' },
           { id: 'translate', label: 'TRANSLATE', icon: '📄' },
+          { id: 'ai-pipeline', label: 'AI PIPELINE', icon: '🤖' },
           { id: 'review', label: 'REVIEW', icon: '🔍' },
           { id: 'deliver', label: 'DELIVER', icon: '✅' }
         ].map(tab => (
@@ -5209,6 +5335,327 @@ tradução juramentada | certified translation`}
                   <span className="mr-2">←</span> Back: Details
                 </button>
               </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* AI PIPELINE TAB */}
+      {activeSubTab === 'ai-pipeline' && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">🤖 AI Translation Pipeline</h2>
+
+          {!selectedOrderId ? (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-3">📋</div>
+              <p>Please select an order from the START tab first</p>
+              <button
+                onClick={() => setActiveSubTab('start')}
+                className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                Go to START
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Pipeline Configuration */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
+                <h3 className="text-xs font-bold text-purple-800 mb-3">⚙️ Pipeline Configuration</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Language Pair */}
+                  <div>
+                    <label className="text-[10px] text-gray-600 block mb-1">Translation Direction</label>
+                    <div className="text-sm font-medium text-purple-700">
+                      {sourceLanguage} → {targetLanguage}
+                    </div>
+                  </div>
+
+                  {/* Document Type */}
+                  <div>
+                    <label className="text-[10px] text-gray-600 block mb-1">Document Type</label>
+                    <div className="text-sm font-medium text-purple-700">{documentType}</div>
+                  </div>
+
+                  {/* Currency Conversion */}
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={aiPipelineConfig.convertCurrency}
+                        onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, convertCurrency: e.target.checked})}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700">Convert Currency (for bank statements, invoices)</span>
+                    </label>
+
+                    {aiPipelineConfig.convertCurrency && (
+                      <div className="flex gap-2 mt-2 ml-6">
+                        <select
+                          value={aiPipelineConfig.sourceCurrency}
+                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded"
+                        >
+                          <option value="BRL">BRL (R$)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                          <option value="JPY">JPY (¥)</option>
+                        </select>
+                        <span className="text-gray-400">→</span>
+                        <select
+                          value={aiPipelineConfig.targetCurrency}
+                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="BRL">BRL (R$)</option>
+                          <option value="EUR">EUR (€)</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Use Glossary */}
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={aiPipelineConfig.useGlossary}
+                        onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, useGlossary: e.target.checked})}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-700">Use Glossary (consistent terminology)</span>
+                    </label>
+                  </div>
+
+                  {/* Custom Instructions */}
+                  <div className="col-span-2">
+                    <label className="text-[10px] text-gray-600 block mb-1">Custom Instructions (Optional)</label>
+                    <textarea
+                      value={aiPipelineConfig.customInstructions}
+                      onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, customInstructions: e.target.value})}
+                      placeholder="Add any special instructions for the translation..."
+                      className="w-full px-2 py-1 text-xs border rounded h-16 resize-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pipeline Status / Progress */}
+              {aiPipeline ? (
+                <div className="border rounded-lg overflow-hidden mb-4">
+                  {/* Pipeline Header */}
+                  <div className={`p-3 ${
+                    aiPipeline.overall_status === 'completed' ? 'bg-green-600' :
+                    aiPipeline.overall_status === 'failed' ? 'bg-red-600' :
+                    aiPipeline.overall_status === 'awaiting_review' ? 'bg-yellow-600' :
+                    'bg-blue-600'
+                  } text-white`}>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-bold text-sm">Pipeline Status: {aiPipeline.overall_status?.toUpperCase()}</h3>
+                        <p className="text-xs opacity-80">Order: {aiPipeline.order_number}</p>
+                      </div>
+                      <div className="text-right text-xs">
+                        <p>Tokens used: {aiPipeline.total_tokens_used?.toLocaleString() || 0}</p>
+                        <p>Current: {aiPipeline.current_stage}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pipeline Stages */}
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex justify-between items-center mb-4">
+                      {['ai_translator', 'ai_layout', 'ai_proofreader', 'human_review'].map((stage, idx) => {
+                        const stageData = aiPipeline.stages?.[stage] || {};
+                        const isActive = aiPipeline.current_stage === stage;
+                        const isCompleted = stageData.status === 'completed' || stageData.status === 'approved';
+                        const isFailed = stageData.status === 'failed';
+
+                        return (
+                          <div key={stage} className="flex items-center">
+                            <div className={`flex flex-col items-center ${idx > 0 ? 'ml-2' : ''}`}>
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${
+                                isCompleted ? 'bg-green-500 text-white' :
+                                isFailed ? 'bg-red-500 text-white' :
+                                isActive ? 'bg-blue-500 text-white animate-pulse' :
+                                'bg-gray-300 text-gray-600'
+                              }`}>
+                                {stage === 'ai_translator' && '🌐'}
+                                {stage === 'ai_layout' && '📐'}
+                                {stage === 'ai_proofreader' && '✅'}
+                                {stage === 'human_review' && '👤'}
+                              </div>
+                              <span className="text-[10px] text-gray-600 mt-1 text-center max-w-16">
+                                {stage === 'ai_translator' && 'Translator'}
+                                {stage === 'ai_layout' && 'Layout'}
+                                {stage === 'ai_proofreader' && 'Proofreader'}
+                                {stage === 'human_review' && 'Human Review'}
+                              </span>
+                              {stageData.status && (
+                                <span className={`text-[9px] ${
+                                  isCompleted ? 'text-green-600' :
+                                  isFailed ? 'text-red-600' :
+                                  isActive ? 'text-blue-600' :
+                                  'text-gray-400'
+                                }`}>
+                                  {stageData.status}
+                                </span>
+                              )}
+                            </div>
+                            {idx < 3 && (
+                              <div className={`w-8 h-0.5 mx-1 ${
+                                isCompleted ? 'bg-green-500' : 'bg-gray-300'
+                              }`}></div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Current Stage Details */}
+                    {aiPipeline.current_stage && aiPipeline.stages?.[aiPipeline.current_stage] && (
+                      <div className="bg-white border rounded p-3 mb-3">
+                        <h4 className="text-xs font-bold text-gray-700 mb-2">
+                          Current Stage: {aiPipeline.current_stage.replace('_', ' ').toUpperCase()}
+                        </h4>
+
+                        {aiPipeline.stages[aiPipeline.current_stage].notes && (
+                          <p className="text-xs text-gray-600 mb-2">
+                            {aiPipeline.stages[aiPipeline.current_stage].notes}
+                          </p>
+                        )}
+
+                        {aiPipeline.stages[aiPipeline.current_stage].changes_made?.length > 0 && (
+                          <div className="mb-2">
+                            <p className="text-[10px] font-medium text-gray-600 mb-1">Changes Made:</p>
+                            <ul className="text-[10px] text-gray-500 list-disc list-inside">
+                              {aiPipeline.stages[aiPipeline.current_stage].changes_made.slice(0, 5).map((change, i) => (
+                                <li key={i}>{change}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Preview of current translation */}
+                        {aiPipeline.stages[aiPipeline.current_stage].result && (
+                          <div className="border rounded bg-gray-50 p-2 max-h-48 overflow-auto mb-3">
+                            <iframe
+                              srcDoc={aiPipeline.stages[aiPipeline.current_stage].result}
+                              title="Translation Preview"
+                              className="w-full h-40 border-0"
+                            />
+                          </div>
+                        )}
+
+                        {/* Approval Buttons */}
+                        {(aiPipeline.overall_status === 'awaiting_review' || aiPipeline.current_stage === 'human_review') && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => approveAIPipelineStage(aiPipeline.current_stage, 'approve')}
+                              disabled={aiPipelineLoading}
+                              className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-400"
+                            >
+                              ✓ Approve & Continue
+                            </button>
+                            <button
+                              onClick={() => {
+                                // Load translation into review tab for editing
+                                if (aiPipeline.stages[aiPipeline.current_stage].result) {
+                                  setTranslationResults([{ translatedText: aiPipeline.stages[aiPipeline.current_stage].result }]);
+                                  setActiveSubTab('review');
+                                }
+                              }}
+                              className="px-4 py-2 bg-yellow-600 text-white text-sm font-bold rounded hover:bg-yellow-700"
+                            >
+                              ✏️ Edit
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Completed Message */}
+                    {aiPipeline.overall_status === 'completed' && (
+                      <div className="bg-green-100 border border-green-300 rounded p-3 text-center">
+                        <div className="text-2xl mb-2">🎉</div>
+                        <p className="text-sm font-bold text-green-800">Translation Pipeline Completed!</p>
+                        <p className="text-xs text-green-600 mb-3">
+                          Reviewed by: {aiPipeline.reviewed_by_name || 'Admin'}
+                        </p>
+                        <button
+                          onClick={() => {
+                            if (aiPipeline.final_translation) {
+                              setTranslationResults([{ translatedText: aiPipeline.final_translation }]);
+                              setActiveSubTab('review');
+                            }
+                          }}
+                          className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                        >
+                          View Final Translation →
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* No Pipeline Yet - Start Button */
+                <div className="text-center py-8 border-2 border-dashed border-purple-300 rounded-lg bg-purple-50">
+                  <div className="text-4xl mb-3">🤖</div>
+                  <h3 className="text-lg font-bold text-purple-800 mb-2">Start AI Translation Pipeline</h3>
+                  <p className="text-sm text-gray-600 mb-4 max-w-md mx-auto">
+                    The AI Pipeline will automatically translate, format, and proofread your document through 4 stages:
+                  </p>
+
+                  <div className="flex justify-center gap-4 mb-6">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white text-xl mx-auto mb-1">🌐</div>
+                      <span className="text-[10px] text-gray-600">AI Translator</span>
+                    </div>
+                    <div className="text-gray-300">→</div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl mx-auto mb-1">📐</div>
+                      <span className="text-[10px] text-gray-600">Layout Review</span>
+                    </div>
+                    <div className="text-gray-300">→</div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center text-white text-xl mx-auto mb-1">✅</div>
+                      <span className="text-[10px] text-gray-600">Proofreader</span>
+                    </div>
+                    <div className="text-gray-300">→</div>
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-yellow-600 rounded-full flex items-center justify-center text-white text-xl mx-auto mb-1">👤</div>
+                      <span className="text-[10px] text-gray-600">Human Review</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={startAIPipeline}
+                    disabled={aiPipelineLoading || !claudeApiKey || originalImages.length === 0}
+                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    {aiPipelineLoading ? '⏳ Processing...' : '🚀 Start AI Pipeline'}
+                  </button>
+
+                  {!claudeApiKey && (
+                    <p className="text-[10px] text-red-500 mt-2">⚠️ Please configure your API Key in the START tab</p>
+                  )}
+                  {originalImages.length === 0 && (
+                    <p className="text-[10px] text-red-500 mt-1">⚠️ Please upload a document first</p>
+                  )}
+                </div>
+              )}
+
+              {/* Processing Status */}
+              {processingStatus && (
+                <div className={`mt-3 p-2 rounded text-xs ${
+                  processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                  processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {processingStatus}
+                </div>
+              )}
             </>
           )}
         </div>

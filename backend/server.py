@@ -1038,6 +1038,102 @@ class ExpenseUpdate(BaseModel):
     vendor: Optional[str] = None
     notes: Optional[str] = None
 
+# ==================== AI TRANSLATION PIPELINE MODELS ====================
+
+class AIPipelineStage(BaseModel):
+    """Individual stage in the AI translation pipeline"""
+    stage_name: str  # ai_translator, ai_layout, ai_proofreader, human_review
+    status: str = "pending"  # pending, in_progress, completed, failed, skipped
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    result: Optional[str] = None  # The output of this stage
+    notes: Optional[str] = None  # AI notes/observations
+    changes_made: Optional[List[str]] = None  # List of changes made in this stage
+    error_message: Optional[str] = None
+
+class AIPipelineConfig(BaseModel):
+    """Configuration for the AI translation pipeline"""
+    source_language: str
+    target_language: str
+    document_type: str
+    # Currency conversion settings
+    convert_currency: bool = False
+    source_currency: Optional[str] = None  # BRL, EUR, etc.
+    target_currency: Optional[str] = None  # USD
+    # Format settings
+    date_format_source: str = "DD/MM/YYYY"  # Brazilian format
+    date_format_target: str = "MM/DD/YYYY"  # US format
+    page_format: str = "letter"  # letter or a4
+    # Additional options
+    preserve_layout: bool = True
+    use_glossary: bool = True
+    glossary_id: Optional[str] = None
+    # Custom instructions
+    custom_instructions: Optional[str] = None
+
+class AIPipeline(BaseModel):
+    """AI Translation Pipeline tracking model"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_id: str
+    order_number: Optional[str] = None
+    # Pipeline configuration
+    config: AIPipelineConfig
+    # Source content
+    original_text: str
+    original_document_base64: Optional[str] = None
+    original_filename: Optional[str] = None
+    # Stages
+    stages: Dict[str, AIPipelineStage] = Field(default_factory=lambda: {
+        "ai_translator": AIPipelineStage(stage_name="ai_translator").dict(),
+        "ai_layout": AIPipelineStage(stage_name="ai_layout").dict(),
+        "ai_proofreader": AIPipelineStage(stage_name="ai_proofreader").dict(),
+        "human_review": AIPipelineStage(stage_name="human_review").dict()
+    })
+    # Current state
+    current_stage: str = "ai_translator"
+    overall_status: str = "pending"  # pending, in_progress, completed, failed, paused
+    # Final output
+    final_translation: Optional[str] = None
+    final_translation_pdf: Optional[str] = None  # Base64 PDF
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    started_by_id: Optional[str] = None
+    started_by_name: Optional[str] = None
+    reviewed_by_id: Optional[str] = None
+    reviewed_by_name: Optional[str] = None
+    # AI usage tracking
+    total_tokens_used: int = 0
+    claude_api_key_used: Optional[str] = None  # Masked for security
+
+class AIPipelineCreate(BaseModel):
+    """Request to start AI translation pipeline"""
+    order_id: str
+    source_language: str
+    target_language: str
+    document_type: str
+    original_text: str
+    original_document_base64: Optional[str] = None
+    original_filename: Optional[str] = None
+    claude_api_key: str
+    # Optional settings
+    convert_currency: bool = False
+    source_currency: Optional[str] = None
+    target_currency: Optional[str] = None
+    page_format: str = "letter"
+    use_glossary: bool = True
+    custom_instructions: Optional[str] = None
+
+class AIPipelineStageApproval(BaseModel):
+    """Request to approve/reject a stage and move to next"""
+    pipeline_id: str
+    stage_name: str
+    action: str  # approve, reject, edit
+    edited_content: Optional[str] = None  # If action is 'edit'
+    reviewer_notes: Optional[str] = None
+
 # ==================== PAYMENT PROOF MODELS ====================
 class PaymentProof(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -8197,6 +8293,905 @@ async def get_api_key_for_translation(token: str = None):
         return {"api_key": settings["value"]}
 
     raise HTTPException(status_code=404, detail="No shared API key configured")
+
+
+# ==================== AI TRANSLATION PIPELINE ENDPOINTS ====================
+
+async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
+    """
+    STAGE 1: AI TRANSLATOR
+    - Translates the document
+    - Converts currencies if needed
+    - Adapts date formats
+    - Applies document-specific formatting
+    """
+    import anthropic
+
+    config = pipeline["config"]
+    original_text = pipeline["original_text"]
+
+    # Build currency conversion instructions
+    currency_instructions = ""
+    if config.get("convert_currency") and config.get("source_currency") and config.get("target_currency"):
+        currency_instructions = f"""
+CURRENCY CONVERSION REQUIREMENTS:
+- Convert all monetary values from {config['source_currency']} to {config['target_currency']}
+- For bank statements, invoices, and financial documents:
+  - Keep the original value in parentheses: "US$ 1,234.56 (R$ 6,234.00)"
+  - Use current approximate exchange rate
+  - Format numbers according to target country conventions
+"""
+
+    # Build date format instructions
+    date_instructions = f"""
+DATE FORMAT CONVERSION:
+- Source format: {config.get('date_format_source', 'DD/MM/YYYY')} (e.g., 25/12/2024)
+- Target format: {config.get('date_format_target', 'MM/DD/YYYY')} (e.g., 12/25/2024 or December 25, 2024)
+- Convert ALL dates to the target format
+"""
+
+    # Get glossary terms if enabled
+    glossary_terms = ""
+    if config.get("use_glossary"):
+        # Try to find language-specific glossary
+        source_lang = config["source_language"].lower()[:2]
+        target_lang = config["target_language"].lower()[:2]
+
+        glossary = await db.glossaries.find_one({
+            "$or": [
+                {"source_language": source_lang, "target_language": target_lang},
+                {"language_pair": f"{source_lang}-{target_lang}"}
+            ]
+        })
+
+        if glossary and glossary.get("terms"):
+            terms_list = "\n".join([f"- {t['source']} → {t['target']}" for t in glossary["terms"][:50]])
+            glossary_terms = f"""
+GLOSSARY - USE THESE EXACT TRANSLATIONS:
+{terms_list}
+"""
+
+    custom_instructions = config.get("custom_instructions", "") or ""
+
+    system_prompt = f"""You are an EXPERT CERTIFIED TRANSLATOR specializing in {config['document_type']} documents.
+Your task is to translate from {config['source_language']} to {config['target_language']}.
+
+═══════════════════════════════════════════════════════════════════
+                    STAGE 1: AI TRANSLATION
+═══════════════════════════════════════════════════════════════════
+
+🎯 MISSION: Produce a complete, accurate, professional translation.
+
+{currency_instructions}
+
+{date_instructions}
+
+{glossary_terms}
+
+TRANSLATION RULES:
+1. ✅ Translate 100% of the content - NO OMISSIONS
+2. ✅ Preserve document structure and hierarchy
+3. ✅ Keep proper names in original form (people, places)
+4. ✅ Use official terminology for the target country
+5. ✅ Maintain all numbers, codes, and identifiers exactly
+6. ✅ Translate stamps, seals, and annotations
+
+FOR BANK STATEMENTS & FINANCIAL DOCUMENTS:
+- Transaction descriptions must be clear and accurate
+- Convert currency symbols appropriately
+- Preserve account numbers and reference codes exactly
+- Format amounts according to target country (US: $1,234.56)
+
+OUTPUT FORMAT:
+- Output clean HTML with embedded CSS
+- Use tables with borders for structured data
+- Target page size: {config.get('page_format', 'letter').upper()}
+- Professional fonts: Georgia, Arial, Times New Roman
+- Include: <!DOCTYPE html> ... </html>
+
+{custom_instructions}
+
+At the end of your translation, add:
+<p style="text-align: center; font-weight: bold; margin-top: 20px;">[END OF TRANSLATION]</p>
+"""
+
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        # Prepare message content
+        message_content = []
+
+        # Add original image if available for visual reference
+        if pipeline.get("original_document_base64"):
+            image_data = pipeline["original_document_base64"]
+            media_type = "image/jpeg"
+
+            if ',' in image_data:
+                header = image_data.split(',')[0]
+                image_data = image_data.split(',')[1]
+
+                # Handle PDF conversion
+                if 'pdf' in header.lower():
+                    try:
+                        pdf_bytes = base64.b64decode(image_data)
+                        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                        page = doc[0]
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                        img_bytes = pix.tobytes("jpeg")
+                        image_data = base64.b64encode(img_bytes).decode('utf-8')
+                        doc.close()
+                    except Exception as e:
+                        logger.error(f"PDF conversion failed: {e}")
+                        image_data = None
+                elif 'png' in header.lower():
+                    media_type = "image/png"
+
+            if image_data:
+                message_content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": image_data,
+                    },
+                })
+
+        message_content.append({
+            "type": "text",
+            "text": f"""Translate this {config['document_type']} document:
+
+{original_text}
+
+Produce a complete HTML translation ready for professional use."""
+        })
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": message_content}]
+        )
+
+        translation = response.content[0].text
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+        return {
+            "success": True,
+            "result": translation,
+            "tokens_used": tokens_used,
+            "notes": f"Translation completed. Language pair: {config['source_language']} → {config['target_language']}. Currency conversion: {'Yes' if config.get('convert_currency') else 'No'}."
+        }
+
+    except Exception as e:
+        logger.error(f"AI Translator stage failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "result": None
+        }
+
+
+async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_api_key: str) -> dict:
+    """
+    STAGE 2: AI LAYOUT REVIEWER
+    - Checks and fixes page breaks
+    - Adjusts format (US Letter vs A4)
+    - Ensures proper visual structure
+    - Maintains original document appearance
+    """
+    import anthropic
+
+    config = pipeline["config"]
+    page_format = config.get("page_format", "letter")
+
+    if page_format == "a4":
+        page_size = "A4 (210mm × 297mm)"
+        margins = "20mm"
+    else:
+        page_size = "US Letter (8.5\" × 11\" / 215.9mm × 279.4mm)"
+        margins = "0.75in"
+
+    system_prompt = f"""You are an EXPERT DOCUMENT LAYOUT SPECIALIST.
+
+═══════════════════════════════════════════════════════════════════
+                    STAGE 2: LAYOUT REVIEW
+═══════════════════════════════════════════════════════════════════
+
+🎯 MISSION: Ensure perfect document layout for professional printing.
+
+TARGET FORMAT: {page_size}
+
+LAYOUT REQUIREMENTS:
+1. ✅ Document must fit properly on the target page size
+2. ✅ Check and fix any page break issues
+3. ✅ Ensure tables don't break across pages awkwardly
+4. ✅ Maintain proper margins ({margins})
+5. ✅ Ensure all content is visible and not cut off
+6. ✅ Preserve the visual hierarchy of the original
+
+CSS ADJUSTMENTS TO MAKE:
+- Add @page rules for proper printing
+- Set page-break-inside: avoid; on important sections
+- Adjust font sizes if needed to fit content
+- Fix any overflow issues
+- Ensure consistent spacing
+
+FORMAT-SPECIFIC RULES:
+- For Brazilian documents going to US: Use US conventions
+- For US documents: Maintain US formatting
+- Currency: US format ($ 1,234.56)
+- Dates: US format (MM/DD/YYYY or Month DD, YYYY)
+
+OUTPUT:
+- Return the COMPLETE corrected HTML document
+- Include all CSS improvements
+- Start with <!DOCTYPE html>
+- End with </html>
+
+Also provide a brief summary of changes made in a JSON block at the very end:
+<!-- CHANGES: ["change1", "change2", ...] -->
+"""
+
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        message_content = []
+
+        # Add original image for visual comparison if available
+        if pipeline.get("original_document_base64"):
+            image_data = pipeline["original_document_base64"]
+            if ',' in image_data:
+                image_data = image_data.split(',')[1]
+
+            # Only add if it looks like valid base64
+            if len(image_data) > 100:
+                try:
+                    message_content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_data[:100000] if len(image_data) > 100000 else image_data,
+                        },
+                    })
+                except:
+                    pass
+
+        message_content.append({
+            "type": "text",
+            "text": f"""Review and improve the layout of this translated document:
+
+{previous_translation}
+
+Ensure it fits properly on {page_size} and is ready for professional printing.
+Return the complete corrected HTML."""
+        })
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{"role": "user", "content": message_content}]
+        )
+
+        result = response.content[0].text
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+        # Extract changes list from the result
+        changes = []
+        if "<!-- CHANGES:" in result:
+            try:
+                changes_match = re.search(r'<!-- CHANGES: (\[.*?\]) -->', result, re.DOTALL)
+                if changes_match:
+                    changes = json.loads(changes_match.group(1))
+                    # Remove the changes comment from the result
+                    result = re.sub(r'<!-- CHANGES: \[.*?\] -->', '', result, flags=re.DOTALL).strip()
+            except:
+                pass
+
+        return {
+            "success": True,
+            "result": result,
+            "tokens_used": tokens_used,
+            "changes_made": changes,
+            "notes": f"Layout optimized for {page_size}. {len(changes)} adjustments made."
+        }
+
+    except Exception as e:
+        logger.error(f"AI Layout stage failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "result": previous_translation  # Keep previous if this fails
+        }
+
+
+async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, claude_api_key: str) -> dict:
+    """
+    STAGE 3: AI PROOFREADER
+    - Validates terminology for target country
+    - Checks consistency of terms
+    - Verifies technical/legal terms
+    - Ensures natural language flow
+    """
+    import anthropic
+
+    config = pipeline["config"]
+    target_language = config["target_language"]
+    document_type = config["document_type"]
+
+    # Determine target country specifics
+    target_country_info = ""
+    if "english" in target_language.lower() or "us" in target_language.lower() or "american" in target_language.lower():
+        target_country_info = """
+TARGET COUNTRY: United States
+- Use American English spelling (color, not colour)
+- Use US legal terminology
+- Dates: MM/DD/YYYY or Month DD, YYYY
+- Currency: $1,234.56
+- Measurements: Keep metric but US readers should understand
+"""
+    elif "portuguese" in target_language.lower() or "brazil" in target_language.lower():
+        target_country_info = """
+TARGET COUNTRY: Brazil
+- Use Brazilian Portuguese spelling
+- Use Brazilian legal terminology
+- Dates: DD/MM/YYYY or DD de mês de YYYY
+- Currency: R$ 1.234,56
+- Use formal register for official documents
+"""
+
+    system_prompt = f"""You are an EXPERT PROOFREADER and TERMINOLOGY SPECIALIST.
+
+═══════════════════════════════════════════════════════════════════
+                    STAGE 3: PROOFREADING
+═══════════════════════════════════════════════════════════════════
+
+🎯 MISSION: Ensure terminology accuracy and natural language flow.
+
+DOCUMENT TYPE: {document_type}
+TARGET LANGUAGE: {target_language}
+
+{target_country_info}
+
+PROOFREADING CHECKLIST:
+1. ✅ TERMINOLOGY: Are all terms correct for the target country?
+   - Legal terms used in that country's courts
+   - Official government terminology
+   - Industry-standard translations
+
+2. ✅ CONSISTENCY: Are the same terms translated the same way throughout?
+   - Names of institutions
+   - Technical terms
+   - Repeated phrases
+
+3. ✅ ACCURACY: Does the translation match the original meaning?
+   - No additions or omissions
+   - Correct interpretation of ambiguous terms
+
+4. ✅ NATURAL FLOW: Does it read naturally in the target language?
+   - Not word-for-word translation
+   - Idiomatic expressions where appropriate
+   - Proper sentence structure
+
+5. ✅ DOCUMENT-SPECIFIC CHECKS:
+   For Birth Certificates: Correct vital records terminology
+   For Bank Statements: Correct financial terminology
+   For Diplomas: Correct academic terminology
+   For Legal Documents: Correct legal terminology
+
+CORRECTIONS TO MAKE:
+- Fix any terminology that doesn't match target country usage
+- Correct any inconsistencies
+- Improve any awkward phrasing
+- Fix any grammatical errors
+
+OUTPUT:
+- Return the COMPLETE corrected HTML document
+- Make corrections directly in the text
+- Start with <!DOCTYPE html>
+- End with </html>
+
+At the end, include a proofreading report:
+<!-- PROOFREADING_REPORT: {{"issues_found": N, "corrections": ["correction1", "correction2"], "terminology_notes": ["note1"]}} -->
+"""
+
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=8192,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"""Proofread this translated {document_type} document:
+
+{previous_translation}
+
+Check terminology, consistency, and natural language flow for {target_language}.
+Return the complete corrected HTML with your proofreading report."""
+            }]
+        )
+
+        result = response.content[0].text
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+        # Extract proofreading report
+        corrections = []
+        notes = ""
+        if "<!-- PROOFREADING_REPORT:" in result:
+            try:
+                report_match = re.search(r'<!-- PROOFREADING_REPORT: (\{.*?\}) -->', result, re.DOTALL)
+                if report_match:
+                    report = json.loads(report_match.group(1))
+                    corrections = report.get("corrections", [])
+                    notes = f"Found {report.get('issues_found', 0)} issues. " + "; ".join(report.get("terminology_notes", []))
+                    # Remove the report from the result
+                    result = re.sub(r'<!-- PROOFREADING_REPORT: \{.*?\} -->', '', result, flags=re.DOTALL).strip()
+            except:
+                pass
+
+        return {
+            "success": True,
+            "result": result,
+            "tokens_used": tokens_used,
+            "changes_made": corrections,
+            "notes": notes or f"Proofreading completed for {target_language}."
+        }
+
+    except Exception as e:
+        logger.error(f"AI Proofreader stage failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "result": previous_translation
+        }
+
+
+@api_router.post("/admin/ai-pipeline/start")
+async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
+    """Start a new AI translation pipeline for an order"""
+    user = await validate_admin_or_user_token(admin_key)
+
+    # Verify order exists
+    order = await db.translation_orders.find_one({"id": request.order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check if pipeline already exists for this order
+    existing = await db.ai_pipelines.find_one({"order_id": request.order_id})
+    if existing and existing.get("overall_status") not in ["completed", "failed"]:
+        raise HTTPException(status_code=400, detail="Active pipeline already exists for this order")
+
+    # Create pipeline configuration
+    config = AIPipelineConfig(
+        source_language=request.source_language,
+        target_language=request.target_language,
+        document_type=request.document_type,
+        convert_currency=request.convert_currency,
+        source_currency=request.source_currency,
+        target_currency=request.target_currency,
+        page_format=request.page_format,
+        use_glossary=request.use_glossary,
+        custom_instructions=request.custom_instructions
+    )
+
+    # Create pipeline
+    pipeline = AIPipeline(
+        order_id=request.order_id,
+        order_number=order.get("order_number"),
+        config=config,
+        original_text=request.original_text,
+        original_document_base64=request.original_document_base64,
+        original_filename=request.original_filename,
+        started_by_id=user.get("id"),
+        started_by_name=user.get("name"),
+        started_at=datetime.utcnow(),
+        overall_status="in_progress",
+        claude_api_key_used=request.claude_api_key[:10] + "..." if request.claude_api_key else None
+    )
+
+    pipeline_dict = pipeline.dict()
+
+    # Save pipeline
+    await db.ai_pipelines.insert_one(pipeline_dict)
+
+    # Update order status
+    await db.translation_orders.update_one(
+        {"id": request.order_id},
+        {"$set": {
+            "translation_status": "in_translation",
+            "ai_pipeline_id": pipeline.id,
+            "ai_pipeline_status": "in_progress"
+        }}
+    )
+
+    # Start Stage 1: AI Translator
+    pipeline_dict["stages"]["ai_translator"]["status"] = "in_progress"
+    pipeline_dict["stages"]["ai_translator"]["started_at"] = datetime.utcnow().isoformat()
+
+    await db.ai_pipelines.update_one(
+        {"id": pipeline.id},
+        {"$set": {
+            "stages.ai_translator.status": "in_progress",
+            "stages.ai_translator.started_at": datetime.utcnow(),
+            "current_stage": "ai_translator"
+        }}
+    )
+
+    # Run Stage 1
+    result = await run_ai_translator_stage(pipeline_dict, request.claude_api_key)
+
+    if result["success"]:
+        await db.ai_pipelines.update_one(
+            {"id": pipeline.id},
+            {"$set": {
+                "stages.ai_translator.status": "completed",
+                "stages.ai_translator.completed_at": datetime.utcnow(),
+                "stages.ai_translator.result": result["result"],
+                "stages.ai_translator.notes": result.get("notes"),
+                "total_tokens_used": result.get("tokens_used", 0),
+                "current_stage": "ai_layout",
+                "stages.ai_layout.status": "in_progress",
+                "stages.ai_layout.started_at": datetime.utcnow()
+            }}
+        )
+
+        # Run Stage 2: Layout Review
+        layout_result = await run_ai_layout_stage(pipeline_dict, result["result"], request.claude_api_key)
+
+        if layout_result["success"]:
+            await db.ai_pipelines.update_one(
+                {"id": pipeline.id},
+                {"$set": {
+                    "stages.ai_layout.status": "completed",
+                    "stages.ai_layout.completed_at": datetime.utcnow(),
+                    "stages.ai_layout.result": layout_result["result"],
+                    "stages.ai_layout.notes": layout_result.get("notes"),
+                    "stages.ai_layout.changes_made": layout_result.get("changes_made", []),
+                    "total_tokens_used": result.get("tokens_used", 0) + layout_result.get("tokens_used", 0),
+                    "current_stage": "ai_proofreader",
+                    "stages.ai_proofreader.status": "in_progress",
+                    "stages.ai_proofreader.started_at": datetime.utcnow()
+                }}
+            )
+
+            # Run Stage 3: Proofreading
+            proofread_result = await run_ai_proofreader_stage(pipeline_dict, layout_result["result"], request.claude_api_key)
+
+            if proofread_result["success"]:
+                total_tokens = result.get("tokens_used", 0) + layout_result.get("tokens_used", 0) + proofread_result.get("tokens_used", 0)
+
+                await db.ai_pipelines.update_one(
+                    {"id": pipeline.id},
+                    {"$set": {
+                        "stages.ai_proofreader.status": "completed",
+                        "stages.ai_proofreader.completed_at": datetime.utcnow(),
+                        "stages.ai_proofreader.result": proofread_result["result"],
+                        "stages.ai_proofreader.notes": proofread_result.get("notes"),
+                        "stages.ai_proofreader.changes_made": proofread_result.get("changes_made", []),
+                        "total_tokens_used": total_tokens,
+                        "current_stage": "human_review",
+                        "stages.human_review.status": "pending",
+                        "stages.human_review.result": proofread_result["result"],
+                        "overall_status": "awaiting_review",
+                        "updated_at": datetime.utcnow()
+                    }}
+                )
+
+                # Update order to show it's ready for human review
+                await db.translation_orders.update_one(
+                    {"id": request.order_id},
+                    {"$set": {
+                        "translation_status": "review",
+                        "ai_pipeline_status": "awaiting_review"
+                    }}
+                )
+
+                # Create notification for PM
+                if order.get("assigned_pm_id"):
+                    notification = Notification(
+                        user_id=order["assigned_pm_id"],
+                        type="ai_translation_ready",
+                        title="AI Translation Ready for Review",
+                        message=f"Order {order.get('order_number')} has completed AI translation and is ready for human review.",
+                        order_id=request.order_id,
+                        order_number=order.get("order_number")
+                    )
+                    await db.notifications.insert_one(notification.dict())
+
+                return {
+                    "status": "success",
+                    "pipeline_id": pipeline.id,
+                    "message": "AI translation completed. Ready for human review.",
+                    "current_stage": "human_review",
+                    "total_tokens_used": total_tokens
+                }
+            else:
+                await db.ai_pipelines.update_one(
+                    {"id": pipeline.id},
+                    {"$set": {
+                        "stages.ai_proofreader.status": "failed",
+                        "stages.ai_proofreader.error_message": proofread_result.get("error"),
+                        "overall_status": "failed",
+                        "updated_at": datetime.utcnow()
+                    }}
+                )
+        else:
+            await db.ai_pipelines.update_one(
+                {"id": pipeline.id},
+                {"$set": {
+                    "stages.ai_layout.status": "failed",
+                    "stages.ai_layout.error_message": layout_result.get("error"),
+                    "overall_status": "failed",
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+    else:
+        await db.ai_pipelines.update_one(
+            {"id": pipeline.id},
+            {"$set": {
+                "stages.ai_translator.status": "failed",
+                "stages.ai_translator.error_message": result.get("error"),
+                "overall_status": "failed",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "status": "error",
+            "pipeline_id": pipeline.id,
+            "message": f"AI translation failed: {result.get('error')}",
+            "current_stage": "ai_translator"
+        }
+
+    # Return final status
+    final_pipeline = await db.ai_pipelines.find_one({"id": pipeline.id})
+    return {
+        "status": final_pipeline.get("overall_status"),
+        "pipeline_id": pipeline.id,
+        "current_stage": final_pipeline.get("current_stage"),
+        "total_tokens_used": final_pipeline.get("total_tokens_used", 0)
+    }
+
+
+@api_router.get("/admin/ai-pipeline/{pipeline_id}")
+async def get_ai_pipeline(pipeline_id: str, admin_key: str):
+    """Get AI pipeline status and details"""
+    await validate_admin_or_user_token(admin_key)
+
+    pipeline = await db.ai_pipelines.find_one({"id": pipeline_id})
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    # Convert ObjectId to string
+    pipeline["_id"] = str(pipeline["_id"])
+
+    return pipeline
+
+
+@api_router.get("/admin/ai-pipeline/order/{order_id}")
+async def get_ai_pipeline_by_order(order_id: str, admin_key: str):
+    """Get AI pipeline for a specific order"""
+    await validate_admin_or_user_token(admin_key)
+
+    pipeline = await db.ai_pipelines.find_one({"order_id": order_id})
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="No pipeline found for this order")
+
+    pipeline["_id"] = str(pipeline["_id"])
+
+    return pipeline
+
+
+@api_router.post("/admin/ai-pipeline/approve")
+async def approve_ai_pipeline_stage(request: AIPipelineStageApproval, admin_key: str):
+    """Approve or edit a pipeline stage result"""
+    user = await validate_admin_or_user_token(admin_key)
+
+    pipeline = await db.ai_pipelines.find_one({"id": request.pipeline_id})
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    if request.stage_name != pipeline.get("current_stage"):
+        raise HTTPException(status_code=400, detail=f"Cannot approve stage '{request.stage_name}'. Current stage is '{pipeline.get('current_stage')}'")
+
+    if request.action == "approve":
+        # Get the result from the current stage
+        current_result = pipeline["stages"][request.stage_name].get("result")
+
+        if request.stage_name == "human_review":
+            # Final approval - complete the pipeline
+            await db.ai_pipelines.update_one(
+                {"id": request.pipeline_id},
+                {"$set": {
+                    "stages.human_review.status": "completed",
+                    "stages.human_review.completed_at": datetime.utcnow(),
+                    "stages.human_review.notes": request.reviewer_notes,
+                    "overall_status": "completed",
+                    "completed_at": datetime.utcnow(),
+                    "reviewed_by_id": user.get("id"),
+                    "reviewed_by_name": user.get("name"),
+                    "final_translation": current_result,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+
+            # Update order
+            await db.translation_orders.update_one(
+                {"id": pipeline["order_id"]},
+                {"$set": {
+                    "translation_status": "ready",
+                    "ai_pipeline_status": "completed",
+                    "translated_content": current_result
+                }}
+            )
+
+            return {
+                "status": "success",
+                "message": "Translation approved and ready for delivery",
+                "pipeline_status": "completed"
+            }
+        else:
+            # Move to next stage
+            stage_order = ["ai_translator", "ai_layout", "ai_proofreader", "human_review"]
+            current_index = stage_order.index(request.stage_name)
+            next_stage = stage_order[current_index + 1]
+
+            await db.ai_pipelines.update_one(
+                {"id": request.pipeline_id},
+                {"$set": {
+                    f"stages.{request.stage_name}.status": "approved",
+                    f"stages.{request.stage_name}.notes": request.reviewer_notes,
+                    "current_stage": next_stage,
+                    f"stages.{next_stage}.status": "pending",
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+
+            return {
+                "status": "success",
+                "message": f"Stage '{request.stage_name}' approved. Moving to '{next_stage}'",
+                "next_stage": next_stage
+            }
+
+    elif request.action == "edit":
+        # Apply manual edits
+        if not request.edited_content:
+            raise HTTPException(status_code=400, detail="Edited content is required for 'edit' action")
+
+        await db.ai_pipelines.update_one(
+            {"id": request.pipeline_id},
+            {"$set": {
+                f"stages.{request.stage_name}.result": request.edited_content,
+                f"stages.{request.stage_name}.notes": request.reviewer_notes or "Manually edited by reviewer",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Stage '{request.stage_name}' content updated"
+        }
+
+    elif request.action == "reject":
+        # Mark stage for re-processing
+        await db.ai_pipelines.update_one(
+            {"id": request.pipeline_id},
+            {"$set": {
+                f"stages.{request.stage_name}.status": "rejected",
+                f"stages.{request.stage_name}.notes": request.reviewer_notes,
+                "overall_status": "revision_needed",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Stage '{request.stage_name}' rejected. Revision needed."
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid action: {request.action}")
+
+
+@api_router.get("/admin/ai-pipelines")
+async def list_ai_pipelines(admin_key: str, status: Optional[str] = None, limit: int = 50):
+    """List all AI translation pipelines"""
+    await validate_admin_or_user_token(admin_key)
+
+    query = {}
+    if status:
+        query["overall_status"] = status
+
+    pipelines = await db.ai_pipelines.find(query).sort("created_at", -1).limit(limit).to_list(length=limit)
+
+    for p in pipelines:
+        p["_id"] = str(p["_id"])
+
+    return {"pipelines": pipelines, "count": len(pipelines)}
+
+
+@api_router.post("/admin/ai-pipeline/{pipeline_id}/retry")
+async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_key: str):
+    """Retry a failed pipeline stage"""
+    await validate_admin_or_user_token(admin_key)
+
+    pipeline = await db.ai_pipelines.find_one({"id": pipeline_id})
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+
+    current_stage = pipeline.get("current_stage")
+    stage_data = pipeline["stages"].get(current_stage, {})
+
+    if stage_data.get("status") not in ["failed", "rejected"]:
+        raise HTTPException(status_code=400, detail=f"Stage '{current_stage}' is not in a retryable state")
+
+    # Get the previous stage result (or original text for first stage)
+    stage_order = ["ai_translator", "ai_layout", "ai_proofreader", "human_review"]
+    current_index = stage_order.index(current_stage)
+
+    if current_index == 0:
+        previous_result = pipeline["original_text"]
+    else:
+        previous_stage = stage_order[current_index - 1]
+        previous_result = pipeline["stages"][previous_stage].get("result", pipeline["original_text"])
+
+    # Mark as in progress
+    await db.ai_pipelines.update_one(
+        {"id": pipeline_id},
+        {"$set": {
+            f"stages.{current_stage}.status": "in_progress",
+            f"stages.{current_stage}.started_at": datetime.utcnow(),
+            f"stages.{current_stage}.error_message": None,
+            "overall_status": "in_progress",
+            "updated_at": datetime.utcnow()
+        }}
+    )
+
+    # Run the appropriate stage
+    if current_stage == "ai_translator":
+        result = await run_ai_translator_stage(pipeline, claude_api_key)
+    elif current_stage == "ai_layout":
+        result = await run_ai_layout_stage(pipeline, previous_result, claude_api_key)
+    elif current_stage == "ai_proofreader":
+        result = await run_ai_proofreader_stage(pipeline, previous_result, claude_api_key)
+    else:
+        raise HTTPException(status_code=400, detail="Cannot retry human review stage")
+
+    if result["success"]:
+        await db.ai_pipelines.update_one(
+            {"id": pipeline_id},
+            {"$set": {
+                f"stages.{current_stage}.status": "completed",
+                f"stages.{current_stage}.completed_at": datetime.utcnow(),
+                f"stages.{current_stage}.result": result["result"],
+                f"stages.{current_stage}.notes": result.get("notes"),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Stage '{current_stage}' completed successfully",
+            "result": result["result"][:500] + "..." if len(result.get("result", "")) > 500 else result.get("result")
+        }
+    else:
+        await db.ai_pipelines.update_one(
+            {"id": pipeline_id},
+            {"$set": {
+                f"stages.{current_stage}.status": "failed",
+                f"stages.{current_stage}.error_message": result.get("error"),
+                "overall_status": "failed",
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "status": "error",
+            "message": f"Stage '{current_stage}' failed: {result.get('error')}"
+        }
 
 
 # Include the router in the main app
