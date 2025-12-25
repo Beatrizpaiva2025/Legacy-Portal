@@ -9034,9 +9034,7 @@ const NewQuotePage = ({ adminKey, user }) => {
   };
 
   const TURNAROUND = {
-    standard: { name: 'Standard (3-5 days)', multiplier: 1.0 },
-    priority: { name: 'Priority (24 hours)', multiplier: 1.5 },
-    urgent: { name: 'Urgent (12 hours)', multiplier: 2.0 }
+    standard: { name: '2-3 business days', multiplier: 1.0 }
   };
 
   // Handle file upload

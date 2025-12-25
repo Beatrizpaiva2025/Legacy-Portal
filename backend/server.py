@@ -3999,12 +3999,8 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
         # Generate order number
         order_number = f"Q{datetime.now().strftime('%y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
 
-        # Determine turnaround days
-        turnaround_days = {
-            "standard": 5,
-            "priority": 1,
-            "urgent": 0.5
-        }.get(quote_data.turnaround, 5)
+        # Turnaround: 2-3 business days
+        turnaround_days = 3
 
         # Create the order as a quote
         order_data = {
@@ -4052,11 +4048,7 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
 
         # Send quote email to client
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        turnaround_display = {
-            "standard": "3-5 business days",
-            "priority": "24 hours",
-            "urgent": "12 hours"
-        }.get(quote_data.turnaround, "3-5 business days")
+        turnaround_display = "2-3 business days"
 
         service_display = "Certified Translation" if quote_data.service_type == "certified" else "Standard Translation"
 
