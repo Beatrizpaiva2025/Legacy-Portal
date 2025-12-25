@@ -4077,11 +4077,30 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
                 <p style="font-size: 24px; color: #0d9488; font-weight: bold;">Total: ${quote_data.total_price:.2f}</p>
             </div>
 
-            <p>Ready to proceed? Click the button below to complete your order:</p>
+            <h3 style="color: #0d9488; margin-top: 30px;">Payment Options</h3>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{frontend_url}/#/customer" style="background: #0d9488; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Your Order</a>
+            <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bbf7d0;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 1: Zelle (Instant)</strong></p>
+                <p style="margin: 0; color: #666;">Send to: <strong>857-208-1139</strong></p>
+                <p style="margin: 0; color: #666;">Business Name: <strong>Legacy Translations Inc</strong></p>
             </div>
+
+            <div style="background: #eff6ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bfdbfe;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 2: Venmo</strong></p>
+                <p style="margin: 0; color: #666;">Username: <strong>@legacytranslations</strong></p>
+            </div>
+
+            <div style="background: #faf5ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #e9d5ff;">
+                <p style="margin: 0 0 15px 0;"><strong>Option 3: Credit/Debit Card</strong></p>
+                <p style="margin: 0; color: #666;">Click the button below to pay securely online:</p>
+                <div style="text-align: center; margin-top: 15px;">
+                    <a href="{frontend_url}/#/customer" style="background: #7c3aed; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pay with Card</a>
+                </div>
+            </div>
+
+            <p style="color: #666; font-size: 14px; margin-top: 20px;">
+                <strong>Important:</strong> Please include your quote number <strong>{order_number}</strong> in the payment reference/memo.
+            </p>
 
             <p style="color: #666; font-size: 14px;">This quote is valid for 30 days. If you have any questions, please reply to this email.</p>
 
