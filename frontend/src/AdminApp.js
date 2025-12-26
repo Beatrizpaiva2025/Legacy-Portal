@@ -5358,6 +5358,66 @@ tradução juramentada | certified translation`}
             </div>
           ) : (
             <>
+              {/* Project Files Section - Load documents here */}
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Project Documents - Select to Load</h3>
+
+                {loadingProjectFiles ? (
+                  <div className="text-sm text-gray-500 text-center py-4">Loading files...</div>
+                ) : selectedProjectFiles.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {selectedProjectFiles.map((doc, idx) => (
+                      <div
+                        key={doc.id}
+                        onClick={() => loadProjectFile(doc)}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                          selectedFileId === doc.id
+                            ? 'bg-green-100 border-2 border-green-500 shadow-md'
+                            : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                          selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                        }`}>
+                          {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${
+                            selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                          }`}>
+                            {doc.filename || `File ${idx + 1}`}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {selectedFileId === doc.id ? '✓ Loaded - Ready' : 'Click to load'}
+                          </div>
+                        </div>
+                        {selectedFileId === doc.id && (
+                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                            ✓
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500 mb-3">No documents found in this project</p>
+                    <button
+                      onClick={() => setActiveSubTab('start')}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                    >
+                      Upload Document in START tab
+                    </button>
+                  </div>
+                )}
+
+                {originalImages.length > 0 && (
+                  <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-700">
+                    ✅ Document loaded: {originalImages[0]?.filename || 'Ready'} ({originalImages.length} page{originalImages.length > 1 ? 's' : ''})
+                  </div>
+                )}
+              </div>
+
               {/* Pipeline Configuration */}
               <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
                 <h3 className="text-xs font-bold text-purple-800 mb-3">⚙️ Pipeline Configuration</h3>
