@@ -8616,56 +8616,56 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </div>
       )}
 
-      <div className="bg-white rounded shadow overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead className="bg-gray-50 border-b">
+      <div className="bg-white rounded-lg shadow-sm overflow-x-auto border border-gray-100">
+        <table className="w-full text-sm">
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
             <tr>
-              <th className="px-2 py-2 text-left font-medium text-blue-600">Code</th>
-              <th className="px-2 py-2 text-left font-medium">Order Date</th>
-              <th className="px-2 py-2 text-left font-medium">Client</th>
-              <th className="px-2 py-2 text-left font-medium">Doc Type</th>
+              <th className="px-3 py-3 text-left font-semibold text-blue-700">Code</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Order Date</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Client</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Doc Type</th>
               {/* PM column - Admin only */}
-              {isAdmin && <th className="px-2 py-2 text-left font-medium">PM</th>}
-              <th className="px-2 py-2 text-left font-medium">Translator</th>
-              <th className="px-2 py-2 text-left font-medium">Deadline</th>
-              <th className="px-2 py-2 text-left font-medium">Status</th>
-              <th className="px-2 py-2 text-left font-medium">Notes</th>
+              {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700">Notes</th>
               {/* Translation Ready column - shows when translation is complete */}
-              <th className="px-2 py-2 text-center font-medium">Translation</th>
+              <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
               {/* Total and Payment columns - Admin only */}
-              {isAdmin && <th className="px-2 py-2 text-right font-medium">Total</th>}
-              {isAdmin && <th className="px-2 py-2 text-center font-medium">Payment</th>}
-              <th className="px-2 py-2 text-center font-medium">Actions</th>
+              {isAdmin && <th className="px-3 py-3 text-right font-semibold text-gray-700">Total</th>}
+              {isAdmin && <th className="px-3 py-3 text-center font-semibold text-gray-700">Payment</th>}
+              <th className="px-3 py-3 text-center font-semibold text-gray-700">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
               const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
               const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
               return (
-                <tr key={order.id} className="hover:bg-gray-50">
+                <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
                   {/* Code */}
-                  <td className="px-2 py-2 font-medium">
+                  <td className="px-3 py-3 font-medium">
                     <button
                       onClick={() => viewOrderDocuments(order)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-semibold"
                       title="Ver documento original"
                     >
                       {order.order_number}
                     </button>
                   </td>
                   {/* Order Date */}
-                  <td className="px-2 py-2 text-gray-600">
+                  <td className="px-3 py-3 text-gray-600">
                     {created.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                    <span className="text-[10px] text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-xs text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                   </td>
                   {/* Client with email and send buttons */}
-                  <td className="px-2 py-2">
-                    <div className="flex items-center gap-1">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
                       <div>
-                        {order.client_name}
-                        <span className="text-gray-400 text-[10px] block">{order.client_email}</span>
+                        <span className="font-medium text-gray-800">{order.client_name}</span>
+                        <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
                       {/* Send translation button - shows when ready, review, or delivered (for resend) */}
                       {['ready', 'review', 'delivered'].includes(order.translation_status) && (isAdmin || isPM) && (
@@ -8684,18 +8684,18 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                   </td>
                   {/* Document Type */}
-                  <td className="px-2 py-2">
-                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded">
+                  <td className="px-3 py-3">
+                    <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">
                       {DOCUMENT_TYPES.find(d => d.value === order.document_type)?.label?.split('/')[0]?.trim() || order.document_type || '-'}
                     </span>
                   </td>
                   {/* PM - Admin only */}
                   {isAdmin && (
-                    <td className={`px-2 py-2 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
+                    <td className={`px-3 py-3 ${(order.assigned_pm_name || order.assigned_pm) ? 'bg-green-50' : ''}`}>
                       {assigningPM === order.id ? (
                         <select
                           autoFocus
-                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          className="px-2 py-1 text-xs border rounded w-28"
                           onChange={(e) => {
                             if (e.target.value) assignPM(order.id, e.target.value);
                           }}
@@ -8708,20 +8708,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           ))}
                         </select>
                       ) : (order.assigned_pm_name || order.assigned_pm) ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-green-700 font-medium">{order.assigned_pm_name || order.assigned_pm}</span>
-                          <button
-                            onClick={() => setAssigningPM(order.id)}
-                            className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500"
-                            title="Change PM"
-                          >
-                            <EditIcon className="w-3 h-3" />
-                          </button>
-                        </div>
+                        <span
+                          onClick={() => setAssigningPM(order.id)}
+                          className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
+                          title="Click to change PM"
+                        >
+                          {order.assigned_pm_name || order.assigned_pm}
+                        </span>
                       ) : (
                         <button
                           onClick={() => setAssigningPM(order.id)}
-                          className="px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] hover:bg-gray-200"
+                          className="px-2 py-1 bg-gray-100 text-gray-500 rounded text-xs hover:bg-gray-200"
                         >
                           Assign
                         </button>
@@ -8729,11 +8726,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </td>
                   )}
                   {/* Translator */}
-                  <td className={`px-2 py-2 ${(order.assigned_translator_name || order.assigned_translator) ? 'bg-green-50' : ''}`}>
+                  <td className={`px-3 py-3 ${(order.assigned_translator_name || order.assigned_translator) ? 'bg-green-50' : ''}`}>
                     {assigningTranslator === order.id ? (
                       <select
                         autoFocus
-                        className="px-1 py-0.5 text-[10px] border rounded w-24"
+                        className="px-2 py-1 text-xs border rounded w-28"
                         onChange={(e) => {
                           if (e.target.value) assignTranslator(order.id, e.target.value);
                         }}
@@ -8747,34 +8744,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       </select>
                     ) : (order.assigned_translator_name || order.assigned_translator) ? (
                       <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-green-700 font-medium">{order.assigned_translator_name || order.assigned_translator}</span>
-                          {/* Edit translator button for Admin and PM */}
-                          {(isAdmin || isPM) && (
-                            <button
-                              onClick={() => openAssignTranslatorModal(order)}
-                              className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500"
-                              title="Change translator"
-                            >
-                              <EditIcon className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
+                        <span
+                          onClick={() => (isAdmin || isPM) && openAssignTranslatorModal(order)}
+                          className={`text-xs text-green-700 font-medium ${(isAdmin || isPM) ? 'cursor-pointer hover:text-green-900 hover:underline' : ''}`}
+                          title={(isAdmin || isPM) ? "Click to change translator" : ""}
+                        >
+                          {order.assigned_translator_name || order.assigned_translator}
+                        </span>
                         {order.translator_assignment_status === 'pending' && (
-                          <span className="text-[9px] px-1 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-0.5 inline-block w-fit border border-yellow-200">Pending</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200">Pending</span>
                         )}
                         {order.translator_assignment_status === 'accepted' && (
-                          <span className="text-[9px] px-1 py-0.5 bg-green-100 text-green-700 rounded mt-0.5 inline-block w-fit">✓ Accepted</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit">✓ Accepted</span>
                         )}
                         {order.translator_assignment_status === 'declined' && (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[9px] px-1 py-0.5 bg-red-100 text-red-700 rounded inline-block w-fit">✕ Declined</span>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded inline-block w-fit">✕ Declined</span>
                             {(isAdmin || isPM) && (
                               <button
                                 onClick={() => openAssignTranslatorModal(order)}
-                                className="text-[9px] px-1 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-0.5"
+                                className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1"
                               >
-                                <RefreshIcon className="w-2.5 h-2.5" /> Reassign
+                                <RefreshIcon className="w-3 h-3" /> Reassign
                               </button>
                             )}
                           </div>
@@ -8784,62 +8775,61 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => openAssignTranslatorModal(order)}
-                          className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] hover:bg-gray-200 flex items-center gap-0.5"
+                          className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 flex items-center gap-1"
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
                         <button
                           onClick={() => openAIPipelineModal(order)}
-                          className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200 flex items-center gap-0.5"
+                          className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 flex items-center gap-1"
                           title="Send to AI Pipeline"
                         >
                           🤖 AI Pipeline
                         </button>
                       </div>
                     ) : (
-                      <span className="text-[10px] text-gray-400">-</span>
+                      <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
                   {/* Deadline with date+time */}
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-3">
                     {editingDeadline === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
                         <input
                           type="date"
                           value={tempDeadlineValue.date}
                           onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, date: e.target.value})}
-                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          className="px-2 py-1 text-xs border rounded w-28"
                         />
                         <input
                           type="time"
                           value={tempDeadlineValue.time}
                           onChange={(e) => setTempDeadlineValue({...tempDeadlineValue, time: e.target.value})}
-                          className="px-1 py-0.5 text-[10px] border rounded w-24"
+                          className="px-2 py-1 text-xs border rounded w-28"
                         />
                         <div className="flex gap-1">
-                          <button onClick={() => saveDeadlineEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
-                          <button onClick={() => setEditingDeadline(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                          <button onClick={() => saveDeadlineEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                          <button onClick={() => setEditingDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1">
-                        <div>
-                          {orderDeadline.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                          <span className="text-[10px] text-gray-500 block">{orderDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-                          {daysUntil > 0 && order.translation_status !== 'delivered' && (
-                            <span className={`text-[10px] ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
-                          )}
-                        </div>
-                        {isAdmin && (
-                          <button onClick={() => startEditingDeadline(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500" title="Edit deadline"><EditIcon className="w-3 h-3" /></button>
+                      <div
+                        onClick={() => isAdmin && startEditingDeadline(order)}
+                        className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={isAdmin ? "Click to edit deadline" : ""}
+                      >
+                        {orderDeadline.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {daysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
                         )}
                       </div>
                     )}
                   </td>
                   {/* Status */}
-                  <td className="px-2 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
+                  <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
                   {/* Notes */}
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-3">
                     {editingTags === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
                         <input
@@ -8847,59 +8837,60 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           placeholder="Internal note..."
                           value={tempTagValue.notes}
                           onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
-                          className="px-1 py-0.5 text-[10px] border rounded w-28"
+                          className="px-2 py-1 text-xs border rounded w-32"
                         />
                         <div className="flex gap-1">
-                          <button onClick={() => saveTagsEdit(order.id)} className="px-1 py-0.5 bg-green-500 text-white rounded text-[10px]">✓</button>
-                          <button onClick={() => setEditingTags(null)} className="px-1 py-0.5 bg-gray-300 text-gray-700 rounded text-[10px]">✕</button>
+                          <button onClick={() => saveTagsEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                          <button onClick={() => setEditingTags(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div
+                        onClick={() => isAdmin && startEditingTags(order)}
+                        className={`flex items-center gap-1 ${isAdmin ? 'cursor-pointer' : ''}`}
+                        title={isAdmin ? "Click to edit notes" : ""}
+                      >
                         {order.notes && (
-                          <span className="px-1 py-0.5 bg-blue-50 text-blue-500 rounded text-[10px] cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3 h-3 inline" /></span>
+                          <span className="px-1.5 py-1 bg-blue-50 text-blue-500 rounded text-xs cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3.5 h-3.5 inline" /></span>
                         )}
                         {order.internal_notes && (
-                          <span className="px-1 py-0.5 bg-amber-50 text-amber-500 rounded text-[10px] cursor-help border border-amber-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3 h-3 inline" /></span>
+                          <span className="px-1.5 py-1 bg-amber-50 text-amber-500 rounded text-xs cursor-help border border-amber-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3.5 h-3.5 inline" /></span>
                         )}
-                        {isAdmin && (
-                          <button onClick={() => startEditingTags(order)} className="p-0.5 hover:bg-gray-100 rounded text-gray-300 hover:text-gray-500" title="Edit notes"><EditIcon className="w-3 h-3" /></button>
-                        )}
-                        {!order.notes && !order.internal_notes && !isAdmin && (
-                          <span className="text-gray-300 text-[10px]">-</span>
+                        {!order.notes && !order.internal_notes && (
+                          <span className="text-gray-300 text-xs">-</span>
                         )}
                       </div>
                     )}
                   </td>
                   {/* Translation Ready column - shows when translation is complete */}
-                  <td className="px-2 py-2 text-center">
+                  <td className="px-3 py-3 text-center">
                     {order.translation_ready ? (
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-medium">
+                        <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
                           ✅ Ready
                         </span>
                         {order.translation_ready_at && (
-                          <span className="text-[9px] text-gray-500">
+                          <span className="text-xs text-gray-500">
                             {new Date(order.translation_ready_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                           </span>
                         )}
                       </div>
                     ) : ['review', 'ready', 'delivered'].includes(order.translation_status) ? (
-                      <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-medium border border-blue-200 flex items-center gap-1">
+                      <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs font-medium border border-blue-200 flex items-center gap-1">
                         <RefreshIcon className="w-3 h-3" /> Review
                       </span>
                     ) : order.translation_status === 'in_translation' ? (
-                      <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded text-[10px] font-medium border border-yellow-200 flex items-center gap-1">
+                      <span className="px-2 py-1 bg-yellow-50 text-yellow-600 rounded text-xs font-medium border border-yellow-200 flex items-center gap-1">
                         <ClockIcon className="w-3 h-3" /> Working
                       </span>
                     ) : (
-                      <span className="text-gray-300 text-[10px]">-</span>
+                      <span className="text-gray-300 text-xs">-</span>
                     )}
                   </td>
                   {/* Total and Payment columns - Admin only */}
-                  {isAdmin && <td className="px-2 py-2 text-right font-medium">${order.total_price?.toFixed(2)}</td>}
-                  {isAdmin && <td className="px-2 py-2 text-center"><span className={`px-1.5 py-0.5 rounded text-[10px] ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
-                  <td className="px-2 py-1 text-center">
+                  {isAdmin && <td className="px-3 py-3 text-right font-semibold text-gray-800">${order.total_price?.toFixed(2)}</td>}
+                  {isAdmin && <td className="px-3 py-3 text-center"><span className={`px-2 py-1 rounded text-xs font-medium ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
+                  <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       {/* View Documents - Always visible */}
                       <button
