@@ -4149,10 +4149,13 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
 
     try:
         # Generate sequential order number starting from P6339
-        last_order = await db.orders.find_one(
+        # Look in translation_orders collection where orders are stored
+        last_order = await db.translation_orders.find_one(
             {"order_number": {"$regex": "^P\\d+$"}},
             sort=[("order_number", -1)]
         )
+
+        # Also check the numeric value to get the highest number
         if last_order and last_order.get("order_number"):
             try:
                 last_num = int(last_order["order_number"][1:])
@@ -4161,6 +4164,15 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
                 next_num = 6339
         else:
             next_num = 6339
+
+        # Ensure we don't create duplicates - check if this number already exists
+        while True:
+            order_number = f"P{next_num}"
+            existing = await db.translation_orders.find_one({"order_number": order_number})
+            if not existing:
+                break
+            next_num += 1
+
         order_number = f"P{next_num}"
 
         # Get PM and Translator names if assigned
