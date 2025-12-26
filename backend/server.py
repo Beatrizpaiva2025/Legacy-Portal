@@ -4442,6 +4442,150 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
         logger.error(f"Error creating quote: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create quote: {str(e)}")
 
+class SendQuoteEmailRequest(BaseModel):
+    to_email: str
+    client_name: str
+    quote_number: str
+    language: str = "en"
+    quote_data: dict
+
+@api_router.post("/admin/send-quote-email")
+async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str):
+    """Send a quote email to a client from PM Dashboard"""
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        qd = request.quote_data
+        lang = request.language
+
+        # Build email content based on language
+        if lang == "pt":
+            subject = f"Seu Orçamento de Tradução - {request.quote_number}"
+            greeting = f"Olá {request.client_name},"
+            intro = "Obrigado por escolher a Legacy Translation Services. Segue seu orçamento:"
+            service_label = "Serviço"
+            languages_label = "Idiomas"
+            pages_label = "Páginas"
+            price_label = "Preço por Página"
+            total_label = "TOTAL"
+            valid_text = "Este orçamento é válido por 30 dias."
+            payment_title = "Formas de Pagamento"
+            thanks = "Obrigado por escolher Legacy Translation Services!"
+        elif lang == "es":
+            subject = f"Su Presupuesto de Traducción - {request.quote_number}"
+            greeting = f"Hola {request.client_name},"
+            intro = "Gracias por elegir Legacy Translation Services. Aquí está su presupuesto:"
+            service_label = "Servicio"
+            languages_label = "Idiomas"
+            pages_label = "Páginas"
+            price_label = "Precio por Página"
+            total_label = "TOTAL"
+            valid_text = "Este presupuesto es válido por 30 días."
+            payment_title = "Opciones de Pago"
+            thanks = "¡Gracias por elegir Legacy Translation Services!"
+        else:  # English default
+            subject = f"Your Translation Quote - {request.quote_number}"
+            greeting = f"Hello {request.client_name},"
+            intro = "Thank you for choosing Legacy Translation Services. Here is your quote:"
+            service_label = "Service"
+            languages_label = "Languages"
+            pages_label = "Pages"
+            price_label = "Price per Page"
+            total_label = "TOTAL"
+            valid_text = "This quote is valid for 30 days."
+            payment_title = "Payment Options"
+            thanks = "Thank you for choosing Legacy Translation Services!"
+
+        # Get values from quote_data
+        doc_type = qd.get("documentType", qd.get("docType", "Translation"))
+        source_lang = qd.get("sourceLanguage", qd.get("sourceLang", "Portuguese"))
+        target_lang = qd.get("targetLanguage", qd.get("targetLang", "English"))
+        pages = qd.get("pages", qd.get("numPages", 1))
+        price_per_page = qd.get("pricePerPage", qd.get("basePrice", 24.99))
+        total = qd.get("total", qd.get("totalPrice", 24.99))
+        service_type = qd.get("serviceType", "Certified Translation")
+        notes = qd.get("notes", qd.get("observations", ""))
+
+        content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;">
+            <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
+            </div>
+
+            <div style="padding: 30px;">
+                <h2 style="color: #0d9488; margin-top: 0;">{subject}</h2>
+                <p>{greeting}</p>
+                <p>{intro}</p>
+
+                <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                    <tr style="background: #f3f4f6;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>{service_label}</strong></td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">{service_type} - {doc_type}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>{languages_label}</strong></td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">{source_lang} → {target_lang}</td>
+                    </tr>
+                    <tr style="background: #f3f4f6;">
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>{pages_label}</strong></td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">{pages}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>{price_label}</strong></td>
+                        <td style="padding: 12px; border: 1px solid #e5e7eb;">${price_per_page:.2f}</td>
+                    </tr>
+                    <tr style="background: #0d9488; color: white;">
+                        <td style="padding: 15px; border: 1px solid #0d9488;"><strong>{total_label}</strong></td>
+                        <td style="padding: 15px; border: 1px solid #0d9488; font-size: 20px;"><strong>${total:.2f}</strong></td>
+                    </tr>
+                </table>
+
+                {"<div style='background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;'><strong>Notes:</strong> " + notes + "</div>" if notes else ""}
+
+                <p style="color: #666; font-size: 14px;">{valid_text}</p>
+
+                <h3 style="color: #0d9488; margin-top: 30px;">{payment_title}</h3>
+
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                        <p style="margin: 0 0 10px 0;"><strong>Zelle</strong></p>
+                        <p style="margin: 0; color: #666; font-size: 14px;">857-208-1139</p>
+                        <p style="margin: 0; color: #666; font-size: 14px;">Legacy Translations Inc</p>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                        <p style="margin: 0 0 10px 0;"><strong>Venmo</strong></p>
+                        <p style="margin: 0; color: #666; font-size: 14px;">@legacytranslations</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+                    <p style="color: #0d9488; font-weight: bold;">{thanks}</p>
+                    <p style="color: #666; font-size: 14px;">
+                        Legacy Translation Services<br>
+                        legacytranslations.com | +1(857)316-7770<br>
+                        www.legacytranslation.com
+                    </p>
+                </div>
+            </div>
+        </div>
+        """
+
+        # Send the email
+        await email_service.send_email(request.to_email, subject, content)
+        logger.info(f"Quote email sent to {request.to_email} - {request.quote_number}")
+
+        return {
+            "success": True,
+            "message": f"Quote sent to {request.to_email}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error sending quote email: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to send quote: {str(e)}")
+
 @api_router.get("/admin/users/by-role/{role}")
 async def get_users_by_role(role: str, admin_key: str):
     """Get users by role (for dropdown selectors)"""
