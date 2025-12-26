@@ -611,6 +611,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
   // Assigned orders for translator
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -1843,6 +1844,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('start');
     }
   }, [selectedOrder]);
+
+  // Close project menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showProjectMenu && !e.target.closest('.project-menu-container')) {
+        setShowProjectMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showProjectMenu]);
 
   // Fetch assigned orders for translator/PM
   const fetchAssignedOrders = async () => {
@@ -3833,12 +3845,122 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="flex items-center space-x-4">
           <h1 className="text-lg font-bold text-blue-600">TRANSLATION WORKSPACE</h1>
           {selectedOrder && (
-            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 rounded-full border border-blue-200">
-              <span className="text-blue-600 text-xs font-medium">📋 {selectedOrder.order_number}</span>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-600 text-xs">{selectedOrder.client_name}</span>
-              <span className="text-gray-400">|</span>
-              <span className="text-xs text-gray-500">{selectedOrder.translate_from} → {selectedOrder.translate_to}</span>
+            <div className="relative group project-menu-container">
+              <button
+                className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => setShowProjectMenu(!showProjectMenu)}
+              >
+                <span className="text-blue-600 text-xs font-bold">📋 {selectedOrder.order_number}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-gray-600 text-xs">{selectedOrder.client_name}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-xs text-gray-500">{selectedOrder.translate_from} → {selectedOrder.translate_to}</span>
+                <span className="text-gray-400 ml-1">▼</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showProjectMenu && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                    <div className="font-bold text-sm">{selectedOrder.order_number}</div>
+                    <div className="text-xs opacity-80">{selectedOrder.client_name}</div>
+                  </div>
+
+                  <div className="p-1">
+                    {/* Load Document */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('start');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">📂</span>
+                      <div className="text-left">
+                        <div className="font-medium">Abrir Documentos</div>
+                        <div className="text-[10px] text-gray-500">Ver arquivos do projeto</div>
+                      </div>
+                    </button>
+
+                    {/* Translate */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('translate');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">📄</span>
+                      <div className="text-left">
+                        <div className="font-medium">Traduzir Documento</div>
+                        <div className="text-[10px] text-gray-500">OCR e tradução manual</div>
+                      </div>
+                    </button>
+
+                    {/* AI Pipeline */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('ai-pipeline');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">🤖</span>
+                      <div className="text-left">
+                        <div className="font-medium">AI Pipeline</div>
+                        <div className="text-[10px] text-gray-500">Tradução automática com IA</div>
+                      </div>
+                    </button>
+
+                    {/* Review - highlighted if translation ready */}
+                    <button
+                      onClick={async () => {
+                        setShowProjectMenu(false);
+                        if (selectedOrder.translation_ready || selectedOrder.translation_html) {
+                          await loadSavedTranslation(selectedOrder);
+                        }
+                        setActiveSubTab('review');
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors ${
+                        selectedOrder.translation_ready || selectedOrder.translation_html
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                          : 'text-gray-700 hover:bg-green-50'
+                      }`}
+                    >
+                      <span className="text-lg">🔍</span>
+                      <div className="text-left">
+                        <div className="font-medium">
+                          {selectedOrder.translation_ready ? '✅ Revisar Tradução' : 'Review'}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          {selectedOrder.translation_ready ? 'Tradução pronta para revisão' : 'Revisar e aprovar'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Deliver */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('deliver');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">✅</span>
+                      <div className="text-left">
+                        <div className="font-medium">Entregar ao Cliente</div>
+                        <div className="text-[10px] text-gray-500">Finalizar e enviar</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-1">
+                    <div className="px-3 py-2 text-[10px] text-gray-400">
+                      Status: <span className="font-medium">{selectedOrder.translation_status || 'received'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -6892,6 +7014,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
+  const [editingProject, setEditingProject] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [savingProject, setSavingProject] = useState(false);
 
   // Editing states for inline edits
   const [editingTags, setEditingTags] = useState(null); // Order ID being edited
@@ -7425,6 +7550,46 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       console.error('Failed to update notes:', err);
       alert('Error updating notes');
     }
+  };
+
+  // Save edited project
+  const saveEditedProject = async () => {
+    if (!viewingOrder || !editFormData) return;
+    setSavingProject(true);
+    try {
+      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, editFormData);
+      // Update local state
+      setViewingOrder(prev => ({ ...prev, ...editFormData }));
+      setEditingProject(false);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to save project:', err);
+      alert('Error saving project: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
+  // Start editing project
+  const startEditingProject = () => {
+    if (!viewingOrder) return;
+    setEditFormData({
+      client_name: viewingOrder.client_name || '',
+      client_email: viewingOrder.client_email || '',
+      translate_from: viewingOrder.translate_from || 'Portuguese',
+      translate_to: viewingOrder.translate_to || 'English',
+      service_type: viewingOrder.service_type || 'standard',
+      page_count: viewingOrder.page_count || 1,
+      urgency: viewingOrder.urgency || 'no',
+      deadline: viewingOrder.deadline ? new Date(viewingOrder.deadline).toISOString().slice(0, 16) : '',
+      document_type: viewingOrder.document_type || '',
+      notes: viewingOrder.notes || '',
+      internal_notes: viewingOrder.internal_notes || '',
+      total_price: viewingOrder.total_price || 0,
+      payment_status: viewingOrder.payment_status || 'pending',
+      translation_status: viewingOrder.translation_status || 'received'
+    });
+    setEditingProject(true);
   };
 
   // Fetch notifications
@@ -9264,18 +9429,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <p className="text-xs opacity-80">{viewingOrder.client_name}</p>
               </div>
               <div className="flex items-center gap-2">
-                {(isAdmin || isPM) && (
+                {(isAdmin || isPM) && !editingProject && (
                   <button
-                    onClick={() => {
-                      setTempNotes({ client: viewingOrder.notes || '', internal: viewingOrder.internal_notes || '' });
-                      setEditingNotes(true);
-                    }}
-                    className="px-2 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30"
+                    onClick={startEditingProject}
+                    className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30 font-medium"
                   >
-                    Update
+                    ✏️ Edit
                   </button>
                 )}
-                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
+                {editingProject && (
+                  <>
+                    <button
+                      onClick={saveEditedProject}
+                      disabled={savingProject}
+                      className="px-3 py-1 bg-green-500 rounded text-xs hover:bg-green-600 font-medium disabled:opacity-50"
+                    >
+                      {savingProject ? '...' : '💾 Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingProject(false)}
+                      className="px-3 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                )}
+                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingProject(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
               </div>
             </div>
 
@@ -9301,70 +9480,266 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* Details Tab */}
               {projectModalTab === 'details' && (
                 <div className="space-y-4">
-                  {/* Client Section */}
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Client</h4>
-                    <table className="w-full text-xs">
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600 w-1/3">Client</td>
-                          <td className="py-2 text-blue-600">{viewingOrder.client_name}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Email</td>
-                          <td className="py-2">{viewingOrder.client_email}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {editingProject ? (
+                    /* EDIT MODE - Editable form */
+                    <>
+                      {/* Client Section - Editable */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">👤 Client</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+                            <input
+                              type="text"
+                              value={editFormData.client_name || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, client_name: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                            <input
+                              type="email"
+                              value={editFormData.client_email || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, client_email: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Requirements Section */}
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Requirements</h4>
-                    <table className="w-full text-xs">
-                      <tbody>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600 w-1/3">Language Pair</td>
-                          <td className="py-2">{viewingOrder.translate_from} → {viewingOrder.translate_to}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Service Type</td>
-                          <td className="py-2 capitalize">{viewingOrder.service_type || 'Standard'}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Pages</td>
-                          <td className="py-2">{viewingOrder.page_count || 1}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Urgency</td>
-                          <td className="py-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
-                              {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
-                            </span>
-                          </td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Created</td>
-                          <td className="py-2">{new Date(viewingOrder.created_at).toLocaleString()}</td>
-                        </tr>
-                        <tr className="border-b">
-                          <td className="py-2 font-medium text-gray-600">Deadline</td>
-                          <td className="py-2">
-                            {viewingOrder.deadline ? (
-                              <span className="text-orange-600 font-medium">
-                                {new Date(viewingOrder.deadline).toLocaleString()}
-                              </span>
-                            ) : '-'}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                      {/* Requirements Section - Editable */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">📋 Requirements</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">From Language</label>
+                            <select
+                              value={editFormData.translate_from || 'Portuguese'}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, translate_from: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            >
+                              {['Portuguese', 'English', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic', 'Dutch', 'Norwegian', 'Swedish', 'Danish'].map(lang => (
+                                <option key={lang} value={lang}>{lang}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">To Language</label>
+                            <select
+                              value={editFormData.translate_to || 'English'}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, translate_to: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            >
+                              {['English', 'Portuguese', 'Spanish', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Russian', 'Arabic', 'Dutch', 'Norwegian', 'Swedish', 'Danish'].map(lang => (
+                                <option key={lang} value={lang}>{lang}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Service Type</label>
+                            <select
+                              value={editFormData.service_type || 'standard'}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, service_type: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            >
+                              <option value="standard">Standard</option>
+                              <option value="certified">Certified</option>
+                              <option value="notarized">Notarized</option>
+                              <option value="apostille">Apostille</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Pages</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editFormData.page_count || 1}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, page_count: parseInt(e.target.value) || 1 }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Urgency</label>
+                            <select
+                              value={editFormData.urgency || 'no'}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, urgency: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            >
+                              <option value="no">Normal</option>
+                              <option value="priority">Priority</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Document Type</label>
+                            <input
+                              type="text"
+                              value={editFormData.document_type || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, document_type: e.target.value }))}
+                              placeholder="Birth Certificate, Diploma..."
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
+                            <input
+                              type="datetime-local"
+                              value={editFormData.deadline || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, deadline: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Notes Section */}
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-600 mb-2">Notes</h4>
-                    {editingNotes ? (
+                      {/* Financial Section - Editable */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">💰 Financial</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Total Price ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editFormData.total_price || 0}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, total_price: parseFloat(e.target.value) || 0 }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Payment Status</label>
+                            <select
+                              value={editFormData.payment_status || 'pending'}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, payment_status: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="paid">Paid</option>
+                              <option value="partial">Partial</option>
+                              <option value="refunded">Refunded</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Section - Editable */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">📊 Status</h4>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Translation Status</label>
+                          <select
+                            value={editFormData.translation_status || 'received'}
+                            onChange={(e) => setEditFormData(prev => ({ ...prev, translation_status: e.target.value }))}
+                            className="w-full px-2 py-1.5 border rounded text-sm"
+                          >
+                            <option value="received">Received</option>
+                            <option value="quote">Quote</option>
+                            <option value="in_translation">In Translation</option>
+                            <option value="review">Review</option>
+                            <option value="pending_review">Pending Review</option>
+                            <option value="client_review">Client Review</option>
+                            <option value="ready">Ready</option>
+                            <option value="delivered">Delivered</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Notes Section - Editable */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">📝 Notes</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Client Notes</label>
+                            <textarea
+                              value={editFormData.notes || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, notes: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                              rows="2"
+                              placeholder="Notes visible to client..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Internal Notes (Admin only)</label>
+                            <textarea
+                              value={editFormData.internal_notes || ''}
+                              onChange={(e) => setEditFormData(prev => ({ ...prev, internal_notes: e.target.value }))}
+                              className="w-full px-2 py-1.5 border rounded text-sm"
+                              rows="2"
+                              placeholder="Internal notes..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* VIEW MODE - Read only */
+                    <>
+                      {/* Client Section */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">Client</h4>
+                        <table className="w-full text-xs">
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600 w-1/3">Client</td>
+                              <td className="py-2 text-blue-600">{viewingOrder.client_name}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Email</td>
+                              <td className="py-2">{viewingOrder.client_email}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Requirements Section */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">Requirements</h4>
+                        <table className="w-full text-xs">
+                          <tbody>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600 w-1/3">Language Pair</td>
+                              <td className="py-2">{viewingOrder.translate_from} → {viewingOrder.translate_to}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Service Type</td>
+                              <td className="py-2 capitalize">{viewingOrder.service_type || 'Standard'}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Pages</td>
+                              <td className="py-2">{viewingOrder.page_count || 1}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Urgency</td>
+                              <td className="py-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
+                                  {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
+                                </span>
+                              </td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Created</td>
+                              <td className="py-2">{new Date(viewingOrder.created_at).toLocaleString()}</td>
+                            </tr>
+                            <tr className="border-b">
+                              <td className="py-2 font-medium text-gray-600">Deadline</td>
+                              <td className="py-2">
+                                {viewingOrder.deadline ? (
+                                  <span className="text-orange-600 font-medium">
+                                    {new Date(viewingOrder.deadline).toLocaleString()}
+                                  </span>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Notes Section */}
+                      <div>
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">Notes</h4>
+                        {editingNotes ? (
                       <div className="space-y-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-600 mb-1">💬 Client Note</label>
@@ -9486,6 +9861,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </tbody>
                       </table>
                     </div>
+                  )}
+                    </>
                   )}
                 </div>
               )}
