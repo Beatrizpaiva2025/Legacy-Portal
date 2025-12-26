@@ -8784,6 +8784,16 @@ Your translation will be reviewed by:
                     TRANSLATION RULES
 ═══════════════════════════════════════════════════════════════════
 
+⚠️ CRITICAL - MULTILINGUAL SOURCE DOCUMENTS:
+When the original document contains text in MULTIPLE languages (e.g., trilingual fields like "NATIONALITY/NATIONALITY/NACIONALIDAD:" or "NOME/NAME/NOMBRE:"):
+• ONLY translate from the SOURCE LANGUAGE ({source_lang})
+• IGNORE text that is already in other languages in the original
+• The OUTPUT column/field should contain ONLY the {target_lang} translation
+• Example: If source is Portuguese and document shows "NACIONALIDADE/NATIONALITY/NACIONALIDAD: BRASILEIRA/BRAZILIAN P"
+  → Translate ONLY the Portuguese "NACIONALIDADE: BRASILEIRA"
+  → Output: "NATIONALITY: BRAZILIAN"
+  → Do NOT show: "NATIONALITY/NATIONALITY/NACIONALIDAD: BRAZILIAN/BRAZILIAN P"
+
 ALWAYS TRANSLATE:
 ✅ All headers, titles, and section headings
 ✅ All body text, including fine print
@@ -9362,13 +9372,23 @@ Use these EXACT translations for the following terms:
                     },
                 })
 
-        message_content.append({
-            "type": "text",
-            "text": f"""Translate this {config['document_type']} document:
+        # Prepare text prompt based on whether we have OCR text or just image
+        if original_text and original_text.strip():
+            text_prompt = f"""Translate this {config['document_type']} document:
 
 {original_text}
 
 Produce a complete HTML translation ready for professional use."""
+        else:
+            text_prompt = f"""Translate this {config['document_type']} document from the image.
+
+Look at the document image carefully and translate ALL visible text from {config['source_language']} to {config['target_language']}.
+
+Produce a complete HTML translation ready for professional use."""
+
+        message_content.append({
+            "type": "text",
+            "text": text_prompt
         })
 
         response = client.messages.create(
