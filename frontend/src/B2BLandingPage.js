@@ -97,8 +97,8 @@ Message: ${formData.message}
                 15+ Years of Experience
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
-                Corporate Translation
-                <span className="block text-blue-900">Partnership Program</span>
+                Certified Excellence
+                <span className="block text-blue-900 italic">Powered by Technology</span>
               </h1>
               <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                 Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms, immigration agencies, and Fortune 500 companies.
@@ -135,8 +135,8 @@ Message: ${formData.message}
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
               <img
-                src="https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                alt="Professional team working with technology"
+                src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Global technology and digital connections"
                 className="relative rounded-2xl shadow-2xl"
               />
               <div className="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-lg">
