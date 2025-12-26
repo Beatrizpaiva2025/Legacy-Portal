@@ -9287,12 +9287,12 @@ async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
     - Converts currencies if needed
     - Adapts date formats
     - Applies document-specific formatting
-    - Handles large documents by chunking (25+ pages)
+    - Handles large documents by chunking (10+ pages)
     """
     import anthropic
 
     config = pipeline["config"]
-    original_text = pipeline["original_text"]
+    original_text = pipeline["original_text"] or ""
 
     # Get glossary terms if enabled
     glossary_terms = ""
@@ -9334,78 +9334,130 @@ Use these EXACT translations for the following terms:
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        # Prepare message content
-        message_content = []
+        # Extract all pages from PDF if present
+        all_page_images = []
+        total_pages = 1
 
-        # Add original image if available for visual reference
         if pipeline.get("original_document_base64"):
             image_data = pipeline["original_document_base64"]
-            media_type = "image/jpeg"
 
             if ',' in image_data:
                 header = image_data.split(',')[0]
-                image_data = image_data.split(',')[1]
+                raw_data = image_data.split(',')[1]
 
-                # Handle PDF conversion
+                # Handle PDF - extract ALL pages
                 if 'pdf' in header.lower():
                     try:
-                        pdf_bytes = base64.b64decode(image_data)
+                        pdf_bytes = base64.b64decode(raw_data)
                         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-                        page = doc[0]
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
-                        img_bytes = pix.tobytes("jpeg")
-                        image_data = base64.b64encode(img_bytes).decode('utf-8')
+                        total_pages = doc.page_count
+                        logger.info(f"PDF has {total_pages} pages")
+
+                        for page_num in range(total_pages):
+                            page = doc[page_num]
+                            # Use higher resolution for better OCR
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+                            img_bytes = pix.tobytes("jpeg")
+                            page_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                            all_page_images.append({
+                                "page": page_num + 1,
+                                "data": page_base64,
+                                "media_type": "image/jpeg"
+                            })
                         doc.close()
                     except Exception as e:
-                        logger.error(f"PDF conversion failed: {e}")
-                        image_data = None
-                elif 'png' in header.lower():
-                    media_type = "image/png"
-
-            if image_data:
-                message_content.append({
-                    "type": "image",
-                    "source": {
-                        "type": "base64",
-                        "media_type": media_type,
-                        "data": image_data,
-                    },
+                        logger.error(f"PDF extraction failed: {e}")
+                        # Fallback to single image
+                        all_page_images.append({
+                            "page": 1,
+                            "data": raw_data,
+                            "media_type": "image/jpeg"
+                        })
+                else:
+                    # Single image (not PDF)
+                    media_type = "image/png" if 'png' in header.lower() else "image/jpeg"
+                    all_page_images.append({
+                        "page": 1,
+                        "data": raw_data,
+                        "media_type": media_type
+                    })
+            elif image_data:
+                # Raw base64 without header
+                all_page_images.append({
+                    "page": 1,
+                    "data": image_data,
+                    "media_type": "image/jpeg"
                 })
 
-        # Prepare text prompt based on whether we have OCR text or just image
-        if original_text and original_text.strip():
-            text_prompt = f"""Translate this {config['document_type']} document:
+        # Determine chunk size based on number of pages
+        # Claude can handle ~10-15 images at once reliably
+        MAX_PAGES_PER_CHUNK = 10
+        total_pages = len(all_page_images) if all_page_images else 1
 
-{original_text}
+        # If small document, process in single call
+        if total_pages <= MAX_PAGES_PER_CHUNK:
+            return await translate_single_chunk(
+                client, config, system_prompt, all_page_images, original_text, 1, 1
+            )
 
-Produce a complete HTML translation ready for professional use."""
+        # Large document - process in chunks
+        logger.info(f"Large document detected: {total_pages} pages. Processing in chunks of {MAX_PAGES_PER_CHUNK}")
+
+        all_translations = []
+        total_tokens = 0
+        num_chunks = math.ceil(total_pages / MAX_PAGES_PER_CHUNK)
+
+        # Split text by page breaks if available
+        text_chunks = []
+        if original_text and ("--- PAGE" in original_text or "---" in original_text):
+            text_parts = [p.strip() for p in original_text.split("---") if p.strip() and "PAGE" not in p.upper()]
+            for i in range(num_chunks):
+                start = i * MAX_PAGES_PER_CHUNK
+                end = min((i + 1) * MAX_PAGES_PER_CHUNK, len(text_parts))
+                text_chunks.append("\n\n".join(text_parts[start:end]) if start < len(text_parts) else "")
         else:
-            text_prompt = f"""Translate this {config['document_type']} document from the image.
+            text_chunks = [original_text if i == 0 else "" for i in range(num_chunks)]
 
-Look at the document image carefully and translate ALL visible text from {config['source_language']} to {config['target_language']}.
+        # Process each chunk
+        for chunk_idx in range(num_chunks):
+            start_page = chunk_idx * MAX_PAGES_PER_CHUNK
+            end_page = min((chunk_idx + 1) * MAX_PAGES_PER_CHUNK, total_pages)
+            chunk_images = all_page_images[start_page:end_page]
+            chunk_text = text_chunks[chunk_idx] if chunk_idx < len(text_chunks) else ""
 
-Produce a complete HTML translation ready for professional use."""
+            logger.info(f"Processing chunk {chunk_idx + 1}/{num_chunks}: pages {start_page + 1}-{end_page}")
 
-        message_content.append({
-            "type": "text",
-            "text": text_prompt
-        })
+            # Update pipeline status in database
+            await db.ai_pipelines.update_one(
+                {"id": pipeline["id"]},
+                {"$set": {
+                    "stages.ai_translator.notes": f"Traduzindo chunk {chunk_idx + 1} de {num_chunks} (páginas {start_page + 1}-{end_page})..."
+                }}
+            )
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8192,
-            system=system_prompt,
-            messages=[{"role": "user", "content": message_content}]
-        )
+            chunk_result = await translate_single_chunk(
+                client, config, system_prompt, chunk_images, chunk_text,
+                chunk_idx + 1, num_chunks
+            )
 
-        translation = response.content[0].text
-        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+            if not chunk_result["success"]:
+                return {
+                    "success": False,
+                    "error": f"Chunk {chunk_idx + 1} failed: {chunk_result.get('error', 'Unknown error')}",
+                    "result": None
+                }
+
+            all_translations.append(chunk_result["result"])
+            total_tokens += chunk_result.get("tokens_used", 0)
+
+        # Combine all chunk translations
+        combined_translation = combine_chunk_translations(all_translations, total_pages)
 
         return {
             "success": True,
-            "result": translation,
-            "tokens_used": tokens_used,
-            "notes": f"Translation completed. Language pair: {config['source_language']} → {config['target_language']}. Currency conversion: {'Yes' if config.get('convert_currency') else 'No'}."
+            "result": combined_translation,
+            "tokens_used": total_tokens,
+            "notes": f"Translation completed. {total_pages} pages processed in {num_chunks} chunks. Language: {config['source_language']} → {config['target_language']}."
         }
 
     except Exception as e:
@@ -9415,6 +9467,136 @@ Produce a complete HTML translation ready for professional use."""
             "error": str(e),
             "result": None
         }
+
+
+async def translate_single_chunk(client, config: dict, system_prompt: str, page_images: list, text: str, chunk_num: int, total_chunks: int) -> dict:
+    """Translate a single chunk of pages"""
+    try:
+        message_content = []
+
+        # Add all page images
+        for page_info in page_images:
+            message_content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": page_info["media_type"],
+                    "data": page_info["data"],
+                },
+            })
+
+        # Prepare text prompt
+        page_range = f"pages {page_images[0]['page']}-{page_images[-1]['page']}" if len(page_images) > 1 else f"page {page_images[0]['page']}"
+        chunk_info = f" (Chunk {chunk_num}/{total_chunks}: {page_range})" if total_chunks > 1 else ""
+
+        if text and text.strip():
+            text_prompt = f"""Translate this {config['document_type']} document{chunk_info}:
+
+{text}
+
+Produce a complete HTML translation ready for professional use.
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+        else:
+            text_prompt = f"""Translate this {config['document_type']} document from the images{chunk_info}.
+
+Look at {'all ' + str(len(page_images)) + ' pages' if len(page_images) > 1 else 'the document'} carefully and translate ALL visible text from {config['source_language']} to {config['target_language']}.
+
+Produce a complete HTML translation ready for professional use.
+{"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
+
+        message_content.append({
+            "type": "text",
+            "text": text_prompt
+        })
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=16384,  # Increased for multi-page documents
+            system=system_prompt,
+            messages=[{"role": "user", "content": message_content}]
+        )
+
+        return {
+            "success": True,
+            "result": response.content[0].text,
+            "tokens_used": response.usage.input_tokens + response.usage.output_tokens
+        }
+
+    except Exception as e:
+        logger.error(f"Chunk translation failed: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "result": None
+        }
+
+
+def combine_chunk_translations(translations: list, total_pages: int) -> str:
+    """Combine multiple chunk translations into a single HTML document"""
+
+    # Extract body content from each translation
+    body_contents = []
+
+    for i, trans in enumerate(translations):
+        # Try to extract content between <body> tags
+        if "<body" in trans.lower():
+            import re
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', trans, re.DOTALL | re.IGNORECASE)
+            if body_match:
+                body_contents.append(body_match.group(1))
+            else:
+                body_contents.append(trans)
+        else:
+            body_contents.append(trans)
+
+    # Combine with page breaks
+    combined_body = '\n<div class="page-break" style="page-break-before: always; margin: 30px 0; border-top: 2px dashed #ccc;"></div>\n'.join(body_contents)
+
+    # Create final HTML document
+    combined_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Translation - {total_pages} Pages</title>
+    <style>
+        body {{
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }}
+        td, th {{
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }}
+        .page-break {{
+            page-break-before: always;
+        }}
+        @media print {{
+            .page-break {{
+                page-break-before: always;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px;">
+        <strong>Document Translation</strong> - {total_pages} page(s) | Generated automatically
+    </div>
+    {combined_body}
+    <p style="text-align: center; font-weight: bold; margin-top: 30px;">[END OF TRANSLATION]</p>
+</body>
+</html>"""
+
+    return combined_html
 
 
 async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_api_key: str) -> dict:
