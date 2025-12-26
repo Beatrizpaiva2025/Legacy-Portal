@@ -1790,13 +1790,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
   ];
 
-  // Fetch exchange rate from API
+  // Fetch exchange rate from API (ExchangeRate-API for real-time rates)
   const fetchExchangeRate = async () => {
     setFetchingRate(true);
     try {
-      // Using Frankfurter API (free, ECB rates)
+      // Using ExchangeRate-API (more accurate, real-time rates)
       const response = await fetch(
-        `https://api.frankfurter.app/latest?from=${translatorNoteSettings.targetCurrency}&to=${translatorNoteSettings.sourceCurrency}`
+        `https://api.exchangerate-api.com/v4/latest/${translatorNoteSettings.targetCurrency}`
       );
       const data = await response.json();
       if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
@@ -1805,10 +1805,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
           rateDate: data.date || new Date().toISOString().split('T')[0]
         }));
+      } else {
+        throw new Error('Rate not found');
       }
     } catch (error) {
-      console.error('Error fetching exchange rate:', error);
-      alert('Could not fetch exchange rate. Please enter manually.');
+      // Fallback to Frankfurter API (ECB rates)
+      try {
+        const response = await fetch(
+          `https://api.frankfurter.app/latest?from=${translatorNoteSettings.targetCurrency}&to=${translatorNoteSettings.sourceCurrency}`
+        );
+        const data = await response.json();
+        if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
+          setTranslatorNoteSettings(prev => ({
+            ...prev,
+            exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
+            rateDate: data.date || new Date().toISOString().split('T')[0]
+          }));
+        }
+      } catch (err) {
+        console.error('Error fetching exchange rate:', err);
+        alert('Could not fetch exchange rate. Please enter manually.');
+      }
     } finally {
       setFetchingRate(false);
     }
@@ -7382,10 +7399,54 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     convert_currency: false,
     source_currency: 'BRL',
     target_currency: 'USD',
+    exchange_rate: '',
+    rate_date: new Date().toISOString().split('T')[0],
+    rate_source: 'xe.com',
     use_glossary: true,
     page_format: 'letter',
     custom_instructions: ''
   });
+  const [fetchingPipelineRate, setFetchingPipelineRate] = useState(false);
+
+  // Fetch exchange rate for pipeline modal (using ExchangeRate-API for more accurate rates)
+  const fetchPipelineExchangeRate = async () => {
+    setFetchingPipelineRate(true);
+    try {
+      // Try ExchangeRate-API first (more accurate, real-time)
+      const response = await fetch(
+        `https://api.exchangerate-api.com/v4/latest/${aiPipelineQuickConfig.target_currency}`
+      );
+      const data = await response.json();
+      if (data.rates && data.rates[aiPipelineQuickConfig.source_currency]) {
+        setAiPipelineQuickConfig(prev => ({
+          ...prev,
+          exchange_rate: data.rates[aiPipelineQuickConfig.source_currency].toFixed(4),
+          rate_date: data.date || new Date().toISOString().split('T')[0]
+        }));
+      } else {
+        throw new Error('Rate not found');
+      }
+    } catch (error) {
+      // Fallback to Frankfurter API
+      try {
+        const response = await fetch(
+          `https://api.frankfurter.app/latest?from=${aiPipelineQuickConfig.target_currency}&to=${aiPipelineQuickConfig.source_currency}`
+        );
+        const data = await response.json();
+        if (data.rates && data.rates[aiPipelineQuickConfig.source_currency]) {
+          setAiPipelineQuickConfig(prev => ({
+            ...prev,
+            exchange_rate: data.rates[aiPipelineQuickConfig.source_currency].toFixed(4),
+            rate_date: data.date || new Date().toISOString().split('T')[0]
+          }));
+        }
+      } catch (err) {
+        alert('Could not fetch exchange rate. Please enter manually.');
+      }
+    } finally {
+      setFetchingPipelineRate(false);
+    }
+  };
 
   const [newProject, setNewProject] = useState({
     client_name: '',
@@ -8598,20 +8659,96 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="text-xs font-medium text-gray-700">Configuration:</div>
 
                 {/* Currency Conversion */}
-                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={aiPipelineQuickConfig.convert_currency}
-                    onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, convert_currency: e.target.checked})}
-                    className="rounded text-purple-600"
-                  />
-                  <span>Convert currency values</span>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={aiPipelineQuickConfig.convert_currency}
+                      onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, convert_currency: e.target.checked})}
+                      className="rounded text-purple-600"
+                    />
+                    <span>Convert currency values</span>
+                  </label>
+
+                  {/* Currency Options - shown when checkbox is checked */}
                   {aiPipelineQuickConfig.convert_currency && (
-                    <span className="text-gray-500">
-                      ({aiPipelineQuickConfig.source_currency} → {aiPipelineQuickConfig.target_currency})
-                    </span>
+                    <div className="ml-6 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                      {/* Currency Dropdowns */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">Source (Document)</label>
+                          <select
+                            value={aiPipelineQuickConfig.source_currency}
+                            onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, source_currency: e.target.value, exchange_rate: ''})}
+                            className="w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-purple-500"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">Target (Translation)</label>
+                          <select
+                            value={aiPipelineQuickConfig.target_currency}
+                            onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, target_currency: e.target.value, exchange_rate: ''})}
+                            className="w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-purple-500"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Exchange Rate */}
+                      <div>
+                        <label className="block text-[10px] text-gray-600 mb-1">
+                          Exchange Rate ({aiPipelineQuickConfig.source_currency} per 1 {aiPipelineQuickConfig.target_currency})
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={aiPipelineQuickConfig.exchange_rate}
+                            onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, exchange_rate: e.target.value})}
+                            placeholder="Ex: 5.54"
+                            className="flex-1 px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-purple-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={fetchPipelineExchangeRate}
+                            disabled={fetchingPipelineRate}
+                            className="px-2 py-1.5 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700 disabled:bg-gray-400 whitespace-nowrap"
+                          >
+                            {fetchingPipelineRate ? '⏳' : '🔄'} Fetch
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Rate Source */}
+                      <div>
+                        <label className="block text-[10px] text-gray-600 mb-1">Rate Source (for citation)</label>
+                        <select
+                          value={aiPipelineQuickConfig.rate_source}
+                          onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, rate_source: e.target.value})}
+                          className="w-full px-2 py-1.5 text-xs border rounded focus:ring-1 focus:ring-purple-500"
+                        >
+                          {RATE_SOURCES.map(source => (
+                            <option key={source.id} value={source.id}>{source.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Preview */}
+                      {aiPipelineQuickConfig.exchange_rate && (
+                        <div className="text-[10px] text-gray-600 bg-white p-2 rounded border">
+                          <strong>Preview:</strong> {CURRENCIES[aiPipelineQuickConfig.source_currency]?.symbol}1,000.00 = [<strong>{CURRENCIES[aiPipelineQuickConfig.target_currency]?.symbol}{(1000 / parseFloat(aiPipelineQuickConfig.exchange_rate)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>]
+                        </div>
+                      )}
+                    </div>
                   )}
-                </label>
+                </div>
 
                 {/* Glossary */}
                 <label className="flex items-center gap-2 text-xs cursor-pointer">
