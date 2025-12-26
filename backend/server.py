@@ -4390,6 +4390,8 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
         # Send quote email to client
         # Use main website domain for better email deliverability
         website_url = "https://legacytranslations.com"
+        # Client portal URL - can be configured via environment variable
+        client_portal_url = os.environ.get('CLIENT_PORTAL_URL', 'https://legacytranslations.com/client-portal')
         turnaround_display = "2-3 business days"
 
         service_display = "Certified Translation" if quote_data.service_type == "certified" else "Standard Translation"
@@ -4424,18 +4426,16 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
                 <p style="margin: 0; color: #666;">Username: <strong>@legacytranslations</strong></p>
             </div>
 
-            <div style="background: #faf5ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #e9d5ff;">
-                <p style="margin: 0 0 15px 0;"><strong>Option 3: Credit/Debit Card</strong></p>
-                <p style="margin: 0; color: #666;">To pay by card, please visit our website:</p>
-                <p style="margin: 10px 0 0 0; color: #7c3aed; font-weight: bold;">legacytranslations.com</p>
-                <p style="margin: 5px 0 0 0; color: #888; font-size: 12px;">Or contact us at +1(857)316-7770 for card payment assistance</p>
-            </div>
-
             <p style="color: #666; font-size: 14px; margin-top: 20px;">
                 <strong>Important:</strong> Please include your quote number <strong>{order_number}</strong> in the payment reference/memo.
             </p>
 
             <p style="color: #666; font-size: 14px;">This quote is valid for 30 days. If you have any questions, please reply to this email.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <p style="color: #666; margin-bottom: 15px;">Pay by card or see all payment options:</p>
+                <a href="{client_portal_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Access Client Portal</a>
+            </div>
 
             <p>Best regards,<br>Legacy Translations Team</p>
 
@@ -4495,6 +4495,8 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "Este orçamento é válido por 30 dias."
             payment_title = "Formas de Pagamento"
             thanks = "Obrigado por escolher Legacy Translation Services!"
+            portal_text = "Pague com cartão ou veja todas as opções:"
+            portal_button = "Acessar Portal do Cliente"
         elif lang == "es":
             subject = f"Su Presupuesto de Traducción - {request.quote_number}"
             greeting = f"Hola {request.client_name},"
@@ -4507,6 +4509,8 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "Este presupuesto es válido por 30 días."
             payment_title = "Opciones de Pago"
             thanks = "¡Gracias por elegir Legacy Translation Services!"
+            portal_text = "Pague con tarjeta o vea todas las opciones:"
+            portal_button = "Acceder al Portal del Cliente"
         else:  # English default
             subject = f"Your Translation Quote - {request.quote_number}"
             greeting = f"Hello {request.client_name},"
@@ -4519,6 +4523,11 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "This quote is valid for 30 days."
             payment_title = "Payment Options"
             thanks = "Thank you for choosing Legacy Translation Services!"
+            portal_text = "Pay by card or see all payment options:"
+            portal_button = "Access Client Portal"
+
+        # Client Portal URL
+        portal_url = os.environ.get('CLIENT_PORTAL_URL', 'https://legacytranslations.com/client-portal')
 
         # Get values from quote_data
         doc_type = qd.get("documentType", qd.get("docType", "Translation"))
@@ -4582,12 +4591,16 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
                     </div>
                 </div>
 
+                <div style="text-align: center; margin: 25px 0;">
+                    <p style="color: #666; margin-bottom: 12px; font-size: 14px;">{portal_text}</p>
+                    <a href="{portal_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">{portal_button}</a>
+                </div>
+
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
                     <p style="color: #0d9488; font-weight: bold;">{thanks}</p>
                     <p style="color: #666; font-size: 14px;">
                         Legacy Translation Services<br>
-                        legacytranslations.com | +1(857)316-7770<br>
-                        www.legacytranslation.com
+                        legacytranslations.com | +1(857)316-7770
                     </p>
                 </div>
             </div>
