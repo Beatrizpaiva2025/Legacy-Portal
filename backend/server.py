@@ -6634,6 +6634,17 @@ class OCRRequest(BaseModel):
     special_commands: Optional[str] = None
     preserve_layout: Optional[bool] = True
 
+class TranslatorNoteSettings(BaseModel):
+    enabled: bool = False
+    source_currency: Optional[str] = None  # e.g., 'BRL', 'NOK'
+    target_currency: Optional[str] = None  # e.g., 'USD', 'CAD'
+    exchange_rate: Optional[float] = None  # e.g., 5.42 (BRL per 1 USD)
+    rate_date: Optional[str] = None  # e.g., '2024-12-26'
+    rate_source: Optional[str] = None  # e.g., 'https://www.xe.com/currencyconverter/'
+    convert_values: Optional[bool] = True  # Whether to convert monetary values
+    source_currency_symbol: Optional[str] = None  # e.g., 'R$'
+    target_currency_symbol: Optional[str] = None  # e.g., '$'
+
 class TranslateRequest(BaseModel):
     text: str
     source_language: str
@@ -6646,6 +6657,7 @@ class TranslateRequest(BaseModel):
     preserve_layout: Optional[bool] = True  # Maintain original document layout
     page_format: Optional[str] = 'letter'  # 'letter' or 'a4'
     original_image: Optional[str] = None  # Base64 image for visual layout reference
+    translator_note: Optional[TranslatorNoteSettings] = None  # For financial document currency conversion
 
 @api_router.post("/admin/ocr")
 async def admin_ocr(request: OCRRequest, admin_key: str):
@@ -6870,6 +6882,60 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
             if request.general_instructions:
                 additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
 
+            # Build currency conversion instructions if translator_note is enabled
+            currency_conversion_instructions = ""
+            if request.translator_note and request.translator_note.enabled and request.translator_note.convert_values:
+                src_symbol = request.translator_note.source_currency_symbol or request.translator_note.source_currency
+                tgt_symbol = request.translator_note.target_currency_symbol or request.translator_note.target_currency
+                rate = request.translator_note.exchange_rate or 1
+
+                currency_conversion_instructions = f"""
+═══════════════════════════════════════════════════════════════════
+                    CURRENCY CONVERSION (FINANCIAL DOCUMENTS)
+═══════════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANT: This is a FINANCIAL DOCUMENT with currency conversion enabled.
+
+CONVERSION SETTINGS:
+- Source Currency: {request.translator_note.source_currency} ({src_symbol})
+- Target Currency: {request.translator_note.target_currency} ({tgt_symbol})
+- Exchange Rate: {src_symbol}{rate} = {tgt_symbol}1.00
+- Rate Date: {request.translator_note.rate_date}
+
+VALUE CONVERSION RULES:
+For MAIN financial values (totals, subtotals, balances, loans, credits, debits, amounts due, net worth):
+1. Keep the original value in the source currency format
+2. Add the converted value in brackets with BOLD formatting
+3. Format: original_value [<strong>CONVERTED_VALUE</strong>]
+
+EXAMPLES:
+- R$5,420.00 → R$5,420.00 [<strong>$1,000.00</strong>]
+- NOK 10,190.00 → NOK 10,190.00 [<strong>$1,000.00</strong>]
+- CA$807,126.92 → 3,113,492.10 [<strong>CA$807,126.92</strong>]
+
+HOW TO CONVERT:
+1. Parse the numeric value from the original amount (ignore currency symbols and thousands separators)
+2. Divide by the exchange rate ({rate}) to get the target currency value
+3. Format with proper thousands separators and 2 decimal places
+4. Add {tgt_symbol} symbol before the converted amount
+5. Wrap in [<strong>...</strong>]
+
+WHAT TO CONVERT (only main financial values):
+✅ Total / Grand Total / Subtotal
+✅ Balance / Available Balance / Current Balance
+✅ Loan Amount / Credit Limit / Debt
+✅ Income / Net Income / Gross Income
+✅ Tax Amount / Tax Due / Refund Amount
+✅ Payment Amount / Amount Due
+✅ Net Worth / Assets / Liabilities
+
+WHAT NOT TO CONVERT (minor values):
+❌ Interest rates (percentages)
+❌ Transaction fees (unless significant)
+❌ Individual small transactions
+❌ Reference numbers that look like amounts
+"""
+
             # Determine page format
             page_format = getattr(request, 'page_format', 'letter')
             if page_format == 'a4':
@@ -6999,7 +7065,7 @@ At the very end of the translation content (but inside the HTML body), add the f
 <p style="text-align: center; font-weight: bold; margin-top: 20px;">[END OF TRANSLATION]</p>
 
 This marker must appear AFTER all translated content but BEFORE the closing body/html tags.
-{additional_instructions}"""
+{currency_conversion_instructions}{additional_instructions}"""
 
             user_message = f"Translate this {request.document_type} document to professional HTML format:\n\n{request.text}"
 

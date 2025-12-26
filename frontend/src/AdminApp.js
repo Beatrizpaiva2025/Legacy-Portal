@@ -1725,6 +1725,123 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
+  // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
+  const [translatorNoteEnabled, setTranslatorNoteEnabled] = useState(false);
+  const [translatorNoteSettings, setTranslatorNoteSettings] = useState({
+    sourceCurrency: 'BRL',
+    targetCurrency: 'USD',
+    exchangeRate: '',
+    rateDate: new Date().toISOString().split('T')[0],
+    rateSource: 'xe.com',
+    convertValues: true,
+    customNote: ''
+  });
+  const [fetchingRate, setFetchingRate] = useState(false);
+
+  // Currency data
+  const CURRENCIES = {
+    BRL: { name: 'Brazilian Real', symbol: 'R$', country: 'Brazil', flag: '🇧🇷' },
+    USD: { name: 'US Dollar', symbol: '$', country: 'USA', flag: '🇺🇸' },
+    CAD: { name: 'Canadian Dollar', symbol: 'CA$', country: 'Canada', flag: '🇨🇦' },
+    EUR: { name: 'Euro', symbol: '€', country: 'Eurozone', flag: '🇪🇺' },
+    GBP: { name: 'British Pound', symbol: '£', country: 'UK', flag: '🇬🇧' },
+    MXN: { name: 'Mexican Peso', symbol: '$', country: 'Mexico', flag: '🇲🇽' },
+    ARS: { name: 'Argentine Peso', symbol: '$', country: 'Argentina', flag: '🇦🇷' },
+    CLP: { name: 'Chilean Peso', symbol: '$', country: 'Chile', flag: '🇨🇱' },
+    COP: { name: 'Colombian Peso', symbol: '$', country: 'Colombia', flag: '🇨🇴' },
+    PEN: { name: 'Peruvian Sol', symbol: 'S/', country: 'Peru', flag: '🇵🇪' },
+    NOK: { name: 'Norwegian Krone', symbol: 'kr', country: 'Norway', flag: '🇳🇴' },
+    SEK: { name: 'Swedish Krona', symbol: 'kr', country: 'Sweden', flag: '🇸🇪' },
+    DKK: { name: 'Danish Krone', symbol: 'kr', country: 'Denmark', flag: '🇩🇰' },
+    CHF: { name: 'Swiss Franc', symbol: 'CHF', country: 'Switzerland', flag: '🇨🇭' },
+    JPY: { name: 'Japanese Yen', symbol: '¥', country: 'Japan', flag: '🇯🇵' },
+    CNY: { name: 'Chinese Yuan', symbol: '¥', country: 'China', flag: '🇨🇳' },
+    KRW: { name: 'South Korean Won', symbol: '₩', country: 'South Korea', flag: '🇰🇷' },
+    INR: { name: 'Indian Rupee', symbol: '₹', country: 'India', flag: '🇮🇳' },
+    AUD: { name: 'Australian Dollar', symbol: 'A$', country: 'Australia', flag: '🇦🇺' },
+    NZD: { name: 'New Zealand Dollar', symbol: 'NZ$', country: 'New Zealand', flag: '🇳🇿' },
+    ZAR: { name: 'South African Rand', symbol: 'R', country: 'South Africa', flag: '🇿🇦' },
+    RUB: { name: 'Russian Ruble', symbol: '₽', country: 'Russia', flag: '🇷🇺' },
+    TRY: { name: 'Turkish Lira', symbol: '₺', country: 'Turkey', flag: '🇹🇷' },
+    PLN: { name: 'Polish Zloty', symbol: 'zł', country: 'Poland', flag: '🇵🇱' },
+    CZK: { name: 'Czech Koruna', symbol: 'Kč', country: 'Czech Republic', flag: '🇨🇿' },
+    HUF: { name: 'Hungarian Forint', symbol: 'Ft', country: 'Hungary', flag: '🇭🇺' },
+    ILS: { name: 'Israeli Shekel', symbol: '₪', country: 'Israel', flag: '🇮🇱' },
+    SGD: { name: 'Singapore Dollar', symbol: 'S$', country: 'Singapore', flag: '🇸🇬' },
+    HKD: { name: 'Hong Kong Dollar', symbol: 'HK$', country: 'Hong Kong', flag: '🇭🇰' },
+    PHP: { name: 'Philippine Peso', symbol: '₱', country: 'Philippines', flag: '🇵🇭' },
+    THB: { name: 'Thai Baht', symbol: '฿', country: 'Thailand', flag: '🇹🇭' },
+    MYR: { name: 'Malaysian Ringgit', symbol: 'RM', country: 'Malaysia', flag: '🇲🇾' },
+    IDR: { name: 'Indonesian Rupiah', symbol: 'Rp', country: 'Indonesia', flag: '🇮🇩' },
+    VND: { name: 'Vietnamese Dong', symbol: '₫', country: 'Vietnam', flag: '🇻🇳' },
+    AED: { name: 'UAE Dirham', symbol: 'د.إ', country: 'UAE', flag: '🇦🇪' },
+    SAR: { name: 'Saudi Riyal', symbol: '﷼', country: 'Saudi Arabia', flag: '🇸🇦' },
+    EGP: { name: 'Egyptian Pound', symbol: '£', country: 'Egypt', flag: '🇪🇬' },
+    NGN: { name: 'Nigerian Naira', symbol: '₦', country: 'Nigeria', flag: '🇳🇬' },
+    KES: { name: 'Kenyan Shilling', symbol: 'KSh', country: 'Kenya', flag: '🇰🇪' }
+  };
+
+  // Rate sources
+  const RATE_SOURCES = [
+    { id: 'xe.com', name: 'XE.com', url: 'https://www.xe.com/currencyconverter/' },
+    { id: 'google', name: 'Google Finance', url: 'https://www.google.com/finance/' },
+    { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.bloomberg.com/markets/currencies' },
+    { id: 'businessinsider', name: 'Business Insider', url: 'https://markets.businessinsider.com/currencies' },
+    { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
+  ];
+
+  // Fetch exchange rate from API
+  const fetchExchangeRate = async () => {
+    setFetchingRate(true);
+    try {
+      // Using Frankfurter API (free, ECB rates)
+      const response = await fetch(
+        `https://api.frankfurter.app/latest?from=${translatorNoteSettings.targetCurrency}&to=${translatorNoteSettings.sourceCurrency}`
+      );
+      const data = await response.json();
+      if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
+        setTranslatorNoteSettings(prev => ({
+          ...prev,
+          exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
+          rateDate: data.date || new Date().toISOString().split('T')[0]
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error);
+      alert('Could not fetch exchange rate. Please enter manually.');
+    } finally {
+      setFetchingRate(false);
+    }
+  };
+
+  // Generate Translator's Note text
+  const generateTranslatorNote = () => {
+    const src = CURRENCIES[translatorNoteSettings.sourceCurrency];
+    const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
+    const rate = translatorNoteSettings.exchangeRate;
+    const date = new Date(translatorNoteSettings.rateDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const source = RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource);
+
+    // Format: NOK 10.19 ≈ US$1.00
+    const noteText = `[TRANSLATOR'S NOTE: Converting ${src.name} into ${tgt.name} (Source: ${source?.url || 'https://www.xe.com/currencyconverter/'}), on this date ${date}, ${translatorNoteSettings.sourceCurrency} ${src.symbol}${rate} is equivalent (≈) to ${tgt.symbol}1.00 (One ${tgt.name}) / the corresponding total available balance in ${tgt.currency || 'dollar'} is between brackets [ ] below].`;
+
+    return noteText;
+  };
+
+  // Convert a value from source to target currency
+  const convertCurrencyValue = (value, addBrackets = true) => {
+    if (!translatorNoteSettings.exchangeRate || !value) return value;
+    const numValue = parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+    if (isNaN(numValue)) return value;
+    const converted = numValue / parseFloat(translatorNoteSettings.exchangeRate);
+    const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
+    const formattedConverted = converted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (addBrackets) {
+      return `[<strong>${tgt.symbol}${formattedConverted}</strong>]`;
+    }
+    return `${tgt.symbol}${formattedConverted}`;
+  };
+
   // Logo states (base64)
   const [logoLeft, setLogoLeft] = useState('');
   const [logoRight, setLogoRight] = useState('');
@@ -2744,6 +2861,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Find corresponding original image for this file
         const originalImage = originalImages.find(img => img.filename === ocrResult.filename);
 
+        // Build translator note settings for value conversion
+        const translatorNoteData = translatorNoteEnabled ? {
+          enabled: true,
+          source_currency: translatorNoteSettings.sourceCurrency,
+          target_currency: translatorNoteSettings.targetCurrency,
+          exchange_rate: parseFloat(translatorNoteSettings.exchangeRate) || 0,
+          rate_date: translatorNoteSettings.rateDate,
+          rate_source: RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource)?.url || '',
+          convert_values: translatorNoteSettings.convertValues,
+          source_currency_symbol: CURRENCIES[translatorNoteSettings.sourceCurrency]?.symbol || '',
+          target_currency_symbol: CURRENCIES[translatorNoteSettings.targetCurrency]?.symbol || ''
+        } : null;
+
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
           text: ocrResult.text,
           source_language: sourceLanguage,
@@ -2755,14 +2885,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           preserve_layout: true,
           page_format: pageFormat,
           // Send original image so Claude can see the visual layout
-          original_image: originalImage ? originalImage.data : null
+          original_image: originalImage ? originalImage.data : null,
+          // Translator's note for financial documents
+          translator_note: translatorNoteData
         });
 
         if (response.data.status === 'success' || response.data.translation) {
+          // Get the translation and optionally prepend translator's note
+          let finalTranslation = response.data.translation;
+
+          // Add translator's note at the beginning of each file (not page)
+          if (translatorNoteEnabled && translatorNoteSettings.exchangeRate) {
+            const noteHTML = `
+<div style="background-color: #fffbeb; border: 2px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-style: italic;">
+  <strong style="color: #b45309;">[TRANSLATOR'S NOTE:</strong> ${generateTranslatorNote().replace('[TRANSLATOR\'S NOTE:', '').replace(/\]$/, '')}<strong style="color: #b45309;">]</strong>
+</div>`;
+
+            // Insert the note after the opening body tag or at the start
+            if (finalTranslation.includes('<body>')) {
+              finalTranslation = finalTranslation.replace('<body>', '<body>' + noteHTML);
+            } else if (finalTranslation.includes('<body')) {
+              // Handle <body class="..."> or similar
+              finalTranslation = finalTranslation.replace(/(<body[^>]*>)/, '$1' + noteHTML);
+            } else {
+              // Just prepend if no body tag
+              finalTranslation = noteHTML + finalTranslation;
+            }
+          }
+
           setTranslationResults(prev => [...prev, {
             filename: ocrResult.filename,
             originalText: ocrResult.text,
-            translatedText: response.data.translation
+            translatedText: finalTranslation
           }]);
         } else {
           throw new Error(response.data.error || response.data.detail || 'Translation failed');
@@ -4284,6 +4438,158 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Translator's Note for Financial Documents */}
+          <div className="bg-white rounded shadow">
+            <button
+              onClick={() => setTranslatorNoteEnabled(!translatorNoteEnabled)}
+              className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
+            >
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">💱</span>
+                <div>
+                  <span className="text-sm font-medium">Translator's Note (Financial Documents)</span>
+                  <p className="text-[10px] text-gray-500">Currency conversion for bank statements, tax returns</p>
+                </div>
+                {translatorNoteEnabled && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Active</span>}
+              </div>
+              <span className="text-gray-400">{translatorNoteEnabled ? '▼' : '▶'}</span>
+            </button>
+
+            {translatorNoteEnabled && (
+              <div className="p-4 border-t space-y-4">
+                {/* Currency Selection */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Source Currency (Document)</label>
+                    <select
+                      value={translatorNoteSettings.sourceCurrency}
+                      onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, sourceCurrency: e.target.value, exchangeRate: ''})}
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    >
+                      {Object.entries(CURRENCIES).map(([code, curr]) => (
+                        <option key={code} value={code}>{curr.flag} {code} - {curr.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Target Currency (Translation)</label>
+                    <select
+                      value={translatorNoteSettings.targetCurrency}
+                      onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, targetCurrency: e.target.value, exchangeRate: ''})}
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    >
+                      {Object.entries(CURRENCIES).map(([code, curr]) => (
+                        <option key={code} value={code}>{curr.flag} {code} - {curr.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Exchange Rate */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Exchange Rate ({translatorNoteSettings.sourceCurrency} per 1 {translatorNoteSettings.targetCurrency})
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.0001"
+                        value={translatorNoteSettings.exchangeRate}
+                        onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, exchangeRate: e.target.value})}
+                        placeholder="Ex: 5.1234"
+                        className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                      />
+                      <button
+                        onClick={fetchExchangeRate}
+                        disabled={fetchingRate}
+                        className="px-3 py-2 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:bg-gray-400 whitespace-nowrap"
+                      >
+                        {fetchingRate ? '⏳' : '🔄'} Fetch Rate
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Rate Date</label>
+                    <input
+                      type="date"
+                      value={translatorNoteSettings.rateDate}
+                      onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, rateDate: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Rate Source */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Rate Source (for citation)</label>
+                  <select
+                    value={translatorNoteSettings.rateSource}
+                    onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, rateSource: e.target.value})}
+                    className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  >
+                    {RATE_SOURCES.map(source => (
+                      <option key={source.id} value={source.id}>{source.name} - {source.url}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Convert Values Toggle */}
+                <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="convertValues"
+                    checked={translatorNoteSettings.convertValues}
+                    onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, convertValues: e.target.checked})}
+                    className="w-4 h-4 text-teal-600 rounded"
+                  />
+                  <label htmlFor="convertValues" className="text-xs text-yellow-800">
+                    <strong>Convert main values in document</strong> (totals, subtotals, balances, loans, credits)
+                    <br />
+                    <span className="text-yellow-600">Format: 3,113,492.10 [<strong>CA$807,126.92</strong>]</span>
+                  </label>
+                </div>
+
+                {/* Preview Note */}
+                {translatorNoteSettings.exchangeRate && (
+                  <div className="p-3 bg-gray-50 border rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-700">📝 Preview Translator's Note:</span>
+                      <button
+                        onClick={() => {
+                          const note = generateTranslatorNote();
+                          navigator.clipboard.writeText(note);
+                          alert('Note copied to clipboard!');
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        📋 Copy
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-600 italic leading-relaxed">
+                      {generateTranslatorNote()}
+                    </p>
+
+                    {/* Example Conversion */}
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <span className="text-[10px] font-medium text-gray-500">Example Conversion:</span>
+                      <div className="mt-1 text-sm">
+                        <span className="text-gray-700">{CURRENCIES[translatorNoteSettings.sourceCurrency].symbol}1,000.00 </span>
+                        <span dangerouslySetInnerHTML={{ __html: convertCurrencyValue(1000 * parseFloat(translatorNoteSettings.exchangeRate || 1)) }} className="text-green-700" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Info */}
+                <div className="text-[10px] text-gray-500 bg-blue-50 p-2 rounded">
+                  <strong>💡 How it works:</strong> When enabled, the translator's note will be added at the beginning of each FILE (not page).
+                  If "Convert values" is checked, main financial values will show converted amounts in brackets.
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Instruction Modal */}
