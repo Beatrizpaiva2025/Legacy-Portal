@@ -4652,7 +4652,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Exchange Rate ({translatorNoteSettings.sourceCurrency} per 1 {translatorNoteSettings.targetCurrency})
+                      1 {translatorNoteSettings.targetCurrency} ({CURRENCIES[translatorNoteSettings.targetCurrency]?.symbol}) = _____ {translatorNoteSettings.sourceCurrency} ({CURRENCIES[translatorNoteSettings.sourceCurrency]?.symbol})
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -6224,7 +6224,7 @@ tradução juramentada | certified translation`}
                         {/* Exchange Rate */}
                         <div>
                           <label className="block text-[10px] text-gray-600 mb-1">
-                            Exchange Rate ({aiPipelineConfig.sourceCurrency} per 1 {aiPipelineConfig.targetCurrency})
+                            1 {aiPipelineConfig.targetCurrency} ({CURRENCIES[aiPipelineConfig.targetCurrency]?.symbol}) = _____ {aiPipelineConfig.sourceCurrency} ({CURRENCIES[aiPipelineConfig.sourceCurrency]?.symbol})
                           </label>
                           <div className="flex gap-2">
                             <input
@@ -9002,7 +9002,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {/* Exchange Rate */}
                       <div>
                         <label className="block text-[10px] text-gray-600 mb-1">
-                          Exchange Rate ({aiPipelineQuickConfig.source_currency} per 1 {aiPipelineQuickConfig.target_currency})
+                          1 {aiPipelineQuickConfig.target_currency} ({CURRENCIES[aiPipelineQuickConfig.target_currency]?.symbol}) = _____ {aiPipelineQuickConfig.source_currency} ({CURRENCIES[aiPipelineQuickConfig.source_currency]?.symbol})
                         </label>
                         <div className="flex gap-2">
                           <input
