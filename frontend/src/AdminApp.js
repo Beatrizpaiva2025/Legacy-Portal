@@ -1697,6 +1697,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     convertCurrency: false,
     sourceCurrency: 'BRL',
     targetCurrency: 'USD',
+    exchangeRate: '',
+    rateSource: 'xe.com',
     useGlossary: true,
     customInstructions: ''
   });
@@ -6045,26 +6047,87 @@ tradução juramentada | certified translation`}
                     </label>
 
                     {aiPipelineConfig.convertCurrency && (
-                      <div className="flex gap-2 mt-2 ml-6 items-center">
-                        <select
-                          value={aiPipelineConfig.sourceCurrency}
-                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded"
-                        >
-                          {Object.entries(CURRENCIES).map(([code, curr]) => (
-                            <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
-                          ))}
-                        </select>
-                        <span className="text-gray-400">→</span>
-                        <select
-                          value={aiPipelineConfig.targetCurrency}
-                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded"
-                        >
-                          {Object.entries(CURRENCIES).map(([code, curr]) => (
-                            <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
-                          ))}
-                        </select>
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                        {/* Currency Dropdowns */}
+                        <div className="flex gap-2 items-center">
+                          <select
+                            value={aiPipelineConfig.sourceCurrency}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
+                            className="px-2 py-1.5 text-xs border rounded flex-1"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                            ))}
+                          </select>
+                          <span className="text-gray-400">→</span>
+                          <select
+                            value={aiPipelineConfig.targetCurrency}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
+                            className="px-2 py-1.5 text-xs border rounded flex-1"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Exchange Rate */}
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">
+                            Exchange Rate ({aiPipelineConfig.sourceCurrency} per 1 {aiPipelineConfig.targetCurrency})
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="0.0001"
+                              value={aiPipelineConfig.exchangeRate || ''}
+                              onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, exchangeRate: e.target.value})}
+                              placeholder="Ex: 5.54"
+                              className="flex-1 px-2 py-1.5 text-xs border rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${aiPipelineConfig.targetCurrency}`);
+                                  const data = await response.json();
+                                  if (data.rates && data.rates[aiPipelineConfig.sourceCurrency]) {
+                                    setAiPipelineConfig(prev => ({
+                                      ...prev,
+                                      exchangeRate: data.rates[aiPipelineConfig.sourceCurrency].toFixed(4)
+                                    }));
+                                  }
+                                } catch (err) {
+                                  alert('Could not fetch rate. Please enter manually.');
+                                }
+                              }}
+                              className="px-2 py-1.5 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700 whitespace-nowrap"
+                            >
+                              🔄 Fetch
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Rate Source */}
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">Rate Source (for citation)</label>
+                          <select
+                            value={aiPipelineConfig.rateSource || 'xe.com'}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, rateSource: e.target.value})}
+                            className="w-full px-2 py-1.5 text-xs border rounded"
+                          >
+                            {RATE_SOURCES.map(source => (
+                              <option key={source.id} value={source.id}>{source.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Preview */}
+                        {aiPipelineConfig.exchangeRate && (
+                          <div className="text-[10px] text-gray-600 bg-white p-2 rounded border">
+                            <strong>Preview:</strong> {CURRENCIES[aiPipelineConfig.sourceCurrency]?.symbol}1,000.00 = [<strong>{CURRENCIES[aiPipelineConfig.targetCurrency]?.symbol}{(1000 / parseFloat(aiPipelineConfig.exchangeRate)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>]
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
