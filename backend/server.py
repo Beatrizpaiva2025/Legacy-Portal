@@ -93,7 +93,10 @@ class EmailDeliveryError(Exception):
 class EmailService:
     def __init__(self):
         self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
-        self.sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+        # For production: use verified domain like "Legacy Translations <noreply@legacytranslations.com>"
+        # For testing: use "Legacy Translations <onboarding@resend.dev>"
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <onboarding@resend.dev>')
+        self.reply_to = os.environ.get('REPLY_TO_EMAIL', 'contact@legacytranslations.com')
         # Initialize Resend
         resend.api_key = self.api_key
 
@@ -104,6 +107,7 @@ class EmailService:
                 "from": self.sender_email,
                 "to": [to],
                 "subject": subject,
+                "reply_to": self.reply_to,
             }
             if content_type == "html":
                 params["html"] = content
@@ -128,6 +132,7 @@ class EmailService:
                 "from": self.sender_email,
                 "to": [to],
                 "subject": subject,
+                "reply_to": self.reply_to,
                 "html": content,
                 "attachments": [
                     {
@@ -4383,7 +4388,10 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
             logger.info(f"Saved {len(quote_data.files)} documents for quote {order_number}")
 
         # Send quote email to client
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+        # Use main website domain for better email deliverability
+        website_url = "https://legacytranslations.com"
+        # Client portal URL - can be configured via environment variable
+        client_portal_url = os.environ.get('CLIENT_PORTAL_URL', 'https://legacytranslations.com/client-portal')
         turnaround_display = "2-3 business days"
 
         service_display = "Certified Translation" if quote_data.service_type == "certified" else "Standard Translation"
@@ -4391,48 +4399,58 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
         subject = f"Your Translation Quote - {order_number}"
         content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px; margin-bottom: 20px;">
-            <h2 style="color: #0d9488;">Your Translation Quote</h2>
-            <p>Hello {quote_data.client_name},</p>
-            <p>Thank you for your interest in our translation services. Here is your quote:</p>
-
-            <div style="background: #f3f4f6; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Quote Number:</strong> {order_number}</p>
-                <p><strong>Service:</strong> {service_display}</p>
-                <p><strong>Languages:</strong> {quote_data.translate_from} → {quote_data.translate_to}</p>
-                <p><strong>Pages:</strong> {quote_data.pages}</p>
-                <p><strong>Turnaround:</strong> {turnaround_display}</p>
-                <p style="font-size: 24px; color: #0d9488; font-weight: bold;">Total: ${quote_data.total_price:.2f}</p>
+            <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #0d9488, #14b8a6); border-radius: 10px 10px 0 0;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 180px;">
             </div>
+            <div style="padding: 30px; background: #ffffff; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+                <h1 style="color: #0d9488; margin: 0 0 20px 0; font-size: 24px;">Your Translation Quote 📋</h1>
+                <p style="color: #374151; font-size: 16px; line-height: 1.6;">Hello {quote_data.client_name},</p>
+                <p style="color: #374151; font-size: 16px; line-height: 1.6;">Thank you for your interest in our translation services. Here is your quote:</p>
 
-            <h3 style="color: #0d9488; margin-top: 30px;">Payment Options</h3>
-
-            <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bbf7d0;">
-                <p style="margin: 0 0 15px 0;"><strong>Option 1: Zelle (Instant)</strong></p>
-                <p style="margin: 0; color: #666;">Send to: <strong>857-208-1139</strong></p>
-                <p style="margin: 0; color: #666;">Business Name: <strong>Legacy Translations Inc</strong></p>
-            </div>
-
-            <div style="background: #eff6ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bfdbfe;">
-                <p style="margin: 0 0 15px 0;"><strong>Option 2: Venmo</strong></p>
-                <p style="margin: 0; color: #666;">Username: <strong>@legacytranslations</strong></p>
-            </div>
-
-            <div style="background: #faf5ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #e9d5ff;">
-                <p style="margin: 0 0 15px 0;"><strong>Option 3: Credit/Debit Card</strong></p>
-                <p style="margin: 0; color: #666;">Click the button below to pay securely online:</p>
-                <div style="text-align: center; margin-top: 15px;">
-                    <a href="{frontend_url}/#/customer" style="background: #7c3aed; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pay with Card</a>
+                <div style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); padding: 20px; border-radius: 8px; margin: 25px 0;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr><td style="padding: 8px 0; color: #6b7280;">Quote Number:</td><td style="padding: 8px 0; font-weight: bold; color: #0d9488;">{order_number}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #6b7280;">Service:</td><td style="padding: 8px 0; font-weight: 600; color: #374151;">{service_display}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #6b7280;">Languages:</td><td style="padding: 8px 0; font-weight: 600; color: #374151;">{quote_data.translate_from} → {quote_data.translate_to}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #6b7280;">Pages:</td><td style="padding: 8px 0; font-weight: 600; color: #374151;">{quote_data.pages}</td></tr>
+                        <tr><td style="padding: 8px 0; color: #6b7280;">Turnaround:</td><td style="padding: 8px 0; font-weight: 600; color: #374151;">{turnaround_display}</td></tr>
+                    </table>
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 2px solid #0d9488; text-align: center;">
+                        <span style="font-size: 28px; color: #0d9488; font-weight: bold;">Total: ${quote_data.total_price:.2f}</span>
+                    </div>
                 </div>
+
+                <h3 style="color: #0d9488; margin: 25px 0 15px 0;">💳 Payment Options</h3>
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <div style="flex: 1; min-width: 180px; background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                        <p style="margin: 0 0 8px 0; font-weight: bold; color: #166534;">Zelle (Preferred)</p>
+                        <p style="margin: 0; color: #666; font-size: 14px;">857-208-1139</p>
+                        <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations Inc</p>
+                    </div>
+                    <div style="flex: 1; min-width: 180px; background: #eff6ff; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                        <p style="margin: 0 0 8px 0; font-weight: bold; color: #1e40af;">Venmo</p>
+                        <p style="margin: 0; color: #666; font-size: 14px;">@legacytranslations</p>
+                    </div>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px; background: #fef3c7; padding: 12px; border-radius: 6px; margin: 15px 0;">
+                    <strong>⚠️ Important:</strong> Please include quote number <strong style="color: #0d9488;">{order_number}</strong> in the payment memo.
+                </p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <p style="color: #6b7280; margin-bottom: 15px;">Pay by card or see all payment options:</p>
+                    <a href="{client_portal_url}" style="display: inline-block; background: #0d9488; color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Access Client Portal</a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 14px;">This quote is valid for 30 days. If you have any questions, feel free to reply to this email or contact us at <a href="mailto:contact@legacytranslations.com" style="color: #0d9488;">contact@legacytranslations.com</a></p>
+
+                <p style="color: #374151; margin-top: 25px;">Best regards,<br><strong>Legacy Translations Team</strong></p>
             </div>
-
-            <p style="color: #666; font-size: 14px; margin-top: 20px;">
-                <strong>Important:</strong> Please include your quote number <strong>{order_number}</strong> in the payment reference/memo.
-            </p>
-
-            <p style="color: #666; font-size: 14px;">This quote is valid for 30 days. If you have any questions, please reply to this email.</p>
-
-            <p>Best regards,<br>Legacy Translations Team</p>
+            <div style="padding: 20px; background: #f9fafb; text-align: center; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
+                <p style="color: #9ca3af; font-size: 12px; margin: 0;">Legacy Translations Inc | +1(857)316-7770</p>
+                <p style="color: #9ca3af; font-size: 12px; margin: 5px 0 0 0;">© 2024 Legacy Translations. All rights reserved.</p>
+            </div>
         </div>
         """
 
@@ -4485,6 +4503,8 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "Este orçamento é válido por 30 dias."
             payment_title = "Formas de Pagamento"
             thanks = "Obrigado por escolher Legacy Translation Services!"
+            portal_text = "Pague com cartão ou veja todas as opções:"
+            portal_button = "Acessar Portal do Cliente"
         elif lang == "es":
             subject = f"Su Presupuesto de Traducción - {request.quote_number}"
             greeting = f"Hola {request.client_name},"
@@ -4497,6 +4517,8 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "Este presupuesto es válido por 30 días."
             payment_title = "Opciones de Pago"
             thanks = "¡Gracias por elegir Legacy Translation Services!"
+            portal_text = "Pague con tarjeta o vea todas las opciones:"
+            portal_button = "Acceder al Portal del Cliente"
         else:  # English default
             subject = f"Your Translation Quote - {request.quote_number}"
             greeting = f"Hello {request.client_name},"
@@ -4509,6 +4531,11 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
             valid_text = "This quote is valid for 30 days."
             payment_title = "Payment Options"
             thanks = "Thank you for choosing Legacy Translation Services!"
+            portal_text = "Pay by card or see all payment options:"
+            portal_button = "Access Client Portal"
+
+        # Client Portal URL
+        portal_url = os.environ.get('CLIENT_PORTAL_URL', 'https://legacytranslations.com/client-portal')
 
         # Get values from quote_data
         doc_type = qd.get("documentType", qd.get("docType", "Translation"))
@@ -4572,12 +4599,16 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
                     </div>
                 </div>
 
+                <div style="text-align: center; margin: 25px 0;">
+                    <p style="color: #666; margin-bottom: 12px; font-size: 14px;">{portal_text}</p>
+                    <a href="{portal_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">{portal_button}</a>
+                </div>
+
                 <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
                     <p style="color: #0d9488; font-weight: bold;">{thanks}</p>
                     <p style="color: #666; font-size: 14px;">
                         Legacy Translation Services<br>
-                        legacytranslations.com | +1(857)316-7770<br>
-                        www.legacytranslation.com
+                        legacytranslations.com | +1(857)316-7770
                     </p>
                 </div>
             </div>
