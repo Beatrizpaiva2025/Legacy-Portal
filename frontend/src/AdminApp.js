@@ -1790,6 +1790,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
   ];
 
+  // Language to Currency mapping (for auto-fill)
+  const LANGUAGE_TO_CURRENCY = {
+    'Portuguese': 'BRL',
+    'English': 'USD',
+    'Spanish': 'MXN',
+    'French': 'EUR',
+    'German': 'EUR',
+    'Italian': 'EUR',
+    'Dutch': 'EUR',
+    'Norwegian': 'NOK',
+    'Swedish': 'SEK',
+    'Danish': 'DKK',
+    'Finnish': 'EUR',
+    'Japanese': 'JPY',
+    'Chinese': 'CNY',
+    'Korean': 'KRW',
+    'Russian': 'RUB',
+    'Arabic': 'AED',
+    'Hebrew': 'ILS',
+    'Turkish': 'TRY',
+    'Polish': 'PLN',
+    'Czech': 'CZK',
+    'Hungarian': 'HUF',
+    'Thai': 'THB',
+    'Vietnamese': 'VND',
+    'Indonesian': 'IDR',
+    'Malay': 'MYR',
+    'Hindi': 'INR',
+    'Greek': 'EUR',
+    'Romanian': 'EUR',
+    'Ukrainian': 'EUR',
+    'Bulgarian': 'EUR'
+  };
+
+  // Get currency from language
+  const getCurrencyFromLanguage = (language) => {
+    return LANGUAGE_TO_CURRENCY[language] || 'USD';
+  };
+
   // Fetch exchange rate from API (ExchangeRate-API for real-time rates)
   const fetchExchangeRate = async () => {
     setFetchingRate(true);
@@ -1959,6 +1998,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       if (selectedOrder.translate_from) setSourceLanguage(selectedOrder.translate_from);
       if (selectedOrder.translate_to) setTargetLanguage(selectedOrder.translate_to);
 
+      // Auto-fill currencies based on languages
+      const srcCurrency = getCurrencyFromLanguage(selectedOrder.translate_from);
+      const tgtCurrency = getCurrencyFromLanguage(selectedOrder.translate_to);
+      setAiPipelineConfig(prev => ({
+        ...prev,
+        sourceCurrency: srcCurrency,
+        targetCurrency: tgtCurrency
+      }));
+      setTranslatorNoteSettings(prev => ({
+        ...prev,
+        sourceCurrency: srcCurrency,
+        targetCurrency: tgtCurrency,
+        exchangeRate: ''
+      }));
+
       // Set translator if assigned
       if (selectedOrder.assigned_translator) {
         setSelectedTranslator(selectedOrder.assigned_translator);
@@ -1979,6 +2033,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('start');
     }
   }, [selectedOrder]);
+
+  // Auto-update currencies when source/target language changes
+  useEffect(() => {
+    if (sourceLanguage) {
+      const srcCurrency = getCurrencyFromLanguage(sourceLanguage);
+      setAiPipelineConfig(prev => ({ ...prev, sourceCurrency: srcCurrency }));
+      setTranslatorNoteSettings(prev => ({ ...prev, sourceCurrency: srcCurrency, exchangeRate: '' }));
+    }
+  }, [sourceLanguage]);
+
+  useEffect(() => {
+    if (targetLanguage) {
+      const tgtCurrency = getCurrencyFromLanguage(targetLanguage);
+      setAiPipelineConfig(prev => ({ ...prev, targetCurrency: tgtCurrency }));
+      setTranslatorNoteSettings(prev => ({ ...prev, targetCurrency: tgtCurrency, exchangeRate: '' }));
+    }
+  }, [targetLanguage]);
 
   // Close project menu when clicking outside
   useEffect(() => {
@@ -5974,16 +6045,15 @@ tradução juramentada | certified translation`}
                     </label>
 
                     {aiPipelineConfig.convertCurrency && (
-                      <div className="flex gap-2 mt-2 ml-6">
+                      <div className="flex gap-2 mt-2 ml-6 items-center">
                         <select
                           value={aiPipelineConfig.sourceCurrency}
                           onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
                           className="px-2 py-1 text-xs border rounded"
                         >
-                          <option value="BRL">BRL (R$)</option>
-                          <option value="EUR">EUR (€)</option>
-                          <option value="GBP">GBP (£)</option>
-                          <option value="JPY">JPY (¥)</option>
+                          {Object.entries(CURRENCIES).map(([code, curr]) => (
+                            <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                          ))}
                         </select>
                         <span className="text-gray-400">→</span>
                         <select
@@ -5991,9 +6061,9 @@ tradução juramentada | certified translation`}
                           onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
                           className="px-2 py-1 text-xs border rounded"
                         >
-                          <option value="USD">USD ($)</option>
-                          <option value="BRL">BRL (R$)</option>
-                          <option value="EUR">EUR (€)</option>
+                          {Object.entries(CURRENCIES).map(([code, curr]) => (
+                            <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                          ))}
                         </select>
                       </div>
                     )}
