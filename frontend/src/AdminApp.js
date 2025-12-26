@@ -2799,22 +2799,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    // Need OCR text first
+    // Check for available text (OCR or translation results)
     let originalText = '';
+    let useQuickStart = false;
+
     if (ocrResults.length > 0) {
       originalText = ocrResults.map(r => r.text).join('\n\n--- PAGE BREAK ---\n\n');
+    } else if (translationResults.length > 0) {
+      originalText = translationResults.map(r => r.translatedText).join('\n\n');
     } else if (originalImages.length > 0) {
-      // Try to get text from translation results if available
-      if (translationResults.length > 0) {
-        originalText = translationResults.map(r => r.translatedText).join('\n\n');
-      } else {
-        alert('Please run OCR or translate the document first to extract text.');
-        return;
-      }
+      // We have an image loaded - can send it directly
+      originalText = ''; // Backend will extract text from image
+    } else {
+      // No document loaded - use quick_start to fetch from order
+      useQuickStart = true;
     }
 
     setAiPipelineLoading(true);
-    setProcessingStatus('🤖 Starting AI Translation Pipeline...');
+    setProcessingStatus(useQuickStart
+      ? '🤖 Iniciando AI Pipeline... Buscando documentos do projeto...'
+      : '🤖 Starting AI Translation Pipeline...');
 
     try {
       const response = await axios.post(`${API}/admin/ai-pipeline/start?admin_key=${adminKey}`, {
@@ -2831,7 +2835,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         target_currency: aiPipelineConfig.targetCurrency,
         page_format: pageFormat,
         use_glossary: aiPipelineConfig.useGlossary,
-        custom_instructions: aiPipelineConfig.customInstructions
+        custom_instructions: aiPipelineConfig.customInstructions,
+        quick_start: useQuickStart
       });
 
       setAiPipeline(response.data);
@@ -2903,6 +2908,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       fetchAIPipelineStatus();
     }
   }, [selectedOrderId]);
+
+  // Auto-refresh pipeline status when processing
+  useEffect(() => {
+    let intervalId = null;
+
+    // Poll every 5 seconds when pipeline is in progress
+    if (aiPipeline && aiPipeline.overall_status === 'in_progress') {
+      intervalId = setInterval(() => {
+        fetchAIPipelineStatus();
+      }, 5000);
+    }
+
+    // Cleanup on unmount or when status changes
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [aiPipeline?.overall_status, selectedOrderId]);
+
+  // Notification when pipeline needs review
+  useEffect(() => {
+    if (aiPipeline?.overall_status === 'awaiting_review' || aiPipeline?.current_stage === 'human_review') {
+      // Browser notification (if permitted)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🔔 Tradução pronta para revisão!', {
+          body: `Projeto ${aiPipeline.order_number} aguarda sua revisão`,
+          icon: '🤖'
+        });
+      }
+      // Visual notification - scroll to review section
+      setProcessingStatus('🔔 ATENÇÃO: Tradução pronta para revisão! Clique em "Approve & Continue" ou "Edit" para continuar.');
+    }
+  }, [aiPipeline?.overall_status, aiPipeline?.current_stage]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Direct translation - Claude sees image directly, no OCR needed
   const handleDirectTranslate = async () => {
@@ -3999,13 +4043,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t ${
+            className={`px-4 py-2 text-xs font-medium rounded-t relative ${
               activeSubTab === tab.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            } ${tab.id === 'ai-pipeline' && aiPipeline?.overall_status === 'awaiting_review' ? 'ring-2 ring-yellow-400 ring-offset-1' : ''}`}
           >
             {tab.icon} {tab.label}
+            {/* AI Pipeline status badge */}
+            {tab.id === 'ai-pipeline' && aiPipeline && (
+              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                aiPipeline.overall_status === 'in_progress' ? 'bg-blue-500 text-white animate-pulse' :
+                aiPipeline.overall_status === 'awaiting_review' ? 'bg-yellow-500 text-black animate-bounce' :
+                aiPipeline.overall_status === 'completed' ? 'bg-green-500 text-white' :
+                aiPipeline.overall_status === 'failed' ? 'bg-red-500 text-white' :
+                'bg-gray-400 text-white'
+              }`}>
+                {aiPipeline.overall_status === 'in_progress' ? '⏳' :
+                 aiPipeline.overall_status === 'awaiting_review' ? '👀' :
+                 aiPipeline.overall_status === 'completed' ? '✓' :
+                 aiPipeline.overall_status === 'failed' ? '✗' : '•'}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -5902,13 +5961,24 @@ tradução juramentada | certified translation`}
 
                         {/* Approval Buttons */}
                         {(aiPipeline.overall_status === 'awaiting_review' || aiPipeline.current_stage === 'human_review') && (
+                          <>
+                          {/* Prominent Review Notice */}
+                          <div className="mb-4 p-4 bg-yellow-100 border-2 border-yellow-400 rounded-lg animate-pulse">
+                            <div className="flex items-center gap-3">
+                              <div className="text-3xl">👀</div>
+                              <div>
+                                <h4 className="text-sm font-bold text-yellow-800">SUA REVISÃO É NECESSÁRIA!</h4>
+                                <p className="text-xs text-yellow-700">O pipeline completou o processamento automático. Revise a tradução abaixo e aprove ou edite.</p>
+                              </div>
+                            </div>
+                          </div>
                           <div className="flex gap-2">
                             <button
                               onClick={() => approveAIPipelineStage(aiPipeline.current_stage, 'approve')}
                               disabled={aiPipelineLoading}
-                              className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-400"
+                              className="flex-1 px-4 py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-400 shadow-lg"
                             >
-                              ✓ Approve & Continue
+                              ✓ Aprovar e Continuar
                             </button>
                             <button
                               onClick={() => {
@@ -5920,9 +5990,10 @@ tradução juramentada | certified translation`}
                               }}
                               className="px-4 py-2 bg-yellow-600 text-white text-sm font-bold rounded hover:bg-yellow-700"
                             >
-                              ✏️ Edit
+                              ✏️ Editar
                             </button>
                           </div>
+                          </>
                         )}
                       </div>
                     )}
@@ -5983,17 +6054,20 @@ tradução juramentada | certified translation`}
 
                   <button
                     onClick={startAIPipeline}
-                    disabled={aiPipelineLoading || !claudeApiKey || originalImages.length === 0}
+                    disabled={aiPipelineLoading || !claudeApiKey}
                     className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed shadow-lg"
                   >
-                    {aiPipelineLoading ? '⏳ Processing...' : '🚀 Start AI Pipeline'}
+                    {aiPipelineLoading ? '⏳ Processando...' : '🚀 Iniciar AI Pipeline'}
                   </button>
 
                   {!claudeApiKey && (
-                    <p className="text-[10px] text-red-500 mt-2">⚠️ Please configure your API Key in the START tab</p>
+                    <p className="text-[10px] text-red-500 mt-2">⚠️ Configure sua API Key na aba START</p>
                   )}
-                  {originalImages.length === 0 && (
-                    <p className="text-[10px] text-red-500 mt-1">⚠️ Please upload a document first</p>
+                  {originalImages.length === 0 && selectedProjectFiles.length > 0 && (
+                    <p className="text-[10px] text-blue-600 mt-1">📂 O pipeline irá buscar automaticamente os documentos do projeto</p>
+                  )}
+                  {originalImages.length === 0 && selectedProjectFiles.length === 0 && (
+                    <p className="text-[10px] text-yellow-600 mt-1">⚠️ Selecione um projeto com documentos na aba START</p>
                   )}
                 </div>
               )}
