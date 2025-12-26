@@ -963,9 +963,20 @@ class TranslationOrderUpdate(BaseModel):
     # Assignment updates (by name - for direct assignment from dropdown)
     assigned_pm: Optional[str] = None
     assigned_translator: Optional[str] = None
-    deadline: Optional[datetime] = None
+    deadline: Optional[str] = None  # Changed to str to accept ISO string
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
+    # NEW: Additional editable fields
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+    translate_from: Optional[str] = None
+    translate_to: Optional[str] = None
+    service_type: Optional[str] = None
+    page_count: Optional[int] = None
+    urgency: Optional[str] = None
+    document_type: Optional[str] = None
+    total_price: Optional[float] = None
+    base_price: Optional[float] = None
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -5361,6 +5372,31 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["deadline"] = update_data.deadline
         if update_data.internal_notes is not None:
             update_dict["internal_notes"] = update_data.internal_notes
+
+        # NEW: Handle additional editable fields from project modal
+        if update_data.client_name is not None:
+            update_dict["client_name"] = update_data.client_name
+        if update_data.client_email is not None:
+            update_dict["client_email"] = update_data.client_email
+        if update_data.translate_from is not None:
+            update_dict["translate_from"] = update_data.translate_from
+        if update_data.translate_to is not None:
+            update_dict["translate_to"] = update_data.translate_to
+        if update_data.service_type is not None:
+            update_dict["service_type"] = update_data.service_type
+        if update_data.page_count is not None:
+            update_dict["page_count"] = update_data.page_count
+        if update_data.urgency is not None:
+            update_dict["urgency"] = update_data.urgency
+        if update_data.document_type is not None:
+            update_dict["document_type"] = update_data.document_type
+        if update_data.total_price is not None:
+            update_dict["total_price"] = update_data.total_price
+        if update_data.base_price is not None:
+            update_dict["base_price"] = update_data.base_price
+
+        # Add updated_at timestamp
+        update_dict["updated_at"] = datetime.utcnow()
 
         if not update_dict:
             raise HTTPException(status_code=400, detail="No update data provided")
