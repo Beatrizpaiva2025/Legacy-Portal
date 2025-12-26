@@ -2908,6 +2908,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   }, [selectedOrderId]);
 
+  // Auto-refresh pipeline status when processing
+  useEffect(() => {
+    let intervalId = null;
+
+    // Poll every 5 seconds when pipeline is in progress
+    if (aiPipeline && aiPipeline.overall_status === 'in_progress') {
+      intervalId = setInterval(() => {
+        fetchAIPipelineStatus();
+      }, 5000);
+    }
+
+    // Cleanup on unmount or when status changes
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [aiPipeline?.overall_status, selectedOrderId]);
+
+  // Notification when pipeline needs review
+  useEffect(() => {
+    if (aiPipeline?.overall_status === 'awaiting_review' || aiPipeline?.current_stage === 'human_review') {
+      // Browser notification (if permitted)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('🔔 Tradução pronta para revisão!', {
+          body: `Projeto ${aiPipeline.order_number} aguarda sua revisão`,
+          icon: '🤖'
+        });
+      }
+      // Visual notification - scroll to review section
+      setProcessingStatus('🔔 ATENÇÃO: Tradução pronta para revisão! Clique em "Approve & Continue" ou "Edit" para continuar.');
+    }
+  }, [aiPipeline?.overall_status, aiPipeline?.current_stage]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Direct translation - Claude sees image directly, no OCR needed
   const handleDirectTranslate = async () => {
     if (originalImages.length === 0) {
@@ -4003,13 +4042,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t ${
+            className={`px-4 py-2 text-xs font-medium rounded-t relative ${
               activeSubTab === tab.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            } ${tab.id === 'ai-pipeline' && aiPipeline?.overall_status === 'awaiting_review' ? 'ring-2 ring-yellow-400 ring-offset-1' : ''}`}
           >
             {tab.icon} {tab.label}
+            {/* AI Pipeline status badge */}
+            {tab.id === 'ai-pipeline' && aiPipeline && (
+              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+                aiPipeline.overall_status === 'in_progress' ? 'bg-blue-500 text-white animate-pulse' :
+                aiPipeline.overall_status === 'awaiting_review' ? 'bg-yellow-500 text-black animate-bounce' :
+                aiPipeline.overall_status === 'completed' ? 'bg-green-500 text-white' :
+                aiPipeline.overall_status === 'failed' ? 'bg-red-500 text-white' :
+                'bg-gray-400 text-white'
+              }`}>
+                {aiPipeline.overall_status === 'in_progress' ? '⏳' :
+                 aiPipeline.overall_status === 'awaiting_review' ? '👀' :
+                 aiPipeline.overall_status === 'completed' ? '✓' :
+                 aiPipeline.overall_status === 'failed' ? '✗' : '•'}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -5906,13 +5960,24 @@ tradução juramentada | certified translation`}
 
                         {/* Approval Buttons */}
                         {(aiPipeline.overall_status === 'awaiting_review' || aiPipeline.current_stage === 'human_review') && (
+                          <>
+                          {/* Prominent Review Notice */}
+                          <div className="mb-4 p-4 bg-yellow-100 border-2 border-yellow-400 rounded-lg animate-pulse">
+                            <div className="flex items-center gap-3">
+                              <div className="text-3xl">👀</div>
+                              <div>
+                                <h4 className="text-sm font-bold text-yellow-800">SUA REVISÃO É NECESSÁRIA!</h4>
+                                <p className="text-xs text-yellow-700">O pipeline completou o processamento automático. Revise a tradução abaixo e aprove ou edite.</p>
+                              </div>
+                            </div>
+                          </div>
                           <div className="flex gap-2">
                             <button
                               onClick={() => approveAIPipelineStage(aiPipeline.current_stage, 'approve')}
                               disabled={aiPipelineLoading}
-                              className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-400"
+                              className="flex-1 px-4 py-3 bg-green-600 text-white text-sm font-bold rounded hover:bg-green-700 disabled:bg-gray-400 shadow-lg"
                             >
-                              ✓ Approve & Continue
+                              ✓ Aprovar e Continuar
                             </button>
                             <button
                               onClick={() => {
@@ -5924,9 +5989,10 @@ tradução juramentada | certified translation`}
                               }}
                               className="px-4 py-2 bg-yellow-600 text-white text-sm font-bold rounded hover:bg-yellow-700"
                             >
-                              ✏️ Edit
+                              ✏️ Editar
                             </button>
                           </div>
+                          </>
                         )}
                       </div>
                     )}
