@@ -459,64 +459,28 @@ Message: ${formData.message}
           <div className="text-center mb-10">
             <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Trusted by businesses nationwide</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-16">
-            {/* ATA Logo */}
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20">
+            {/* ATA Member Logo */}
             <div className="text-center">
-              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
+              <div className="h-12 md:h-14 mx-auto mb-2 flex items-center justify-center">
                 <img
-                  src="https://www.atanet.org/wp-content/uploads/2021/01/ata-logo.png"
-                  alt="American Translators Association"
-                  className="max-h-full max-w-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
+                  src="https://i.imgur.com/QX8K9Zy.png"
+                  alt="ATA Member - American Translators Association"
+                  className="h-full object-contain"
                 />
-                <div className="hidden items-center justify-center bg-blue-900 text-white font-bold text-xl px-4 py-2 rounded">
-                  ATA
-                </div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">Corporate Member #275993</div>
+              <div className="text-xs text-gray-500">Member #275993</div>
             </div>
 
-            {/* USCIS Logo */}
+            {/* BBB Accredited Business A+ Logo */}
             <div className="text-center">
-              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
+              <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/US-USCIS-Seal.svg/200px-US-USCIS-Seal.svg.png"
-                  alt="USCIS"
-                  className="max-h-full max-w-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
+                  src="https://i.imgur.com/7vJ9YKa.png"
+                  alt="BBB Accredited Business A+"
+                  className="h-full object-contain"
                 />
-                <div className="hidden items-center justify-center">
-                  <svg className="h-14 w-14 text-blue-900" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                  </svg>
-                </div>
               </div>
-              <div className="text-sm text-gray-600 font-medium">100% Acceptance Guaranteed</div>
-            </div>
-
-            {/* BBB Logo */}
-            <div className="text-center">
-              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
-                <img
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Better_Business_Bureau.svg/200px-Better_Business_Bureau.svg.png"
-                  alt="Better Business Bureau"
-                  className="max-h-full max-w-full object-contain"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                    e.target.nextSibling.style.display = 'flex';
-                  }}
-                />
-                <div className="hidden items-center justify-center bg-blue-600 text-white font-bold text-xl px-4 py-2 rounded">
-                  BBB
-                </div>
-              </div>
-              <div className="text-sm text-gray-600 font-medium">A+ Rating</div>
             </div>
           </div>
         </div>
