@@ -459,18 +459,64 @@ Message: ${formData.message}
           <div className="text-center mb-10">
             <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Trusted by businesses nationwide</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-12">
+          <div className="flex flex-wrap justify-center items-center gap-16">
+            {/* ATA Logo */}
             <div className="text-center">
-              <img src="https://www.atanet.org/wp-content/themes/developer/images/logo.svg" alt="ATA" className="h-12 mx-auto mb-2 opacity-70" />
-              <div className="text-sm text-gray-500">Corporate Member #275993</div>
+              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
+                <img
+                  src="https://www.atanet.org/wp-content/uploads/2021/01/ata-logo.png"
+                  alt="American Translators Association"
+                  className="max-h-full max-w-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden items-center justify-center bg-blue-900 text-white font-bold text-xl px-4 py-2 rounded">
+                  ATA
+                </div>
+              </div>
+              <div className="text-sm text-gray-600 font-medium">Corporate Member #275993</div>
             </div>
+
+            {/* USCIS Logo */}
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-700">USCIS</div>
-              <div className="text-sm text-gray-500">100% Acceptance Guaranteed</div>
+              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/US-USCIS-Seal.svg/200px-US-USCIS-Seal.svg.png"
+                  alt="USCIS"
+                  className="max-h-full max-w-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden items-center justify-center">
+                  <svg className="h-14 w-14 text-blue-900" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                  </svg>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600 font-medium">100% Acceptance Guaranteed</div>
             </div>
+
+            {/* BBB Logo */}
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-700">BBB</div>
-              <div className="text-sm text-gray-500">A+ Rating</div>
+              <div className="h-16 w-40 mx-auto mb-3 flex items-center justify-center">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Better_Business_Bureau.svg/200px-Better_Business_Bureau.svg.png"
+                  alt="Better Business Bureau"
+                  className="max-h-full max-w-full object-contain"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.nextSibling.style.display = 'flex';
+                  }}
+                />
+                <div className="hidden items-center justify-center bg-blue-600 text-white font-bold text-xl px-4 py-2 rounded">
+                  BBB
+                </div>
+              </div>
+              <div className="text-sm text-gray-600 font-medium">A+ Rating</div>
             </div>
           </div>
         </div>
