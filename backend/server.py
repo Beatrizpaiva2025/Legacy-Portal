@@ -5677,6 +5677,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         has_file_attachment = order.get("translated_file") and order.get("translated_filename")
         has_html_translation = order.get("translation_html")
 
+        # Debug logging
+        logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}")
+        if has_html_translation:
+            logger.info(f"translation_html length: {len(has_html_translation)} chars")
+
         # Prepare attachment data
         attachment_data = None
         attachment_filename = None
@@ -5687,6 +5692,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             attachment_data = order["translated_file"]
             attachment_filename = order["translated_filename"]
             attachment_type = order.get("translated_file_type", "application/pdf")
+            logger.info(f"Using uploaded file: {attachment_filename}")
         elif has_html_translation:
             # Generate HTML file from translation_html
             translation_html_content = generate_translation_html_for_email(order)
@@ -5694,6 +5700,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             attachment_data = base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8')
             attachment_filename = f"Translation_{order['order_number']}.html"
             attachment_type = "text/html"
+            logger.info(f"Generated HTML attachment: {attachment_filename}, size: {len(attachment_data)} bytes")
+        else:
+            logger.warning(f"No translation content found for order {order.get('order_number')}")
 
         has_attachment = attachment_data is not None
 
@@ -5800,12 +5809,21 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "status": "success",
             "message": "Order delivered and emails sent",
             "attachment_sent": has_attachment,
+            "attachment_filename": attachment_filename,
+            "attachment_type": attachment_type,
             "pm_notified": pm_notified,
-            "bcc_sent": bcc_sent
+            "bcc_sent": bcc_sent,
+            "debug": {
+                "had_file": has_file_attachment,
+                "had_html": bool(has_html_translation),
+                "html_length": len(has_html_translation) if has_html_translation else 0
+            }
         }
 
     except Exception as e:
         logger.error(f"Failed to send delivery emails: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"status": "partial", "message": "Order marked as delivered but email sending failed", "error": str(e)}
 
 @api_router.get("/admin/orders/{order_id}/translated-document")

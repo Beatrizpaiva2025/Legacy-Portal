@@ -7065,15 +7065,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false
       });
 
-      let message = response.data.attachment_sent
-        ? 'Translation sent to client successfully! (with attachment)'
-        : 'Order marked as delivered! (email sent without attachment)';
+      let message = '✅ Email enviado para o cliente!\n\n';
+
+      if (response.data.attachment_sent) {
+        message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
+      } else {
+        message += '⚠️ Sem anexo (nenhum arquivo de tradução encontrado)\n';
+        // Show debug info if no attachment
+        if (response.data.debug) {
+          message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
+        }
+      }
 
       if (response.data.pm_notified) {
-        message += '\nPM notified.';
+        message += '\n📧 PM notificado.';
       }
       if (response.data.bcc_sent) {
-        message += '\nBCC copy sent.';
+        message += '\n📧 Cópia BCC enviada.';
       }
 
       alert(message);
@@ -7082,7 +7090,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Error sending to client');
+      alert('Erro ao enviar: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingToClient(false);
     }
