@@ -16,11 +16,11 @@ root.render(
         <Route path="/admin/*" element={<AdminApp />} />
         {/* Customer Portal - /#/customer */}
         <Route path="/customer/*" element={<CustomerApp />} />
-        {/* B2B Landing Page - /#/b2b */}
-        <Route path="/b2b" element={<B2BLandingPage />} />
-        {/* Partner Portal - /#/partner */}
+        {/* Partner Portal - /#/partner (only for registered partners) */}
         <Route path="/partner/*" element={<App />} />
-        <Route path="/*" element={<App />} />
+        {/* B2B Landing Page - Default page for visitors */}
+        <Route path="/b2b" element={<B2BLandingPage />} />
+        <Route path="/*" element={<B2BLandingPage />} />
       </Routes>
     </HashRouter>
   </React.StrictMode>,

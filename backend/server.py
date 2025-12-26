@@ -4148,8 +4148,20 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
     try:
-        # Generate order number
-        order_number = f"P{datetime.now().strftime('%y%m%d')}-{str(uuid.uuid4())[:4].upper()}"
+        # Generate sequential order number starting from P6339
+        last_order = await db.orders.find_one(
+            {"order_number": {"$regex": "^P\\d+$"}},
+            sort=[("order_number", -1)]
+        )
+        if last_order and last_order.get("order_number"):
+            try:
+                last_num = int(last_order["order_number"][1:])
+                next_num = last_num + 1
+            except:
+                next_num = 6339
+        else:
+            next_num = 6339
+        order_number = f"P{next_num}"
 
         # Get PM and Translator names if assigned
         pm_name = None
