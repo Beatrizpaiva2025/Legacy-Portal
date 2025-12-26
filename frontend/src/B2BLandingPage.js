@@ -94,11 +94,11 @@ Message: ${formData.message}
             <div>
               <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
                 <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
-                Trusted Since 2010 — 15+ Years of Excellence
+                15+ Years of Experience
               </div>
               <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
-                Corporate Translation
-                <span className="block text-blue-900">Partnership Program</span>
+                Certified Excellence
+                <span className="block text-blue-900 italic">Powered by Technology</span>
               </h1>
               <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                 Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms, immigration agencies, and Fortune 500 companies.
@@ -135,23 +135,10 @@ Message: ${formData.message}
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
               <img
-                src="https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                alt="Professional team working with technology"
+                src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Global technology and digital connections"
                 className="relative rounded-2xl shadow-2xl"
               />
-              <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900">500+</div>
-                    <div className="text-sm text-slate-500">Corporate Clients</div>
-                  </div>
-                </div>
-              </div>
               <div className="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
@@ -170,10 +157,35 @@ Message: ${formData.message}
         </div>
       </section>
 
+      {/* Free Translation Offer Banner */}
+      <section className="py-8 bg-gradient-to-r from-green-600 to-green-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 text-white text-center md:text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-xl md:text-2xl font-bold">First Translation FREE!</div>
+                <div className="text-green-100 text-sm md:text-base">Up to 2 pages - No commitment required</div>
+              </div>
+            </div>
+            <a
+              href="#contact-form"
+              className="px-6 py-3 bg-white text-green-600 rounded-full font-semibold hover:bg-green-50 transition-colors shadow-lg"
+            >
+              Claim Your Free Translation
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Stats Section */}
       <section className="py-16 bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div className="grid grid-cols-3 gap-8 text-center">
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">15+</div>
               <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Years Experience</div>
@@ -181,10 +193,6 @@ Message: ${formData.message}
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">50+</div>
               <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Languages</div>
-            </div>
-            <div className="p-6">
-              <div className="text-4xl md:text-5xl font-bold text-white">500+</div>
-              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Corporate Clients</div>
             </div>
             <div className="p-6">
               <div className="text-4xl md:text-5xl font-bold text-white">100%</div>
@@ -331,6 +339,12 @@ Message: ${formData.message}
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   <span className="text-blue-100">Custom pricing available</span>
+                </div>
+                <div className="flex items-center">
+                  <svg className="w-6 h-6 text-yellow-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                  <span className="text-yellow-200 font-semibold">First translation FREE (up to 2 pages)</span>
                 </div>
               </div>
             </div>
@@ -527,7 +541,7 @@ Message: ${formData.message}
             </div>
             <div>
               <h4 className="font-bold mb-4">Contact</h4>
-              <p className="text-blue-200">info@legacytranslations.com</p>
+              <p className="text-blue-200">contact@legacytranslations.com</p>
               <p className="text-blue-200">(857) 208-1139</p>
             </div>
             <div>
