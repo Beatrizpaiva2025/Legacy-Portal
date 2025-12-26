@@ -608,6 +608,94 @@ const SearchBar = ({ value, onChange, placeholder }) => (
   </div>
 );
 
+// ==================== CURRENCY DATA (SHARED) ====================
+const CURRENCIES = {
+  BRL: { name: 'Brazilian Real', symbol: 'R$', country: 'Brazil', flag: '🇧🇷' },
+  USD: { name: 'US Dollar', symbol: '$', country: 'USA', flag: '🇺🇸' },
+  CAD: { name: 'Canadian Dollar', symbol: 'CA$', country: 'Canada', flag: '🇨🇦' },
+  EUR: { name: 'Euro', symbol: '€', country: 'Eurozone', flag: '🇪🇺' },
+  GBP: { name: 'British Pound', symbol: '£', country: 'UK', flag: '🇬🇧' },
+  MXN: { name: 'Mexican Peso', symbol: '$', country: 'Mexico', flag: '🇲🇽' },
+  ARS: { name: 'Argentine Peso', symbol: '$', country: 'Argentina', flag: '🇦🇷' },
+  CLP: { name: 'Chilean Peso', symbol: '$', country: 'Chile', flag: '🇨🇱' },
+  COP: { name: 'Colombian Peso', symbol: '$', country: 'Colombia', flag: '🇨🇴' },
+  PEN: { name: 'Peruvian Sol', symbol: 'S/', country: 'Peru', flag: '🇵🇪' },
+  NOK: { name: 'Norwegian Krone', symbol: 'kr', country: 'Norway', flag: '🇳🇴' },
+  SEK: { name: 'Swedish Krona', symbol: 'kr', country: 'Sweden', flag: '🇸🇪' },
+  DKK: { name: 'Danish Krone', symbol: 'kr', country: 'Denmark', flag: '🇩🇰' },
+  CHF: { name: 'Swiss Franc', symbol: 'CHF', country: 'Switzerland', flag: '🇨🇭' },
+  JPY: { name: 'Japanese Yen', symbol: '¥', country: 'Japan', flag: '🇯🇵' },
+  CNY: { name: 'Chinese Yuan', symbol: '¥', country: 'China', flag: '🇨🇳' },
+  KRW: { name: 'South Korean Won', symbol: '₩', country: 'South Korea', flag: '🇰🇷' },
+  INR: { name: 'Indian Rupee', symbol: '₹', country: 'India', flag: '🇮🇳' },
+  AUD: { name: 'Australian Dollar', symbol: 'A$', country: 'Australia', flag: '🇦🇺' },
+  NZD: { name: 'New Zealand Dollar', symbol: 'NZ$', country: 'New Zealand', flag: '🇳🇿' },
+  ZAR: { name: 'South African Rand', symbol: 'R', country: 'South Africa', flag: '🇿🇦' },
+  RUB: { name: 'Russian Ruble', symbol: '₽', country: 'Russia', flag: '🇷🇺' },
+  TRY: { name: 'Turkish Lira', symbol: '₺', country: 'Turkey', flag: '🇹🇷' },
+  PLN: { name: 'Polish Zloty', symbol: 'zł', country: 'Poland', flag: '🇵🇱' },
+  CZK: { name: 'Czech Koruna', symbol: 'Kč', country: 'Czech Republic', flag: '🇨🇿' },
+  HUF: { name: 'Hungarian Forint', symbol: 'Ft', country: 'Hungary', flag: '🇭🇺' },
+  ILS: { name: 'Israeli Shekel', symbol: '₪', country: 'Israel', flag: '🇮🇱' },
+  SGD: { name: 'Singapore Dollar', symbol: 'S$', country: 'Singapore', flag: '🇸🇬' },
+  HKD: { name: 'Hong Kong Dollar', symbol: 'HK$', country: 'Hong Kong', flag: '🇭🇰' },
+  PHP: { name: 'Philippine Peso', symbol: '₱', country: 'Philippines', flag: '🇵🇭' },
+  THB: { name: 'Thai Baht', symbol: '฿', country: 'Thailand', flag: '🇹🇭' },
+  MYR: { name: 'Malaysian Ringgit', symbol: 'RM', country: 'Malaysia', flag: '🇲🇾' },
+  IDR: { name: 'Indonesian Rupiah', symbol: 'Rp', country: 'Indonesia', flag: '🇮🇩' },
+  VND: { name: 'Vietnamese Dong', symbol: '₫', country: 'Vietnam', flag: '🇻🇳' },
+  AED: { name: 'UAE Dirham', symbol: 'د.إ', country: 'UAE', flag: '🇦🇪' },
+  SAR: { name: 'Saudi Riyal', symbol: '﷼', country: 'Saudi Arabia', flag: '🇸🇦' },
+  EGP: { name: 'Egyptian Pound', symbol: '£', country: 'Egypt', flag: '🇪🇬' },
+  NGN: { name: 'Nigerian Naira', symbol: '₦', country: 'Nigeria', flag: '🇳🇬' },
+  KES: { name: 'Kenyan Shilling', symbol: 'KSh', country: 'Kenya', flag: '🇰🇪' }
+};
+
+const RATE_SOURCES = [
+  { id: 'xe.com', name: 'XE.com', url: 'https://www.xe.com/currencyconverter/' },
+  { id: 'google', name: 'Google Finance', url: 'https://www.google.com/finance/' },
+  { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.bloomberg.com/markets/currencies' },
+  { id: 'businessinsider', name: 'Business Insider', url: 'https://markets.businessinsider.com/currencies' },
+  { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
+];
+
+const LANGUAGE_TO_CURRENCY = {
+  'Portuguese': 'BRL',
+  'English': 'USD',
+  'Spanish': 'MXN',
+  'French': 'EUR',
+  'German': 'EUR',
+  'Italian': 'EUR',
+  'Dutch': 'EUR',
+  'Norwegian': 'NOK',
+  'Swedish': 'SEK',
+  'Danish': 'DKK',
+  'Finnish': 'EUR',
+  'Japanese': 'JPY',
+  'Chinese': 'CNY',
+  'Korean': 'KRW',
+  'Russian': 'RUB',
+  'Arabic': 'AED',
+  'Hebrew': 'ILS',
+  'Turkish': 'TRY',
+  'Polish': 'PLN',
+  'Czech': 'CZK',
+  'Hungarian': 'HUF',
+  'Thai': 'THB',
+  'Vietnamese': 'VND',
+  'Indonesian': 'IDR',
+  'Malay': 'MYR',
+  'Hindi': 'INR',
+  'Greek': 'EUR',
+  'Romanian': 'EUR',
+  'Ukrainian': 'EUR',
+  'Bulgarian': 'EUR'
+};
+
+const getCurrencyFromLanguage = (language) => {
+  return LANGUAGE_TO_CURRENCY[language] || 'USD';
+};
+
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // State
@@ -1739,97 +1827,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     customNote: ''
   });
   const [fetchingRate, setFetchingRate] = useState(false);
-
-  // Currency data
-  const CURRENCIES = {
-    BRL: { name: 'Brazilian Real', symbol: 'R$', country: 'Brazil', flag: '🇧🇷' },
-    USD: { name: 'US Dollar', symbol: '$', country: 'USA', flag: '🇺🇸' },
-    CAD: { name: 'Canadian Dollar', symbol: 'CA$', country: 'Canada', flag: '🇨🇦' },
-    EUR: { name: 'Euro', symbol: '€', country: 'Eurozone', flag: '🇪🇺' },
-    GBP: { name: 'British Pound', symbol: '£', country: 'UK', flag: '🇬🇧' },
-    MXN: { name: 'Mexican Peso', symbol: '$', country: 'Mexico', flag: '🇲🇽' },
-    ARS: { name: 'Argentine Peso', symbol: '$', country: 'Argentina', flag: '🇦🇷' },
-    CLP: { name: 'Chilean Peso', symbol: '$', country: 'Chile', flag: '🇨🇱' },
-    COP: { name: 'Colombian Peso', symbol: '$', country: 'Colombia', flag: '🇨🇴' },
-    PEN: { name: 'Peruvian Sol', symbol: 'S/', country: 'Peru', flag: '🇵🇪' },
-    NOK: { name: 'Norwegian Krone', symbol: 'kr', country: 'Norway', flag: '🇳🇴' },
-    SEK: { name: 'Swedish Krona', symbol: 'kr', country: 'Sweden', flag: '🇸🇪' },
-    DKK: { name: 'Danish Krone', symbol: 'kr', country: 'Denmark', flag: '🇩🇰' },
-    CHF: { name: 'Swiss Franc', symbol: 'CHF', country: 'Switzerland', flag: '🇨🇭' },
-    JPY: { name: 'Japanese Yen', symbol: '¥', country: 'Japan', flag: '🇯🇵' },
-    CNY: { name: 'Chinese Yuan', symbol: '¥', country: 'China', flag: '🇨🇳' },
-    KRW: { name: 'South Korean Won', symbol: '₩', country: 'South Korea', flag: '🇰🇷' },
-    INR: { name: 'Indian Rupee', symbol: '₹', country: 'India', flag: '🇮🇳' },
-    AUD: { name: 'Australian Dollar', symbol: 'A$', country: 'Australia', flag: '🇦🇺' },
-    NZD: { name: 'New Zealand Dollar', symbol: 'NZ$', country: 'New Zealand', flag: '🇳🇿' },
-    ZAR: { name: 'South African Rand', symbol: 'R', country: 'South Africa', flag: '🇿🇦' },
-    RUB: { name: 'Russian Ruble', symbol: '₽', country: 'Russia', flag: '🇷🇺' },
-    TRY: { name: 'Turkish Lira', symbol: '₺', country: 'Turkey', flag: '🇹🇷' },
-    PLN: { name: 'Polish Zloty', symbol: 'zł', country: 'Poland', flag: '🇵🇱' },
-    CZK: { name: 'Czech Koruna', symbol: 'Kč', country: 'Czech Republic', flag: '🇨🇿' },
-    HUF: { name: 'Hungarian Forint', symbol: 'Ft', country: 'Hungary', flag: '🇭🇺' },
-    ILS: { name: 'Israeli Shekel', symbol: '₪', country: 'Israel', flag: '🇮🇱' },
-    SGD: { name: 'Singapore Dollar', symbol: 'S$', country: 'Singapore', flag: '🇸🇬' },
-    HKD: { name: 'Hong Kong Dollar', symbol: 'HK$', country: 'Hong Kong', flag: '🇭🇰' },
-    PHP: { name: 'Philippine Peso', symbol: '₱', country: 'Philippines', flag: '🇵🇭' },
-    THB: { name: 'Thai Baht', symbol: '฿', country: 'Thailand', flag: '🇹🇭' },
-    MYR: { name: 'Malaysian Ringgit', symbol: 'RM', country: 'Malaysia', flag: '🇲🇾' },
-    IDR: { name: 'Indonesian Rupiah', symbol: 'Rp', country: 'Indonesia', flag: '🇮🇩' },
-    VND: { name: 'Vietnamese Dong', symbol: '₫', country: 'Vietnam', flag: '🇻🇳' },
-    AED: { name: 'UAE Dirham', symbol: 'د.إ', country: 'UAE', flag: '🇦🇪' },
-    SAR: { name: 'Saudi Riyal', symbol: '﷼', country: 'Saudi Arabia', flag: '🇸🇦' },
-    EGP: { name: 'Egyptian Pound', symbol: '£', country: 'Egypt', flag: '🇪🇬' },
-    NGN: { name: 'Nigerian Naira', symbol: '₦', country: 'Nigeria', flag: '🇳🇬' },
-    KES: { name: 'Kenyan Shilling', symbol: 'KSh', country: 'Kenya', flag: '🇰🇪' }
-  };
-
-  // Rate sources
-  const RATE_SOURCES = [
-    { id: 'xe.com', name: 'XE.com', url: 'https://www.xe.com/currencyconverter/' },
-    { id: 'google', name: 'Google Finance', url: 'https://www.google.com/finance/' },
-    { id: 'bloomberg', name: 'Bloomberg', url: 'https://www.bloomberg.com/markets/currencies' },
-    { id: 'businessinsider', name: 'Business Insider', url: 'https://markets.businessinsider.com/currencies' },
-    { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
-  ];
-
-  // Language to Currency mapping (for auto-fill)
-  const LANGUAGE_TO_CURRENCY = {
-    'Portuguese': 'BRL',
-    'English': 'USD',
-    'Spanish': 'MXN',
-    'French': 'EUR',
-    'German': 'EUR',
-    'Italian': 'EUR',
-    'Dutch': 'EUR',
-    'Norwegian': 'NOK',
-    'Swedish': 'SEK',
-    'Danish': 'DKK',
-    'Finnish': 'EUR',
-    'Japanese': 'JPY',
-    'Chinese': 'CNY',
-    'Korean': 'KRW',
-    'Russian': 'RUB',
-    'Arabic': 'AED',
-    'Hebrew': 'ILS',
-    'Turkish': 'TRY',
-    'Polish': 'PLN',
-    'Czech': 'CZK',
-    'Hungarian': 'HUF',
-    'Thai': 'THB',
-    'Vietnamese': 'VND',
-    'Indonesian': 'IDR',
-    'Malay': 'MYR',
-    'Hindi': 'INR',
-    'Greek': 'EUR',
-    'Romanian': 'EUR',
-    'Ukrainian': 'EUR',
-    'Bulgarian': 'EUR'
-  };
-
-  // Get currency from language
-  const getCurrencyFromLanguage = (language) => {
-    return LANGUAGE_TO_CURRENCY[language] || 'USD';
-  };
 
   // Fetch exchange rate from API (ExchangeRate-API for real-time rates)
   const fetchExchangeRate = async () => {
