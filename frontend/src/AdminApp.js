@@ -10445,7 +10445,11 @@ const NewQuotePage = ({ adminKey, user }) => {
     turnaround: 'standard',
     delivery_method: 'digital',
     discount: 0,
-    special_instructions: ''
+    special_instructions: '',
+    // Editable prices
+    custom_price_per_page: 24.99,
+    custom_urgency_multiplier: 1.0,
+    custom_delivery_fee: 0
   });
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
@@ -10460,7 +10464,7 @@ const NewQuotePage = ({ adminKey, user }) => {
   const SERVICE_TYPES = {
     certified: { name: 'Certified Translation', price: 24.99, description: 'Official documents, legal, immigration' },
     sworn: { name: 'Sworn Translation (Tradução Juramentada)', price: 34.99, description: 'Court-recognized, notarized by sworn translator' },
-    apostille: { name: 'Apostille Service', price: 85.00, description: 'HCCH Apostille authentication for international use' },
+    apostille: { name: 'Apostille Service', price: 85.00, description: 'HCCH Apostille authentication', comingSoon: true },
     standard: { name: 'Standard Translation', price: 19.99, description: 'General use, no certification' }
   };
 
@@ -10527,21 +10531,22 @@ const NewQuotePage = ({ adminKey, user }) => {
     setError('');
 
     // Calculate total pages (simplified - 1 page per file for now)
-    const totalPages = uploadedFiles.length;
-    const basePrice = SERVICE_TYPES[formData.service_type].price;
-    const turnaroundMultiplier = TURNAROUND[formData.turnaround].multiplier;
-    const deliveryFee = DELIVERY_OPTIONS[formData.delivery_method].price;
+    const totalPages = uploadedFiles.length || 1;
+    // Use custom editable prices
+    const pricePerPage = parseFloat(formData.custom_price_per_page) || SERVICE_TYPES[formData.service_type].price;
+    const urgencyMultiplier = parseFloat(formData.custom_urgency_multiplier) || TURNAROUND[formData.turnaround].multiplier;
+    const deliveryFee = parseFloat(formData.custom_delivery_fee) || DELIVERY_OPTIONS[formData.delivery_method].price;
     const discountPercent = parseFloat(formData.discount) || 0;
 
-    const subtotal = totalPages * basePrice;
-    const turnaroundFee = subtotal * (turnaroundMultiplier - 1);
+    const subtotal = totalPages * pricePerPage;
+    const turnaroundFee = subtotal * (urgencyMultiplier - 1);
     const discountAmount = (subtotal + turnaroundFee) * (discountPercent / 100);
     const total = subtotal + turnaroundFee + deliveryFee - discountAmount;
 
     setTimeout(() => {
       setQuote({
         pages: totalPages,
-        base_price: basePrice,
+        base_price: pricePerPage,
         subtotal: subtotal,
         turnaround_fee: turnaroundFee,
         delivery_fee: deliveryFee,
@@ -10723,23 +10728,51 @@ const NewQuotePage = ({ adminKey, user }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Service Type</label>
               <div className="space-y-2">
                 {Object.entries(SERVICE_TYPES).map(([key, service]) => (
-                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.service_type === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                  <label
+                    key={key}
+                    className={`flex items-center p-3 border rounded-lg ${service.comingSoon ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer'} ${formData.service_type === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}
+                  >
                     <input
                       type="radio"
                       name="service_type"
                       value={key}
                       checked={formData.service_type === key}
-                      onChange={(e) => { setFormData({...formData, service_type: e.target.value}); setQuote(null); }}
+                      disabled={service.comingSoon}
+                      onChange={(e) => {
+                        setFormData({
+                          ...formData,
+                          service_type: e.target.value,
+                          custom_price_per_page: SERVICE_TYPES[e.target.value].price
+                        });
+                        setQuote(null);
+                      }}
                       className="mr-3"
                     />
                     <div className="flex-1">
-                      <div className="font-medium">{service.name}</div>
+                      <div className="font-medium">
+                        {service.name}
+                        {service.comingSoon && <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">Coming Soon</span>}
+                      </div>
                       <div className="text-sm text-gray-500">{service.description}</div>
                     </div>
                     <div className="font-bold text-teal-600">${service.price}/page</div>
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* Editable Price per Page */}
+            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <label className="block text-sm font-medium text-yellow-800 mb-2">Custom Price per Page ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.custom_price_per_page}
+                onChange={(e) => { setFormData({...formData, custom_price_per_page: parseFloat(e.target.value) || 0}); setQuote(null); }}
+                className="w-full px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+              />
+              <p className="text-xs text-yellow-600 mt-1">Override the default price per page for this quote</p>
             </div>
 
             {/* Turnaround */}
@@ -10753,7 +10786,14 @@ const NewQuotePage = ({ adminKey, user }) => {
                       name="turnaround"
                       value={key}
                       checked={formData.turnaround === key}
-                      onChange={(e) => { setFormData({...formData, turnaround: e.target.value}); setQuote(null); }}
+                      onChange={(e) => {
+                        setFormData({
+                          ...formData,
+                          turnaround: e.target.value,
+                          custom_urgency_multiplier: TURNAROUND[e.target.value].multiplier
+                        });
+                        setQuote(null);
+                      }}
                       className="mr-3"
                     />
                     <div className="flex-1">
@@ -10764,6 +10804,19 @@ const NewQuotePage = ({ adminKey, user }) => {
                     )}
                   </label>
                 ))}
+              </div>
+              {/* Custom Urgency Multiplier */}
+              <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <label className="block text-xs font-medium text-orange-800 mb-1">Custom Urgency Multiplier</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={formData.custom_urgency_multiplier}
+                  onChange={(e) => { setFormData({...formData, custom_urgency_multiplier: parseFloat(e.target.value) || 1}); setQuote(null); }}
+                  className="w-full px-2 py-1 text-sm border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
+                />
+                <p className="text-xs text-orange-600 mt-1">1.0 = no fee, 1.25 = +25%, 2.0 = +100%</p>
               </div>
             </div>
 
@@ -10778,7 +10831,14 @@ const NewQuotePage = ({ adminKey, user }) => {
                       name="delivery_method"
                       value={key}
                       checked={formData.delivery_method === key}
-                      onChange={(e) => { setFormData({...formData, delivery_method: e.target.value}); setQuote(null); }}
+                      onChange={(e) => {
+                        setFormData({
+                          ...formData,
+                          delivery_method: e.target.value,
+                          custom_delivery_fee: DELIVERY_OPTIONS[e.target.value].price
+                        });
+                        setQuote(null);
+                      }}
                       className="mr-3"
                     />
                     <div className="flex-1">
@@ -10790,6 +10850,19 @@ const NewQuotePage = ({ adminKey, user }) => {
                     )}
                   </label>
                 ))}
+              </div>
+              {/* Custom Delivery Fee */}
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <label className="block text-xs font-medium text-blue-800 mb-1">Custom Delivery Fee ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.custom_delivery_fee}
+                  onChange={(e) => { setFormData({...formData, custom_delivery_fee: parseFloat(e.target.value) || 0}); setQuote(null); }}
+                  className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-blue-600 mt-1">Override the delivery fee for this quote</p>
               </div>
             </div>
 
@@ -15530,7 +15603,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     >
                       <option value="certified">Tradução Certificada (Certified)</option>
                       <option value="sworn">Tradução Juramentada (Sworn)</option>
-                      <option value="apostille">Apostila (Apostille)</option>
+                      <option value="apostille" disabled>Apostila (Apostille) - Coming Soon</option>
                       <option value="standard">Tradução Profissional (Standard)</option>
                     </select>
                   </div>
