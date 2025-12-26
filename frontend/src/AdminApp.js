@@ -611,6 +611,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
+  const [showProjectMenu, setShowProjectMenu] = useState(false);
 
   // Assigned orders for translator
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -1843,6 +1844,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('start');
     }
   }, [selectedOrder]);
+
+  // Close project menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showProjectMenu && !e.target.closest('.project-menu-container')) {
+        setShowProjectMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showProjectMenu]);
 
   // Fetch assigned orders for translator/PM
   const fetchAssignedOrders = async () => {
@@ -3833,12 +3845,122 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="flex items-center space-x-4">
           <h1 className="text-lg font-bold text-blue-600">TRANSLATION WORKSPACE</h1>
           {selectedOrder && (
-            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-50 rounded-full border border-blue-200">
-              <span className="text-blue-600 text-xs font-medium">📋 {selectedOrder.order_number}</span>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-600 text-xs">{selectedOrder.client_name}</span>
-              <span className="text-gray-400">|</span>
-              <span className="text-xs text-gray-500">{selectedOrder.translate_from} → {selectedOrder.translate_to}</span>
+            <div className="relative group project-menu-container">
+              <button
+                className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-full border border-blue-200 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
+                onClick={() => setShowProjectMenu(!showProjectMenu)}
+              >
+                <span className="text-blue-600 text-xs font-bold">📋 {selectedOrder.order_number}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-gray-600 text-xs">{selectedOrder.client_name}</span>
+                <span className="text-gray-400">|</span>
+                <span className="text-xs text-gray-500">{selectedOrder.translate_from} → {selectedOrder.translate_to}</span>
+                <span className="text-gray-400 ml-1">▼</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showProjectMenu && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                    <div className="font-bold text-sm">{selectedOrder.order_number}</div>
+                    <div className="text-xs opacity-80">{selectedOrder.client_name}</div>
+                  </div>
+
+                  <div className="p-1">
+                    {/* Load Document */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('start');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">📂</span>
+                      <div className="text-left">
+                        <div className="font-medium">Abrir Documentos</div>
+                        <div className="text-[10px] text-gray-500">Ver arquivos do projeto</div>
+                      </div>
+                    </button>
+
+                    {/* Translate */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('translate');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-yellow-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">📄</span>
+                      <div className="text-left">
+                        <div className="font-medium">Traduzir Documento</div>
+                        <div className="text-[10px] text-gray-500">OCR e tradução manual</div>
+                      </div>
+                    </button>
+
+                    {/* AI Pipeline */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('ai-pipeline');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">🤖</span>
+                      <div className="text-left">
+                        <div className="font-medium">AI Pipeline</div>
+                        <div className="text-[10px] text-gray-500">Tradução automática com IA</div>
+                      </div>
+                    </button>
+
+                    {/* Review - highlighted if translation ready */}
+                    <button
+                      onClick={async () => {
+                        setShowProjectMenu(false);
+                        if (selectedOrder.translation_ready || selectedOrder.translation_html) {
+                          await loadSavedTranslation(selectedOrder);
+                        }
+                        setActiveSubTab('review');
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors ${
+                        selectedOrder.translation_ready || selectedOrder.translation_html
+                          ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-300'
+                          : 'text-gray-700 hover:bg-green-50'
+                      }`}
+                    >
+                      <span className="text-lg">🔍</span>
+                      <div className="text-left">
+                        <div className="font-medium">
+                          {selectedOrder.translation_ready ? '✅ Revisar Tradução' : 'Review'}
+                        </div>
+                        <div className="text-[10px] text-gray-500">
+                          {selectedOrder.translation_ready ? 'Tradução pronta para revisão' : 'Revisar e aprovar'}
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* Deliver */}
+                    <button
+                      onClick={() => {
+                        setShowProjectMenu(false);
+                        setActiveSubTab('deliver');
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded transition-colors"
+                    >
+                      <span className="text-lg">✅</span>
+                      <div className="text-left">
+                        <div className="font-medium">Entregar ao Cliente</div>
+                        <div className="text-[10px] text-gray-500">Finalizar e enviar</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-gray-100 p-1">
+                    <div className="px-3 py-2 text-[10px] text-gray-400">
+                      Status: <span className="font-medium">{selectedOrder.translation_status || 'received'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
