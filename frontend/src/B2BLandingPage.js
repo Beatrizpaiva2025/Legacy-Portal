@@ -459,12 +459,12 @@ Message: ${formData.message}
           <div className="text-center mb-10">
             <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Trusted by businesses nationwide</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20">
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
             {/* ATA Member Logo */}
             <div className="text-center">
-              <div className="h-12 md:h-14 mx-auto mb-2 flex items-center justify-center">
+              <div className="h-14 md:h-16 mx-auto mb-2 flex items-center justify-center">
                 <img
-                  src="https://i.imgur.com/QX8K9Zy.png"
+                  src="https://i.imgur.com/Swl1ClD.png"
                   alt="ATA Member - American Translators Association"
                   className="h-full object-contain"
                 />
@@ -476,11 +476,23 @@ Message: ${formData.message}
             <div className="text-center">
               <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="https://i.imgur.com/7vJ9YKa.png"
+                  src="https://i.imgur.com/L6QhuCx.png"
                   alt="BBB Accredited Business A+"
                   className="h-full object-contain"
                 />
               </div>
+            </div>
+
+            {/* USCIS Logo */}
+            <div className="text-center">
+              <div className="h-16 md:h-20 mx-auto mb-2 flex items-center justify-center">
+                <img
+                  src="https://i.imgur.com/djZgFkJ.png"
+                  alt="U.S. Citizenship and Immigration Services"
+                  className="h-full object-contain"
+                />
+              </div>
+              <div className="text-xs text-gray-500">100% Acceptance Guaranteed</div>
             </div>
           </div>
         </div>
