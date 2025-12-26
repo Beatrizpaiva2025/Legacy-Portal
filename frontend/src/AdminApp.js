@@ -7558,10 +7558,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setSavingProject(true);
     try {
       await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, editFormData);
-      // Update local state
-      setViewingOrder(prev => ({ ...prev, ...editFormData }));
+
+      // Update viewing order locally
+      const updatedOrder = { ...viewingOrder, ...editFormData };
+      setViewingOrder(updatedOrder);
+
+      // Update orders list locally for immediate display
+      setOrders(prev => prev.map(o =>
+        o.id === viewingOrder.id ? { ...o, ...editFormData } : o
+      ));
+
       setEditingProject(false);
+
+      // Also refresh from server to ensure consistency
       fetchOrders();
+
+      alert('✅ Projeto salvo com sucesso!');
     } catch (err) {
       console.error('Failed to save project:', err);
       alert('Error saving project: ' + (err.response?.data?.detail || err.message));
