@@ -87,68 +87,108 @@ Message: ${formData.message}
         </div>
       </header>
 
-      {/* Hero Section with Image */}
-      <section className="pt-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900"></div>
-        <div className="absolute inset-0 opacity-20" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-        }}></div>
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="text-white">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-                Business Partnership Program
+      {/* Hero Section - Clean Professional */}
+      <section className="pt-24 bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
+                <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
+                Trusted Since 2010 — 15+ Years of Excellence
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
+                Corporate Translation
+                <span className="block text-blue-900">Partnership Program</span>
               </h1>
-              <p className="text-xl md:text-2xl text-blue-100 mb-8 leading-relaxed">
-                Streamline your company's translation needs with exclusive corporate benefits and dedicated support.
+              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+                Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms, immigration agencies, and Fortune 500 companies.
               </p>
-              <div className="flex flex-wrap gap-4">
-                <a href="#contact-form" className="bg-white text-blue-900 px-8 py-4 rounded-full font-semibold text-lg hover:bg-blue-50 transition-colors shadow-lg">
-                  Become a Partner
+              <div className="flex flex-wrap gap-4 mb-8">
+                <a href="#contact-form" className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
+                  Request Partnership
                 </a>
-                <a href="#benefits" className="border-2 border-white text-white px-8 py-4 rounded-full font-semibold text-lg hover:bg-white/10 transition-colors">
-                  Learn More
+                <a href="#benefits" className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
+                  View Benefits
                 </a>
               </div>
+              <div className="flex items-center gap-6 text-sm text-slate-500">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  USCIS Certified
+                </div>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  ATA Member
+                </div>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  24h Turnaround
+                </div>
+              </div>
             </div>
-            <div className="hidden md:block">
+            <div className="hidden lg:block relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
               <img
-                src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                alt="Business professionals collaborating"
-                className="rounded-2xl shadow-2xl"
+                src="https://images.unsplash.com/photo-1551434678-e076c223a692?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+                alt="Professional team working with technology"
+                className="relative rounded-2xl shadow-2xl"
               />
+              <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-xl shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-900 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-900">500+</div>
+                    <div className="text-sm text-slate-500">Corporate Clients</div>
+                  </div>
+                </div>
+              </div>
+              <div className="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-900">50+</div>
+                    <div className="text-sm text-slate-500">Languages</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Wave divider */}
-        <div className="absolute bottom-0 left-0 right-0">
-          <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="white"/>
-          </svg>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section className="py-12 bg-white">
+      <section className="py-16 bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-blue-900">10+</div>
-              <div className="text-gray-600 mt-2">Years Experience</div>
+            <div className="p-6">
+              <div className="text-4xl md:text-5xl font-bold text-white">15+</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Years Experience</div>
             </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-blue-900">50+</div>
-              <div className="text-gray-600 mt-2">Languages</div>
+            <div className="p-6">
+              <div className="text-4xl md:text-5xl font-bold text-white">50+</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Languages</div>
             </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-blue-900">500+</div>
-              <div className="text-gray-600 mt-2">Corporate Clients</div>
+            <div className="p-6">
+              <div className="text-4xl md:text-5xl font-bold text-white">500+</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">Corporate Clients</div>
             </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-blue-900">100%</div>
-              <div className="text-gray-600 mt-2">USCIS Accepted</div>
+            <div className="p-6">
+              <div className="text-4xl md:text-5xl font-bold text-white">100%</div>
+              <div className="text-slate-400 mt-2 text-sm uppercase tracking-wide">USCIS Accepted</div>
             </div>
           </div>
         </div>
@@ -224,7 +264,7 @@ Message: ${formData.message}
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-blue-900 mb-3">Certified Quality</h3>
-              <p className="text-gray-600">ATA member since 2015. All certified translations are 100% guaranteed accepted by USCIS.</p>
+              <p className="text-gray-600">ATA member since 2010. All certified translations are 100% guaranteed accepted by USCIS.</p>
             </div>
           </div>
         </div>
@@ -460,7 +500,7 @@ Message: ${formData.message}
                 className="h-10 mb-4 brightness-0 invert"
               />
               <p className="text-blue-200">
-                Leader in Portuguese and Spanish Translations since 2015.
+                Leader in Portuguese and Spanish Translations since 2010.
               </p>
             </div>
             <div>
