@@ -2164,11 +2164,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setFiles([file]);
         setSelectedFileId(doc.id);
 
-        // Also set originalImages for PDF generation (needs data URL format)
-        const dataUrl = `data:${contentType};base64,${base64Data}`;
-        setOriginalImages([{ filename: doc.filename, data: dataUrl }]);
+        // For PDFs, convert to images (one per page)
+        if (contentType === 'application/pdf' || doc.filename?.toLowerCase().endsWith('.pdf')) {
+          setProcessingStatus(`📄 Extraindo páginas do PDF...`);
+          try {
+            const images = await convertPdfToImages(file, (currentPage, totalPages) => {
+              setProcessingStatus(`📄 Extraindo página ${currentPage} de ${totalPages}...`);
+            });
+            setOriginalImages(images);
+            setProcessingStatus(`✅ "${doc.filename}" carregado! (${images.length} página${images.length > 1 ? 's' : ''})`);
+          } catch (pdfErr) {
+            console.error('Failed to convert PDF to images:', pdfErr);
+            // Fallback to single image
+            const dataUrl = `data:${contentType};base64,${base64Data}`;
+            setOriginalImages([{ filename: doc.filename, data: dataUrl }]);
+            setProcessingStatus(`✅ "${doc.filename}" carregado! (PDF não pôde ser dividido em páginas)`);
+          }
+        } else {
+          // For images, just store directly
+          const dataUrl = `data:${contentType};base64,${base64Data}`;
+          setOriginalImages([{ filename: doc.filename, data: base64Data, type: contentType }]);
+          setProcessingStatus(`✅ "${doc.filename}" carregado!`);
+        }
 
-        setProcessingStatus(`✅ "${doc.filename}" carregado! Prossiga para traduzir.`);
         setActiveSubTab('translate');
       }
     } catch (err) {
