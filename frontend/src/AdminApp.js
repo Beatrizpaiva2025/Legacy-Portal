@@ -1697,6 +1697,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     convertCurrency: false,
     sourceCurrency: 'BRL',
     targetCurrency: 'USD',
+    exchangeRate: '',
+    rateSource: 'xe.com',
     useGlossary: true,
     customInstructions: ''
   });
@@ -1789,6 +1791,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     { id: 'businessinsider', name: 'Business Insider', url: 'https://markets.businessinsider.com/currencies' },
     { id: 'oanda', name: 'OANDA', url: 'https://www.oanda.com/currency-converter/' }
   ];
+
+  // Language to Currency mapping (for auto-fill)
+  const LANGUAGE_TO_CURRENCY = {
+    'Portuguese': 'BRL',
+    'English': 'USD',
+    'Spanish': 'MXN',
+    'French': 'EUR',
+    'German': 'EUR',
+    'Italian': 'EUR',
+    'Dutch': 'EUR',
+    'Norwegian': 'NOK',
+    'Swedish': 'SEK',
+    'Danish': 'DKK',
+    'Finnish': 'EUR',
+    'Japanese': 'JPY',
+    'Chinese': 'CNY',
+    'Korean': 'KRW',
+    'Russian': 'RUB',
+    'Arabic': 'AED',
+    'Hebrew': 'ILS',
+    'Turkish': 'TRY',
+    'Polish': 'PLN',
+    'Czech': 'CZK',
+    'Hungarian': 'HUF',
+    'Thai': 'THB',
+    'Vietnamese': 'VND',
+    'Indonesian': 'IDR',
+    'Malay': 'MYR',
+    'Hindi': 'INR',
+    'Greek': 'EUR',
+    'Romanian': 'EUR',
+    'Ukrainian': 'EUR',
+    'Bulgarian': 'EUR'
+  };
+
+  // Get currency from language
+  const getCurrencyFromLanguage = (language) => {
+    return LANGUAGE_TO_CURRENCY[language] || 'USD';
+  };
 
   // Fetch exchange rate from API (ExchangeRate-API for real-time rates)
   const fetchExchangeRate = async () => {
@@ -1959,6 +2000,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       if (selectedOrder.translate_from) setSourceLanguage(selectedOrder.translate_from);
       if (selectedOrder.translate_to) setTargetLanguage(selectedOrder.translate_to);
 
+      // Auto-fill currencies based on languages
+      const srcCurrency = getCurrencyFromLanguage(selectedOrder.translate_from);
+      const tgtCurrency = getCurrencyFromLanguage(selectedOrder.translate_to);
+      setAiPipelineConfig(prev => ({
+        ...prev,
+        sourceCurrency: srcCurrency,
+        targetCurrency: tgtCurrency
+      }));
+      setTranslatorNoteSettings(prev => ({
+        ...prev,
+        sourceCurrency: srcCurrency,
+        targetCurrency: tgtCurrency,
+        exchangeRate: ''
+      }));
+
       // Set translator if assigned
       if (selectedOrder.assigned_translator) {
         setSelectedTranslator(selectedOrder.assigned_translator);
@@ -1979,6 +2035,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setActiveSubTab('start');
     }
   }, [selectedOrder]);
+
+  // Auto-update currencies when source/target language changes
+  useEffect(() => {
+    if (sourceLanguage) {
+      const srcCurrency = getCurrencyFromLanguage(sourceLanguage);
+      setAiPipelineConfig(prev => ({ ...prev, sourceCurrency: srcCurrency }));
+      setTranslatorNoteSettings(prev => ({ ...prev, sourceCurrency: srcCurrency, exchangeRate: '' }));
+    }
+  }, [sourceLanguage]);
+
+  useEffect(() => {
+    if (targetLanguage) {
+      const tgtCurrency = getCurrencyFromLanguage(targetLanguage);
+      setAiPipelineConfig(prev => ({ ...prev, targetCurrency: tgtCurrency }));
+      setTranslatorNoteSettings(prev => ({ ...prev, targetCurrency: tgtCurrency, exchangeRate: '' }));
+    }
+  }, [targetLanguage]);
 
   // Close project menu when clicking outside
   useEffect(() => {
@@ -6124,27 +6197,87 @@ tradução juramentada | certified translation`}
                     </label>
 
                     {aiPipelineConfig.convertCurrency && (
-                      <div className="flex gap-2 mt-2 ml-6">
-                        <select
-                          value={aiPipelineConfig.sourceCurrency}
-                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded"
-                        >
-                          <option value="BRL">BRL (R$)</option>
-                          <option value="EUR">EUR (€)</option>
-                          <option value="GBP">GBP (£)</option>
-                          <option value="JPY">JPY (¥)</option>
-                        </select>
-                        <span className="text-gray-400">→</span>
-                        <select
-                          value={aiPipelineConfig.targetCurrency}
-                          onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded"
-                        >
-                          <option value="USD">USD ($)</option>
-                          <option value="BRL">BRL (R$)</option>
-                          <option value="EUR">EUR (€)</option>
-                        </select>
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                        {/* Currency Dropdowns */}
+                        <div className="flex gap-2 items-center">
+                          <select
+                            value={aiPipelineConfig.sourceCurrency}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, sourceCurrency: e.target.value})}
+                            className="px-2 py-1.5 text-xs border rounded flex-1"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                            ))}
+                          </select>
+                          <span className="text-gray-400">→</span>
+                          <select
+                            value={aiPipelineConfig.targetCurrency}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, targetCurrency: e.target.value})}
+                            className="px-2 py-1.5 text-xs border rounded flex-1"
+                          >
+                            {Object.entries(CURRENCIES).map(([code, curr]) => (
+                              <option key={code} value={code}>{curr.flag} {code} ({curr.symbol})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Exchange Rate */}
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">
+                            Exchange Rate ({aiPipelineConfig.sourceCurrency} per 1 {aiPipelineConfig.targetCurrency})
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="0.0001"
+                              value={aiPipelineConfig.exchangeRate || ''}
+                              onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, exchangeRate: e.target.value})}
+                              placeholder="Ex: 5.54"
+                              className="flex-1 px-2 py-1.5 text-xs border rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${aiPipelineConfig.targetCurrency}`);
+                                  const data = await response.json();
+                                  if (data.rates && data.rates[aiPipelineConfig.sourceCurrency]) {
+                                    setAiPipelineConfig(prev => ({
+                                      ...prev,
+                                      exchangeRate: data.rates[aiPipelineConfig.sourceCurrency].toFixed(4)
+                                    }));
+                                  }
+                                } catch (err) {
+                                  alert('Could not fetch rate. Please enter manually.');
+                                }
+                              }}
+                              className="px-2 py-1.5 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700 whitespace-nowrap"
+                            >
+                              🔄 Fetch
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Rate Source */}
+                        <div>
+                          <label className="block text-[10px] text-gray-600 mb-1">Rate Source (for citation)</label>
+                          <select
+                            value={aiPipelineConfig.rateSource || 'xe.com'}
+                            onChange={(e) => setAiPipelineConfig({...aiPipelineConfig, rateSource: e.target.value})}
+                            className="w-full px-2 py-1.5 text-xs border rounded"
+                          >
+                            {RATE_SOURCES.map(source => (
+                              <option key={source.id} value={source.id}>{source.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Preview */}
+                        {aiPipelineConfig.exchangeRate && (
+                          <div className="text-[10px] text-gray-600 bg-white p-2 rounded border">
+                            <strong>Preview:</strong> {CURRENCIES[aiPipelineConfig.sourceCurrency]?.symbol}1,000.00 = [<strong>{CURRENCIES[aiPipelineConfig.targetCurrency]?.symbol}{(1000 / parseFloat(aiPipelineConfig.exchangeRate)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>]
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
