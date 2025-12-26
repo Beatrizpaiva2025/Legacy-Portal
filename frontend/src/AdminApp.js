@@ -520,6 +520,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
+    { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
@@ -10351,6 +10352,8 @@ const NewQuotePage = ({ adminKey, user }) => {
     translate_to: 'English',
     service_type: 'certified',
     turnaround: 'standard',
+    delivery_method: 'digital',
+    discount: 0,
     special_instructions: ''
   });
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -10365,11 +10368,23 @@ const NewQuotePage = ({ adminKey, user }) => {
 
   const SERVICE_TYPES = {
     certified: { name: 'Certified Translation', price: 24.99, description: 'Official documents, legal, immigration' },
+    sworn: { name: 'Sworn Translation (Tradução Juramentada)', price: 34.99, description: 'Court-recognized, notarized by sworn translator' },
+    apostille: { name: 'Apostille Service', price: 85.00, description: 'HCCH Apostille authentication for international use' },
     standard: { name: 'Standard Translation', price: 19.99, description: 'General use, no certification' }
   };
 
   const TURNAROUND = {
-    standard: { name: '2-3 business days', multiplier: 1.0 }
+    standard: { name: '2-3 business days', multiplier: 1.0 },
+    priority: { name: 'Priority (24 hours)', multiplier: 1.25 },
+    urgent: { name: 'Urgent (12 hours)', multiplier: 2.0 }
+  };
+
+  const DELIVERY_OPTIONS = {
+    digital: { name: 'Digital Delivery (Email/Download)', price: 0, description: 'PDF via email' },
+    usps_standard: { name: 'USPS Standard Mail', price: 5.99, description: '5-7 business days' },
+    usps_priority: { name: 'USPS Priority Mail', price: 12.99, description: '2-3 business days' },
+    usps_express: { name: 'USPS Express Mail', price: 29.99, description: '1-2 business days' },
+    fedex_overnight: { name: 'FedEx Overnight', price: 39.99, description: 'Next business day' }
   };
 
   // Handle file upload
@@ -10424,10 +10439,13 @@ const NewQuotePage = ({ adminKey, user }) => {
     const totalPages = uploadedFiles.length;
     const basePrice = SERVICE_TYPES[formData.service_type].price;
     const turnaroundMultiplier = TURNAROUND[formData.turnaround].multiplier;
+    const deliveryFee = DELIVERY_OPTIONS[formData.delivery_method].price;
+    const discountPercent = parseFloat(formData.discount) || 0;
 
     const subtotal = totalPages * basePrice;
     const turnaroundFee = subtotal * (turnaroundMultiplier - 1);
-    const total = subtotal + turnaroundFee;
+    const discountAmount = (subtotal + turnaroundFee) * (discountPercent / 100);
+    const total = subtotal + turnaroundFee + deliveryFee - discountAmount;
 
     setTimeout(() => {
       setQuote({
@@ -10435,9 +10453,13 @@ const NewQuotePage = ({ adminKey, user }) => {
         base_price: basePrice,
         subtotal: subtotal,
         turnaround_fee: turnaroundFee,
+        delivery_fee: deliveryFee,
+        discount_percent: discountPercent,
+        discount_amount: discountAmount,
         total: total,
         service: SERVICE_TYPES[formData.service_type].name,
-        turnaround: TURNAROUND[formData.turnaround].name
+        turnaround: TURNAROUND[formData.turnaround].name,
+        delivery: DELIVERY_OPTIONS[formData.delivery_method].name
       });
       setCalculating(false);
     }, 500);
@@ -10653,6 +10675,47 @@ const NewQuotePage = ({ adminKey, user }) => {
                 ))}
               </div>
             </div>
+
+            {/* Delivery Method */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Method</label>
+              <div className="space-y-2">
+                {Object.entries(DELIVERY_OPTIONS).map(([key, option]) => (
+                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.delivery_method === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="delivery_method"
+                      value={key}
+                      checked={formData.delivery_method === key}
+                      onChange={(e) => { setFormData({...formData, delivery_method: e.target.value}); setQuote(null); }}
+                      className="mr-3"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium">{option.name}</div>
+                      <div className="text-sm text-gray-500">{option.description}</div>
+                    </div>
+                    {option.price > 0 && (
+                      <div className="text-sm text-blue-600">+${option.price.toFixed(2)}</div>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Discount */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Discount (%)</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={formData.discount}
+                onChange={(e) => { setFormData({...formData, discount: parseFloat(e.target.value) || 0}); setQuote(null); }}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                placeholder="0"
+              />
+              <p className="text-xs text-gray-500 mt-1">Enter discount percentage (e.g., 10 for 10% off)</p>
+            </div>
           </div>
 
           {/* Documents */}
@@ -10734,13 +10797,29 @@ const NewQuotePage = ({ adminKey, user }) => {
                     <span className="font-medium">{quote.turnaround}</span>
                   </div>
                   <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Delivery</span>
+                    <span className="font-medium">{quote.delivery}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
                     <span>${quote.subtotal.toFixed(2)}</span>
                   </div>
                   {quote.turnaround_fee > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Rush Fee</span>
-                      <span>${quote.turnaround_fee.toFixed(2)}</span>
+                      <span className="text-orange-600">+${quote.turnaround_fee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {quote.delivery_fee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Delivery Fee</span>
+                      <span className="text-blue-600">+${quote.delivery_fee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {quote.discount_amount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Discount ({quote.discount_percent}%)</span>
+                      <span className="text-green-600">-${quote.discount_amount.toFixed(2)}</span>
                     </div>
                   )}
                   <div className="border-t pt-3 flex justify-between">
@@ -10775,6 +10854,237 @@ const NewQuotePage = ({ adminKey, user }) => {
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== FOLLOW-UPS PAGE ====================
+const FollowupsPage = ({ adminKey }) => {
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [followupData, setFollowupData] = useState(null);
+  const [error, setError] = useState('');
+
+  const fetchFollowupStatus = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/admin/quotes/followup-status?admin_key=${adminKey}`);
+      setFollowupData(response.data);
+    } catch (err) {
+      setError('Failed to load follow-up data');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const processFollowups = async () => {
+    setProcessing(true);
+    try {
+      const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
+      const result = response.data;
+      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrors: ${result.errors.length}` : ''}`);
+      fetchFollowupStatus();
+    } catch (err) {
+      alert('Failed to process follow-ups. Check console for details.');
+      console.error(err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFollowupStatus();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Quote Follow-up System</h1>
+            <p className="text-gray-600 text-sm">Automated reminders for unconverted quotes</p>
+          </div>
+          <button
+            onClick={processFollowups}
+            disabled={processing}
+            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 flex items-center gap-2"
+          >
+            {processing ? (
+              <>
+                <span className="animate-spin">⏳</span>
+                Processing...
+              </>
+            ) : (
+              <>
+                <span>🚀</span>
+                Process Follow-ups Now
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Summary Cards */}
+        {followupData?.summary && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="bg-white rounded-lg shadow p-4 text-center">
+              <div className="text-3xl font-bold text-gray-600">{followupData.summary.total_pending}</div>
+              <div className="text-xs text-gray-500">Pending (0-3 days)</div>
+            </div>
+            <div className="bg-yellow-50 rounded-lg shadow p-4 text-center border border-yellow-200">
+              <div className="text-3xl font-bold text-yellow-600">{followupData.summary.needs_first_reminder}</div>
+              <div className="text-xs text-yellow-700">Need 1st Reminder</div>
+            </div>
+            <div className="bg-orange-50 rounded-lg shadow p-4 text-center border border-orange-200">
+              <div className="text-3xl font-bold text-orange-600">{followupData.summary.needs_second_reminder}</div>
+              <div className="text-xs text-orange-700">Need 2nd Reminder (10%)</div>
+            </div>
+            <div className="bg-red-50 rounded-lg shadow p-4 text-center border border-red-200">
+              <div className="text-3xl font-bold text-red-600">{followupData.summary.needs_third_reminder}</div>
+              <div className="text-xs text-red-700">Need 3rd Reminder (15%)</div>
+            </div>
+            <div className="bg-gray-100 rounded-lg shadow p-4 text-center">
+              <div className="text-3xl font-bold text-gray-500">{followupData.summary.marked_lost}</div>
+              <div className="text-xs text-gray-500">Marked Lost</div>
+            </div>
+          </div>
+        )}
+
+        {/* Schedule Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <h3 className="font-semibold text-blue-800 mb-2">Follow-up Schedule</h3>
+          <div className="grid grid-cols-4 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-blue-600 font-bold">Day 3</div>
+              <div className="text-blue-700">1st Reminder</div>
+              <div className="text-blue-500 text-xs">No discount</div>
+            </div>
+            <div className="text-center">
+              <div className="text-blue-600 font-bold">Day 7</div>
+              <div className="text-blue-700">2nd Reminder</div>
+              <div className="text-blue-500 text-xs">10% discount</div>
+            </div>
+            <div className="text-center">
+              <div className="text-blue-600 font-bold">Day 14</div>
+              <div className="text-blue-700">3rd Reminder</div>
+              <div className="text-blue-500 text-xs">15% discount</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-600 font-bold">Day 21</div>
+              <div className="text-gray-700">Mark as Lost</div>
+              <div className="text-gray-500 text-xs">Close quote</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quote Orders Table */}
+        {followupData?.quote_orders?.length > 0 && (
+          <div className="bg-white rounded-lg shadow mb-6">
+            <div className="px-4 py-3 border-b bg-gray-50">
+              <h3 className="font-semibold text-gray-800">Quote Orders ({followupData.quote_orders.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Quote #</th>
+                    <th className="px-4 py-2 text-left">Client</th>
+                    <th className="px-4 py-2 text-left">Email</th>
+                    <th className="px-4 py-2 text-right">Amount</th>
+                    <th className="px-4 py-2 text-center">Days</th>
+                    <th className="px-4 py-2 text-center">Reminders</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-left">Next Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {followupData.quote_orders.map((order, idx) => (
+                    <tr key={idx} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{order.order_number}</td>
+                      <td className="px-4 py-2">{order.client_name}</td>
+                      <td className="px-4 py-2 text-gray-600">{order.client_email}</td>
+                      <td className="px-4 py-2 text-right">${(order.total_price || 0).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-center">{order.days_since_creation}</td>
+                      <td className="px-4 py-2 text-center">{order.followup_count || 0}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          order.status === 'Quote - Lost' ? 'bg-gray-200 text-gray-700' :
+                          order.status === 'Quote' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">{order.next_action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Abandoned Quotes Table */}
+        {followupData?.abandoned_quotes?.length > 0 && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-4 py-3 border-b bg-gray-50">
+              <h3 className="font-semibold text-gray-800">Abandoned Quotes ({followupData.abandoned_quotes.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left">Name</th>
+                    <th className="px-4 py-2 text-left">Email</th>
+                    <th className="px-4 py-2 text-right">Amount</th>
+                    <th className="px-4 py-2 text-center">Days</th>
+                    <th className="px-4 py-2 text-center">Reminders</th>
+                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-2 text-left">Next Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {followupData.abandoned_quotes.map((quote, idx) => (
+                    <tr key={idx} className="border-t hover:bg-gray-50">
+                      <td className="px-4 py-2 font-medium">{quote.name}</td>
+                      <td className="px-4 py-2 text-gray-600">{quote.email}</td>
+                      <td className="px-4 py-2 text-right">${(quote.total_price || 0).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-center">{quote.days_since_creation}</td>
+                      <td className="px-4 py-2 text-center">{quote.reminder_count || 0}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          quote.status === 'lost' ? 'bg-gray-200 text-gray-700' :
+                          quote.status === 'recovered' ? 'bg-green-100 text-green-700' :
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {quote.status || 'abandoned'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-600">{quote.next_action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {(!followupData?.quote_orders?.length && !followupData?.abandoned_quotes?.length) && (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="text-6xl mb-4">✅</div>
+            <h3 className="text-lg font-semibold text-gray-700">All caught up!</h3>
+            <p className="text-gray-500">No quotes requiring follow-up at this time.</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -14482,8 +14792,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     pricePerPage: 24.99,
     discount: 0,
     urgency: 'no',
+    deliveryMethod: 'digital',
     notes: ''
   });
+
+  const PM_DELIVERY_OPTIONS = {
+    digital: { name: 'Digital (Email/Download)', price: 0 },
+    usps_standard: { name: 'USPS Standard (5-7 days)', price: 5.99 },
+    usps_priority: { name: 'USPS Priority (2-3 days)', price: 12.99 },
+    usps_express: { name: 'USPS Express (1-2 days)', price: 29.99 },
+    fedex_overnight: { name: 'FedEx Overnight', price: 39.99 }
+  };
   const [quoteLanguage, setQuoteLanguage] = useState('en'); // en, pt, es
   const [showQuotePreview, setShowQuotePreview] = useState(false);
   const [sendingQuote, setSendingQuote] = useState(false);
@@ -14606,9 +14925,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     let urgencyFee = 0;
     if (quoteForm.urgency === 'priority') urgencyFee = basePrice * 0.25;
     if (quoteForm.urgency === 'urgent') urgencyFee = basePrice * 1.0;
-    const discountAmount = basePrice * (quoteForm.discount / 100);
-    const total = basePrice + urgencyFee - discountAmount;
-    return { basePrice, urgencyFee, discountAmount, total };
+    const deliveryFee = PM_DELIVERY_OPTIONS[quoteForm.deliveryMethod]?.price || 0;
+    const discountAmount = (basePrice + urgencyFee) * (quoteForm.discount / 100);
+    const total = basePrice + urgencyFee + deliveryFee - discountAmount;
+    return { basePrice, urgencyFee, deliveryFee, discountAmount, total };
   };
 
   // Send quote via email
@@ -15107,15 +15427,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Serviço</label>
                     <select
                       value={quoteForm.serviceType}
-                      onChange={(e) => setQuoteForm({
-                        ...quoteForm,
-                        serviceType: e.target.value,
-                        pricePerPage: e.target.value === 'standard' ? 24.99 : 19.50
-                      })}
+                      onChange={(e) => {
+                        const prices = { certified: 24.99, sworn: 34.99, apostille: 85.00, standard: 19.50 };
+                        setQuoteForm({
+                          ...quoteForm,
+                          serviceType: e.target.value,
+                          pricePerPage: prices[e.target.value] || 24.99
+                        });
+                      }}
                       className="w-full px-2 py-1.5 text-xs border rounded"
                     >
-                      <option value="standard">Tradução Juramentada (Certified)</option>
-                      <option value="professional">Tradução Profissional (Professional)</option>
+                      <option value="certified">Tradução Certificada (Certified)</option>
+                      <option value="sworn">Tradução Juramentada (Sworn)</option>
+                      <option value="apostille">Apostila (Apostille)</option>
+                      <option value="standard">Tradução Profissional (Standard)</option>
                     </select>
                   </div>
                   <div>
@@ -15130,6 +15455,22 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <option value="urgent">Urgente (12 horas) +100%</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Delivery Method */}
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Método de Entrega</label>
+                  <select
+                    value={quoteForm.deliveryMethod}
+                    onChange={(e) => setQuoteForm({...quoteForm, deliveryMethod: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    {Object.entries(PM_DELIVERY_OPTIONS).map(([key, opt]) => (
+                      <option key={key} value={key}>
+                        {opt.name} {opt.price > 0 ? `(+$${opt.price.toFixed(2)})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Pricing */}
@@ -15233,6 +15574,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className="flex justify-between text-sm text-orange-600">
                           <span>Taxa de Urgência ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
                           <span>+${prices.urgencyFee.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {prices.deliveryFee > 0 && (
+                        <div className="flex justify-between text-sm text-blue-600">
+                          <span>Taxa de Entrega ({PM_DELIVERY_OPTIONS[quoteForm.deliveryMethod]?.name})</span>
+                          <span>+${prices.deliveryFee.toFixed(2)}</span>
                         </div>
                       )}
                       {prices.discountAmount > 0 && (
@@ -15380,6 +15727,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 <tr className="border-b text-orange-600">
                                   <td className="py-2">{t.urgencyFee}</td>
                                   <td className="py-2 text-right">+${prices.urgencyFee.toFixed(2)}</td>
+                                </tr>
+                              )}
+                              {prices.deliveryFee > 0 && (
+                                <tr className="border-b text-blue-600">
+                                  <td className="py-2">{quoteLanguage === 'pt' ? 'Taxa de Entrega' : quoteLanguage === 'es' ? 'Tarifa de Envío' : 'Delivery Fee'}</td>
+                                  <td className="py-2 text-right">+${prices.deliveryFee.toFixed(2)}</td>
                                 </tr>
                               )}
                               {prices.discountAmount > 0 && (
@@ -16101,6 +16454,10 @@ function AdminApp() {
       case 'finances':
         return userRole === 'admin'
           ? <FinancesPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'followups':
+        return ['admin', 'pm'].includes(userRole)
+          ? <FollowupsPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'users':
         return ['admin', 'pm'].includes(userRole)
