@@ -8311,6 +8311,479 @@ async def send_abandoned_quote_reminder(quote_id: str, admin_key: str, include_d
         logger.error(f"Error sending reminder: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to send reminder")
 
+# ==================== AUTOMATED FOLLOW-UP SYSTEM ====================
+
+@api_router.post("/admin/quotes/process-followups")
+async def process_quote_followups(admin_key: str):
+    """
+    Automated follow-up system for unconverted quotes.
+    Follow-up schedule:
+    - Day 3: First reminder (no discount)
+    - Day 7: Second reminder (10% discount)
+    - Day 14: Third reminder (15% discount)
+    - Day 21: Mark as "lost"
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        now = datetime.utcnow()
+        results = {
+            "reminders_sent": 0,
+            "marked_lost": 0,
+            "errors": []
+        }
+
+        # Get all abandoned quotes that need follow-up
+        abandoned_quotes = await db.abandoned_quotes.find({
+            "status": {"$in": ["abandoned", "pending"]}
+        }).to_list(1000)
+
+        # Also get quotes from translation_orders with status "Quote" that haven't converted
+        quote_orders = await db.translation_orders.find({
+            "translation_status": "Quote",
+            "payment_status": "pending"
+        }).to_list(1000)
+
+        # Process abandoned quotes
+        for quote in abandoned_quotes:
+            try:
+                created_at = quote.get("created_at", now)
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                days_since = (now - created_at).days
+                reminder_count = quote.get("reminder_sent", 0)
+                last_reminder = quote.get("last_reminder_at")
+
+                # Determine what action to take
+                should_remind = False
+                discount_percent = 0
+
+                if days_since >= 21 and quote.get("status") != "lost":
+                    # Mark as lost
+                    await db.abandoned_quotes.update_one(
+                        {"id": quote["id"]},
+                        {"$set": {"status": "lost", "marked_lost_at": now}}
+                    )
+                    results["marked_lost"] += 1
+                    continue
+
+                elif days_since >= 14 and reminder_count < 3:
+                    # Third reminder with 15% discount
+                    should_remind = True
+                    discount_percent = 15
+
+                elif days_since >= 7 and reminder_count < 2:
+                    # Second reminder with 10% discount
+                    should_remind = True
+                    discount_percent = 10
+
+                elif days_since >= 3 and reminder_count < 1:
+                    # First reminder, no discount
+                    should_remind = True
+                    discount_percent = 0
+
+                if should_remind:
+                    # Check if we sent a reminder recently (within 24 hours)
+                    if last_reminder:
+                        if isinstance(last_reminder, str):
+                            last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                        hours_since_last = (now - last_reminder).total_seconds() / 3600
+                        if hours_since_last < 24:
+                            continue
+
+                    # Generate discount code if needed
+                    discount_code = None
+                    if discount_percent > 0:
+                        discount_code = f"FOLLOWUP{discount_percent}-{quote['id'][:6].upper()}"
+                        await db.discount_codes.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "code": discount_code,
+                            "type": "percentage",
+                            "value": discount_percent,
+                            "max_uses": 1,
+                            "uses": 0,
+                            "abandoned_quote_id": quote["id"],
+                            "expires_at": now + timedelta(days=7),
+                            "created_at": now,
+                            "is_active": True
+                        })
+
+                    # Send reminder email
+                    await send_followup_email(
+                        quote["email"],
+                        quote.get("name", "Customer"),
+                        quote,
+                        reminder_count + 1,
+                        discount_percent,
+                        discount_code
+                    )
+
+                    # Update quote
+                    await db.abandoned_quotes.update_one(
+                        {"id": quote["id"]},
+                        {
+                            "$set": {"last_reminder_at": now},
+                            "$inc": {"reminder_sent": 1}
+                        }
+                    )
+                    results["reminders_sent"] += 1
+
+            except Exception as e:
+                results["errors"].append(f"Quote {quote.get('id', 'unknown')}: {str(e)}")
+
+        # Process quote orders
+        for order in quote_orders:
+            try:
+                created_at = order.get("created_at", now)
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                days_since = (now - created_at).days
+                reminder_count = order.get("followup_count", 0)
+                last_reminder = order.get("last_followup_at")
+
+                should_remind = False
+                discount_percent = 0
+
+                if days_since >= 21:
+                    # Mark quote as expired/lost
+                    await db.translation_orders.update_one(
+                        {"id": order["id"]},
+                        {"$set": {"translation_status": "Quote - Lost", "updated_at": now}}
+                    )
+                    results["marked_lost"] += 1
+                    continue
+
+                elif days_since >= 14 and reminder_count < 3:
+                    should_remind = True
+                    discount_percent = 15
+
+                elif days_since >= 7 and reminder_count < 2:
+                    should_remind = True
+                    discount_percent = 10
+
+                elif days_since >= 3 and reminder_count < 1:
+                    should_remind = True
+                    discount_percent = 0
+
+                if should_remind:
+                    if last_reminder:
+                        if isinstance(last_reminder, str):
+                            last_reminder = datetime.fromisoformat(last_reminder.replace('Z', '+00:00'))
+                        hours_since_last = (now - last_reminder).total_seconds() / 3600
+                        if hours_since_last < 24:
+                            continue
+
+                    # Generate discount code if needed
+                    discount_code = None
+                    if discount_percent > 0:
+                        discount_code = f"QUOTE{discount_percent}-{order['order_number']}"
+                        await db.discount_codes.insert_one({
+                            "id": str(uuid.uuid4()),
+                            "code": discount_code,
+                            "type": "percentage",
+                            "value": discount_percent,
+                            "max_uses": 1,
+                            "uses": 0,
+                            "order_id": order["id"],
+                            "expires_at": now + timedelta(days=7),
+                            "created_at": now,
+                            "is_active": True
+                        })
+
+                    # Send reminder email for quote order
+                    await send_quote_order_followup_email(
+                        order.get("client_email"),
+                        order.get("client_name", "Customer"),
+                        order,
+                        reminder_count + 1,
+                        discount_percent,
+                        discount_code
+                    )
+
+                    # Update order
+                    await db.translation_orders.update_one(
+                        {"id": order["id"]},
+                        {
+                            "$set": {"last_followup_at": now, "updated_at": now},
+                            "$inc": {"followup_count": 1}
+                        }
+                    )
+                    results["reminders_sent"] += 1
+
+            except Exception as e:
+                results["errors"].append(f"Order {order.get('order_number', 'unknown')}: {str(e)}")
+
+        logger.info(f"Follow-up processing complete: {results}")
+        return results
+
+    except Exception as e:
+        logger.error(f"Error processing follow-ups: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process follow-ups: {str(e)}")
+
+async def send_followup_email(email: str, name: str, quote: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
+    """Send follow-up email for abandoned quote"""
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-customer.onrender.com')
+    total_price = quote.get("total_price", 0)
+    discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
+
+    if reminder_number == 1:
+        subject = "Don't forget your translation quote! - Legacy Translations"
+        intro = "We noticed you started a translation request but didn't complete your order. Your quote is still available!"
+        cta_text = "Complete Your Order"
+    elif reminder_number == 2:
+        subject = f"Special offer: {discount_percent}% off your translation! - Legacy Translations"
+        intro = f"We'd love to help with your translation! As a special thank you for your interest, here's {discount_percent}% off your order."
+        cta_text = "Claim Your Discount"
+    else:
+        subject = f"Last chance: {discount_percent}% off - Legacy Translations"
+        intro = f"This is your final reminder! Don't miss out on {discount_percent}% off your translation. This offer expires soon!"
+        cta_text = "Get Started Now"
+
+    discount_section = ""
+    if discount_code and discount_percent > 0:
+        discount_section = f"""
+        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
+            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
+            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
+            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+        </div>
+        """
+
+    content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
+        </div>
+
+        <div style="padding: 30px;">
+            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
+            <p>{intro}</p>
+
+            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <p><strong>Service:</strong> {quote.get('service_type', 'Translation').replace('_', ' ').title()}</p>
+                <p><strong>Languages:</strong> {quote.get('translate_from', 'Source')} → {quote.get('translate_to', 'Target')}</p>
+                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+            </div>
+
+            {discount_section}
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+            </div>
+
+            <p style="color: #666; font-size: 14px;">If you have any questions, feel free to reply to this email or call us at +1(857)316-7770.</p>
+
+            <p>Best regards,<br>Legacy Translations Team</p>
+        </div>
+
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
+        </div>
+    </div>
+    """
+
+    await email_service.send_email(email, subject, content)
+    logger.info(f"Follow-up email #{reminder_number} sent to {email}")
+
+async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
+    """Send follow-up email for quote order"""
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-customer.onrender.com')
+    total_price = order.get("total_price", order.get("base_price", 0))
+    discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
+    order_number = order.get("order_number", "N/A")
+
+    if reminder_number == 1:
+        subject = f"Your quote {order_number} is waiting! - Legacy Translations"
+        intro = "We noticed you received a translation quote but haven't completed your order yet. We're ready to help!"
+        cta_text = "Complete Your Order"
+    elif reminder_number == 2:
+        subject = f"Special offer on quote {order_number}: {discount_percent}% off!"
+        intro = f"We'd love to work on your translation! Here's {discount_percent}% off as a thank you for your interest."
+        cta_text = "Claim Your Discount"
+    else:
+        subject = f"Final reminder: {discount_percent}% off quote {order_number}"
+        intro = f"This is your last chance to get {discount_percent}% off! Don't miss this special offer."
+        cta_text = "Get Started Now"
+
+    discount_section = ""
+    if discount_code and discount_percent > 0:
+        discount_section = f"""
+        <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
+            <p style="margin: 0 0 10px 0; font-size: 14px;">Use code at checkout:</p>
+            <p style="font-size: 24px; font-weight: bold; color: #d97706; margin: 0;">{discount_code}</p>
+            <p style="margin: 10px 0 0 0; font-size: 14px;">for <strong>{discount_percent}% OFF</strong></p>
+            <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">Was: ${total_price:.2f} | Now: ${discounted_price:.2f}</p>
+        </div>
+        """
+
+    content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+        <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 150px;">
+        </div>
+
+        <div style="padding: 30px;">
+            <h2 style="color: #0d9488; margin-top: 0;">Hello {name}!</h2>
+            <p>{intro}</p>
+
+            <div style="background: #f0fdfa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <p><strong>Quote #:</strong> {order_number}</p>
+                <p><strong>Service:</strong> {order.get('service_type', 'Translation').replace('_', ' ').title()}</p>
+                <p><strong>Languages:</strong> {order.get('translate_from', 'Source')} → {order.get('translate_to', 'Target')}</p>
+                <p><strong>Pages:</strong> {order.get('page_count', 1)}</p>
+                <p style="font-size: 20px; color: #0d9488; font-weight: bold; margin: 10px 0 0 0;">Total: ${total_price:.2f}</p>
+            </div>
+
+            {discount_section}
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{frontend_url}" style="display: inline-block; padding: 15px 40px; background: #0d9488; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">{cta_text}</a>
+            </div>
+
+            <h3 style="color: #0d9488;">Payment Options</h3>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 150px; background: #f0fdf4; padding: 15px; border-radius: 8px;">
+                    <p style="margin: 0;"><strong>Zelle</strong></p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">857-208-1139</p>
+                </div>
+                <div style="flex: 1; min-width: 150px; background: #eff6ff; padding: 15px; border-radius: 8px;">
+                    <p style="margin: 0;"><strong>Venmo</strong></p>
+                    <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">@legacytranslations</p>
+                </div>
+            </div>
+
+            <p style="margin-top: 20px; color: #666; font-size: 14px;">Questions? Reply to this email or call +1(857)316-7770.</p>
+
+            <p>Best regards,<br>Legacy Translations Team</p>
+        </div>
+
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="margin: 0; color: #666; font-size: 12px;">Legacy Translations | www.legacytranslations.com</p>
+        </div>
+    </div>
+    """
+
+    await email_service.send_email(email, subject, content)
+    logger.info(f"Quote order follow-up email #{reminder_number} sent to {email} for {order_number}")
+
+@api_router.get("/admin/quotes/followup-status")
+async def get_followup_status(admin_key: str):
+    """Get status of all quotes and their follow-up progress"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        now = datetime.utcnow()
+
+        # Get abandoned quotes with follow-up info
+        abandoned = await db.abandoned_quotes.find({}).sort("created_at", -1).to_list(500)
+
+        # Get quote orders
+        quote_orders = await db.translation_orders.find({
+            "translation_status": {"$regex": "^Quote", "$options": "i"}
+        }).sort("created_at", -1).to_list(500)
+
+        result = {
+            "abandoned_quotes": [],
+            "quote_orders": [],
+            "summary": {
+                "total_pending": 0,
+                "needs_first_reminder": 0,
+                "needs_second_reminder": 0,
+                "needs_third_reminder": 0,
+                "marked_lost": 0
+            }
+        }
+
+        for q in abandoned:
+            created_at = q.get("created_at", now)
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            days_since = (now - created_at).days
+            reminder_count = q.get("reminder_sent", 0)
+
+            status_info = {
+                "id": q.get("id"),
+                "email": q.get("email"),
+                "name": q.get("name"),
+                "total_price": q.get("total_price"),
+                "days_since_creation": days_since,
+                "reminder_count": reminder_count,
+                "status": q.get("status"),
+                "next_action": None
+            }
+
+            if q.get("status") == "lost":
+                result["summary"]["marked_lost"] += 1
+                status_info["next_action"] = "None - marked as lost"
+            elif q.get("status") == "recovered":
+                status_info["next_action"] = "None - converted to order"
+            elif days_since >= 21:
+                status_info["next_action"] = "Will be marked as lost"
+            elif days_since >= 14 and reminder_count < 3:
+                result["summary"]["needs_third_reminder"] += 1
+                status_info["next_action"] = "Third reminder (15% discount)"
+            elif days_since >= 7 and reminder_count < 2:
+                result["summary"]["needs_second_reminder"] += 1
+                status_info["next_action"] = "Second reminder (10% discount)"
+            elif days_since >= 3 and reminder_count < 1:
+                result["summary"]["needs_first_reminder"] += 1
+                status_info["next_action"] = "First reminder (no discount)"
+            else:
+                result["summary"]["total_pending"] += 1
+                status_info["next_action"] = f"Wait {3 - days_since} more days"
+
+            result["abandoned_quotes"].append(status_info)
+
+        for o in quote_orders:
+            created_at = o.get("created_at", now)
+            if isinstance(created_at, str):
+                created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            days_since = (now - created_at).days
+            reminder_count = o.get("followup_count", 0)
+
+            status_info = {
+                "id": o.get("id"),
+                "order_number": o.get("order_number"),
+                "client_email": o.get("client_email"),
+                "client_name": o.get("client_name"),
+                "total_price": o.get("total_price"),
+                "days_since_creation": days_since,
+                "followup_count": reminder_count,
+                "status": o.get("translation_status"),
+                "next_action": None
+            }
+
+            if o.get("translation_status") == "Quote - Lost":
+                result["summary"]["marked_lost"] += 1
+                status_info["next_action"] = "None - marked as lost"
+            elif days_since >= 21:
+                status_info["next_action"] = "Will be marked as lost"
+            elif days_since >= 14 and reminder_count < 3:
+                result["summary"]["needs_third_reminder"] += 1
+                status_info["next_action"] = "Third reminder (15% discount)"
+            elif days_since >= 7 and reminder_count < 2:
+                result["summary"]["needs_second_reminder"] += 1
+                status_info["next_action"] = "Second reminder (10% discount)"
+            elif days_since >= 3 and reminder_count < 1:
+                result["summary"]["needs_first_reminder"] += 1
+                status_info["next_action"] = "First reminder (no discount)"
+            else:
+                result["summary"]["total_pending"] += 1
+                status_info["next_action"] = f"Wait {3 - days_since} more days"
+
+            result["quote_orders"].append(status_info)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting follow-up status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get follow-up status")
+
 # ==================== DISCOUNT CODES ====================
 
 class DiscountCode(BaseModel):
