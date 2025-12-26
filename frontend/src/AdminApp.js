@@ -7065,15 +7065,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false
       });
 
-      let message = response.data.attachment_sent
-        ? 'Translation sent to client successfully! (with attachment)'
-        : 'Order marked as delivered! (email sent without attachment)';
+      let message = '✅ Email enviado para o cliente!\n\n';
+
+      if (response.data.attachment_sent) {
+        message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
+      } else {
+        message += '⚠️ Sem anexo (nenhum arquivo de tradução encontrado)\n';
+        // Show debug info if no attachment
+        if (response.data.debug) {
+          message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
+        }
+      }
 
       if (response.data.pm_notified) {
-        message += '\nPM notified.';
+        message += '\n📧 PM notificado.';
       }
       if (response.data.bcc_sent) {
-        message += '\nBCC copy sent.';
+        message += '\n📧 Cópia BCC enviada.';
       }
 
       alert(message);
@@ -7082,7 +7090,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Error sending to client');
+      alert('Erro ao enviar: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingToClient(false);
     }
@@ -9512,160 +9520,134 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       {/* Send to Client Modal */}
       {sendingOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className={`p-4 border-b flex justify-between items-center rounded-t-lg ${
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
+            <div className={`p-3 border-b flex justify-between items-center rounded-t-lg flex-shrink-0 ${
               sendingOrder.translation_status === 'delivered' ? 'bg-blue-600' : 'bg-teal-600'
             } text-white`}>
               <div>
-                <h3 className="font-bold">
+                <h3 className="font-bold text-sm">
                   {sendingOrder.translation_status === 'delivered' ? '🔄 Resend Translation' : '📤 Send to Client'}
                 </h3>
-                <p className="text-xs opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
+                <p className="text-[10px] opacity-80">{sendingOrder.order_number} - {sendingOrder.client_name}</p>
               </div>
               <button onClick={() => setSendingOrder(null)} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
-            <div className="p-4">
+            <div className="p-3 overflow-y-auto flex-1">
               {/* Resend notice for delivered orders */}
               {sendingOrder.translation_status === 'delivered' && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <div className="text-xs text-blue-700">
-                    <strong>ℹ️ Resending:</strong> This translation was already delivered
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
+                  <div className="text-[10px] text-blue-700">
+                    <strong>ℹ️ Resending:</strong> Delivered
                     {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString()}`}.
-                    You can upload a new file below before resending.
+                    Upload new file below if needed.
                   </div>
                 </div>
               )}
 
               {/* Client Info */}
-              <div className="mb-4 p-3 bg-gray-50 rounded border">
-                <div className="text-xs font-medium text-gray-600 mb-1">Client:</div>
-                <div className="text-sm font-medium">{sendingOrder.client_name}</div>
-                <div className="text-xs text-gray-500">{sendingOrder.client_email}</div>
+              <div className="mb-3 p-2 bg-gray-50 rounded border">
+                <div className="text-[10px] font-medium text-gray-600">Client:</div>
+                <div className="text-xs font-medium">{sendingOrder.client_name}</div>
+                <div className="text-[10px] text-gray-500">{sendingOrder.client_email}</div>
               </div>
 
               {/* Translated Document Status */}
-              <div className="mb-4">
-                <div className="text-xs font-medium text-gray-600 mb-2">📄 Translated Document:</div>
+              <div className="mb-3">
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Document:</div>
                 {!translatedDocInfo ? (
-                  <div className="text-center py-3 text-gray-500 text-xs">Loading...</div>
+                  <div className="text-center py-2 text-gray-500 text-[10px]">Loading...</div>
                 ) : translatedDocInfo.has_translated_document ? (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span className="text-green-600 text-lg mr-2">✅</span>
-                        <div>
-                          <div className="text-xs font-medium text-green-800">Translation available</div>
-                          <div className="text-[10px] text-green-600">
-                            {translatedDocInfo.translated_filename || 'HTML generated in workspace'}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
-                        className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                      >
-                        ⬇️ Download
-                      </button>
+                  <div className="p-2 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="text-green-600 mr-1">✅</span>
+                      <span className="text-[10px] text-green-800">Available</span>
                     </div>
+                    <button
+                      onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
+                      className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
+                    >
+                      ⬇️ Download
+                    </button>
                   </div>
                 ) : (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                    <div className="flex items-center">
-                      <span className="text-yellow-600 text-lg mr-2">⚠️</span>
-                      <div className="text-xs text-yellow-800">
-                        No translation attached. Upload below or send without attachment.
-                      </div>
-                    </div>
+                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <div className="text-[10px] text-yellow-800">⚠️ No translation attached</div>
                   </div>
                 )}
               </div>
 
               {/* Upload new document */}
-              <div className="mb-4">
-                <div className="text-xs font-medium text-gray-600 mb-2">📎 Upload new document:</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    id="translationFile"
-                    accept=".pdf,.doc,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files[0]) {
-                        uploadTranslatedDocument(sendingOrder.id, e.target.files[0]);
-                      }
-                    }}
-                  />
-                  <label
-                    htmlFor="translationFile"
-                    className={`flex-1 px-3 py-2 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-xs ${uploadingFile ? 'opacity-50' : ''}`}
-                  >
-                    {uploadingFile ? 'Uploading...' : '📁 Click to select file (PDF, DOC)'}
-                  </label>
-                </div>
+              <div className="mb-3">
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload new:</div>
+                <input
+                  type="file"
+                  id="translationFile"
+                  accept=".pdf,.doc,.docx"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files[0]) {
+                      uploadTranslatedDocument(sendingOrder.id, e.target.files[0]);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="translationFile"
+                  className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
+                >
+                  {uploadingFile ? 'Uploading...' : '📁 Select file (PDF, DOC)'}
+                </label>
               </div>
 
               {/* Notify PM Option */}
               {sendingOrder?.assigned_pm_id && (
-                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                <div className="mb-3 p-2 bg-purple-50 border border-purple-200 rounded">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={notifyPM}
                       onChange={(e) => setNotifyPM(e.target.checked)}
-                      className="w-4 h-4 text-purple-600 rounded"
+                      className="w-3 h-3 text-purple-600 rounded"
                     />
-                    <div>
-                      <span className="text-xs font-medium text-purple-700">Notify Project Manager</span>
-                      <p className="text-[10px] text-purple-600">
-                        {sendingOrder.assigned_pm_name || sendingOrder.assigned_pm || 'Assigned PM'} will receive a copy
-                      </p>
-                    </div>
+                    <span className="text-[10px] text-purple-700">
+                      Notify PM ({sendingOrder.assigned_pm_name || 'Assigned'})
+                    </span>
                   </label>
                 </div>
               )}
 
               {/* BCC Field */}
-              <div className="mb-4">
-                <label className="text-xs font-medium text-gray-600 mb-1 block">
-                  📧 BCC (Blind Carbon Copy):
-                </label>
+              <div className="mb-2">
+                <label className="text-[10px] font-medium text-gray-600 mb-1 block">📧 BCC:</label>
                 <input
                   type="email"
                   value={sendBccEmail}
                   onChange={(e) => setSendBccEmail(e.target.value)}
                   placeholder="email@example.com (optional)"
-                  className="w-full px-3 py-2 border rounded text-sm"
+                  className="w-full px-2 py-1 border rounded text-xs"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">
-                  Send a hidden copy to another email address
-                </p>
-              </div>
-
-              {/* Warning */}
-              <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
-                💡 By clicking "Send", the client will receive an email with the translation attached (if available).
               </div>
             </div>
 
-            <div className="p-3 border-t bg-gray-50 flex justify-between rounded-b-lg">
+            {/* Footer - always visible */}
+            <div className="p-2 border-t bg-gray-50 flex justify-between rounded-b-lg flex-shrink-0">
               <button
                 onClick={() => setSendingOrder(null)}
-                className="px-4 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
+                className="px-3 py-1.5 bg-gray-400 text-white rounded text-xs hover:bg-gray-500"
               >
                 Cancel
               </button>
               <button
                 onClick={() => sendTranslationToClient(sendingOrder.id)}
                 disabled={sendingToClient}
-                className={`px-4 py-1.5 text-white rounded text-xs disabled:bg-gray-400 ${
+                className={`px-3 py-1.5 text-white rounded text-xs disabled:bg-gray-400 ${
                   sendingOrder.translation_status === 'delivered'
                     ? 'bg-blue-600 hover:bg-blue-700'
                     : 'bg-teal-600 hover:bg-teal-700'
                 }`}
               >
-                {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend to Client' : '📤 Send to Client')}
+                {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend' : '📤 Send')}
               </button>
             </div>
           </div>
