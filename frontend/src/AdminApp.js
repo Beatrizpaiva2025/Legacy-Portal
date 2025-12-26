@@ -10121,36 +10121,85 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Translated Document Status */}
               <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Document:</div>
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Tradução para Anexar:</div>
                 {!translatedDocInfo ? (
-                  <div className="text-center py-2 text-gray-500 text-[10px]">Loading...</div>
+                  <div className="text-center py-2 text-gray-500 text-[10px]">Carregando...</div>
                 ) : translatedDocInfo.has_translated_document ? (
-                  <div className="p-2 bg-green-50 border border-green-200 rounded flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="text-green-600 mr-1">✅</span>
-                      <span className="text-[10px] text-green-800">Available</span>
-                    </div>
-                    <button
-                      onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
-                      className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
-                    >
-                      ⬇️ Download
-                    </button>
+                  <div className="space-y-2">
+                    {/* Show HTML translation from workspace */}
+                    {translatedDocInfo.has_html_translation && (
+                      <div className="p-2 bg-green-50 border border-green-200 rounded">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center">
+                            <span className="text-green-600 mr-1">✅</span>
+                            <span className="text-[10px] text-green-800 font-medium">Tradução do Workspace</span>
+                          </div>
+                          <button
+                            onClick={() => downloadTranslatedDocument(sendingOrder.id, 'translation.html')}
+                            className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
+                          >
+                            👁️ Preview
+                          </button>
+                        </div>
+                        {translatedDocInfo.translation_settings && (
+                          <div className="text-[9px] text-gray-600 space-y-0.5 mt-1 border-t border-green-200 pt-1">
+                            <div>📝 Tipo: {translatedDocInfo.translation_settings.document_type || 'N/A'}</div>
+                            <div>🌐 {translatedDocInfo.translation_settings.source_language} → {translatedDocInfo.translation_settings.target_language}</div>
+                            {translatedDocInfo.translation_settings.translator_name && (
+                              <div>👤 Tradutor: {translatedDocInfo.translation_settings.translator_name}</div>
+                            )}
+                            {translatedDocInfo.translation_settings.submitted_by && (
+                              <div>📤 Enviado por: {translatedDocInfo.translation_settings.submitted_by}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Show uploaded file */}
+                    {translatedDocInfo.has_file_attachment && (
+                      <div className="p-2 bg-blue-50 border border-blue-200 rounded">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <span className="text-blue-600 mr-1">📎</span>
+                            <span className="text-[10px] text-blue-800 font-medium">
+                              Arquivo: {translatedDocInfo.translated_filename || 'documento.pdf'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
+                            className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
+                          >
+                            ⬇️ Download
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Priority notice */}
+                    {translatedDocInfo.has_file_attachment && translatedDocInfo.has_html_translation && (
+                      <div className="p-1.5 bg-yellow-50 border border-yellow-200 rounded text-[9px] text-yellow-700">
+                        ⚠️ O arquivo PDF terá prioridade sobre a tradução do workspace
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
-                    <div className="text-[10px] text-yellow-800">⚠️ No translation attached</div>
+                    <div className="text-[10px] text-yellow-800">⚠️ Nenhuma tradução anexada</div>
+                    <div className="text-[9px] text-yellow-600 mt-1">
+                      Faça upload de um arquivo abaixo ou complete a tradução no Workspace
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Upload new document */}
+              {/* Upload new document - External translation */}
               <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload new:</div>
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload Tradução Externa:</div>
                 <input
                   type="file"
                   id="translationFile"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf,.doc,.docx,.html"
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files[0]) {
@@ -10162,8 +10211,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   htmlFor="translationFile"
                   className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
                 >
-                  {uploadingFile ? 'Uploading...' : '📁 Select file (PDF, DOC)'}
+                  {uploadingFile ? 'Enviando...' : '📁 Selecionar arquivo (PDF, DOC, HTML)'}
                 </label>
+                <div className="text-[9px] text-gray-400 mt-1 text-center">
+                  Para traduções feitas fora do sistema
+                </div>
               </div>
 
               {/* Notify PM Option */}
