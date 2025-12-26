@@ -93,7 +93,10 @@ class EmailDeliveryError(Exception):
 class EmailService:
     def __init__(self):
         self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
-        self.sender_email = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+        # For production: use verified domain like "Legacy Translations <noreply@legacytranslations.com>"
+        # For testing: use "Legacy Translations <onboarding@resend.dev>"
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <onboarding@resend.dev>')
+        self.reply_to = os.environ.get('REPLY_TO_EMAIL', 'contact@legacytranslations.com')
         # Initialize Resend
         resend.api_key = self.api_key
 
@@ -104,6 +107,7 @@ class EmailService:
                 "from": self.sender_email,
                 "to": [to],
                 "subject": subject,
+                "reply_to": self.reply_to,
             }
             if content_type == "html":
                 params["html"] = content
@@ -128,6 +132,7 @@ class EmailService:
                 "from": self.sender_email,
                 "to": [to],
                 "subject": subject,
+                "reply_to": self.reply_to,
                 "html": content,
                 "attachments": [
                     {
@@ -4383,7 +4388,8 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
             logger.info(f"Saved {len(quote_data.files)} documents for quote {order_number}")
 
         # Send quote email to client
-        frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
+        # Use main website domain for better email deliverability
+        website_url = "https://legacytranslations.com"
         turnaround_display = "2-3 business days"
 
         service_display = "Certified Translation" if quote_data.service_type == "certified" else "Standard Translation"
@@ -4408,7 +4414,7 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
             <h3 style="color: #0d9488; margin-top: 30px;">Payment Options</h3>
 
             <div style="background: #f0fdf4; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #bbf7d0;">
-                <p style="margin: 0 0 15px 0;"><strong>Option 1: Zelle (Instant)</strong></p>
+                <p style="margin: 0 0 15px 0;"><strong>Option 1: Zelle (Instant & Preferred)</strong></p>
                 <p style="margin: 0; color: #666;">Send to: <strong>857-208-1139</strong></p>
                 <p style="margin: 0; color: #666;">Business Name: <strong>Legacy Translations Inc</strong></p>
             </div>
@@ -4420,10 +4426,9 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
 
             <div style="background: #faf5ff; padding: 20px; border-radius: 10px; margin: 20px 0; border: 1px solid #e9d5ff;">
                 <p style="margin: 0 0 15px 0;"><strong>Option 3: Credit/Debit Card</strong></p>
-                <p style="margin: 0; color: #666;">Click the button below to pay securely online:</p>
-                <div style="text-align: center; margin-top: 15px;">
-                    <a href="{frontend_url}/#/customer" style="background: #7c3aed; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Pay with Card</a>
-                </div>
+                <p style="margin: 0; color: #666;">To pay by card, please visit our website:</p>
+                <p style="margin: 10px 0 0 0; color: #7c3aed; font-weight: bold;">legacytranslations.com</p>
+                <p style="margin: 5px 0 0 0; color: #888; font-size: 12px;">Or contact us at +1(857)316-7770 for card payment assistance</p>
             </div>
 
             <p style="color: #666; font-size: 14px; margin-top: 20px;">
@@ -4433,6 +4438,11 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
             <p style="color: #666; font-size: 14px;">This quote is valid for 30 days. If you have any questions, please reply to this email.</p>
 
             <p>Best regards,<br>Legacy Translations Team</p>
+
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+                <p style="margin: 0; color: #999; font-size: 12px;">Legacy Translations Inc</p>
+                <p style="margin: 5px 0 0 0; color: #999; font-size: 12px;">+1(857)316-7770 | legacytranslations.com</p>
+            </div>
         </div>
         """
 
