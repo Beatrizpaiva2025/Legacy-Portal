@@ -10022,7 +10022,7 @@ Use these EXACT translations for the following terms:
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if chunk_idx < num_chunks - 1:
-                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
+                await asyncio.sleep(45)  # Wait 45 seconds between chunks (8K tokens/min limit)
 
         # Combine all chunk translations
         combined_translation = combine_chunk_translations(all_translations, total_pages)
@@ -10089,6 +10089,15 @@ Produce a complete HTML translation ready for professional use.
             system=system_prompt,
             messages=[{"role": "user", "content": message_content}]
         )
+
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Chunk {chunk_num} translation returned empty response")
+            return {
+                "success": False,
+                "error": "API returned empty response (possible rate limit)",
+                "result": None
+            }
 
         return {
             "success": True,
@@ -10273,6 +10282,16 @@ OUTPUT: Complete corrected HTML section."""
             }]
         )
 
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Layout chunk {chunk_num} returned empty response")
+            return {
+                "success": True,
+                "result": chunk,  # Return original
+                "tokens_used": 0,
+                "changes": []
+            }
+
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
@@ -10433,7 +10452,7 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if i < total_chunks:
-                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
+                await asyncio.sleep(45)  # Wait 45 seconds between chunks (8K tokens/min limit)
 
         # Combine all chunks
         final_result = combine_layout_chunks(processed_chunks, config)
@@ -10575,6 +10594,16 @@ OUTPUT: Complete corrected HTML section."""
             }]
         )
 
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Proofreader chunk {chunk_num} returned empty response")
+            return {
+                "success": True,
+                "result": chunk,  # Return original
+                "tokens_used": 0,
+                "corrections": []
+            }
+
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
@@ -10661,7 +10690,7 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if i < total_chunks:
-                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
+                await asyncio.sleep(45)  # Wait 45 seconds between chunks (8K tokens/min limit)
 
         # Combine all chunks using the same function as layout
         final_result = combine_layout_chunks(processed_chunks, config)
