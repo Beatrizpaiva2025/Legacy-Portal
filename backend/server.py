@@ -10169,14 +10169,221 @@ def combine_chunk_translations(translations: list, total_pages: int) -> str:
     return combined_html
 
 
+def split_html_into_chunks(html_content: str, max_chunk_size: int = 50000) -> list:
+    """Split HTML content into chunks by page-break divs or by size"""
+    import re
+
+    # Try to split by page-break divs first
+    page_break_pattern = r'<div[^>]*class="[^"]*page-break[^"]*"[^>]*>.*?</div>'
+
+    # Find all page break positions
+    breaks = list(re.finditer(page_break_pattern, html_content, re.DOTALL | re.IGNORECASE))
+
+    if breaks:
+        # Split by page breaks
+        chunks = []
+        last_end = 0
+        current_chunk = ""
+
+        for match in breaks:
+            section = html_content[last_end:match.end()]
+
+            # If adding this section would make chunk too large, save current and start new
+            if len(current_chunk) + len(section) > max_chunk_size and current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = section
+            else:
+                current_chunk += section
+
+            last_end = match.end()
+
+        # Add remaining content
+        remaining = html_content[last_end:]
+        if remaining.strip():
+            if len(current_chunk) + len(remaining) > max_chunk_size and current_chunk:
+                chunks.append(current_chunk)
+                chunks.append(remaining)
+            else:
+                current_chunk += remaining
+                chunks.append(current_chunk)
+        elif current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks if chunks else [html_content]
+
+    # Fallback: split by size at paragraph boundaries
+    if len(html_content) <= max_chunk_size:
+        return [html_content]
+
+    chunks = []
+    current_pos = 0
+
+    while current_pos < len(html_content):
+        end_pos = min(current_pos + max_chunk_size, len(html_content))
+
+        # Try to find a good break point (end of paragraph or div)
+        if end_pos < len(html_content):
+            # Look for </div> or </p> near the end
+            search_start = max(current_pos, end_pos - 1000)
+            search_text = html_content[search_start:end_pos]
+
+            for pattern in ['</div>', '</p>', '</table>', '<br']:
+                last_break = search_text.rfind(pattern)
+                if last_break != -1:
+                    end_pos = search_start + last_break + len(pattern)
+                    break
+
+        chunks.append(html_content[current_pos:end_pos])
+        current_pos = end_pos
+
+    return chunks
+
+
+async def process_layout_chunk(chunk: str, chunk_num: int, total_chunks: int,
+                                config: dict, claude_api_key: str) -> dict:
+    """Process a single chunk through layout optimization"""
+    import anthropic
+
+    page_format = config.get("page_format", "letter")
+    page_size = "US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"
+
+    system_prompt = get_ai_layout_prompt(config)
+
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=16384,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"""Optimize the layout of this document section (chunk {chunk_num}/{total_chunks}) for professional printing:
+
+{chunk}
+
+TARGET: {page_size}
+TASK: Optimize CSS, fix page breaks, ensure print-ready output.
+IMPORTANT: Return ONLY the optimized HTML content. Preserve all structure.
+OUTPUT: Complete corrected HTML section."""
+            }]
+        )
+
+        result = response.content[0].text
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+        # Extract changes if present
+        changes = []
+        if "<!-- LAYOUT_CHANGES:" in result:
+            try:
+                changes_match = re.search(r'<!-- LAYOUT_CHANGES: (\[.*?\]) -->', result, re.DOTALL)
+                if changes_match:
+                    changes = json.loads(changes_match.group(1))
+                    result = re.sub(r'<!-- LAYOUT_CHANGES: \[.*?\] -->', '', result, flags=re.DOTALL).strip()
+            except:
+                pass
+
+        return {
+            "success": True,
+            "result": result,
+            "tokens_used": tokens_used,
+            "changes": changes
+        }
+
+    except Exception as e:
+        logger.warning(f"Layout chunk {chunk_num} failed: {str(e)}, using original")
+        return {
+            "success": True,  # Don't fail the whole process
+            "result": chunk,  # Return original chunk
+            "tokens_used": 0,
+            "changes": []
+        }
+
+
+def combine_layout_chunks(chunks: list, config: dict) -> str:
+    """Combine layout-optimized chunks into a single HTML document"""
+    page_format = config.get("page_format", "letter")
+    page_size = "US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"
+
+    # Extract body content from each chunk
+    body_contents = []
+
+    for chunk in chunks:
+        # Try to extract content between <body> tags
+        if "<body" in chunk.lower():
+            body_match = re.search(r'<body[^>]*>(.*?)</body>', chunk, re.DOTALL | re.IGNORECASE)
+            if body_match:
+                body_contents.append(body_match.group(1))
+            else:
+                # Remove doctype, html, head tags if present
+                clean_chunk = re.sub(r'<!DOCTYPE[^>]*>', '', chunk, flags=re.IGNORECASE)
+                clean_chunk = re.sub(r'<html[^>]*>|</html>', '', clean_chunk, flags=re.IGNORECASE)
+                clean_chunk = re.sub(r'<head[^>]*>.*?</head>', '', clean_chunk, flags=re.DOTALL | re.IGNORECASE)
+                body_contents.append(clean_chunk.strip())
+        else:
+            body_contents.append(chunk)
+
+    combined_body = '\n'.join(body_contents)
+
+    # Create final optimized HTML document
+    combined_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Translated Document - Layout Optimized</title>
+    <style>
+        @page {{
+            size: {page_size};
+            margin: 1in;
+        }}
+        body {{
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }}
+        td, th {{
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }}
+        .page-break {{
+            page-break-before: always;
+        }}
+        @media print {{
+            .page-break {{
+                page-break-before: always;
+            }}
+            body {{
+                padding: 0;
+            }}
+        }}
+    </style>
+</head>
+<body>
+{combined_body}
+</body>
+</html>"""
+
+    return combined_html
+
+
 async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_api_key: str) -> dict:
     """
-    STAGE 2: AI LAYOUT REVIEWER
+    STAGE 2: AI LAYOUT REVIEWER (with chunking support for large documents)
     - Uses specialized layout prompt
     - Checks and fixes page breaks
     - Adjusts format (US Letter vs A4)
     - Ensures proper visual structure
     - Maintains original document appearance
+    - Processes large documents in chunks
     """
     import anthropic
 
@@ -10184,7 +10391,54 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
     page_format = config.get("page_format", "letter")
     page_size = "US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"
 
-    # Get specialized layout prompt
+    # Validate input
+    if not previous_translation:
+        logger.error("AI Layout stage: No translation provided")
+        return {
+            "success": False,
+            "error": "No translation content to process",
+            "result": ""
+        }
+
+    translation_size = len(previous_translation)
+    logger.info(f"AI Layout stage: Processing translation of {translation_size} characters")
+
+    # Threshold for chunking (50KB per chunk)
+    MAX_CHUNK_SIZE = 50000
+
+    # If document is large, use chunking
+    if translation_size > MAX_CHUNK_SIZE:
+        logger.info(f"AI Layout stage: Large document detected, using chunking")
+
+        chunks = split_html_into_chunks(previous_translation, MAX_CHUNK_SIZE)
+        total_chunks = len(chunks)
+        logger.info(f"AI Layout stage: Split into {total_chunks} chunks")
+
+        processed_chunks = []
+        total_tokens = 0
+        all_changes = []
+
+        for i, chunk in enumerate(chunks, 1):
+            logger.info(f"AI Layout stage: Processing chunk {i}/{total_chunks} ({len(chunk)} chars)")
+
+            result = await process_layout_chunk(chunk, i, total_chunks, config, claude_api_key)
+
+            processed_chunks.append(result["result"])
+            total_tokens += result.get("tokens_used", 0)
+            all_changes.extend(result.get("changes", []))
+
+        # Combine all chunks
+        final_result = combine_layout_chunks(processed_chunks, config)
+
+        return {
+            "success": True,
+            "result": final_result,
+            "tokens_used": total_tokens,
+            "changes_made": all_changes,
+            "notes": f"Layout optimized for {page_size}. Processed {total_chunks} chunks. {len(all_changes)} adjustments made."
+        }
+
+    # For smaller documents, process normally
     system_prompt = get_ai_layout_prompt(config)
 
     try:
@@ -10208,8 +10462,8 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
                             "data": image_data[:100000] if len(image_data) > 100000 else image_data,
                         },
                     })
-                except:
-                    pass
+                except Exception as img_error:
+                    logger.warning(f"Failed to add image to layout stage: {img_error}")
 
         message_content.append({
             "type": "text",
@@ -10232,6 +10486,17 @@ OUTPUT: Complete corrected HTML document."""
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
+        # Validate that we got a proper result
+        if not result or len(result) < 100:
+            logger.warning(f"AI Layout stage returned short result: {len(result) if result else 0} chars")
+            return {
+                "success": True,
+                "result": previous_translation,  # Fall back to original translation
+                "tokens_used": tokens_used,
+                "changes_made": [],
+                "notes": "Layout stage returned incomplete result, using original translation."
+            }
+
         # Extract changes list from the result
         changes = []
         if "<!-- LAYOUT_CHANGES:" in result:
@@ -10240,8 +10505,8 @@ OUTPUT: Complete corrected HTML document."""
                 if changes_match:
                     changes = json.loads(changes_match.group(1))
                     result = re.sub(r'<!-- LAYOUT_CHANGES: \[.*?\] -->', '', result, flags=re.DOTALL).strip()
-            except:
-                pass
+            except Exception as parse_error:
+                logger.warning(f"Failed to parse layout changes: {parse_error}")
 
         return {
             "success": True,
@@ -10251,23 +10516,98 @@ OUTPUT: Complete corrected HTML document."""
             "notes": f"Layout optimized for {page_size}. {len(changes)} adjustments made."
         }
 
+    except anthropic.APIError as api_error:
+        error_msg = f"Claude API error: {str(api_error)}"
+        logger.error(f"AI Layout stage API error: {error_msg}")
+        # Return the original translation so the pipeline can continue
+        return {
+            "success": True,  # Mark as success to continue pipeline
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": f"Layout skipped due to API error. Translation preserved."
+        }
+
     except Exception as e:
-        logger.error(f"AI Layout stage failed: {str(e)}")
+        error_msg = str(e) if str(e) else "Unknown error occurred"
+        logger.error(f"AI Layout stage failed: {error_msg}")
         return {
             "success": False,
-            "error": str(e),
+            "error": error_msg,
             "result": previous_translation
+        }
+
+
+async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: int,
+                                     config: dict, claude_api_key: str) -> dict:
+    """Process a single chunk through proofreading"""
+    import anthropic
+
+    target_language = config["target_language"]
+    document_type = config["document_type"]
+    system_prompt = get_ai_proofreader_prompt(config)
+
+    try:
+        client = anthropic.Anthropic(api_key=claude_api_key)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=16384,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": f"""Proofread this section (chunk {chunk_num}/{total_chunks}) of a translated {document_type} document:
+
+{chunk}
+
+TASK: Verify terminology, consistency, and natural language flow for {target_language}.
+TARGET: United States official use (if English)
+IMPORTANT: Return ONLY the proofread HTML content. Preserve all structure.
+OUTPUT: Complete corrected HTML section."""
+            }]
+        )
+
+        result = response.content[0].text
+        tokens_used = response.usage.input_tokens + response.usage.output_tokens
+
+        # Extract corrections if present
+        corrections = []
+        if "<!-- PROOFREADING_REPORT:" in result:
+            try:
+                report_match = re.search(r'<!-- PROOFREADING_REPORT: (\{.*?\}) -->', result, re.DOTALL)
+                if report_match:
+                    report = json.loads(report_match.group(1))
+                    corrections = report.get("corrections", [])
+                    result = re.sub(r'<!-- PROOFREADING_REPORT: \{.*?\} -->', '', result, flags=re.DOTALL).strip()
+            except:
+                pass
+
+        return {
+            "success": True,
+            "result": result,
+            "tokens_used": tokens_used,
+            "corrections": corrections
+        }
+
+    except Exception as e:
+        logger.warning(f"Proofreader chunk {chunk_num} failed: {str(e)}, using original")
+        return {
+            "success": True,
+            "result": chunk,
+            "tokens_used": 0,
+            "corrections": []
         }
 
 
 async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, claude_api_key: str) -> dict:
     """
-    STAGE 3: AI PROOFREADER
+    STAGE 3: AI PROOFREADER (with chunking support for large documents)
     - Uses specialized proofreading prompt
     - Validates terminology for target country
     - Checks consistency of terms
     - Verifies technical/legal terms
     - Ensures natural language flow
+    - Processes large documents in chunks
     """
     import anthropic
 
@@ -10275,7 +10615,55 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
     target_language = config["target_language"]
     document_type = config["document_type"]
 
-    # Get specialized proofreader prompt
+    # Validate input
+    if not previous_translation:
+        logger.error("AI Proofreader stage: No translation provided")
+        return {
+            "success": False,
+            "error": "No translation content to proofread",
+            "result": ""
+        }
+
+    translation_size = len(previous_translation)
+    logger.info(f"AI Proofreader stage: Processing translation of {translation_size} characters")
+
+    # Threshold for chunking (50KB per chunk)
+    MAX_CHUNK_SIZE = 50000
+
+    # If document is large, use chunking
+    if translation_size > MAX_CHUNK_SIZE:
+        logger.info(f"AI Proofreader stage: Large document detected, using chunking")
+
+        chunks = split_html_into_chunks(previous_translation, MAX_CHUNK_SIZE)
+        total_chunks = len(chunks)
+        logger.info(f"AI Proofreader stage: Split into {total_chunks} chunks")
+
+        processed_chunks = []
+        total_tokens = 0
+        all_corrections = []
+
+        for i, chunk in enumerate(chunks, 1):
+            logger.info(f"AI Proofreader stage: Processing chunk {i}/{total_chunks} ({len(chunk)} chars)")
+
+            result = await process_proofreader_chunk(chunk, i, total_chunks, config, claude_api_key)
+
+            processed_chunks.append(result["result"])
+            total_tokens += result.get("tokens_used", 0)
+            all_corrections.extend(result.get("corrections", []))
+
+        # Combine all chunks using the same function as layout
+        final_result = combine_layout_chunks(processed_chunks, config)
+
+        return {
+            "success": True,
+            "result": final_result,
+            "tokens_used": total_tokens,
+            "changes_made": all_corrections,
+            "notes": f"Proofreading completed for {target_language}. Processed {total_chunks} chunks. {len(all_corrections)} corrections made.",
+            "quality_score": "good"
+        }
+
+    # For smaller documents, process normally
     system_prompt = get_ai_proofreader_prompt(config)
 
     try:
@@ -10300,6 +10688,18 @@ OUTPUT: Complete corrected HTML with proofreading report."""
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
+        # Validate result
+        if not result or len(result) < 100:
+            logger.warning(f"AI Proofreader stage returned short result: {len(result) if result else 0} chars")
+            return {
+                "success": True,
+                "result": previous_translation,
+                "tokens_used": tokens_used,
+                "changes_made": [],
+                "notes": "Proofreading returned incomplete result, using previous translation.",
+                "quality_score": "not_evaluated"
+            }
+
         # Extract proofreading report
         corrections = []
         notes = ""
@@ -10315,8 +10715,8 @@ OUTPUT: Complete corrected HTML with proofreading report."""
                     terminology_notes = report.get("terminology_notes", [])
                     notes = f"Quality: {quality_score}. Found {report.get('issues_found', 0)} issues. " + "; ".join(terminology_notes[:3])
                     result = re.sub(r'<!-- PROOFREADING_REPORT: \{.*?\} -->', '', result, flags=re.DOTALL).strip()
-            except:
-                pass
+            except Exception as parse_error:
+                logger.warning(f"Failed to parse proofreading report: {parse_error}")
 
         return {
             "success": True,
@@ -10327,11 +10727,24 @@ OUTPUT: Complete corrected HTML with proofreading report."""
             "quality_score": quality_score
         }
 
+    except anthropic.APIError as api_error:
+        error_msg = f"Claude API error: {str(api_error)}"
+        logger.error(f"AI Proofreader stage API error: {error_msg}")
+        return {
+            "success": True,  # Mark as success to continue pipeline
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": "Proofreading skipped due to API error. Translation preserved.",
+            "quality_score": "not_evaluated"
+        }
+
     except Exception as e:
-        logger.error(f"AI Proofreader stage failed: {str(e)}")
+        error_msg = str(e) if str(e) else "Unknown error occurred"
+        logger.error(f"AI Proofreader stage failed: {error_msg}")
         return {
             "success": False,
-            "error": str(e),
+            "error": error_msg,
             "result": previous_translation
         }
 

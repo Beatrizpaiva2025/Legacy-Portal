@@ -6494,6 +6494,52 @@ tradução juramentada | certified translation`}
                         </button>
                       </div>
                     )}
+
+                    {/* Failed Message */}
+                    {aiPipeline.overall_status === 'failed' && (
+                      <div className="bg-red-100 border border-red-300 rounded p-3">
+                        <div className="text-center mb-3">
+                          <div className="text-2xl mb-2">❌</div>
+                          <p className="text-sm font-bold text-red-800">Pipeline Failed at Stage: {aiPipeline.current_stage?.replace('_', ' ').toUpperCase()}</p>
+                        </div>
+
+                        {/* Show error message from the failed stage */}
+                        {aiPipeline.stages?.[aiPipeline.current_stage]?.error_message && (
+                          <div className="bg-red-50 border border-red-200 rounded p-2 mb-3">
+                            <p className="text-xs font-medium text-red-700 mb-1">Error Details:</p>
+                            <p className="text-xs text-red-600 font-mono">
+                              {aiPipeline.stages[aiPipeline.current_stage].error_message}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Show partial result if translator completed */}
+                        {aiPipeline.stages?.ai_translator?.status === 'completed' && aiPipeline.stages?.ai_translator?.result && (
+                          <div className="mb-3">
+                            <p className="text-xs font-medium text-gray-700 mb-1">✅ Translation was completed successfully. You can use it:</p>
+                            <button
+                              onClick={() => {
+                                setTranslationResults([{ translatedText: aiPipeline.stages.ai_translator.result }]);
+                                setActiveSubTab('review');
+                              }}
+                              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            >
+                              Use Translation Result →
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={startAIPipeline}
+                            disabled={aiPipelineLoading}
+                            className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700 disabled:bg-gray-400"
+                          >
+                            🔄 Retry Pipeline
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
