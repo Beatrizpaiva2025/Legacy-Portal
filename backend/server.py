@@ -8760,11 +8760,13 @@ Your specialty: {source_lang} → {target_lang} translation for official use in 
 ═══════════════════════════════════════════════════════════════════
                     YOUR ROLE: AI TRANSLATOR
 ═══════════════════════════════════════════════════════════════════
-You are the FIRST stage in our 4-stage AI translation pipeline.
+You are the FIRST stage in our 3-stage AI translation pipeline.
 Your translation will be reviewed by:
-1. Layout Specialist (formatting)
-2. Proofreader (terminology)
-3. Human Reviewer (final approval)
+1. Proofreader (terminology verification)
+2. Human Reviewer (final approval)
+
+⚠️ IMPORTANT: You are responsible for BOTH translation AND layout preservation.
+There is NO separate layout stage - your output must be print-ready!
 
 ═══════════════════════════════════════════════════════════════════
                     GOLDEN RULES
@@ -8819,6 +8821,41 @@ STANDARD NOTATIONS:
 [blank field]
 
 {glossary_terms}
+
+═══════════════════════════════════════════════════════════════════
+                    ⚠️ CRITICAL: LAYOUT PRESERVATION ⚠️
+═══════════════════════════════════════════════════════════════════
+
+You MUST replicate the EXACT visual layout of the original document:
+
+📐 STRUCTURE:
+• Match the original document's visual structure EXACTLY
+• If the original has a header, reproduce it with same proportions
+• If the original has columns, use columns
+• If the original has tables, use tables with same structure
+• If the original has borders/boxes, include them
+
+📄 PAGE LAYOUT:
+• Replicate the spacing and positioning of elements
+• Match header/footer placement from original
+• Preserve margin proportions between elements
+• Keep text alignment (left, center, right) as in original
+
+🎨 VISUAL FIDELITY:
+• Use similar font sizes (larger for headers, smaller for fine print)
+• Bold text that was bold in original
+• Underline text that was underlined
+• Match any decorative elements (lines, separators)
+
+📊 TABLES & FORMS:
+• Reproduce table structure exactly (rows, columns, merged cells)
+• Keep cell alignments as in original
+• Include all borders and lines shown in original
+
+🔤 TYPOGRAPHY:
+• Headers should be visually prominent (larger, bold, centered if original was)
+• Body text should be readable (12pt equivalent)
+• Fine print should be smaller (10pt or less)
 
 ═══════════════════════════════════════════════════════════════════
                     OUTPUT FORMAT
@@ -10377,6 +10414,8 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
     result = await run_ai_translator_stage(pipeline_dict, claude_api_key)
 
     if result["success"]:
+        # Skip Layout stage - go directly to Proofreader
+        # Layout preservation is now handled in the translator prompt
         await db.ai_pipelines.update_one(
             {"id": pipeline.id},
             {"$set": {
@@ -10385,98 +10424,73 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                 "stages.ai_translator.result": result["result"],
                 "stages.ai_translator.notes": result.get("notes"),
                 "total_tokens_used": result.get("tokens_used", 0),
-                "current_stage": "ai_layout",
-                "stages.ai_layout.status": "in_progress",
-                "stages.ai_layout.started_at": datetime.utcnow()
+                # Skip ai_layout - mark as skipped and go to proofreader
+                "stages.ai_layout.status": "skipped",
+                "stages.ai_layout.notes": "Layout preservation handled in translator stage",
+                "current_stage": "ai_proofreader",
+                "stages.ai_proofreader.status": "in_progress",
+                "stages.ai_proofreader.started_at": datetime.utcnow()
             }}
         )
 
-        # Run Stage 2: Layout Review
-        layout_result = await run_ai_layout_stage(pipeline_dict, result["result"], claude_api_key)
+        # Skip Stage 2 (Layout) - Run Stage 3: Proofreading directly
+        proofread_result = await run_ai_proofreader_stage(pipeline_dict, result["result"], claude_api_key)
 
-        if layout_result["success"]:
+        if proofread_result["success"]:
+            total_tokens = result.get("tokens_used", 0) + proofread_result.get("tokens_used", 0)
+
             await db.ai_pipelines.update_one(
                 {"id": pipeline.id},
                 {"$set": {
-                    "stages.ai_layout.status": "completed",
-                    "stages.ai_layout.completed_at": datetime.utcnow(),
-                    "stages.ai_layout.result": layout_result["result"],
-                    "stages.ai_layout.notes": layout_result.get("notes"),
-                    "stages.ai_layout.changes_made": layout_result.get("changes_made", []),
-                    "total_tokens_used": result.get("tokens_used", 0) + layout_result.get("tokens_used", 0),
-                    "current_stage": "ai_proofreader",
-                    "stages.ai_proofreader.status": "in_progress",
-                    "stages.ai_proofreader.started_at": datetime.utcnow()
+                    "stages.ai_proofreader.status": "completed",
+                    "stages.ai_proofreader.completed_at": datetime.utcnow(),
+                    "stages.ai_proofreader.result": proofread_result["result"],
+                    "stages.ai_proofreader.notes": proofread_result.get("notes"),
+                    "stages.ai_proofreader.changes_made": proofread_result.get("changes_made", []),
+                    "total_tokens_used": total_tokens,
+                    "current_stage": "human_review",
+                    "stages.human_review.status": "pending",
+                    "stages.human_review.result": proofread_result["result"],
+                    "overall_status": "awaiting_review",
+                    "updated_at": datetime.utcnow()
                 }}
             )
 
-            # Run Stage 3: Proofreading
-            proofread_result = await run_ai_proofreader_stage(pipeline_dict, layout_result["result"], claude_api_key)
+            # Update order to show it's ready for human review
+            await db.translation_orders.update_one(
+                {"id": request.order_id},
+                {"$set": {
+                    "translation_status": "review",
+                    "ai_pipeline_status": "awaiting_review"
+                }}
+            )
 
-            if proofread_result["success"]:
-                total_tokens = result.get("tokens_used", 0) + layout_result.get("tokens_used", 0) + proofread_result.get("tokens_used", 0)
-
-                await db.ai_pipelines.update_one(
-                    {"id": pipeline.id},
-                    {"$set": {
-                        "stages.ai_proofreader.status": "completed",
-                        "stages.ai_proofreader.completed_at": datetime.utcnow(),
-                        "stages.ai_proofreader.result": proofread_result["result"],
-                        "stages.ai_proofreader.notes": proofread_result.get("notes"),
-                        "stages.ai_proofreader.changes_made": proofread_result.get("changes_made", []),
-                        "total_tokens_used": total_tokens,
-                        "current_stage": "human_review",
-                        "stages.human_review.status": "pending",
-                        "stages.human_review.result": proofread_result["result"],
-                        "overall_status": "awaiting_review",
-                        "updated_at": datetime.utcnow()
-                    }}
+            # Create notification for PM
+            if order.get("assigned_pm_id"):
+                notification = Notification(
+                    user_id=order["assigned_pm_id"],
+                    type="ai_translation_ready",
+                    title="AI Translation Ready for Review",
+                    message=f"Order {order.get('order_number')} has completed AI translation and is ready for human review.",
+                    order_id=request.order_id,
+                    order_number=order.get("order_number")
                 )
+                await db.notifications.insert_one(notification.dict())
 
-                # Update order to show it's ready for human review
-                await db.translation_orders.update_one(
-                    {"id": request.order_id},
-                    {"$set": {
-                        "translation_status": "review",
-                        "ai_pipeline_status": "awaiting_review"
-                    }}
-                )
-
-                # Create notification for PM
-                if order.get("assigned_pm_id"):
-                    notification = Notification(
-                        user_id=order["assigned_pm_id"],
-                        type="ai_translation_ready",
-                        title="AI Translation Ready for Review",
-                        message=f"Order {order.get('order_number')} has completed AI translation and is ready for human review.",
-                        order_id=request.order_id,
-                        order_number=order.get("order_number")
-                    )
-                    await db.notifications.insert_one(notification.dict())
-
-                return {
-                    "status": "success",
-                    "pipeline_id": pipeline.id,
-                    "message": "AI translation completed. Ready for human review.",
-                    "current_stage": "human_review",
-                    "total_tokens_used": total_tokens
-                }
-            else:
-                await db.ai_pipelines.update_one(
-                    {"id": pipeline.id},
-                    {"$set": {
-                        "stages.ai_proofreader.status": "failed",
-                        "stages.ai_proofreader.error_message": proofread_result.get("error"),
-                        "overall_status": "failed",
-                        "updated_at": datetime.utcnow()
-                    }}
-                )
+            return {
+                "status": "success",
+                "pipeline_id": pipeline.id,
+                "message": "AI translation completed. Ready for human review.",
+                "current_stage": "human_review",
+                "total_tokens_used": total_tokens
+            }
         else:
+            # Proofreader failed
             await db.ai_pipelines.update_one(
                 {"id": pipeline.id},
                 {"$set": {
-                    "stages.ai_layout.status": "failed",
-                    "stages.ai_layout.error_message": layout_result.get("error"),
+                    "stages.ai_proofreader.status": "failed",
+                    "stages.ai_proofreader.error_message": proofread_result.get("error"),
                     "overall_status": "failed",
                     "updated_at": datetime.utcnow()
                 }}
