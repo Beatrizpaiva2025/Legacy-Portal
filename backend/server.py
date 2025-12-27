@@ -9452,7 +9452,7 @@ Use these EXACT translations for the following terms:
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if chunk_idx < num_chunks - 1:
-                await asyncio.sleep(15)  # Wait 15 seconds between chunks
+                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
 
         # Combine all chunk translations
         combined_translation = combine_chunk_translations(all_translations, total_pages)
@@ -9863,7 +9863,7 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if i < total_chunks:
-                await asyncio.sleep(15)  # Wait 15 seconds between chunks
+                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
 
         # Combine all chunks
         final_result = combine_layout_chunks(processed_chunks, config)
@@ -10091,7 +10091,7 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
 
             # Rate limiting: wait between chunks to avoid API rate limits
             if i < total_chunks:
-                await asyncio.sleep(15)  # Wait 15 seconds between chunks
+                await asyncio.sleep(2)  # Wait 2 seconds between chunks (Tier 1+)
 
         # Combine all chunks using the same function as layout
         final_result = combine_layout_chunks(processed_chunks, config)
