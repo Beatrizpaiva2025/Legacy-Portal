@@ -9614,6 +9614,31 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
     page_format = config.get("page_format", "letter")
     page_size = "US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"
 
+    # Validate input
+    if not previous_translation:
+        logger.error("AI Layout stage: No translation provided")
+        return {
+            "success": False,
+            "error": "No translation content to process",
+            "result": ""
+        }
+
+    translation_size = len(previous_translation)
+    logger.info(f"AI Layout stage: Processing translation of {translation_size} characters")
+
+    # For very large documents (> 200KB), skip layout stage as it may timeout
+    # The translation is already formatted well from the translator stage
+    MAX_LAYOUT_SIZE = 200000  # 200KB
+    if translation_size > MAX_LAYOUT_SIZE:
+        logger.info(f"AI Layout stage: Document too large ({translation_size} chars), skipping layout optimization")
+        return {
+            "success": True,
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": f"Layout skipped for large document ({translation_size // 1000}KB). Translation preserved as-is."
+        }
+
     # Get specialized layout prompt
     system_prompt = get_ai_layout_prompt(config)
 
@@ -9638,8 +9663,8 @@ async def run_ai_layout_stage(pipeline: dict, previous_translation: str, claude_
                             "data": image_data[:100000] if len(image_data) > 100000 else image_data,
                         },
                     })
-                except:
-                    pass
+                except Exception as img_error:
+                    logger.warning(f"Failed to add image to layout stage: {img_error}")
 
         message_content.append({
             "type": "text",
@@ -9662,6 +9687,17 @@ OUTPUT: Complete corrected HTML document."""
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
+        # Validate that we got a proper result
+        if not result or len(result) < 100:
+            logger.warning(f"AI Layout stage returned short result: {len(result) if result else 0} chars")
+            return {
+                "success": True,
+                "result": previous_translation,  # Fall back to original translation
+                "tokens_used": tokens_used,
+                "changes_made": [],
+                "notes": "Layout stage returned incomplete result, using original translation."
+            }
+
         # Extract changes list from the result
         changes = []
         if "<!-- LAYOUT_CHANGES:" in result:
@@ -9670,8 +9706,8 @@ OUTPUT: Complete corrected HTML document."""
                 if changes_match:
                     changes = json.loads(changes_match.group(1))
                     result = re.sub(r'<!-- LAYOUT_CHANGES: \[.*?\] -->', '', result, flags=re.DOTALL).strip()
-            except:
-                pass
+            except Exception as parse_error:
+                logger.warning(f"Failed to parse layout changes: {parse_error}")
 
         return {
             "success": True,
@@ -9681,11 +9717,24 @@ OUTPUT: Complete corrected HTML document."""
             "notes": f"Layout optimized for {page_size}. {len(changes)} adjustments made."
         }
 
+    except anthropic.APIError as api_error:
+        error_msg = f"Claude API error: {str(api_error)}"
+        logger.error(f"AI Layout stage API error: {error_msg}")
+        # Return the original translation so the pipeline can continue
+        return {
+            "success": True,  # Mark as success to continue pipeline
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": f"Layout skipped due to API error. Translation preserved."
+        }
+
     except Exception as e:
-        logger.error(f"AI Layout stage failed: {str(e)}")
+        error_msg = str(e) if str(e) else "Unknown error occurred"
+        logger.error(f"AI Layout stage failed: {error_msg}")
         return {
             "success": False,
-            "error": str(e),
+            "error": error_msg,
             "result": previous_translation
         }
 
@@ -9704,6 +9753,31 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
     config = pipeline["config"]
     target_language = config["target_language"]
     document_type = config["document_type"]
+
+    # Validate input
+    if not previous_translation:
+        logger.error("AI Proofreader stage: No translation provided")
+        return {
+            "success": False,
+            "error": "No translation content to proofread",
+            "result": ""
+        }
+
+    translation_size = len(previous_translation)
+    logger.info(f"AI Proofreader stage: Processing translation of {translation_size} characters")
+
+    # For very large documents, skip proofreading to avoid timeout
+    MAX_PROOFREAD_SIZE = 200000  # 200KB
+    if translation_size > MAX_PROOFREAD_SIZE:
+        logger.info(f"AI Proofreader stage: Document too large ({translation_size} chars), skipping proofreading")
+        return {
+            "success": True,
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": f"Proofreading skipped for large document ({translation_size // 1000}KB). Translation preserved.",
+            "quality_score": "not_evaluated"
+        }
 
     # Get specialized proofreader prompt
     system_prompt = get_ai_proofreader_prompt(config)
@@ -9730,6 +9804,18 @@ OUTPUT: Complete corrected HTML with proofreading report."""
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
 
+        # Validate result
+        if not result or len(result) < 100:
+            logger.warning(f"AI Proofreader stage returned short result: {len(result) if result else 0} chars")
+            return {
+                "success": True,
+                "result": previous_translation,
+                "tokens_used": tokens_used,
+                "changes_made": [],
+                "notes": "Proofreading returned incomplete result, using previous translation.",
+                "quality_score": "not_evaluated"
+            }
+
         # Extract proofreading report
         corrections = []
         notes = ""
@@ -9745,8 +9831,8 @@ OUTPUT: Complete corrected HTML with proofreading report."""
                     terminology_notes = report.get("terminology_notes", [])
                     notes = f"Quality: {quality_score}. Found {report.get('issues_found', 0)} issues. " + "; ".join(terminology_notes[:3])
                     result = re.sub(r'<!-- PROOFREADING_REPORT: \{.*?\} -->', '', result, flags=re.DOTALL).strip()
-            except:
-                pass
+            except Exception as parse_error:
+                logger.warning(f"Failed to parse proofreading report: {parse_error}")
 
         return {
             "success": True,
@@ -9757,11 +9843,24 @@ OUTPUT: Complete corrected HTML with proofreading report."""
             "quality_score": quality_score
         }
 
+    except anthropic.APIError as api_error:
+        error_msg = f"Claude API error: {str(api_error)}"
+        logger.error(f"AI Proofreader stage API error: {error_msg}")
+        return {
+            "success": True,  # Mark as success to continue pipeline
+            "result": previous_translation,
+            "tokens_used": 0,
+            "changes_made": [],
+            "notes": "Proofreading skipped due to API error. Translation preserved.",
+            "quality_score": "not_evaluated"
+        }
+
     except Exception as e:
-        logger.error(f"AI Proofreader stage failed: {str(e)}")
+        error_msg = str(e) if str(e) else "Unknown error occurred"
+        logger.error(f"AI Proofreader stage failed: {error_msg}")
         return {
             "success": False,
-            "error": str(e),
+            "error": error_msg,
             "result": previous_translation
         }
 
