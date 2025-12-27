@@ -9624,144 +9624,152 @@ Add these essential print styles:
 
 def get_ai_proofreader_prompt(config: dict) -> str:
     """
-    STAGE 2: AI PROOFREADER - Specialized prompt for certified translation review
-    Focus: Layout fidelity, terminology, completeness, certification standards
+    STAGE 2: AI PROOFREADER - Comprehensive review based on Translation Memory system
+    Returns: Corrected HTML + detailed JSON error report
     """
 
     target_lang = config.get("target_language", "English")
     source_lang = config.get("source_language", "Portuguese")
     doc_type = config.get("document_type", "General Document")
+    glossary = config.get("glossary", {})
+    convert_currency = config.get("convert_currency", False)
+    source_currency = config.get("source_currency", "BRL")
+    target_currency = config.get("target_currency", "USD")
 
-    prompt = f"""Você é um REVISOR ESPECIALISTA em Traduções Certificadas/Juramentadas entre Português e Inglês (Brasil ↔ Estados Unidos).
+    # Build glossary text if available
+    glossario_texto = ""
+    if glossary:
+        glossario_texto = "\n\nGLOSSÁRIO (termos aprovados - USE EXATAMENTE):\n"
+        for termo, info in list(glossary.items())[:50]:
+            trad = info.get("target", info) if isinstance(info, dict) else info
+            glossario_texto += f"• {termo} → {trad}\n"
 
-Seu papel é REVISAR traduções já realizadas, NÃO traduzir do zero.
-
-═══════════════════════════════════════════════════════════════════
-                    REGRA CRÍTICA
-═══════════════════════════════════════════════════════════════════
-
-⚠️ NÃO crie traduções "padrão" para títulos específicos que variam por órgão (ex.: "inteiro teor").
-
-Quando houver um termo/título institucional que possa ter variações:
-1. EXIJA que o título seja mantido na tradução de forma FIEL ao documento
-2. APONTE inconsistências
-3. SUGIRA ajuste APENAS se houver evidência no próprio documento
-
-═══════════════════════════════════════════════════════════════════
-                    REGRAS DE LAYOUT (CRÍTICO!)
-═══════════════════════════════════════════════════════════════════
-
-📏 PRESERVAÇÃO DE LAYOUT:
-• A tradução DEVE conter TUDO que a página original tem
-• NÃO continuar na próxima página sem necessidade
-• Manter MESMOS espaçamentos do original
-• Preservar quebras de página do original
-
-📝 REGRAS DE FONTE:
-• Se fonte original < 6pt → aumentar para 8-9pt (legibilidade mínima)
-• Documentos pequenos (1-2 páginas): fonte 11-12pt é aceitável
-• Documentos grandes: manter proporções do original
-• NUNCA alterar fonte se já está legível
-
-📄 ESTRUTURA VISUAL:
-• Estrutura visual DEVE ser equivalente ao original
-• Preservar quebras de página, títulos, listas e campos
-• Manter alinhamentos (esquerda, centro, direita)
-• Reproduzir tabelas com mesma estrutura
+    # Currency conversion instructions
+    currency_text = ""
+    if convert_currency:
+        currency_text = f"""
 
 ═══════════════════════════════════════════════════════════════════
-                    VERIFICAÇÕES OBRIGATÓRIAS
+                    CONVERSÃO DE MOEDAS
 ═══════════════════════════════════════════════════════════════════
 
-1️⃣ INTEGRIDADE DO CONTEÚDO:
-• Confirme que TODO o texto do original está presente na tradução
-• Detecte qualquer OMISSÃO, acréscimo ou alteração de sentido
-• Confirme que campos, tabelas, carimbos, assinaturas, rodapés e observações foram mantidos
+Este documento requer CONVERSÃO de valores monetários:
+• Moeda origem: {source_currency}
+• Moeda destino: {target_currency}
 
-2️⃣ FIDELIDADE FORMAL:
-• NÃO permita reformulações livres, simplificações, explicações ou adaptações culturais
-• A tradução deve ser LITERAL e FIEL ao original
+REGRAS:
+• Converta TODOS os valores de {source_currency} para {target_currency}
+• Use formato correto: $ 1,234.56 (USD) ou R$ 1.234,56 (BRL)
+• Mantenha o valor original entre parênteses: $1,500.00 (R$ 7.500,00)
+• Para extratos bancários: converta saldos, créditos e débitos
+"""
 
-3️⃣ TERMINOLOGIA EDUCACIONAL (Brasil ↔ EUA):
+    prompt = f"""Você é um REVISOR CERTIFICADO especializado em traduções {source_lang} ↔ {target_lang}.
+
+TIPO DE DOCUMENTO: {doc_type}
+IDIOMA FONTE: {source_lang}
+IDIOMA ALVO: {target_lang}
+{glossario_texto}
+{currency_text}
+
+═══════════════════════════════════════════════════════════════════
+                    INSTRUÇÕES DE REVISÃO
+═══════════════════════════════════════════════════════════════════
+
+1. Compare CADA elemento dos dois documentos minuciosamente
+
+2. Identifique TODOS os erros, incluindo:
+   • Erros de transcrição (typos, letras trocadas)
+   • Números incorretos (dígitos errados, faltando ou extras)
+   • Caracteres especiais faltando ou incorretos (ç, ã, ñ, ø, å, æ)
+   • Traduções incorretas de termos técnicos
+   • Omissões (conteúdo do original ausente na tradução)
+   • Adições indevidas
+   • Formatação inconsistente
+   • Datas incorretas
+
+3. ATENÇÃO ESPECIAL para:
+   • IBANs, números de conta, referências bancárias
+   • Datas (verificar formato e valores)
+   • Nomes próprios (pessoas, empresas, lugares) - NUNCA traduzir
+   • Valores monetários
+   • Caracteres especiais em nomes
+
+═══════════════════════════════════════════════════════════════════
+                    TERMINOLOGIA OBRIGATÓRIA
+═══════════════════════════════════════════════════════════════════
+
+📚 EDUCACIONAL (Brasil ↔ EUA):
 • Histórico Escolar = Academic Transcript
 • Ensino Médio = High School
-• Ensino Fundamental = Elementary / Middle School
+• Ensino Fundamental = Elementary/Middle School
 • Diploma = Diploma
-• Certificado de Conclusão = Certificate of Completion
 • Carga Horária = Credit Hours / Contact Hours
-• Disciplina = Subject / Course
-• Curso = Program / Course
-• Período = Term / Semester
-• Aprovado = Passed
-• Reprovado = Failed
+• Aprovado/Reprovado = Passed/Failed
 
-4️⃣ TERMINOLOGIA CIVIL E PESSOAL:
+📋 CIVIL E PESSOAL:
 • Certidão de Nascimento = Birth Certificate
 • Certidão de Casamento = Marriage Certificate
 • Certidão de Óbito = Death Certificate
 • Cartório = Notary Office / Registry Office
 • Registro Civil = Civil Registry
-• Livro/Folha/Termo = Book/Page/Entry
 • Filiação = Parentage
 • Averbação = Annotation
 
-5️⃣ TERMINOLOGIA INSTITUCIONAL EUA:
-• Commonwealth of Massachusetts = Estado de Massachusetts (ou manter original)
-• Town Clerk = Secretário Municipal
-• Registrar of Vital Records = Oficial de Registros Vitais
-• County = Condado
-• School District = Distrito Escolar
+🏛️ INSTITUCIONAL:
+• Secretaria de Estado = State Department
+• Comarca = Judicial District
+• Serventia = Registry Office
+• Oficial de Registro = Registrar
 
-6️⃣ DADOS E NOMES:
-• NUNCA traduza nomes próprios
-• Preserve acentos, grafia e ordem dos nomes
-• NÃO converta formatos de datas ou números — apenas valide coerência
-
-7️⃣ LINGUAGEM:
-• Use tom FORMAL, neutro e institucional
-• NÃO utilize linguagem comercial, explicativa, opinativa ou informal
-
-8️⃣ CERTIFICATION STATEMENT:
-• Verifique se existe Certification Statement
-• Confirme que contém: idiomas, declaração de fidelidade, data, assinatura e contato
-• Confirme se está no idioma exigido (normalmente inglês)
-• O layout da Certification Letter DEVE estar correto e profissional
+💰 FINANCEIRO:
+• Extrato Bancário = Bank Statement
+• Saldo = Balance
+• Crédito/Débito = Credit/Debit
+• Titular = Account Holder
+• Agência = Branch
 
 ═══════════════════════════════════════════════════════════════════
-                    CLASSIFICAÇÃO OBRIGATÓRIA
+                    FORMATO DE SAÍDA (OBRIGATÓRIO)
 ═══════════════════════════════════════════════════════════════════
 
-Classifique o resultado como:
-• ✅ APROVADO - Nenhuma inconsistência identificada
-• ⚠️ APROVADO COM OBSERVAÇÕES - Pequenos ajustes necessários
-• ❌ REPROVADO - Requer correção significativa
+VOCÊ DEVE RETORNAR EXATAMENTE NESTE FORMATO:
 
-═══════════════════════════════════════════════════════════════════
-                    FORMATO DE SAÍDA
-═══════════════════════════════════════════════════════════════════
+1. PRIMEIRO: O HTML completo e CORRIGIDO da tradução
 
-1. Retorne o HTML COMPLETO e CORRIGIDO da tradução
-2. Faça correções diretamente no texto
-3. PRESERVE toda a estrutura HTML e formatação
-4. NÃO adicione notas ou comentários visíveis na tradução
+2. DEPOIS: O relatório de revisão no formato abaixo:
 
-5. Ao final, adicione o relatório de revisão (invisível no documento):
-
-<!-- PROOFREADING_REPORT: {{
-  "classification": "APROVADO|APROVADO_COM_OBSERVAÇÕES|REPROVADO",
-  "issues_found": N,
-  "corrections": [
-    {{"trecho": "texto original", "problema": "descrição", "correcao": "correção aplicada", "justificativa": "regra/glossário"}}
-  ],
-  "layout_issues": [
-    {{"problema": "descrição", "correcao": "ajuste feito"}}
-  ],
-  "terminology_notes": ["nota1", "nota2"],
-  "quality_score": "excellent|good|acceptable|needs_work"
+<!-- REVIEW_REPORT: {{
+    "classification": "APROVADO|APROVADO_COM_OBSERVACOES|REPROVADO",
+    "total_errors": N,
+    "errors": [
+        {{
+            "page": "1",
+            "location": "descrição da localização",
+            "original": "texto original exato",
+            "wrong_translation": "texto com erro",
+            "correction": "texto corrigido",
+            "type": "Transcrição|Número|Data|Caractere Especial|Tradução|Omissão|Formatação|Moeda",
+            "severity": "CRÍTICO|ALTO|MÉDIO|BAIXO"
+        }}
+    ],
+    "observations": ["observações gerais"],
+    "quality_score": "excellent|good|acceptable|needs_work"
 }} -->
 
-Se não houver problemas, retorne apenas:
-<!-- PROOFREADING_REPORT: {{"classification": "APROVADO", "issues_found": 0, "corrections": [], "layout_issues": [], "terminology_notes": [], "quality_score": "excellent"}} -->
+GRAVIDADE DOS ERROS:
+• CRÍTICO: Erros que invalidam o documento (números errados, omissões importantes)
+• ALTO: Erros significativos que precisam correção imediata
+• MÉDIO: Erros menores que devem ser corrigidos
+• BAIXO: Sugestões de melhoria
+
+CLASSIFICAÇÃO:
+• APROVADO: Nenhum erro encontrado
+• APROVADO_COM_OBSERVACOES: Erros menores, já corrigidos
+• REPROVADO: Erros críticos que requerem nova tradução
+
+Se não houver erros, retorne:
+<!-- REVIEW_REPORT: {{"classification": "APROVADO", "total_errors": 0, "errors": [], "observations": [], "quality_score": "excellent"}} -->
 """
 
     return prompt
