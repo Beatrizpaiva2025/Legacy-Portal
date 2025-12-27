@@ -93,6 +93,21 @@ const DOCUMENT_TYPES = [
   { value: 'other', label: 'Outros / Other' }
 ];
 
+// Document Categories for uploaded files
+const DOCUMENT_CATEGORIES = [
+  { value: '', label: '-- Select Category --' },
+  { value: 'financial', label: 'Financial / Financeiro' },
+  { value: 'educational', label: 'Educational / Educacional' },
+  { value: 'personal', label: 'Personal Documents / Documentos Pessoais' },
+  { value: 'bank_statement', label: 'Bank Statement / Extrato Bancário' },
+  { value: 'legal', label: 'Legal / Jurídico' },
+  { value: 'medical', label: 'Medical / Médico' },
+  { value: 'immigration', label: 'Immigration / Imigração' },
+  { value: 'business', label: 'Business / Empresarial' },
+  { value: 'government', label: 'Government / Governamental' },
+  { value: 'other', label: 'Other / Outros' }
+];
+
 // ==================== SVG ICONS (Professional/Minimal) ====================
 const EditIcon = ({ className = "w-3 h-3" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -7712,7 +7727,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     payment_tag: '',
     create_invoice: false,
     invoice_terms: '30_days',
-    invoice_custom_date: ''
+    invoice_custom_date: '',
+    document_category: ''
   });
 
   // Document type filter state
@@ -8605,6 +8621,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         translate_from: 'Portuguese',
         translate_to: 'English',
         service_type: 'standard',
+        document_type: '',
         page_count: 1,
         word_count: 0,
         urgency: 'no',
@@ -8622,7 +8639,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         payment_tag: '',
         create_invoice: false,
         invoice_terms: '30_days',
-        invoice_custom_date: ''
+        invoice_custom_date: '',
+        document_category: ''
       });
       setDocumentFiles([]);
       fetchOrders();
@@ -9560,18 +9578,34 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
             {/* Document Upload - Multiple Files */}
             <div className="mb-3">
-              <label className="block text-[10px] font-medium text-gray-600 mb-1">Documents to Translate (Multiple allowed)</label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setDocumentFiles(Array.from(e.target.files))}
-                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.tiff,.bmp,.gif"
-                  className="text-xs"
-                />
-                {documentFiles.length > 0 && (
-                  <span className="text-xs text-green-600">✓ {documentFiles.length} file(s) selected</span>
-                )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Documents to Translate (Multiple allowed)</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => setDocumentFiles(Array.from(e.target.files))}
+                      accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.tiff,.bmp,.gif"
+                      className="text-xs"
+                    />
+                    {documentFiles.length > 0 && (
+                      <span className="text-xs text-green-600">✓ {documentFiles.length} file(s) selected</span>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG, TIFF, BMP, GIF - Max 100MB per file</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Category</label>
+                  <select
+                    value={newProject.document_category}
+                    onChange={(e) => setNewProject({...newProject, document_category: e.target.value})}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    {DOCUMENT_CATEGORIES.map(cat => <option key={cat.value} value={cat.value}>{cat.label}</option>)}
+                  </select>
+                  <p className="text-[9px] text-gray-400 mt-1">Select the category that best describes your documents</p>
+                </div>
               </div>
               {documentFiles.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -9590,7 +9624,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   ))}
                 </div>
               )}
-              <p className="text-[9px] text-gray-400 mt-1">Accepted: PDF, DOC, DOCX, TXT, JPG, PNG, TIFF, BMP, GIF - Max 100MB per file</p>
             </div>
 
             <div className="grid grid-cols-4 gap-3 mb-3">
