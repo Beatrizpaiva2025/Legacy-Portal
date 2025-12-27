@@ -713,6 +713,10 @@ const getCurrencyFromLanguage = (language) => {
 
 // ==================== TRANSLATION WORKSPACE ====================
 const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
+  // User role checks
+  const isAdmin = user?.role === 'admin';
+  const isPM = user?.role === 'pm';
+
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
   const [showProjectMenu, setShowProjectMenu] = useState(false);
@@ -4743,8 +4747,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* Quick Info */}
                 <div className="text-[10px] text-gray-500 bg-blue-50 p-2 rounded">
-                  <strong>💡 How it works:</strong> When enabled, the translator's note will be added at the beginning of each FILE (not page).
+                  <strong>💡 How it works:</strong> When enabled, the translator's note will be added at the beginning of the FIRST PAGE of EACH FILE (if multiple files).
                   If "Convert values" is checked, main financial values will show converted amounts in brackets.
+                  <br/><strong>Note:</strong> The preview above auto-updates when you change currency, date, or source.
                 </div>
               </div>
             )}
@@ -6780,12 +6785,12 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* Proofreading Section - Admin Only */}
-              {isAdmin && (
+              {/* Proofreading Section - Admin and PM */}
+              {(isAdmin || isPM) && (
                 <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
-                      🔍 Proofreading (Admin)
+                      🔍 Proofreading
                     </h3>
                     <button
                       onClick={runProofreading}
