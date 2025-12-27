@@ -4568,7 +4568,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'ai-pipeline', label: 'AI PIPELINE', icon: '🤖', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] },
@@ -4581,24 +4580,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               activeSubTab === tab.id
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            } ${tab.id === 'ai-pipeline' && aiPipeline?.overall_status === 'awaiting_review' ? 'ring-2 ring-yellow-400 ring-offset-1' : ''}`}
+            }`}
           >
             {tab.icon} {tab.label}
-            {/* AI Pipeline status badge */}
-            {tab.id === 'ai-pipeline' && aiPipeline && (
-              <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
-                aiPipeline.overall_status === 'in_progress' ? 'bg-blue-500 text-white animate-pulse' :
-                aiPipeline.overall_status === 'awaiting_review' ? 'bg-yellow-500 text-black animate-bounce' :
-                aiPipeline.overall_status === 'completed' ? 'bg-green-500 text-white' :
-                aiPipeline.overall_status === 'failed' ? 'bg-red-500 text-white' :
-                'bg-gray-400 text-white'
-              }`}>
-                {aiPipeline.overall_status === 'in_progress' ? '⏳' :
-                 aiPipeline.overall_status === 'awaiting_review' ? '👀' :
-                 aiPipeline.overall_status === 'completed' ? '✓' :
-                 aiPipeline.overall_status === 'failed' ? '✗' : '•'}
-              </span>
-            )}
           </button>
         ))}
       </div>
