@@ -6352,7 +6352,7 @@ tradução juramentada | certified translation`}
                   {/* Pipeline Stages */}
                   <div className="p-4 bg-gray-50">
                     <div className="flex justify-between items-center mb-4">
-                      {['ai_translator', 'ai_layout', 'ai_proofreader', 'human_review'].map((stage, idx) => {
+                      {['ai_translator', 'ai_proofreader', 'human_review'].map((stage, idx) => {
                         const stageData = aiPipeline.stages?.[stage] || {};
                         const isActive = aiPipeline.current_stage === stage;
                         const isCompleted = stageData.status === 'completed' || stageData.status === 'approved';
@@ -6368,13 +6368,11 @@ tradução juramentada | certified translation`}
                                 'bg-gray-300 text-gray-600'
                               }`}>
                                 {stage === 'ai_translator' && '🌐'}
-                                {stage === 'ai_layout' && '📐'}
                                 {stage === 'ai_proofreader' && '✅'}
                                 {stage === 'human_review' && '👤'}
                               </div>
                               <span className="text-[10px] text-gray-600 mt-1 text-center max-w-16">
                                 {stage === 'ai_translator' && 'Translator'}
-                                {stage === 'ai_layout' && 'Layout'}
                                 {stage === 'ai_proofreader' && 'Proofreader'}
                                 {stage === 'human_review' && 'Human Review'}
                               </span>
@@ -6389,7 +6387,7 @@ tradução juramentada | certified translation`}
                                 </span>
                               )}
                             </div>
-                            {idx < 3 && (
+                            {idx < 2 && (
                               <div className={`w-8 h-0.5 mx-1 ${
                                 isCompleted ? 'bg-green-500' : 'bg-gray-300'
                               }`}></div>
