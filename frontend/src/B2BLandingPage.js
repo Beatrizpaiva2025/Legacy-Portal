@@ -101,7 +101,7 @@ Message: ${formData.message}
                 <span className="block text-blue-900 italic">Powered by Technology</span>
               </h1>
               <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms, immigration agencies, and Fortune 500 companies.
+                Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.
               </p>
               <div className="flex flex-wrap gap-4 mb-8">
                 <a href="#contact-form" className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
@@ -139,19 +139,6 @@ Message: ${formData.message}
                 alt="Global technology with international flags"
                 className="relative rounded-2xl shadow-2xl"
               />
-              <div className="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900">50+</div>
-                    <div className="text-sm text-slate-500">Languages</div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -272,7 +259,7 @@ Message: ${formData.message}
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-blue-900 mb-3">Certified Quality</h3>
-              <p className="text-gray-600">ATA member since 2010. All certified translations are 100% guaranteed accepted by USCIS.</p>
+              <p className="text-gray-600">ATA member since 2010. Certified translations in full compliance with strict USCIS standards.</p>
             </div>
           </div>
         </div>
@@ -506,7 +493,7 @@ Message: ${formData.message}
                   className="h-full object-contain"
                 />
               </div>
-              <div className="text-xs text-gray-500">100% Acceptance Guaranteed</div>
+              <div className="text-xs text-gray-500">Strict USCIS Compliance</div>
             </div>
           </div>
         </div>
