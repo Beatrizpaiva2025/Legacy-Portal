@@ -11148,8 +11148,8 @@ async def approve_ai_pipeline_stage(request: AIPipelineStageApproval, admin_key:
                 "pipeline_status": "completed"
             }
         else:
-            # Move to next stage
-            stage_order = ["ai_translator", "ai_layout", "ai_proofreader", "human_review"]
+            # Move to next stage (ai_layout removed - handled in translator)
+            stage_order = ["ai_translator", "ai_proofreader", "human_review"]
             current_index = stage_order.index(request.stage_name)
             next_stage = stage_order[current_index + 1]
 
@@ -11243,7 +11243,7 @@ async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_k
         raise HTTPException(status_code=400, detail=f"Stage '{current_stage}' is not in a retryable state")
 
     # Get the previous stage result (or original text for first stage)
-    stage_order = ["ai_translator", "ai_layout", "ai_proofreader", "human_review"]
+    stage_order = ["ai_translator", "ai_proofreader", "human_review"]
     current_index = stage_order.index(current_stage)
 
     if current_index == 0:
@@ -11264,11 +11264,9 @@ async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_k
         }}
     )
 
-    # Run the appropriate stage
+    # Run the appropriate stage (ai_layout removed - handled in translator)
     if current_stage == "ai_translator":
         result = await run_ai_translator_stage(pipeline, claude_api_key)
-    elif current_stage == "ai_layout":
-        result = await run_ai_layout_stage(pipeline, previous_result, claude_api_key)
     elif current_stage == "ai_proofreader":
         result = await run_ai_proofreader_stage(pipeline, previous_result, claude_api_key)
     else:
