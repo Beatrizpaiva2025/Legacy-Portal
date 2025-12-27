@@ -2122,10 +2122,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Auto-load project when selectedOrder prop is provided (e.g., coming from Projects page)
   useEffect(() => {
-    if (selectedOrder && selectedOrder.id && !selectedOrderId) {
-      // Auto-select the project to load its documents
-      selectProject(selectedOrder);
-    }
+    const loadOrderData = async () => {
+      if (selectedOrder && selectedOrder.id && !selectedOrderId) {
+        // Auto-select the project to load its documents
+        await selectProject(selectedOrder);
+
+        // If order has saved translation, load it and go to REVIEW tab
+        if (selectedOrder.translation_ready || selectedOrder.translation_html) {
+          const loaded = await loadSavedTranslation(selectedOrder);
+          if (loaded) {
+            setActiveSubTab('review');
+            setProcessingStatus(`✅ Tradução do projeto ${selectedOrder.order_number} carregada para revisão!`);
+          }
+        }
+      }
+    };
+    loadOrderData();
   }, [selectedOrder]);
 
   // Select project and fetch its files
@@ -4453,13 +4465,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
-          { id: 'start', label: 'START', icon: '📝' },
-          { id: 'translate', label: 'TRANSLATE', icon: '📄' },
-          { id: 'ai-pipeline', label: 'AI PIPELINE', icon: '🤖' },
-          { id: 'review', label: 'REVIEW', icon: '🔍' },
-          { id: 'deliver', label: 'DELIVER', icon: '✅' },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐' }
-        ].map(tab => (
+          { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
+          { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
+          { id: 'ai-pipeline', label: 'AI PIPELINE', icon: '🤖', roles: ['admin', 'pm', 'translator'] },
+          { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] },
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
+        ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
@@ -6785,180 +6798,6 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* Proofreading Section - Admin and PM */}
-              {(isAdmin || isPM) && (
-                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
-                      🔍 Proofreading
-                    </h3>
-                    <button
-                      onClick={runProofreading}
-                      disabled={isProofreading || !translationResults[selectedResultIndex]?.translatedText}
-                      className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isProofreading ? (
-                        <>
-                          <span className="animate-spin">⏳</span>
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          🔎 Run Proofreading
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Error Display */}
-                  {proofreadingError && (
-                    <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
-                      ❌ {proofreadingError}
-                    </div>
-                  )}
-
-                  {/* Proofreading Results */}
-                  {proofreadingResult && (
-                    <div className="space-y-3">
-                      {/* Classification Badge */}
-                      <div className="flex items-center gap-3">
-                        <span className={`px-4 py-2 rounded-full text-sm font-bold ${
-                          proofreadingResult.classificacao === 'APROVADO'
-                            ? 'bg-green-500 text-white'
-                            : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
-                            ? 'bg-yellow-500 text-white'
-                            : 'bg-red-500 text-white'
-                        }`}>
-                          {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
-                           proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
-                           '❌ REPROVADO'}
-                        </span>
-                        <span className="text-xs text-gray-600">
-                          Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%
-                        </span>
-                      </div>
-
-                      {/* Summary Counts */}
-                      <div className="flex gap-4 text-xs">
-                        <span className="px-2 py-1 bg-gray-100 rounded">
-                          Total: <strong>{proofreadingResult.total_erros || 0}</strong>
-                        </span>
-                        <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
-                          Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
-                        </span>
-                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
-                          Altos: <strong>{proofreadingResult.altos || 0}</strong>
-                        </span>
-                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
-                          Médios: <strong>{proofreadingResult.medios || 0}</strong>
-                        </span>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                          Baixos: <strong>{proofreadingResult.baixos || 0}</strong>
-                        </span>
-                      </div>
-
-                      {/* Errors Table */}
-                      {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
-                        <div>
-                          {/* Apply All Button */}
-                          <div className="flex justify-end mb-2">
-                            <button
-                              onClick={applyAllProofreadingCorrections}
-                              disabled={proofreadingResult.erros.every(e => e.applied)}
-                              className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
-                            >
-                              ✅ Apply All Corrections
-                            </button>
-                          </div>
-                          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                            <table className="w-full text-xs">
-                              <thead className="bg-gray-100">
-                                <tr>
-                                  <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
-                                  <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
-                                  <th className="px-2 py-2 text-left font-medium text-gray-600">Original</th>
-                                  <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
-                                  <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
-                                  <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {proofreadingResult.erros.map((erro, idx) => (
-                                  <tr key={idx} className={`border-t ${
-                                    erro.applied ? 'bg-green-50 opacity-60' :
-                                    erro.severidade === 'CRÍTICO' ? 'bg-red-50' :
-                                    erro.severidade === 'ALTO' ? 'bg-orange-50' :
-                                    erro.severidade === 'MÉDIO' ? 'bg-yellow-50' :
-                                    'bg-blue-50'
-                                  }`}>
-                                    <td className="px-2 py-2">
-                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                        erro.severidade === 'CRÍTICO' ? 'bg-red-500 text-white' :
-                                        erro.severidade === 'ALTO' ? 'bg-orange-500 text-white' :
-                                        erro.severidade === 'MÉDIO' ? 'bg-yellow-500 text-white' :
-                                        'bg-blue-500 text-white'
-                                      }`}>
-                                        {erro.severidade}
-                                      </span>
-                                    </td>
-                                    <td className="px-2 py-2 text-gray-700">{erro.tipo}</td>
-                                    <td className="px-2 py-2 text-gray-600 max-w-[120px] truncate" title={erro.original}>
-                                      {erro.original}
-                                    </td>
-                                    <td className="px-2 py-2 text-red-600 max-w-[120px] truncate" title={erro.encontrado}>
-                                      {erro.applied ? <s>{erro.encontrado}</s> : erro.encontrado}
-                                    </td>
-                                    <td className="px-2 py-2 text-green-600 max-w-[120px] truncate" title={erro.sugestao}>
-                                      {erro.sugestao}
-                                    </td>
-                                    <td className="px-2 py-2 text-center">
-                                      {erro.applied ? (
-                                        <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
-                                      ) : (
-                                        <button
-                                          onClick={() => applyProofreadingCorrection(erro, idx)}
-                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                                        >
-                                          Aplicar
-                                        </button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* No Errors Message */}
-                      {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && (
-                        <div className="p-4 bg-green-100 border border-green-300 rounded text-center">
-                          <span className="text-green-700 text-sm font-medium">
-                            ✅ Nenhum erro encontrado na tradução!
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Observations */}
-                      {proofreadingResult.observacoes && (
-                        <div className="p-3 bg-gray-100 border border-gray-200 rounded">
-                          <h4 className="text-xs font-medium text-gray-700 mb-1">📝 Observações:</h4>
-                          <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Instructions when no result */}
-                  {!proofreadingResult && !isProofreading && !proofreadingError && (
-                    <p className="text-xs text-gray-500">
-                      Clique em "Run Proofreading" para analisar a tradução e identificar erros.
-                    </p>
-                  )}
-                </div>
-              )}
-
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
                 <button
@@ -6967,12 +6806,18 @@ tradução juramentada | certified translation`}
                 >
                   <span className="mr-2">←</span> Back: Document
                 </button>
-                <button
-                  onClick={() => setActiveSubTab('deliver')}
-                  className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center"
-                >
-                  Next: Deliver <span className="ml-2">→</span>
-                </button>
+                {(isAdmin || isPM) ? (
+                  <button
+                    onClick={() => setActiveSubTab('proofreading')}
+                    className="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 flex items-center"
+                  >
+                    Next: Proofreading <span className="ml-2">→</span>
+                  </button>
+                ) : (
+                  <div className="text-xs text-gray-500 bg-gray-100 px-4 py-2 rounded">
+                    ✅ Tradução salva. Aguardando revisão do PM/Admin.
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -7038,8 +6883,249 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* APPROVAL TAB */}
-      {activeSubTab === 'deliver' && (
+      {/* PROOFREADING TAB - Admin and PM Only */}
+      {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">🔍 Proofreading & Quality Assurance</h2>
+
+          {translationResults.length > 0 ? (
+            <>
+              {/* Document selector */}
+              {translationResults.length > 1 && (
+                <div className="mb-3">
+                  <label className="text-xs text-gray-600 mr-2">Document:</label>
+                  <select
+                    value={selectedResultIndex}
+                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
+                    className="px-2 py-1 text-xs border rounded"
+                  >
+                    {translationResults.map((r, idx) => (
+                      <option key={idx} value={idx}>{r.filename}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Translation Preview */}
+              <div className="mb-4 border rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-gray-100 border-b">
+                  <span className="text-xs font-bold text-gray-700">📄 Translation to Review</span>
+                </div>
+                <div className="p-4 bg-white max-h-64 overflow-y-auto">
+                  <div
+                    className="text-xs"
+                    dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
+                  />
+                </div>
+              </div>
+
+              {/* Proofreading Controls */}
+              <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
+                    🔎 AI Proofreading Analysis
+                  </h3>
+                  <button
+                    onClick={runProofreading}
+                    disabled={isProofreading || !translationResults[selectedResultIndex]?.translatedText}
+                    className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isProofreading ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        🔎 Run Proofreading
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Error Display */}
+                {proofreadingError && (
+                  <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
+                    ❌ {proofreadingError}
+                  </div>
+                )}
+
+                {/* Proofreading Results */}
+                {proofreadingResult && (
+                  <div className="space-y-3">
+                    {/* Classification Badge */}
+                    <div className="flex items-center gap-3">
+                      <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                        proofreadingResult.classificacao === 'APROVADO'
+                          ? 'bg-green-500 text-white'
+                          : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-red-500 text-white'
+                      }`}>
+                        {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
+                         proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
+                         '❌ REPROVADO'}
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%
+                      </span>
+                    </div>
+
+                    {/* Summary Counts */}
+                    <div className="flex gap-4 text-xs">
+                      <span className="px-2 py-1 bg-gray-100 rounded">
+                        Total: <strong>{proofreadingResult.total_erros || 0}</strong>
+                      </span>
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
+                        Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
+                      </span>
+                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                        Altos: <strong>{proofreadingResult.altos || 0}</strong>
+                      </span>
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                        Médios: <strong>{proofreadingResult.medios || 0}</strong>
+                      </span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                        Baixos: <strong>{proofreadingResult.baixos || 0}</strong>
+                      </span>
+                    </div>
+
+                    {/* Errors Table */}
+                    {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                      <div>
+                        {/* Apply All Button */}
+                        <div className="flex justify-end mb-2">
+                          <button
+                            onClick={applyAllProofreadingCorrections}
+                            disabled={proofreadingResult.erros.every(e => e.applied)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                          >
+                            ✅ Apply All Corrections
+                          </button>
+                        </div>
+                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Original</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
+                                <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
+                                <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {proofreadingResult.erros.map((erro, idx) => (
+                                <tr key={idx} className={`border-t ${
+                                  erro.applied ? 'bg-green-50 opacity-60' :
+                                  erro.severidade === 'CRÍTICO' ? 'bg-red-50' :
+                                  erro.severidade === 'ALTO' ? 'bg-orange-50' :
+                                  erro.severidade === 'MÉDIO' ? 'bg-yellow-50' :
+                                  'bg-blue-50'
+                                }`}>
+                                  <td className="px-2 py-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      erro.severidade === 'CRÍTICO' ? 'bg-red-500 text-white' :
+                                      erro.severidade === 'ALTO' ? 'bg-orange-500 text-white' :
+                                      erro.severidade === 'MÉDIO' ? 'bg-yellow-500 text-white' :
+                                      'bg-blue-500 text-white'
+                                    }`}>
+                                      {erro.severidade}
+                                    </span>
+                                  </td>
+                                  <td className="px-2 py-2 text-gray-700">{erro.tipo}</td>
+                                  <td className="px-2 py-2 text-gray-600 max-w-[120px] truncate" title={erro.original}>
+                                    {erro.original}
+                                  </td>
+                                  <td className="px-2 py-2 text-red-600 max-w-[120px] truncate" title={erro.encontrado}>
+                                    {erro.applied ? <s>{erro.encontrado}</s> : erro.encontrado}
+                                  </td>
+                                  <td className="px-2 py-2 text-green-600 max-w-[120px] truncate" title={erro.sugestao}>
+                                    {erro.sugestao}
+                                  </td>
+                                  <td className="px-2 py-2 text-center">
+                                    {erro.applied ? (
+                                      <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => applyProofreadingCorrection(erro, idx)}
+                                        className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                      >
+                                        Aplicar
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No Errors Message */}
+                    {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && (
+                      <div className="p-4 bg-green-100 border border-green-300 rounded text-center">
+                        <span className="text-green-700 text-sm font-medium">
+                          ✅ Nenhum erro encontrado na tradução!
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Observations */}
+                    {proofreadingResult.observacoes && (
+                      <div className="p-3 bg-gray-100 border border-gray-200 rounded">
+                        <h4 className="text-xs font-medium text-gray-700 mb-1">📝 Observações:</h4>
+                        <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Instructions when no result */}
+                {!proofreadingResult && !isProofreading && !proofreadingError && (
+                  <p className="text-xs text-gray-500">
+                    Clique em "Run Proofreading" para analisar a tradução e identificar erros.
+                  </p>
+                )}
+              </div>
+
+              {/* Navigation */}
+              <div className="mt-4 flex justify-between items-center">
+                <button
+                  onClick={() => setActiveSubTab('review')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Review
+                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setActiveSubTab('deliver')}
+                    className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center"
+                  >
+                    Next: Deliver <span className="ml-2">→</span>
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">🔍</div>
+              <p className="text-xs mb-4">Nenhuma tradução para revisar. Vá para a aba REVIEW para carregar uma tradução.</p>
+              <button
+                onClick={() => setActiveSubTab('review')}
+                className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Ir para Review
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* APPROVAL TAB - Admin Only */}
+      {activeSubTab === 'deliver' && isAdmin && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
