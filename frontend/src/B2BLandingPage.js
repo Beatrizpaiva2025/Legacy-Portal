@@ -135,8 +135,8 @@ Message: ${formData.message}
             <div className="hidden lg:block relative">
               <div className="absolute -inset-4 bg-gradient-to-r from-blue-100 to-slate-100 rounded-3xl transform rotate-3"></div>
               <img
-                src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                alt="Global technology and digital connections"
+                src="https://files.manuscdn.com/user_upload_by_module/session_file/310419663028493717/GnDnCrLJEsQqGTWB.png"
+                alt="Global technology with international flags"
                 className="relative rounded-2xl shadow-2xl"
               />
               <div className="absolute -top-4 -right-4 bg-white p-4 rounded-xl shadow-lg">
