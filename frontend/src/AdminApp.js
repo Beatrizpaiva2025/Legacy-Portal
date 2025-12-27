@@ -4453,7 +4453,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATE', icon: '📄' },
           { id: 'ai-pipeline', label: 'AI PIPELINE', icon: '🤖' },
           { id: 'review', label: 'REVIEW', icon: '🔍' },
-          { id: 'deliver', label: 'DELIVER', icon: '✅' }
+          { id: 'deliver', label: 'DELIVER', icon: '✅' },
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -4594,81 +4595,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <option value="sworn">Sworn Translation</option>
                 </select>
               </div>
-            </div>
-          </div>
-
-          {/* Glossaries & Translation Memories Section - Collapsible */}
-          <div className="bg-white rounded shadow">
-            <div className="p-4 border-b flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">🌐</span>
-                <div>
-                  <h2 className="text-sm font-bold">Glossaries & Translation Memories</h2>
-                  <p className="text-xs text-gray-500">Upload and manage terminology resources</p>
-                </div>
-              </div>
-              <button
-                onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] }); setShowGlossaryModal(true); }}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-              >
-                <span className="mr-1">+</span> Add
-              </button>
-            </div>
-            <div className="p-4">
-              {/* Filters */}
-              <div className="flex space-x-3 mb-4">
-                <select
-                  value={resourcesFilter.language}
-                  onChange={(e) => setResourcesFilter({ ...resourcesFilter, language: e.target.value })}
-                  className="px-3 py-1.5 text-xs border rounded"
-                >
-                  <option>All Languages</option>
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-                <select
-                  value={resourcesFilter.field}
-                  onChange={(e) => setResourcesFilter({ ...resourcesFilter, field: e.target.value })}
-                  className="px-3 py-1.5 text-xs border rounded"
-                >
-                  <option>All Fields</option>
-                  <option>Financial</option>
-                  <option>Education</option>
-                  <option>General</option>
-                  <option>Personal Documents</option>
-                </select>
-              </div>
-
-              {filteredGlossaries.length > 0 ? (
-                <div className="space-y-2">
-                  {filteredGlossaries.map((gloss) => (
-                    <div key={gloss.id} className="p-3 border rounded hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-medium">{gloss.name}</span>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
-                              {gloss.sourceLang || 'PT'} {gloss.bidirectional ? '↔' : '→'} {gloss.targetLang || 'EN'}
-                            </span>
-                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{gloss.field}</span>
-                            <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
-                            {gloss.bidirectional && (
-                              <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-[10px]">↔ Bidirectional</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex space-x-1">
-                          <button onClick={() => handleEditGlossary(gloss)} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">✏️</button>
-                          <button onClick={() => handleDeleteGlossary(gloss.id)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️</button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="text-xs">No glossaries/TM yet. Click "Add" to upload one.</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -5143,6 +5069,130 @@ tradução juramentada | certified translation`}
             </div>
           )}
 
+          {/* Certificate Preview - LIVE with Editable Fields */}
+          <div className="bg-white rounded shadow p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded">
+                  Template: {selectedCertificateTemplate.startsWith('custom-')
+                    ? customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate)?.name || 'Custom'
+                    : CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.name || 'Default'}
+                </span>
+                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
+              </div>
+            </div>
+
+            {/* Check if selected template is a form type */}
+            {CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm ? (
+              /* Render Form Template (like RMV Foreign DL) */
+              <div
+                className="border rounded bg-white overflow-auto"
+                style={{maxHeight: '800px'}}
+                dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML }}
+              />
+            ) : (
+              /* Render Standard Certificate Template */
+              <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
+
+                {/* Header with logos */}
+                <div className="flex justify-between items-center mb-2 pb-2">
+                  <div className="w-32">
+                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
+                  </div>
+                  <div className="text-center flex-1 px-4">
+                    <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
+                    <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+                    <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
+                  </div>
+                  <div className="w-20 text-right">
+                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
+                  </div>
+                </div>
+                {/* Light blue line below header */}
+                <div className="w-full h-0.5 bg-blue-200 mb-4"></div>
+
+                {/* Order Number */}
+                <div className="text-right mb-6 text-sm">
+                  <span>Order # </span>
+                  <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
+                </div>
+
+                {/* Main Title */}
+                <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
+
+                {/* Translation of ... */}
+                <p className="text-center mb-6 text-sm">
+                  Translation of{' '}
+                  <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600" placeholder="School Transcript" />
+                  {' '}from<br/>
+                  <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1">
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                  {' '}to{' '}
+                  <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600">
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </p>
+
+                {/* Body paragraphs - Dynamic based on selected template */}
+                {(() => {
+                  // Get the template paragraphs
+                  let templateParagraphs;
+                  if (selectedCertificateTemplate.startsWith('custom-')) {
+                    const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+                    templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                  } else {
+                    templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+                  }
+
+                  // Replace placeholders with actual values
+                  return templateParagraphs.map((paragraph, index) => {
+                    const processedParagraph = paragraph
+                      .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+                      .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+
+                    return (
+                      <p
+                        key={index}
+                        className={`${index === templateParagraphs.length - 1 ? 'mb-6' : 'mb-4'} text-justify text-xs leading-relaxed`}
+                        dangerouslySetInnerHTML={{ __html: processedParagraph }}
+                      />
+                    );
+                  });
+                })()}
+
+                {/* Signature and Stamp Section */}
+                <div className="mt-8 flex justify-between items-end">
+                  <div>
+                    {signatureImage ? (
+                      <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
+                    ) : (
+                      <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
+                  )}
+                  <div className="text-xs">Authorized Representative</div>
+                  <div className="text-xs">Legacy Translations Inc.</div>
+                  <div className="text-xs mt-2">
+                    Dated:{' '}
+                    <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
+                  </div>
+                </div>
+                <div className="text-center">
+                  {logoStamp ? (
+                    <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full border-4 border-blue-600 flex flex-col items-center justify-center p-2" style={{borderStyle: 'double'}}>
+                      <div className="text-[8px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
+                      <div className="text-[10px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
+                      <div className="text-[8px] text-blue-600">ATA # 275993</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            )}
+          </div>
+
           {/* Certificate Logos Section */}
           <div className="bg-white rounded shadow p-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">🖼️ Certificate Logos & Signature</h3>
@@ -5324,130 +5374,6 @@ tradução juramentada | certified translation`}
             </div>
           </div>
 
-          {/* Certificate Preview - LIVE with Editable Fields */}
-          <div className="bg-white rounded shadow p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xs font-bold text-blue-700">📄 Certificate Preview (Live)</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-green-600 bg-green-50 px-2 py-1 rounded">
-                  Template: {selectedCertificateTemplate.startsWith('custom-')
-                    ? customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate)?.name || 'Custom'
-                    : CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.name || 'Default'}
-                </span>
-                <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
-              </div>
-            </div>
-
-            {/* Check if selected template is a form type */}
-            {CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm ? (
-              /* Render Form Template (like RMV Foreign DL) */
-              <div
-                className="border rounded bg-white overflow-auto"
-                style={{maxHeight: '800px'}}
-                dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML }}
-              />
-            ) : (
-              /* Render Standard Certificate Template */
-              <div className="border rounded p-8 bg-white" style={{fontFamily: 'Georgia, Times New Roman, serif', fontSize: '12px', lineHeight: '1.6', maxWidth: '800px', margin: '0 auto'}}>
-
-                {/* Header with logos */}
-                <div className="flex justify-between items-center mb-2 pb-2">
-                  <div className="w-32">
-                    {logoLeft ? <img src={logoLeft} alt="Logo" className="max-h-12" /> : <div className="text-[10px] text-blue-600 font-bold">LEGACY<br/><span className="font-normal text-[8px]">TRANSLATIONS</span></div>}
-                  </div>
-                  <div className="text-center flex-1 px-4">
-                    <div className="font-bold text-blue-600 text-sm">Legacy Translations</div>
-                    <div className="text-[9px] text-gray-600">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
-                    <div className="text-[9px] text-gray-600">(857) 316-7770 · contact@legacytranslations.com</div>
-                  </div>
-                  <div className="w-20 text-right">
-                    {logoRight ? <img src={logoRight} alt="ATA" className="max-h-10 ml-auto" /> : <div className="text-[9px] text-gray-600 italic">ata<br/><span className="text-[8px]">Member # 275993</span></div>}
-                  </div>
-                </div>
-                {/* Light blue line below header */}
-                <div className="w-full h-0.5 bg-blue-200 mb-4"></div>
-
-                {/* Order Number */}
-                <div className="text-right mb-6 text-sm">
-                  <span>Order # </span>
-                  <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
-                </div>
-
-                {/* Main Title */}
-                <h1 className="text-2xl text-center mb-6 font-normal" style={{color: '#1a365d'}}>Certification of Translation Accuracy</h1>
-
-                {/* Translation of ... */}
-                <p className="text-center mb-6 text-sm">
-                  Translation of{' '}
-                  <input type="text" value={documentType} onChange={(e) => setDocumentType(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-32 text-center focus:outline-none focus:border-blue-600" placeholder="School Transcript" />
-                  {' '}from<br/>
-                  <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600 mt-1">
-                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                  </select>
-                  {' '}to{' '}
-                  <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 focus:outline-none focus:border-blue-600">
-                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                  </select>
-                </p>
-
-                {/* Body paragraphs - Dynamic based on selected template */}
-                {(() => {
-                  // Get the template paragraphs
-                  let templateParagraphs;
-                  if (selectedCertificateTemplate.startsWith('custom-')) {
-                    const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
-                    templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-                  } else {
-                    templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
-                  }
-
-                  // Replace placeholders with actual values
-                  return templateParagraphs.map((paragraph, index) => {
-                    const processedParagraph = paragraph
-                      .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
-                      .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
-
-                    return (
-                      <p
-                        key={index}
-                        className={`${index === templateParagraphs.length - 1 ? 'mb-6' : 'mb-4'} text-justify text-xs leading-relaxed`}
-                        dangerouslySetInnerHTML={{ __html: processedParagraph }}
-                      />
-                    );
-                  });
-                })()}
-
-                {/* Signature and Stamp Section */}
-                <div className="mt-8 flex justify-between items-end">
-                  <div>
-                    {signatureImage ? (
-                      <img src={signatureImage} alt="Signature" className="h-8 mb-1" style={{maxWidth: '150px'}} />
-                    ) : (
-                      <div className="mb-1" style={{fontFamily: 'Rage Italic, cursive', fontSize: '20px', color: '#1a365d'}}>Beatriz Paiva</div>
-                  )}
-                  <div className="text-xs">Authorized Representative</div>
-                  <div className="text-xs">Legacy Translations Inc.</div>
-                  <div className="text-xs mt-2">
-                    Dated:{' '}
-                    <input type="text" value={translationDate} onChange={(e) => setTranslationDate(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-28 focus:outline-none focus:border-blue-600" />
-                  </div>
-                </div>
-                <div className="text-center">
-                  {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp" className="w-28 h-28 object-contain" />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full border-4 border-blue-600 flex flex-col items-center justify-center p-2" style={{borderStyle: 'double'}}>
-                      <div className="text-[8px] text-blue-600 font-bold">CERTIFIED TRANSLATOR</div>
-                      <div className="text-[10px] text-blue-600 font-bold mt-1">LEGACY TRANSLATIONS</div>
-                      <div className="text-[8px] text-blue-600">ATA # 275993</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            )}
-          </div>
-
           {/* Navigation */}
           <div className="mt-4 flex justify-end">
             <button
@@ -5544,64 +5470,85 @@ tradução juramentada | certified translation`}
           {/* Project Documents Section - Select to Load */}
           {selectedOrderId && (
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Documentos do Projeto - Clique para Carregar</h3>
+              <div className="flex justify-between items-start gap-4">
+                {/* Left side - Files */}
+                <div className="flex-1">
+                  <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Documentos do Projeto - Clique para Carregar</h3>
 
-              {loadingProjectFiles ? (
-                <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
-              ) : selectedProjectFiles.length > 0 ? (
-                <>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {selectedProjectFiles.map((doc, idx) => (
-                      <div
-                        key={doc.id}
-                        onClick={() => loadProjectFile(doc)}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                          selectedFileId === doc.id
-                            ? 'bg-green-100 border-2 border-green-500 shadow-md'
-                            : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
-                        }`}
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
-                          selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                        }`}>
-                          {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-medium truncate ${
-                            selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
-                          }`}>
-                            {doc.filename || `Arquivo ${idx + 1}`}
+                  {loadingProjectFiles ? (
+                    <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
+                  ) : selectedProjectFiles.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedProjectFiles.map((doc, idx) => (
+                          <div
+                            key={doc.id}
+                            onClick={() => loadProjectFile(doc)}
+                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                              selectedFileId === doc.id
+                                ? 'bg-green-100 border-2 border-green-500 shadow-md'
+                                : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
+                            }`}
+                          >
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                              selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                            }`}>
+                              {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-sm font-medium truncate ${
+                                selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                              }`}>
+                                {doc.filename || `Arquivo ${idx + 1}`}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {selectedFileId === doc.id ? '✓ Carregado - Pronto' : 'Clique para carregar'}
+                              </div>
+                            </div>
+                            {selectedFileId === doc.id && (
+                              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                                ✓
+                              </div>
+                            )}
                           </div>
-                          <div className="text-xs text-gray-400">
-                            {selectedFileId === doc.id ? '✓ Carregado - Pronto' : 'Clique para carregar'}
-                          </div>
-                        </div>
-                        {selectedFileId === doc.id && (
-                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
-                            ✓
-                          </div>
-                        )}
+                        ))}
                       </div>
-                    ))}
-                  </div>
 
-                  {originalImages.length > 0 && (
-                    <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-700">
-                      ✅ Documento carregado: {originalImages[0]?.filename || 'Pronto'} ({originalImages.length} página{originalImages.length > 1 ? 's' : ''})
+                      {originalImages.length > 0 && (
+                        <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-700">
+                          ✅ Documento carregado: {originalImages[0]?.filename || 'Pronto'} ({originalImages.length} página{originalImages.length > 1 ? 's' : ''})
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 mb-3">Nenhum documento encontrado neste projeto</p>
+                      <button
+                        onClick={() => setActiveSubTab('start')}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                      >
+                        Fazer Upload na aba START
+                      </button>
                     </div>
                   )}
-                </>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-gray-500 mb-3">Nenhum documento encontrado neste projeto</p>
-                  <button
-                    onClick={() => setActiveSubTab('start')}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                  >
-                    Fazer Upload na aba START
-                  </button>
                 </div>
-              )}
+
+                {/* Right side - Field Selector */}
+                <div className="w-48 flex-shrink-0">
+                  <label className="block text-xs font-bold text-blue-800 mb-2">📂 Field</label>
+                  <select
+                    value={documentCategory}
+                    onChange={(e) => setDocumentCategory(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-blue-300 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="financial">📊 Financial</option>
+                    <option value="education">🎓 Education</option>
+                    <option value="general">📄 General</option>
+                    <option value="personal">👤 Personal</option>
+                  </select>
+                  <p className="text-[10px] text-gray-500 mt-1">Auto-selected from document type</p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -7871,6 +7818,83 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
+      {/* GLOSSARIES TAB */}
+      {activeSubTab === 'glossaries' && (
+        <div className="bg-white rounded shadow">
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🌐</span>
+              <div>
+                <h2 className="text-sm font-bold">Glossaries & Translation Memories</h2>
+                <p className="text-xs text-gray-500">Upload and manage terminology resources</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] }); setShowGlossaryModal(true); }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+            >
+              <span className="mr-1">+</span> Add
+            </button>
+          </div>
+          <div className="p-4">
+            {/* Filters */}
+            <div className="flex space-x-3 mb-4">
+              <select
+                value={resourcesFilter.language}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, language: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Languages</option>
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+              <select
+                value={resourcesFilter.field}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, field: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Fields</option>
+                <option>Financial</option>
+                <option>Education</option>
+                <option>General</option>
+                <option>Personal Documents</option>
+              </select>
+            </div>
+
+            {filteredGlossaries.length > 0 ? (
+              <div className="space-y-2">
+                {filteredGlossaries.map((gloss) => (
+                  <div key={gloss.id} className="p-3 border rounded hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-medium">{gloss.name}</span>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                            {gloss.sourceLang || 'PT'} {gloss.bidirectional ? '↔' : '→'} {gloss.targetLang || 'EN'}
+                          </span>
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{gloss.field}</span>
+                          <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
+                          {gloss.bidirectional && (
+                            <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-[10px]">↔ Bidirectional</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex space-x-1">
+                        <button onClick={() => handleEditGlossary(gloss)} className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded">✏️</button>
+                        <button onClick={() => handleDeleteGlossary(gloss.id)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-xs">No glossaries/TM yet. Click "Add" to upload one.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -9174,8 +9198,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {/* AI Pipeline Quick Start Modal */}
       {aiPipelineModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg flex-shrink-0">
               <div>
                 <h3 className="font-bold">🤖 AI Translation Pipeline</h3>
                 <p className="text-xs opacity-80">{aiPipelineModal.order_number} - {aiPipelineModal.client_name}</p>
@@ -9183,7 +9207,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button onClick={() => setAiPipelineModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Order Info */}
               <div className="bg-purple-50 p-3 rounded-lg">
                 <div className="grid grid-cols-2 gap-2 text-xs">
@@ -9372,7 +9396,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
             </div>
 
-            <div className="p-3 border-t bg-gray-50 flex justify-between items-center rounded-b-lg">
+            <div className="p-3 border-t bg-gray-50 flex justify-between items-center rounded-b-lg flex-shrink-0">
               <button
                 onClick={() => setAiPipelineModal(null)}
                 className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
