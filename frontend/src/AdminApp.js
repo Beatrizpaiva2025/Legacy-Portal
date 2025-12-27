@@ -1661,6 +1661,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
 
+  // Proofreading state (admin only)
+  const [proofreadingResult, setProofreadingResult] = useState(null);
+  const [isProofreading, setIsProofreading] = useState(false);
+  const [proofreadingError, setProofreadingError] = useState('');
+
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
   const [targetLanguage, setTargetLanguage] = useState('English');
@@ -2583,6 +2588,68 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     setActiveSubTab('review');
     setProcessingStatus('✅ Ready for review');
+  };
+
+  // Run detailed proofreading (admin only)
+  const runProofreading = async () => {
+    if (!claudeApiKey) {
+      alert('Please configure Claude API key in Settings');
+      return;
+    }
+
+    const currentResult = translationResults[selectedResultIndex];
+    if (!currentResult?.translatedText) {
+      alert('No translation to proofread');
+      return;
+    }
+
+    // Extract text from translation (remove HTML tags for proofreading)
+    const translatedText = currentResult.translatedText
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Get original text (from OCR or extracted)
+    const originalText = ocrResults[selectedResultIndex]?.text ||
+                        currentResult.originalText ||
+                        'Original text not available';
+
+    setIsProofreading(true);
+    setProofreadingError('');
+    setProofreadingResult(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/proofread?admin_key=${encodeURIComponent(adminKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          original_text: originalText,
+          translated_text: translatedText,
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          document_type: documentType,
+          claude_api_key: claudeApiKey
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Proofreading failed');
+      }
+
+      if (data.proofreading_result) {
+        setProofreadingResult(data.proofreading_result);
+      } else if (data.raw_response) {
+        // Show raw response if JSON parsing failed
+        setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response}`);
+      }
+    } catch (error) {
+      console.error('Proofreading error:', error);
+      setProofreadingError(error.message);
+    } finally {
+      setIsProofreading(false);
+    }
   };
 
   // Convert file to base64
@@ -6202,6 +6269,154 @@ tradução juramentada | certified translation`}
                   <div className="text-xs text-green-800 bg-white p-2 rounded border border-green-200 whitespace-pre-wrap">
                     {claudeNotes}
                   </div>
+                </div>
+              )}
+
+              {/* Proofreading Section - Admin Only */}
+              {isAdmin && (
+                <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2">
+                      🔍 Proofreading (Admin)
+                    </h3>
+                    <button
+                      onClick={runProofreading}
+                      disabled={isProofreading || !translationResults[selectedResultIndex]?.translatedText}
+                      className="px-4 py-2 bg-indigo-600 text-white text-xs font-medium rounded hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {isProofreading ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          🔎 Run Proofreading
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Error Display */}
+                  {proofreadingError && (
+                    <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
+                      ❌ {proofreadingError}
+                    </div>
+                  )}
+
+                  {/* Proofreading Results */}
+                  {proofreadingResult && (
+                    <div className="space-y-3">
+                      {/* Classification Badge */}
+                      <div className="flex items-center gap-3">
+                        <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                          proofreadingResult.classificacao === 'APROVADO'
+                            ? 'bg-green-500 text-white'
+                            : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                            ? 'bg-yellow-500 text-white'
+                            : 'bg-red-500 text-white'
+                        }`}>
+                          {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
+                           proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
+                           '❌ REPROVADO'}
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%
+                        </span>
+                      </div>
+
+                      {/* Summary Counts */}
+                      <div className="flex gap-4 text-xs">
+                        <span className="px-2 py-1 bg-gray-100 rounded">
+                          Total: <strong>{proofreadingResult.total_erros || 0}</strong>
+                        </span>
+                        <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
+                          Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
+                        </span>
+                        <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                          Altos: <strong>{proofreadingResult.altos || 0}</strong>
+                        </span>
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                          Médios: <strong>{proofreadingResult.medios || 0}</strong>
+                        </span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                          Baixos: <strong>{proofreadingResult.baixos || 0}</strong>
+                        </span>
+                      </div>
+
+                      {/* Errors Table */}
+                      {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600">Severidade</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600">Tipo</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600">Original</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600">Encontrado</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-600">Sugestão</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {proofreadingResult.erros.map((erro, idx) => (
+                                <tr key={idx} className={`border-t ${
+                                  erro.severidade === 'CRÍTICO' ? 'bg-red-50' :
+                                  erro.severidade === 'ALTO' ? 'bg-orange-50' :
+                                  erro.severidade === 'MÉDIO' ? 'bg-yellow-50' :
+                                  'bg-blue-50'
+                                }`}>
+                                  <td className="px-3 py-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      erro.severidade === 'CRÍTICO' ? 'bg-red-500 text-white' :
+                                      erro.severidade === 'ALTO' ? 'bg-orange-500 text-white' :
+                                      erro.severidade === 'MÉDIO' ? 'bg-yellow-500 text-white' :
+                                      'bg-blue-500 text-white'
+                                    }`}>
+                                      {erro.severidade}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 text-gray-700">{erro.tipo}</td>
+                                  <td className="px-3 py-2 text-gray-600 max-w-[150px] truncate" title={erro.original}>
+                                    {erro.original}
+                                  </td>
+                                  <td className="px-3 py-2 text-red-600 max-w-[150px] truncate" title={erro.encontrado}>
+                                    {erro.encontrado}
+                                  </td>
+                                  <td className="px-3 py-2 text-green-600 max-w-[150px] truncate" title={erro.sugestao}>
+                                    {erro.sugestao}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* No Errors Message */}
+                      {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && (
+                        <div className="p-4 bg-green-100 border border-green-300 rounded text-center">
+                          <span className="text-green-700 text-sm font-medium">
+                            ✅ Nenhum erro encontrado na tradução!
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Observations */}
+                      {proofreadingResult.observacoes && (
+                        <div className="p-3 bg-gray-100 border border-gray-200 rounded">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">📝 Observações:</h4>
+                          <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Instructions when no result */}
+                  {!proofreadingResult && !isProofreading && !proofreadingError && (
+                    <p className="text-xs text-gray-500">
+                      Clique em "Run Proofreading" para analisar a tradução e identificar erros.
+                    </p>
+                  )}
                 </div>
               )}
 
