@@ -4331,168 +4331,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
-          {/* Assigned Orders for all users */}
-          {(user?.role === 'admin' || user?.role === 'translator' || user?.role === 'pm') && (
-            <div className="bg-white rounded shadow">
-              <div className="p-3 border-b bg-gradient-to-r from-purple-600 to-purple-700">
-                <h3 className="text-sm font-bold text-white flex items-center">
-                  📋 Projetos
-                  {assignedOrders.length > 0 && (
-                    <span className="ml-2 bg-white text-purple-600 px-2 py-0.5 rounded-full text-xs font-bold">{assignedOrders.length}</span>
-                  )}
-                </h3>
-                <p className="text-[10px] text-purple-200 mt-1">Clique em um projeto para abrir o documento</p>
-              </div>
-              <div className="p-3">
-                {loadingAssigned ? (
-                  <div className="text-center py-4 text-gray-500 text-xs">Carregando projetos...</div>
-                ) : assignedOrders.length > 0 ? (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {assignedOrders.map(order => (
-                      <div
-                        key={order.id}
-                        onClick={() => loadOrderDocument(order)}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
-                          selectedOrderId === order.id
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 bg-gray-50 hover:border-purple-300 hover:bg-purple-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-purple-700">{order.order_number}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                order.translation_status === 'received' ? 'bg-gray-200 text-gray-700' :
-                                order.translation_status === 'in_translation' ? 'bg-yellow-200 text-yellow-800' :
-                                order.translation_status === 'pending_review' ? 'bg-orange-200 text-orange-800' :
-                                order.translation_status === 'pending_pm_review' ? 'bg-orange-200 text-orange-800' :
-                                order.translation_status === 'review' ? 'bg-purple-200 text-purple-800' :
-                                order.translation_ready ? 'bg-green-200 text-green-800' :
-                                'bg-purple-200 text-purple-800'
-                              }`}>
-                                {order.translation_status === 'received' ? 'Novo' :
-                                 order.translation_status === 'in_translation' ? 'Em progresso' :
-                                 order.translation_status === 'pending_review' ? '⏳ Aguardando Revisão' :
-                                 order.translation_status === 'pending_pm_review' ? '⏳ Aguardando PM' :
-                                 order.translation_status === 'review' ? 'Para Revisar' :
-                                 order.translation_ready ? '✅ Tradução Pronta' : 'Revisão'}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-700 mt-1">{order.client_name}</div>
-                            <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
-                              <span>🌐 {order.translate_from} → {order.translate_to}</span>
-                              {order.page_count && <span>📄 {order.page_count} pg</span>}
-                            </div>
-                            {order.deadline && (
-                              <div className="text-[10px] text-orange-600 mt-1">
-                                ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')} {new Date(order.deadline).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {/* Show Review button if translation is ready */}
-                            {(order.translation_ready || order.translation_html) ? (
-                              <>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    setSelectedOrderId(order.id);
-                                    setOrderNumber(order.order_number);
-                                    const loaded = await loadSavedTranslation(order);
-                                    if (loaded) {
-                                      setActiveSubTab('review');
-                                    }
-                                  }}
-                                  className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center text-white text-lg hover:bg-green-700 transition-colors"
-                                >
-                                  ✅
-                                </button>
-                                <span className="text-[9px] text-green-600 font-medium">Revisar</span>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center text-white text-lg">
-                                  📂
-                                </div>
-                                <span className="text-[9px] text-purple-600 font-medium">Abrir</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        {/* Files list for selected project */}
-                        {selectedOrderId === order.id && (
-                          <div className="mt-2 pt-2 border-t border-purple-200">
-                            <div className="text-[10px] text-purple-700 font-medium mb-2">
-                              📁 Arquivos do Projeto ({selectedProjectFiles.length})
-                            </div>
-                            {loadingProjectFiles ? (
-                              <div className="text-[10px] text-gray-500 text-center py-2">Carregando arquivos...</div>
-                            ) : selectedProjectFiles.length > 0 ? (
-                              <div className="space-y-1.5">
-                                {selectedProjectFiles.map((doc, idx) => (
-                                  <div
-                                    key={doc.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      loadProjectFile(doc);
-                                    }}
-                                    className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-all ${
-                                      selectedFileId === doc.id
-                                        ? 'bg-green-100 border-2 border-green-500'
-                                        : 'bg-white border border-gray-200 hover:bg-purple-100 hover:border-purple-400'
-                                    }`}
-                                  >
-                                    <div className={`w-8 h-8 rounded flex items-center justify-center text-sm ${
-                                      selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                                    }`}>
-                                      {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className={`text-xs font-medium truncate ${
-                                        selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
-                                      }`}>
-                                        {doc.filename || `Arquivo ${idx + 1}`}
-                                      </div>
-                                      <div className="text-[9px] text-gray-400">
-                                        {selectedFileId === doc.id ? '✓ Carregado' : 'Clique para abrir'}
-                                      </div>
-                                    </div>
-                                    {selectedFileId === doc.id && (
-                                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
-                                        ✓
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-[10px] text-gray-400 text-center py-2">
-                                Nenhum arquivo encontrado
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-gray-400">
-                    <div className="text-4xl mb-2">📭</div>
-                    <div className="text-sm font-medium">Nenhum projeto atribuído</div>
-                    <div className="text-xs mt-1">Aguarde novos projetos serem enviados para você</div>
-                  </div>
-                )}
-                <button
-                  onClick={fetchAssignedOrders}
-                  className="mt-3 w-full py-2 text-xs text-purple-600 hover:text-white hover:bg-purple-600 border border-purple-300 rounded-lg transition-colors font-medium"
-                >
-                  🔄 Atualizar Lista
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
@@ -4500,45 +4338,107 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </p>
           </div>
 
-          {/* API Key - Collapsible (Shared with all translators) */}
-          <div className="bg-white rounded shadow">
-            <button
-              onClick={() => setShowApiKey(!showApiKey)}
-              className="w-full p-3 flex items-center justify-between text-left hover:bg-gray-50"
-            >
-              <div className="flex items-center space-x-2">
-                <span className="text-lg">🔑</span>
-                <span className="text-sm font-medium">API Key Settings</span>
-                {claudeApiKey && <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">✓ Configured</span>}
-                <span className="text-[9px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded">Shared with all users</span>
+          {/* Translation Direction */}
+          <div className="bg-white rounded shadow p-4">
+            <h3 className="text-xs font-bold text-blue-700 mb-3">🌐 Translation Direction</h3>
+            <div className="flex items-center justify-center gap-4">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">From:</label>
+                <select
+                  value={sourceLanguage}
+                  onChange={(e) => setSourceLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded font-medium"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
               </div>
-              <span className="text-gray-400">{showApiKey ? '▼' : '▶'}</span>
-            </button>
-            {showApiKey && (
-              <div className="p-4 border-t">
-                <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-3">
-                  <p className="text-xs text-blue-700">
-                    <strong>🌐 Shared API Key:</strong> When you save the API key here, it will be available to all translators who access the Translation Workspace. They won't need to configure their own key.
-                  </p>
+              <div className="pt-5 text-2xl text-blue-500">→</div>
+              <div className="flex-1">
+                <label className="block text-xs text-gray-600 mb-1">To:</label>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded font-medium"
+                >
+                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Document Type - Expandable */}
+          <div className="bg-white rounded shadow">
+            <details className="group" open>
+              <summary className="p-3 cursor-pointer flex items-center justify-between hover:bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📁</span>
+                  <span className="text-sm font-bold">Document Type</span>
+                  {documentType && <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">{documentType}</span>}
                 </div>
-                <div className="flex space-x-2">
-                  <input
-                    type="password"
-                    value={claudeApiKey}
-                    onChange={(e) => setClaudeApiKey(e.target.value)}
-                    placeholder="sk-ant-api03-..."
-                    className="flex-1 px-3 py-2 text-xs border rounded"
-                  />
+                <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="p-4 pt-0 border-t">
+                {/* Document Category Buttons */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
                   <button
-                    onClick={saveApiKey}
-                    className="px-4 py-2 bg-yellow-500 text-white text-xs rounded hover:bg-yellow-600"
+                    onClick={() => setDocumentCategory('financial')}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
                   >
-                    💾 Save & Share
+                    📊 Financial
+                  </button>
+                  <button
+                    onClick={() => setDocumentCategory('education')}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                  >
+                    🎓 Education
+                  </button>
+                  <button
+                    onClick={() => setDocumentCategory('general')}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                  >
+                    📄 General
+                  </button>
+                  <button
+                    onClick={() => setDocumentCategory('personal')}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                  >
+                    👤 Personal
                   </button>
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2">Required for translation. Get yours at console.anthropic.com</p>
+                {/* Document Type Input */}
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Document Type:</label>
+                  <input
+                    type="text"
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    placeholder="e.g., Bank Statement, Birth Certificate, Diploma..."
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
+                </div>
               </div>
-            )}
+            </details>
+          </div>
+
+          {/* Page Format Section - Moved up before Logos */}
+          <div className="bg-white rounded shadow p-4">
+            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
+                <select value={pageFormat} onChange={(e) => savePageFormat(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
+                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
+                  <option value="a4">A4 (210mm x 297mm) - International</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
+                <select value={translationType} onChange={(e) => saveTranslationType(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
+                  <option value="certified">Certified Translation</option>
+                  <option value="sworn">Sworn Translation</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Glossaries & Translation Memories Section - Collapsible */}
@@ -5390,27 +5290,6 @@ tradução juramentada | certified translation`}
               </div>
             </div>
             )}
-          </div>
-
-          {/* Page Format Section */}
-          <div className="bg-white rounded shadow p-4">
-            <h3 className="text-xs font-bold text-gray-700 mb-3">📄 Page Format</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Translation Type</label>
-                <select value={translationType} onChange={(e) => saveTranslationType(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
-                  <option value="certified">Certified Translation</option>
-                  <option value="sworn">Sworn Translation</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Page Size</label>
-                <select value={pageFormat} onChange={(e) => savePageFormat(e.target.value)} className="w-full px-2 py-1.5 text-xs border rounded">
-                  <option value="letter">Letter (8.5" x 11") - US Standard</option>
-                  <option value="a4">A4 (210mm x 297mm) - International</option>
-                </select>
-              </div>
-            </div>
           </div>
 
           {/* Navigation */}
