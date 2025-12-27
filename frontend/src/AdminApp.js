@@ -2325,16 +2325,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Send translation to Projects
   const sendToProjects = async (destination = 'admin') => {
-    // Validate document type
-    if (!documentType.trim()) {
-      alert('Please fill in the Document Type field');
-      return;
-    }
+    // For 'save' destination, only require basic info
+    if (destination !== 'save') {
+      // Validate document type
+      if (!documentType.trim()) {
+        alert('Please fill in the Document Type field');
+        return;
+      }
 
-    // Validate approval checklist
-    if (!isApprovalComplete) {
-      alert('Please complete all items in the Approval Checklist before sending');
-      return;
+      // Validate approval checklist only for delivery
+      if (destination === 'deliver' && !isApprovalComplete) {
+        alert('Please complete all items in the Approval Checklist before sending');
+        return;
+      }
     }
 
     if (!selectedOrderId) {
@@ -2351,8 +2354,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
-      const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
-      const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
       // Build translation HTML (simplified for storage)
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
@@ -2362,7 +2363,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         translation_html: translationHTML,
         source_language: sourceLanguage,
         target_language: targetLanguage,
-        document_type: documentType,
+        document_type: documentType || 'Document',
         translator_name: translator?.name || selectedTranslator,
         translation_date: translationDate,
         include_cover: includeCover,
@@ -2372,38 +2373,138 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
-        send_to: destination, // 'pm', 'admin', or 'review'
+        send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
         submitted_by_role: user?.role || 'unknown'
       });
 
-      const destinationLabel = destination === 'pm' ? 'PM' : destination === 'review' ? 'Admin/PM for Review' : 'Admin';
+      const destinationLabels = {
+        'save': 'Saved',
+        'pm': 'PM Review',
+        'ready': 'Ready for Delivery',
+        'deliver': 'Client'
+      };
+      const destinationLabel = destinationLabels[destination] || destination;
+
       if (response.data.status === 'success' || response.data.success) {
-        // Check if user is a translator (they can't access Projects page)
         const isTranslator = user?.role === 'translator';
 
-        if (isTranslator) {
-          setProcessingStatus(`✅ Translation submitted for review! Admin/PM will review and send to client.`);
+        if (destination === 'save') {
+          setProcessingStatus(`✅ Translation saved successfully!`);
+        } else if (destination === 'pm') {
+          setProcessingStatus(`✅ Translation sent to PM for review!`);
+          if (isTranslator) {
+            // Translator goes back or stays
+            setTimeout(() => {
+              if (onBack) onBack();
+            }, 1500);
+          }
         } else {
-          setProcessingStatus(`✅ Translation sent to ${destinationLabel}! Returning to Projects...`);
-        }
-        setSelectedOrderId('');
-
-        // Navigate back to Projects after a short delay (only for non-translators)
-        if (onBack && !isTranslator) {
-          setTimeout(() => {
-            onBack();
-          }, 1500);
+          setProcessingStatus(`✅ Translation sent to ${destinationLabel}!`);
         }
 
         // Refresh orders list
         fetchAvailableOrders();
+        fetchAssignedOrders();
       } else {
         throw new Error(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
       console.error('Error sending to projects:', error);
       setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setSendingToProjects(false);
+    }
+  };
+
+  // Approve translation (PM/Admin) - marks as ready for delivery
+  const approveTranslation = async () => {
+    if (!selectedOrderId) {
+      alert('No order selected');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      '✅ Approve this translation?\n\n' +
+      'The translation will be marked as "Ready for Delivery" and will appear in the Admin\'s delivery queue.'
+    );
+
+    if (!confirmed) return;
+
+    setSendingToProjects(true);
+    try {
+      // Update order status to ready for delivery
+      await axios.put(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`, {
+        translation_status: 'ready',
+        proofreading_status: 'approved',
+        proofreading_score: proofreadingResult?.pontuacao_final || null,
+        proofreading_by: user?.name || 'PM',
+        proofreading_date: new Date().toISOString()
+      });
+
+      setProcessingStatus('✅ Translation APPROVED! Ready for delivery by Admin.');
+
+      // Refresh lists
+      fetchAvailableOrders();
+      fetchAssignedOrders();
+
+      // Navigate back for PM
+      if (isPM && !isAdmin && onBack) {
+        setTimeout(() => onBack(), 1500);
+      } else if (isAdmin) {
+        // Admin can go directly to deliver
+        setActiveSubTab('deliver');
+      }
+    } catch (error) {
+      console.error('Error approving translation:', error);
+      setProcessingStatus(`❌ Failed to approve: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setSendingToProjects(false);
+    }
+  };
+
+  // Reject translation (PM/Admin) - returns to translator
+  const rejectTranslation = async () => {
+    if (!selectedOrderId) {
+      alert('No order selected');
+      return;
+    }
+
+    const reason = window.prompt(
+      '❌ Reject this translation?\n\n' +
+      'Please provide a reason for rejection (will be sent to translator):'
+    );
+
+    if (reason === null) return; // Cancelled
+    if (!reason.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    setSendingToProjects(true);
+    try {
+      // Update order status back to in_translation
+      await axios.put(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`, {
+        translation_status: 'in_translation',
+        proofreading_status: 'rejected',
+        proofreading_notes: reason,
+        proofreading_by: user?.name || 'PM',
+        proofreading_date: new Date().toISOString()
+      });
+
+      setProcessingStatus('❌ Translation REJECTED. Returned to translator with feedback.');
+
+      // Refresh lists
+      fetchAvailableOrders();
+      fetchAssignedOrders();
+
+      // Navigate back
+      if (onBack) {
+        setTimeout(() => onBack(), 1500);
+      }
+    } catch (error) {
+      console.error('Error rejecting translation:', error);
+      setProcessingStatus(`❌ Failed to reject: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
     }
@@ -6806,18 +6907,37 @@ tradução juramentada | certified translation`}
                 >
                   <span className="mr-2">←</span> Back: Document
                 </button>
-                {(isAdmin || isPM) ? (
+                <div className="flex gap-2">
+                  {/* Save button for all users */}
                   <button
-                    onClick={() => setActiveSubTab('proofreading')}
-                    className="px-6 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 flex items-center"
+                    onClick={() => sendToProjects('save')}
+                    disabled={sendingToProjects || translationResults.length === 0}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
                   >
-                    Next: Proofreading <span className="ml-2">→</span>
+                    💾 Save Translation
                   </button>
-                ) : (
-                  <div className="text-xs text-gray-500 bg-gray-100 px-4 py-2 rounded">
-                    ✅ Tradução salva. Aguardando revisão do PM/Admin.
-                  </div>
-                )}
+
+                  {/* Translator: Send to PM Review */}
+                  {!isAdmin && !isPM && (
+                    <button
+                      onClick={() => sendToProjects('pm')}
+                      disabled={sendingToProjects || translationResults.length === 0}
+                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                    >
+                      📤 Send to PM Review
+                    </button>
+                  )}
+
+                  {/* Admin/PM: Go to Proofreading */}
+                  {(isAdmin || isPM) && (
+                    <button
+                      onClick={() => setActiveSubTab('proofreading')}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 flex items-center gap-2"
+                    >
+                      Next: Proofreading <span className="ml-1">→</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </>
           ) : (
@@ -7091,22 +7211,51 @@ tradução juramentada | certified translation`}
                 )}
               </div>
 
-              {/* Navigation */}
-              <div className="mt-4 flex justify-between items-center">
-                <button
-                  onClick={() => setActiveSubTab('review')}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
-                >
-                  <span className="mr-2">←</span> Back: Review
-                </button>
-                {isAdmin && (
+              {/* Approval Actions */}
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <h4 className="text-sm font-bold text-gray-700 mb-3">📋 Approval Decision</h4>
+                <div className="flex justify-between items-center">
                   <button
-                    onClick={() => setActiveSubTab('deliver')}
-                    className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center"
+                    onClick={() => setActiveSubTab('review')}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
                   >
-                    Next: Deliver <span className="ml-2">→</span>
+                    <span className="mr-2">←</span> Back: Review
                   </button>
-                )}
+                  <div className="flex gap-3">
+                    {/* Reject Button */}
+                    <button
+                      onClick={rejectTranslation}
+                      disabled={sendingToProjects}
+                      className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
+                    >
+                      ❌ Reject
+                    </button>
+
+                    {/* Approve Button */}
+                    <button
+                      onClick={approveTranslation}
+                      disabled={sendingToProjects}
+                      className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:bg-gray-300 flex items-center gap-2"
+                    >
+                      ✅ Approve
+                    </button>
+
+                    {/* Admin: Go directly to Deliver */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => setActiveSubTab('deliver')}
+                        className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        📤 Go to Deliver
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery" (Admin will send to client)
+                  <br/>
+                  ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                </p>
               </div>
             </>
           ) : (
@@ -9102,10 +9251,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const getStatusLabel = (status) => {
     const labels = {
       'received': 'Quote',
-      'in_translation': 'In progress',
+      'in_translation': 'In Progress',
       'review': 'PM Review',
+      'pending_pm_review': 'PM Review',
       'client_review': 'Client Review',
-      'ready': 'Completed',
+      'ready': 'Ready',
       'delivered': 'Delivered'
     };
     return labels[status] || status;
