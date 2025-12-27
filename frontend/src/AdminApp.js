@@ -2976,7 +2976,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setProofreadingResult(null);
 
     try {
-      const response = await fetch(`${API_BASE}/admin/proofread?admin_key=${encodeURIComponent(adminKey)}`, {
+      const response = await fetch(`${API}/admin/proofread?admin_key=${encodeURIComponent(adminKey)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4166,7 +4166,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       // Persist to backend
       try {
-        await axios.post(`${API_BASE_URL}/glossaries`, tmEntry, { withCredentials: true });
+        await axios.post(`${API}/glossaries`, tmEntry, { withCredentials: true });
       } catch (err) {
         // Save to localStorage as fallback
         localStorage.setItem('glossaries', JSON.stringify(newGlossaries));
