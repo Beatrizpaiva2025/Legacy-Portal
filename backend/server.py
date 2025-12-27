@@ -10113,15 +10113,34 @@ Produce a complete HTML translation ready for professional use.
             "text": text_prompt
         })
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,  # Increased for multi-page documents
-            system=system_prompt,
-            messages=[{"role": "user", "content": message_content}]
-        )
+        # Retry logic for rate limits
+        import anthropic
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16384,  # Increased for multi-page documents
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": message_content}]
+                )
+                break  # Success
+            except anthropic.RateLimitError:
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)
+                    logger.warning(f"Translator chunk {chunk_num} rate limit, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Translator chunk {chunk_num} rate limit exceeded after {max_retries} retries")
+                    return {
+                        "success": False,
+                        "error": "API rate limit exceeded after multiple retries",
+                        "result": None
+                    }
 
         # Safety check for empty response
-        if not response.content or len(response.content) == 0:
+        if not response or not response.content or len(response.content) == 0:
             logger.warning(f"Chunk {chunk_num} translation returned empty response")
             return {
                 "success": False,
@@ -10295,13 +10314,18 @@ async def process_layout_chunk(chunk: str, chunk_num: int, total_chunks: int,
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,
-            system=system_prompt,
-            messages=[{
-                "role": "user",
-                "content": f"""Optimize the layout of this document section (chunk {chunk_num}/{total_chunks}) for professional printing:
+        # Retry logic for rate limits
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16384,
+                    system=system_prompt,
+                    messages=[{
+                        "role": "user",
+                        "content": f"""Optimize the layout of this document section (chunk {chunk_num}/{total_chunks}) for professional printing:
 
 {chunk}
 
@@ -10309,8 +10333,20 @@ TARGET: {page_size}
 TASK: Optimize CSS, fix page breaks, ensure print-ready output.
 IMPORTANT: Return ONLY the optimized HTML content. Preserve all structure.
 OUTPUT: Complete corrected HTML section."""
-            }]
-        )
+                    }]
+                )
+                break  # Success
+            except anthropic.RateLimitError:
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)
+                    logger.warning(f"Layout chunk {chunk_num} rate limit, waiting {wait_time}s")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning(f"Layout chunk {chunk_num} rate limit exceeded, using original")
+                    return {"success": True, "result": chunk, "tokens_used": 0, "changes": []}
+
+        if not response:
+            return {"success": True, "result": chunk, "tokens_used": 0, "changes": []}
 
         # Safety check for empty response
         if not response.content or len(response.content) == 0:
@@ -10533,12 +10569,41 @@ TASK: Optimize CSS, fix page breaks, ensure print-ready output.
 OUTPUT: Complete corrected HTML document."""
         })
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,
-            system=system_prompt,
-            messages=[{"role": "user", "content": message_content}]
-        )
+        # Retry logic for rate limits
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16384,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": message_content}]
+                )
+                break  # Success, exit retry loop
+            except anthropic.RateLimitError as rate_error:
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)  # 60s, 120s, 180s
+                    logger.warning(f"AI Layout rate limit hit, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning(f"AI Layout rate limit exceeded after {max_retries} retries, skipping layout stage")
+                    return {
+                        "success": True,
+                        "result": previous_translation,
+                        "tokens_used": 0,
+                        "changes_made": [],
+                        "notes": "Layout skipped due to API rate limit. Translation preserved."
+                    }
+
+        if not response:
+            return {
+                "success": True,
+                "result": previous_translation,
+                "tokens_used": 0,
+                "changes_made": [],
+                "notes": "Layout skipped - no response from API. Translation preserved."
+            }
 
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
@@ -10607,13 +10672,18 @@ async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: in
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,
-            system=system_prompt,
-            messages=[{
-                "role": "user",
-                "content": f"""Proofread this section (chunk {chunk_num}/{total_chunks}) of a translated {document_type} document:
+        # Retry logic for rate limits
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16384,
+                    system=system_prompt,
+                    messages=[{
+                        "role": "user",
+                        "content": f"""Proofread this section (chunk {chunk_num}/{total_chunks}) of a translated {document_type} document:
 
 {chunk}
 
@@ -10621,8 +10691,20 @@ TASK: Verify terminology, consistency, and natural language flow for {target_lan
 TARGET: United States official use (if English)
 IMPORTANT: Return ONLY the proofread HTML content. Preserve all structure.
 OUTPUT: Complete corrected HTML section."""
-            }]
-        )
+                    }]
+                )
+                break  # Success
+            except anthropic.RateLimitError:
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)
+                    logger.warning(f"Proofreader chunk {chunk_num} rate limit, waiting {wait_time}s")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning(f"Proofreader chunk {chunk_num} rate limit exceeded, using original")
+                    return {"success": True, "result": chunk, "tokens_used": 0, "corrections": []}
+
+        if not response:
+            return {"success": True, "result": chunk, "tokens_used": 0, "corrections": []}
 
         # Safety check for empty response
         if not response.content or len(response.content) == 0:
@@ -10740,21 +10822,52 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=16384,
-            system=system_prompt,
-            messages=[{
-                "role": "user",
-                "content": f"""Proofread this translated {document_type} document:
+        # Retry logic for rate limits
+        max_retries = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16384,
+                    system=system_prompt,
+                    messages=[{
+                        "role": "user",
+                        "content": f"""Proofread this translated {document_type} document:
 
 {previous_translation}
 
 TASK: Verify terminology, consistency, and natural language flow for {target_language}.
 TARGET: United States official use (if English)
 OUTPUT: Complete corrected HTML with proofreading report."""
-            }]
-        )
+                    }]
+                )
+                break  # Success
+            except anthropic.RateLimitError:
+                if attempt < max_retries - 1:
+                    wait_time = 60 * (attempt + 1)
+                    logger.warning(f"AI Proofreader rate limit hit, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.warning(f"AI Proofreader rate limit exceeded after {max_retries} retries, skipping proofreading")
+                    return {
+                        "success": True,
+                        "result": previous_translation,
+                        "tokens_used": 0,
+                        "changes_made": [],
+                        "notes": "Proofreading skipped due to API rate limit. Translation preserved.",
+                        "quality_score": "not_evaluated"
+                    }
+
+        if not response:
+            return {
+                "success": True,
+                "result": previous_translation,
+                "tokens_used": 0,
+                "changes_made": [],
+                "notes": "Proofreading skipped - no response from API. Translation preserved.",
+                "quality_score": "not_evaluated"
+            }
 
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
