@@ -942,6 +942,9 @@ class TranslationOrder(BaseModel):
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
+    # Document classification
+    document_type: Optional[str] = None  # birth_certificate, marriage_certificate, diploma, etc.
+    document_category: Optional[str] = None  # financial, educational, personal, bank_statement, etc.
 
 class TranslationOrderCreate(BaseModel):
     client_name: str
@@ -1017,6 +1020,9 @@ class ManualProjectCreate(BaseModel):
     create_invoice: Optional[bool] = False
     invoice_terms: Optional[str] = "30_days"  # '15_days', '30_days', 'custom'
     invoice_custom_date: Optional[str] = None
+    # Document classification
+    document_type: Optional[str] = None  # birth_certificate, marriage_certificate, diploma, etc.
+    document_category: Optional[str] = None  # financial, educational, personal, bank_statement, etc.
     # Files (base64)
     document_data: Optional[str] = None
     document_filename: Optional[str] = None
@@ -4252,7 +4258,9 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             deadline=deadline,
             internal_notes=project_data.internal_notes,
             revenue_source=project_data.revenue_source,
-            payment_method=project_data.payment_method
+            payment_method=project_data.payment_method,
+            document_type=project_data.document_type,
+            document_category=project_data.document_category
         )
 
         # Store additional fields in order dict

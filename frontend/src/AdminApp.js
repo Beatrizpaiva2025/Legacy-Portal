@@ -8621,6 +8621,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         translate_from: 'Portuguese',
         translate_to: 'English',
         service_type: 'standard',
+        document_type: '',
         page_count: 1,
         word_count: 0,
         urgency: 'no',
@@ -8638,7 +8639,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         payment_tag: '',
         create_invoice: false,
         invoice_terms: '30_days',
-        invoice_custom_date: ''
+        invoice_custom_date: '',
+        document_category: ''
       });
       setDocumentFiles([]);
       fetchOrders();
