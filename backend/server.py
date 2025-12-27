@@ -1202,6 +1202,9 @@ class AIPipelineConfig(BaseModel):
     convert_currency: bool = False
     source_currency: Optional[str] = None  # BRL, EUR, etc.
     target_currency: Optional[str] = None  # USD
+    exchange_rate: Optional[float] = None  # e.g., 5.42
+    rate_date: Optional[str] = None  # e.g., "2024-12-27"
+    add_translator_note: bool = False  # Add translator's note with conversion info
     # Format settings
     date_format_source: str = "DD/MM/YYYY"  # Brazilian format
     date_format_target: str = "MM/DD/YYYY"  # US format
@@ -1264,6 +1267,9 @@ class AIPipelineCreate(BaseModel):
     convert_currency: bool = False
     source_currency: Optional[str] = None
     target_currency: Optional[str] = None
+    exchange_rate: Optional[float] = None  # e.g., 5.42
+    rate_date: Optional[str] = None  # e.g., "2024-12-27"
+    add_translator_note: bool = True  # Add translator's note with conversion info on first page
     page_format: str = "letter"
     use_glossary: bool = True
     custom_instructions: Optional[str] = None
@@ -9290,20 +9296,48 @@ def get_ai_translator_prompt(config: dict, glossary_terms: str = "") -> str:
 
     # Currency conversion
     currency_section = ""
+    translator_note_section = ""
     if config.get("convert_currency"):
         src_curr = config.get("source_currency", "BRL")
         tgt_curr = config.get("target_currency", "USD")
+        exchange_rate = config.get("exchange_rate", 5.0)
+        rate_date = config.get("rate_date", "current date")
+
         currency_section = f"""
 ═══════════════════════════════════════════════════════════════════
                     CURRENCY CONVERSION
 ═══════════════════════════════════════════════════════════════════
 Convert monetary values from {src_curr} to {tgt_curr}:
-• Show BOTH values: "$1,234.56 (R$ 6,170.00)"
-• Use approximate exchange rate (1 USD ≈ 5.0 BRL as reference)
+• Exchange Rate: 1 {tgt_curr} = {exchange_rate} {src_curr}
+• Rate Date: {rate_date}
+• Show BOTH values: Original [CONVERTED in bold]
+• Example: R$ 5,420.00 [<strong>$1,000.00 USD</strong>]
 • Format according to target country:
   - USD: $1,234.56 (comma for thousands, period for decimals)
   - BRL: R$ 1.234,56 (period for thousands, comma for decimals)
 • For bank statements: preserve all transaction codes and dates
+"""
+
+        # Add translator's note instruction for financial documents
+        if config.get("add_translator_note"):
+            translator_note_section = f"""
+═══════════════════════════════════════════════════════════════════
+              ⚠️ TRANSLATOR'S NOTE - MANDATORY ⚠️
+═══════════════════════════════════════════════════════════════════
+You MUST add a "TRANSLATOR'S NOTE" box at the TOP of the FIRST PAGE.
+
+Insert this HTML block IMMEDIATELY after the opening <body> tag:
+
+<div style="border: 2px solid #333; padding: 15px; margin-bottom: 20px; background-color: #f9f9f9; font-size: 10pt;">
+  <strong>TRANSLATOR'S NOTE:</strong><br>
+  Currency values in this document have been converted from {src_curr} to {tgt_curr}
+  using the exchange rate of <strong>1 {tgt_curr} = {exchange_rate} {src_curr}</strong>
+  as of <strong>{rate_date}</strong>.<br>
+  Original values are shown with converted amounts in brackets [<strong>USD value</strong>].
+</div>
+
+This note is REQUIRED for all financial documents with currency conversion.
+DO NOT omit this note - it is essential for document authenticity.
 """
 
     # Date format
@@ -9393,6 +9427,8 @@ There is NO separate layout stage - your output must be print-ready!
 {date_section}
 
 {currency_section}
+
+{translator_note_section}
 
 {doc_specific}
 
@@ -11032,6 +11068,9 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
         convert_currency=request.convert_currency,
         source_currency=request.source_currency,
         target_currency=request.target_currency,
+        exchange_rate=request.exchange_rate,
+        rate_date=request.rate_date or datetime.utcnow().strftime("%Y-%m-%d"),
+        add_translator_note=request.add_translator_note,
         page_format=request.page_format,
         use_glossary=request.use_glossary,
         custom_instructions=request.custom_instructions

@@ -1801,7 +1801,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     sourceCurrency: 'BRL',
     targetCurrency: 'USD',
     exchangeRate: '',
+    rateDate: new Date().toISOString().split('T')[0],
     rateSource: 'xe.com',
+    addTranslatorNote: true,  // Add translator's note with conversion info on first page
     useGlossary: true,
     customInstructions: ''
   });
@@ -3107,6 +3109,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         convert_currency: aiPipelineConfig.convertCurrency,
         source_currency: aiPipelineConfig.sourceCurrency,
         target_currency: aiPipelineConfig.targetCurrency,
+        exchange_rate: parseFloat(aiPipelineConfig.exchangeRate) || null,
+        rate_date: aiPipelineConfig.rateDate,
+        add_translator_note: aiPipelineConfig.addTranslatorNote,
         page_format: pageFormat,
         use_glossary: aiPipelineConfig.useGlossary,
         custom_instructions: aiPipelineConfig.customInstructions,
@@ -7657,6 +7662,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     exchange_rate: '',
     rate_date: new Date().toISOString().split('T')[0],
     rate_source: 'xe.com',
+    add_translator_note: true, // Add translator's note with conversion info
     use_glossary: true,
     page_format: 'letter',
     custom_instructions: ''
@@ -9004,6 +9010,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <strong>Preview:</strong> {CURRENCIES[aiPipelineQuickConfig.source_currency]?.symbol}1,000.00 = [<strong>{CURRENCIES[aiPipelineQuickConfig.target_currency]?.symbol}{(1000 / parseFloat(aiPipelineQuickConfig.exchange_rate)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>]
                         </div>
                       )}
+
+                      {/* Translator's Note */}
+                      <label className="flex items-center gap-2 text-xs cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={aiPipelineQuickConfig.add_translator_note}
+                          onChange={(e) => setAiPipelineQuickConfig({...aiPipelineQuickConfig, add_translator_note: e.target.checked})}
+                          className="rounded text-amber-600"
+                        />
+                        <span className="text-amber-800">📝 Add Translator's Note (show conversion info on first page)</span>
+                      </label>
                     </div>
                   )}
                 </div>
