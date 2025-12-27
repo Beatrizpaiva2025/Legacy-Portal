@@ -7017,44 +7017,77 @@ CRITICAL OUTPUT RULES:
 
                     # Check if it's a PDF and convert to image
                     if 'pdf' in header.lower():
-                        logger.info("Converting PDF to image for Claude...")
+                        logger.info("Converting PDF to images for Claude...")
                         try:
                             import fitz  # PyMuPDF
                             pdf_bytes = base64.b64decode(image_data)
                             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                            total_pages = len(doc)
+                            logger.info(f"PDF has {total_pages} pages")
 
-                            # Convert first page to image
-                            page = doc[0]
-                            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
-                            img_bytes = pix.tobytes("jpeg")
-                            image_data = base64.b64encode(img_bytes).decode('utf-8')
-                            media_type = "image/jpeg"
+                            # Extract ALL pages as images
+                            page_images = []
+                            for page_num in range(total_pages):
+                                page = doc[page_num]
+                                pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
+                                img_bytes = pix.tobytes("jpeg")
+                                page_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                                page_images.append({
+                                    "page_num": page_num + 1,
+                                    "data": page_b64
+                                })
+
                             doc.close()
-                            logger.info("PDF converted to image successfully")
+                            logger.info(f"PDF converted to {len(page_images)} images successfully")
+
+                            # Store all page images for multi-page translation
+                            all_page_images = page_images
+                            media_type = "image/jpeg"
+
                         except Exception as e:
                             logger.error(f"PDF conversion failed: {e}")
                             # Fall back to text-only translation
-                            image_data = None
+                            all_page_images = []
                     elif 'png' in header.lower():
                         media_type = "image/png"
+                        all_page_images = [{"page_num": 1, "data": image_data}]
                     elif 'gif' in header.lower():
                         media_type = "image/gif"
+                        all_page_images = [{"page_num": 1, "data": image_data}]
                     elif 'webp' in header.lower():
                         media_type = "image/webp"
+                        all_page_images = [{"page_num": 1, "data": image_data}]
+                    else:
+                        # Default to jpeg
+                        all_page_images = [{"page_num": 1, "data": image_data}]
+                else:
+                    # No header, assume single image
+                    all_page_images = [{"page_num": 1, "data": image_data}] if image_data else []
 
-                if image_data:
-                    message_content = [
-                        {
+                # Build message content with ALL page images
+                if all_page_images:
+                    message_content = []
+
+                    # Add ALL page images to the message
+                    for page_info in all_page_images:
+                        message_content.append({
                             "type": "image",
                             "source": {
                                 "type": "base64",
                                 "media_type": media_type,
-                                "data": image_data,
+                                "data": page_info["data"],
                             },
-                        },
-                        {
-                            "type": "text",
-                            "text": f"""Look at this document image carefully. This is the original document.
+                        })
+
+                    # Add the text instruction after all images
+                    total_pages = len(all_page_images)
+                    pages_text = f"This document has {total_pages} page(s). You MUST translate ALL {total_pages} pages." if total_pages > 1 else "This is a single-page document."
+
+                    message_content.append({
+                        "type": "text",
+                        "text": f"""Look at these document images carefully. These are ALL the pages of the original document.
+
+{pages_text}
 
 The OCR text extracted from this document is:
 ---
@@ -7063,12 +7096,15 @@ The OCR text extracted from this document is:
 
 {user_message}
 
-CRITICAL: Your HTML output MUST match the visual layout of the original document image above.
-- If you see tables in the image, create HTML tables with the same structure
-- If you see bordered sections, use CSS borders
-- Replicate the exact visual appearance in HTML format"""
-                        }
-                    ]
+CRITICAL INSTRUCTIONS:
+1. Your HTML output MUST include translations for ALL {total_pages} PAGE(S)
+2. Use clear page separators between pages (e.g., <div class="page-break" style="page-break-after: always;"></div>)
+3. Match the visual layout of EACH original page
+4. If you see tables in any image, create HTML tables with the same structure
+5. If you see bordered sections, use CSS borders
+6. Replicate the exact visual appearance of EACH page in HTML format
+7. DO NOT skip any pages - all pages must be translated"""
+                    })
                 else:
                     message_content = user_message
             else:
