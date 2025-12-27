@@ -13693,6 +13693,18 @@ const UsersPage = ({ adminKey, user }) => {
     }
   };
 
+  const handleResendInvitation = async (userId, userName, userEmail) => {
+    if (!window.confirm(`Resend invitation email to "${userName}" (${userEmail})?`)) return;
+    try {
+      const response = await axios.post(`${API}/admin/auth/resend-invitation?admin_key=${adminKey}`, {
+        user_id: userId
+      });
+      alert(response.data?.message || 'Invitation email resent successfully!');
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Error resending invitation');
+    }
+  };
+
   const roleColors = {
     admin: 'bg-red-100 text-red-800',
     pm: 'bg-blue-100 text-blue-800',
@@ -13869,9 +13881,15 @@ const UsersPage = ({ adminKey, user }) => {
                     {u.language_pairs || '-'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {u.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    {u.invitation_pending ? (
+                      <span className="px-2 py-1 rounded text-xs bg-yellow-100 text-yellow-800">
+                        Pending Invitation
+                      </span>
+                    ) : (
+                      <span className={`px-2 py-1 rounded text-xs ${u.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {u.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 space-x-2">
                     <button
@@ -13880,6 +13898,14 @@ const UsersPage = ({ adminKey, user }) => {
                     >
                       {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
                     </button>
+                    {u.invitation_pending && (
+                      <button
+                        onClick={() => handleResendInvitation(u.id, u.name, u.email)}
+                        className="text-orange-600 hover:text-orange-800 text-xs"
+                      >
+                        Resend Invitation
+                      </button>
+                    )}
                     {isAdmin && (
                       <button
                         onClick={() => handleToggleActive(u.id)}
