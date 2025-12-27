@@ -9520,6 +9520,15 @@ Produce a complete HTML translation ready for professional use.
             messages=[{"role": "user", "content": message_content}]
         )
 
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Chunk {chunk_num} translation returned empty response")
+            return {
+                "success": False,
+                "error": "API returned empty response (possible rate limit)",
+                "result": None
+            }
+
         return {
             "success": True,
             "result": response.content[0].text,
@@ -9702,6 +9711,16 @@ IMPORTANT: Return ONLY the optimized HTML content. Preserve all structure.
 OUTPUT: Complete corrected HTML section."""
             }]
         )
+
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Layout chunk {chunk_num} returned empty response")
+            return {
+                "success": True,
+                "result": chunk,  # Return original
+                "tokens_used": 0,
+                "changes": []
+            }
 
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
@@ -10004,6 +10023,16 @@ IMPORTANT: Return ONLY the proofread HTML content. Preserve all structure.
 OUTPUT: Complete corrected HTML section."""
             }]
         )
+
+        # Safety check for empty response
+        if not response.content or len(response.content) == 0:
+            logger.warning(f"Proofreader chunk {chunk_num} returned empty response")
+            return {
+                "success": True,
+                "result": chunk,  # Return original
+                "tokens_used": 0,
+                "corrections": []
+            }
 
         result = response.content[0].text
         tokens_used = response.usage.input_tokens + response.usage.output_tokens
