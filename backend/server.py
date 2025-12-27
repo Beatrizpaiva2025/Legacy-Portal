@@ -7265,6 +7265,266 @@ CRITICAL INSTRUCTIONS:
         raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
 
 
+# ==================== PROOFREADING ENDPOINT ====================
+
+class ProofreadRequest(BaseModel):
+    original_text: str
+    translated_text: str
+    source_language: str = "Portuguese (Brazil)"
+    target_language: str = "English"
+    document_type: str = "General Document"
+    claude_api_key: str
+
+# Special characters by language
+LANGUAGE_SPECIAL_CHARS = {
+    "Portuguese": "ç ã õ á é í ó ú â ê ô à Ç Ã Õ",
+    "Portuguese (Brazil)": "ç ã õ á é í ó ú â ê ô à Ç Ã Õ",
+    "Norwegian": "ø å æ Ø Å Æ",
+    "Swedish": "å ä ö Å Ä Ö",
+    "Danish": "æ ø å Æ Ø Å",
+    "German": "ä ö ü ß Ä Ö Ü",
+    "French": "é è ê ë à â ù û ô î ï ç œ æ",
+    "Spanish": "ñ á é í ó ú ü ¿ ¡ Ñ",
+    "Italian": "à è é ì ò ù",
+    "Polish": "ą ć ę ł ń ó ś ź ż",
+    "Turkish": "ç ğ ı ö ş ü",
+    "English": "",
+}
+
+# Document-type specific terminology
+DOCUMENT_TERMINOLOGY = {
+    "bank_statement": """
+TERMINOLOGIA BANCÁRIA:
+- Brukskonto = Checking Account
+- Sparekonto = Savings Account
+- Bufferspar = Buffer Savings
+- Avtalegiro = Direct Debit
+- Saldo = Balance
+- Rente = Interest
+- Gebyr = Fee/Charge
+- Extrato Bancário = Bank Statement
+- Crédito/Débito = Credit/Debit
+- Titular = Account Holder
+- Agência = Branch
+""",
+    "academic": """
+TERMINOLOGIA ACADÊMICA:
+- Histórico Escolar = Academic Transcript
+- Diploma = Diploma / Degree Certificate
+- Bacharel / Bacharelado = Bachelor's Degree
+- Licenciatura = Teaching Degree / Licentiate
+- Mestrado = Master's Degree
+- Doutorado = Doctorate / Ph.D.
+- Carga Horária = Course Load / Credit Hours
+- Disciplina = Course / Subject
+- Aprovado = Passed / Approved
+- Reprovado = Failed
+- Colação de Grau = Graduation Ceremony
+""",
+    "certificate": """
+TERMINOLOGIA DE CERTIDÕES:
+- Certidão de Nascimento = Birth Certificate
+- Certidão de Casamento = Marriage Certificate
+- Certidão de Óbito = Death Certificate
+- Certidão de Inteiro Teor = Full Copy Certificate
+- Cartório = Notary Office / Registry Office
+- Oficial de Registro = Registrar / Notary
+- Livro = Book / Register
+- Folha = Page / Folio
+- Termo = Entry / Record
+- Averbação = Annotation / Amendment
+- Filiação = Parentage
+""",
+    "general": """
+TERMINOLOGIA GERAL:
+- Use terminologia padrão para o tipo de documento
+- Mantenha consistência em todo o documento
+"""
+}
+
+def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str) -> str:
+    """Generate document-type specific proofreading prompt."""
+
+    special_chars = LANGUAGE_SPECIAL_CHARS.get(source_lang, "")
+
+    # Determine terminology based on document type
+    doc_type_lower = doc_type.lower()
+    if "bank" in doc_type_lower or "extrato" in doc_type_lower or "statement" in doc_type_lower:
+        terminology = DOCUMENT_TERMINOLOGY["bank_statement"]
+    elif "academ" in doc_type_lower or "diplom" in doc_type_lower or "histórico" in doc_type_lower or "transcript" in doc_type_lower:
+        terminology = DOCUMENT_TERMINOLOGY["academic"]
+    elif "certid" in doc_type_lower or "birth" in doc_type_lower or "marriage" in doc_type_lower or "certificate" in doc_type_lower:
+        terminology = DOCUMENT_TERMINOLOGY["certificate"]
+    else:
+        terminology = DOCUMENT_TERMINOLOGY["general"]
+
+    prompt = f"""Você é um revisor de traduções certificado.
+
+IDIOMA FONTE: {source_lang}
+IDIOMA ALVO: {target_lang}
+TIPO DE DOCUMENTO: {doc_type}
+
+CARACTERES ESPECIAIS DO IDIOMA FONTE (devem ser PRESERVADOS em nomes próprios):
+{special_chars}
+
+{terminology}
+
+INSTRUÇÕES DE REVISÃO:
+
+1. Compare CADA elemento dos dois documentos minuciosamente
+
+2. Identifique TODOS os erros, incluindo:
+   - Erros de transcrição (typos, letras trocadas)
+   - Números incorretos (dígitos errados, faltando ou extras)
+   - Caracteres especiais faltando ou incorretos
+   - Traduções incorretas de termos técnicos
+   - Omissões (conteúdo do original ausente na tradução)
+   - Adições indevidas (conteúdo na tradução que não está no original)
+   - Formatação inconsistente
+   - Datas incorretas
+
+3. ATENÇÃO ESPECIAL para:
+   - IBANs, números de conta, referências bancárias
+   - Datas (verificar formato e valores)
+   - Nomes próprios (pessoas, empresas, lugares)
+   - Valores monetários
+   - Caracteres especiais em nomes ({special_chars})
+
+4. Para cada erro forneça:
+   - Página/localização
+   - Texto original
+   - Texto errado na tradução
+   - Correção sugerida
+   - Tipo de erro
+   - Gravidade (CRÍTICO/ALTO/MÉDIO/BAIXO)
+
+GRAVIDADE DOS ERROS:
+- CRÍTICO: Erros que invalidam o documento (números errados em IBANs, omissões de cláusulas importantes)
+- ALTO: Erros significativos (nomes com caracteres errados, datas incorretas)
+- MÉDIO: Erros que devem ser corrigidos (terminologia inconsistente)
+- BAIXO: Sugestões de melhoria (formatação, estilo)
+
+FORMATO DE SAÍDA (JSON):
+{{
+    "erros": [
+        {{
+            "pagina": "1",
+            "localizacao": "descrição da localização",
+            "original": "texto original exato",
+            "traducao_errada": "texto com erro",
+            "correcao": "texto corrigido",
+            "tipo": "Transcrição|Número|Data|Caractere Especial|Tradução Incorreta|Omissão|Formatação",
+            "gravidade": "CRÍTICO|ALTO|MÉDIO|BAIXO"
+        }}
+    ],
+    "resumo": {{
+        "total_erros": 0,
+        "criticos": 0,
+        "altos": 0,
+        "medios": 0,
+        "baixos": 0,
+        "qualidade": "APROVADO|APROVADO_COM_OBSERVACOES|REPROVADO"
+    }},
+    "observacoes": ["observações gerais sobre a tradução"]
+}}
+
+Responda APENAS com o JSON válido."""
+
+    return prompt
+
+
+@api_router.post("/admin/proofread")
+async def admin_proofread(request: ProofreadRequest, admin_key: str):
+    """
+    Proofread a translation - Returns JSON with detailed errors
+    Admin only endpoint for detailed proofreading
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    if not request.claude_api_key:
+        raise HTTPException(status_code=400, detail="Claude API key is required")
+
+    try:
+        system_prompt = get_proofreading_prompt(
+            request.source_language,
+            request.target_language,
+            request.document_type
+        )
+
+        user_message = f"""=== DOCUMENTO ORIGINAL ({request.source_language}) ===
+{request.original_text}
+=== FIM DO DOCUMENTO ORIGINAL ===
+
+=== TRADUÇÃO ({request.target_language}) ===
+{request.translated_text}
+=== FIM DA TRADUÇÃO ===
+
+Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
+
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": request.claude_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 8192,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_message}
+                    ]
+                }
+            )
+
+            if response.status_code != 200:
+                error_detail = response.text
+                logger.error(f"Claude API error: {response.status_code} - {error_detail}")
+                raise HTTPException(status_code=response.status_code, detail=f"Claude API error: {error_detail}")
+
+            result = response.json()
+            proofreading_result = result.get("content", [{}])[0].get("text", "")
+
+            # Try to parse as JSON
+            try:
+                # Clean up the response - remove markdown code blocks if present
+                clean_result = proofreading_result.strip()
+                if clean_result.startswith("```json"):
+                    clean_result = clean_result[7:]
+                if clean_result.startswith("```"):
+                    clean_result = clean_result[3:]
+                if clean_result.endswith("```"):
+                    clean_result = clean_result[:-3]
+                clean_result = clean_result.strip()
+
+                parsed_result = json.loads(clean_result)
+
+                return {
+                    "status": "success",
+                    "proofreading_result": parsed_result,
+                    "raw_response": proofreading_result
+                }
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return raw response
+                return {
+                    "status": "success",
+                    "proofreading_result": None,
+                    "raw_response": proofreading_result,
+                    "parse_error": "Could not parse response as JSON"
+                }
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Proofreading request timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Proofreading error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Proofreading failed: {str(e)}")
+
+
 # ==================== TRANSLATION RESOURCES ENDPOINTS ====================
 
 class TranslationInstructionCreate(BaseModel):
