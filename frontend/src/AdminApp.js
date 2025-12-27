@@ -6180,10 +6180,13 @@ tradução juramentada | certified translation`}
                 )}
               </div>
 
-              {/* Pipeline Configuration */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
-                <h3 className="text-xs font-bold text-purple-800 mb-3">⚙️ Pipeline Configuration</h3>
-
+              {/* Pipeline Configuration - Collapsible */}
+              <details className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg mb-4">
+                <summary className="p-3 cursor-pointer text-xs font-bold text-purple-800 hover:bg-purple-100 rounded-lg">
+                  ⚙️ Configurações do Pipeline (clique para expandir)
+                  <span className="float-right text-gray-500">▼</span>
+                </summary>
+                <div className="p-4 pt-0">
                 <div className="grid grid-cols-2 gap-4">
                   {/* Language Pair */}
                   <div>
@@ -6321,7 +6324,8 @@ tradução juramentada | certified translation`}
                     />
                   </div>
                 </div>
-              </div>
+                </div>
+              </details>
 
               {/* Pipeline Status / Progress */}
               {aiPipeline ? (
