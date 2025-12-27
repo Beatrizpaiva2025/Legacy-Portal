@@ -10662,7 +10662,7 @@ OUTPUT: Complete corrected HTML document."""
 
 async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: int,
                                      config: dict, claude_api_key: str) -> dict:
-    """Process a single chunk through proofreading"""
+    """Process a single chunk through proofreading - CRITICAL, will retry many times"""
     import anthropic
 
     target_language = config["target_language"]
@@ -10672,8 +10672,8 @@ async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: in
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        # Retry logic for rate limits
-        max_retries = 3
+        # PROOFREADER IS CRITICAL - retry up to 10 times
+        max_retries = 10
         response = None
         for attempt in range(max_retries):
             try:
@@ -10695,15 +10695,13 @@ OUTPUT: Complete corrected HTML section."""
                 )
                 break  # Success
             except anthropic.RateLimitError:
-                if attempt < max_retries - 1:
-                    wait_time = 60 * (attempt + 1)
-                    logger.warning(f"Proofreader chunk {chunk_num} rate limit, waiting {wait_time}s")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.warning(f"Proofreader chunk {chunk_num} rate limit exceeded, using original")
-                    return {"success": True, "result": chunk, "tokens_used": 0, "corrections": []}
+                wait_time = 90 * (attempt + 1)  # 90s, 180s, 270s...
+                logger.warning(f"Proofreader chunk {chunk_num} rate limit, waiting {wait_time}s (attempt {attempt + 2}/{max_retries})")
+                await asyncio.sleep(wait_time)
 
         if not response:
+            # Even after all retries, return original to not block pipeline
+            logger.error(f"Proofreader chunk {chunk_num} failed after {max_retries} attempts")
             return {"success": True, "result": chunk, "tokens_used": 0, "corrections": []}
 
         # Safety check for empty response
@@ -10822,8 +10820,8 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
     try:
         client = anthropic.Anthropic(api_key=claude_api_key)
 
-        # Retry logic for rate limits
-        max_retries = 3
+        # PROOFREADER IS CRITICAL - retry up to 10 times with longer waits
+        max_retries = 10
         response = None
         for attempt in range(max_retries):
             try:
@@ -10843,30 +10841,26 @@ OUTPUT: Complete corrected HTML with proofreading report."""
                     }]
                 )
                 break  # Success
-            except anthropic.RateLimitError:
-                if attempt < max_retries - 1:
-                    wait_time = 60 * (attempt + 1)
-                    logger.warning(f"AI Proofreader rate limit hit, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.warning(f"AI Proofreader rate limit exceeded after {max_retries} retries, skipping proofreading")
-                    return {
-                        "success": True,
-                        "result": previous_translation,
-                        "tokens_used": 0,
-                        "changes_made": [],
-                        "notes": "Proofreading skipped due to API rate limit. Translation preserved.",
-                        "quality_score": "not_evaluated"
-                    }
+            except anthropic.RateLimitError as rate_error:
+                # Wait longer for proofreader - it's critical
+                wait_time = 90 * (attempt + 1)  # 90s, 180s, 270s, etc.
+                logger.warning(f"AI Proofreader rate limit hit, waiting {wait_time}s before retry {attempt + 2}/{max_retries}")
+
+                # Update pipeline status to show waiting
+                await db.ai_pipelines.update_one(
+                    {"id": pipeline["id"]},
+                    {"$set": {
+                        "stages.ai_proofreader.notes": f"Rate limit - aguardando {wait_time}s (tentativa {attempt + 2}/{max_retries})..."
+                    }}
+                )
+                await asyncio.sleep(wait_time)
 
         if not response:
+            # Last resort - fail the stage so user can retry manually
             return {
-                "success": True,
-                "result": previous_translation,
-                "tokens_used": 0,
-                "changes_made": [],
-                "notes": "Proofreading skipped - no response from API. Translation preserved.",
-                "quality_score": "not_evaluated"
+                "success": False,
+                "error": "Proofreader could not complete after 10 attempts due to API rate limits. Please try again in a few minutes.",
+                "result": previous_translation
             }
 
         result = response.content[0].text
