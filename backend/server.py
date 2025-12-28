@@ -3298,11 +3298,11 @@ async def get_current_admin_user_info(token: str):
 
 @api_router.get("/admin/users")
 async def list_admin_users(token: str, admin_key: str):
-    """List all admin users (admin only)"""
+    """List all admin users (admin and PM can access)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin"]:
+        if user and user.get("role") in ["admin", "pm"]:
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -3315,6 +3315,7 @@ async def list_admin_users(token: str, admin_key: str):
             "name": u["name"],
             "role": u["role"],
             "is_active": u.get("is_active", True),
+            "invitation_pending": u.get("invitation_pending", False),
             "rate_per_page": u.get("rate_per_page"),
             "rate_per_word": u.get("rate_per_word"),
             "language_pairs": u.get("language_pairs"),
@@ -4804,24 +4805,31 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
         raise HTTPException(status_code=500, detail=f"Failed to send quote: {str(e)}")
 
 @api_router.get("/admin/users/by-role/{role}")
-async def get_users_by_role(role: str, admin_key: str):
-    """Get users by role (for dropdown selectors)"""
+async def get_users_by_role(role: str, admin_key: str, include_pending: bool = True):
+    """Get users by role (for dropdown selectors and user management)"""
     # Validate admin key or user token
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     try:
-        users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+        # Include users with pending invitations if requested
+        if include_pending:
+            users = await db.admin_users.find({"role": role}).to_list(100)
+        else:
+            users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+
         return [{
             "id": u["id"],
             "name": u["name"],
             "email": u["email"],
             "role": u.get("role", role),
             "is_active": u.get("is_active", True),
+            "invitation_pending": u.get("invitation_pending", False),
             "language_pairs": u.get("language_pairs"),
             "rate_per_page": u.get("rate_per_page"),
-            "rate_per_word": u.get("rate_per_word")
+            "rate_per_word": u.get("rate_per_word"),
+            "created_at": u.get("created_at")
         } for u in users]
     except Exception as e:
         logger.error(f"Error fetching users by role: {str(e)}")
