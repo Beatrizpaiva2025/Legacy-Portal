@@ -4150,8 +4150,14 @@ async def get_order(order_id: str, token: str):
 # ==================== ADMIN ENDPOINTS (for you to manage orders) ====================
 
 @api_router.get("/admin/orders")
-async def admin_get_all_orders(admin_key: str):
-    """Get all orders (admin only)"""
+async def admin_get_all_orders(
+    admin_key: str,
+    page: int = 1,
+    limit: int = 50,
+    status: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Get all orders with pagination (admin only)"""
     # Check if it's master admin key OR a valid user token
     is_valid = False
     expected_key = os.environ.get("ADMIN_KEY", "legacy_admin_2024")
@@ -4175,8 +4181,25 @@ async def admin_get_all_orders(admin_key: str):
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Fetch orders with projection to reduce data transfer
-    orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+    # Build query filter
+    query = {}
+    if status and status != "all":
+        query["translation_status"] = status
+    if search:
+        query["$or"] = [
+            {"order_number": {"$regex": search, "$options": "i"}},
+            {"client_name": {"$regex": search, "$options": "i"}},
+            {"client_email": {"$regex": search, "$options": "i"}}
+        ]
+
+    # Get total count for pagination
+    total_count = await db.translation_orders.count_documents(query)
+
+    # Calculate skip value
+    skip = (page - 1) * limit
+
+    # Fetch orders with pagination
+    orders = await db.translation_orders.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
 
     # Calculate summary in single pass for better performance
     total_pending = 0
@@ -4202,10 +4225,21 @@ async def admin_get_all_orders(admin_key: str):
         elif payment_status == "overdue":
             total_overdue += 1
 
+    # Calculate total pages
+    total_pages = (total_count + limit - 1) // limit
+
     return {
         "orders": orders,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        },
         "summary": {
-            "total_orders": len(orders),
+            "total_orders": total_count,
             "pending": total_pending,
             "paid": total_paid,
             "overdue": total_overdue,
