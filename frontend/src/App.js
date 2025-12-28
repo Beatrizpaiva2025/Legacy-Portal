@@ -1959,15 +1959,25 @@ function App() {
 
   // Check for reset token and verification route in URL
   useEffect(() => {
+    // Check query params in main URL
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('reset_token');
+    let token = urlParams.get('reset_token');
+
+    // Also check query params in hash (for /#/partner?reset_token=xxx)
+    const hash = window.location.hash;
+    if (!token && hash.includes('?')) {
+      const hashParams = new URLSearchParams(hash.split('?')[1]);
+      token = hashParams.get('reset_token');
+    }
+
     if (token) {
       setResetToken(token);
+      // Clean up URL after getting token
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash.split('?')[0]);
     }
 
     // Check for verification route: /#/verify/CERTIFICATION_ID
-    const hash = window.location.hash;
-    const verifyMatch = hash.match(/^#\/verify\/(.+)$/);
+    const verifyMatch = hash.match(/^#\/verify\/(.+?)(\?|$)/);
     if (verifyMatch) {
       setVerificationId(verifyMatch[1]);
     }
@@ -1975,7 +1985,7 @@ function App() {
     // Listen for hash changes
     const handleHashChange = () => {
       const newHash = window.location.hash;
-      const match = newHash.match(/^#\/verify\/(.+)$/);
+      const match = newHash.match(/^#\/verify\/(.+?)(\?|$)/);
       if (match) {
         setVerificationId(match[1]);
       } else {
@@ -2041,11 +2051,13 @@ function App() {
         t={t}
         onSuccess={() => {
           setResetToken(null);
-          window.history.replaceState({}, '', window.location.pathname);
+          // Redirect to partner login page
+          window.location.href = '/#/partner';
         }}
         onCancel={() => {
           setResetToken(null);
-          window.history.replaceState({}, '', window.location.pathname);
+          // Redirect to partner login page
+          window.location.href = '/#/partner';
         }}
       />
     );
