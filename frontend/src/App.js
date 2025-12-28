@@ -1904,7 +1904,10 @@ const VerificationPage = ({ certificationId }) => {
                 {verification.certifier_name && (
                   <div className="flex justify-between py-2 border-b border-green-200">
                     <span className="text-gray-600">Certified By:</span>
-                    <span className="font-medium">{verification.certifier_name}</span>
+                    <span className="font-medium text-right">
+                      {verification.certifier_name}
+                      {verification.certifier_title && <div className="text-xs text-gray-500">{verification.certifier_title}</div>}
+                    </span>
                   </div>
                 )}
                 {verification.certifier_credentials && (

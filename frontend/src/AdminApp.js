@@ -4024,7 +4024,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         page_count: translationResults.length,
         document_content: translationContent,
         certifier_name: translator?.name || 'Beatriz Paiva',
-        certifier_title: translator?.title || 'Certified Translator',
+        certifier_title: 'Legal Representative - Legacy Translations',
         certifier_credentials: 'ATA Member # 275993',
         company_name: certCompanyName || 'Legacy Translations, LLC',
         company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',

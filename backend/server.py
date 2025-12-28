@@ -1108,6 +1108,7 @@ class CertificationVerifyResponse(BaseModel):
     source_language: Optional[str] = None
     target_language: Optional[str] = None
     certifier_name: Optional[str] = None
+    certifier_title: Optional[str] = None
     certifier_credentials: Optional[str] = None
     company_name: Optional[str] = None
     client_name: Optional[str] = None
@@ -12620,6 +12621,7 @@ async def verify_certification(certification_id: str):
             source_language=certification.get("source_language"),
             target_language=certification.get("target_language"),
             certifier_name=certification.get("certifier_name"),
+            certifier_title=certification.get("certifier_title"),
             certifier_credentials=certification.get("certifier_credentials"),
             company_name=certification.get("company_name"),
             client_name=certification.get("client_name"),
