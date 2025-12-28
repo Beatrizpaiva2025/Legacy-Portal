@@ -5537,6 +5537,36 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         }
     }
 
+@api_router.get("/admin/orders/{order_id}")
+async def admin_get_single_order(order_id: str, admin_key: str):
+    """Get a single order by ID (admin or PM)"""
+    # Validate admin key OR valid token from admin/PM
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm", "translator"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find order by id
+        order = await db.translation_orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        # Remove MongoDB _id
+        if '_id' in order:
+            del order['_id']
+
+        return {"order": order}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching order {order_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.put("/admin/orders/{order_id}")
 async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate, admin_key: str):
     """Update order status (admin or PM)"""
