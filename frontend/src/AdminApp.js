@@ -12600,6 +12600,9 @@ const UsersPage = ({ adminKey, user }) => {
   const [userDocuments, setUserDocuments] = useState({});
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [search, setSearch] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [savingUser, setSavingUser] = useState(false);
 
   const isAdmin = user?.role === 'admin';
   const isPM = user?.role === 'pm';
@@ -12637,6 +12640,50 @@ const UsersPage = ({ adminKey, user }) => {
     } catch (err) {
       console.error('Error fetching user documents:', err);
       setUserDocuments(prev => ({ ...prev, [userId]: [] }));
+    }
+  };
+
+  // Start editing a user
+  const startEditUser = (u) => {
+    setEditingUser(u.id);
+    setEditForm({
+      name: u.name || '',
+      email: u.email || '',
+      role: u.role || '',
+      rate_per_page: u.rate_per_page || '',
+      rate_per_word: u.rate_per_word || '',
+      language_pairs: u.language_pairs || ''
+    });
+  };
+
+  // Cancel editing
+  const cancelEditUser = () => {
+    setEditingUser(null);
+    setEditForm({});
+  };
+
+  // Save user edits
+  const saveUserEdits = async (userId) => {
+    setSavingUser(true);
+    try {
+      const updateData = {};
+      if (editForm.name) updateData.name = editForm.name;
+      if (editForm.email) updateData.email = editForm.email;
+      if (editForm.role) updateData.role = editForm.role;
+      if (editForm.rate_per_page !== '') updateData.rate_per_page = parseFloat(editForm.rate_per_page);
+      if (editForm.rate_per_word !== '') updateData.rate_per_word = parseFloat(editForm.rate_per_word);
+      if (editForm.language_pairs !== undefined) updateData.language_pairs = editForm.language_pairs;
+
+      await axios.put(`${API}/admin/users/${userId}?admin_key=${adminKey}`, updateData);
+      await fetchUsers();
+      setEditingUser(null);
+      setEditForm({});
+      alert('Perfil atualizado com sucesso!');
+    } catch (err) {
+      console.error('Error updating user:', err);
+      alert(err.response?.data?.detail || 'Erro ao atualizar perfil');
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -13011,21 +13058,79 @@ const UsersPage = ({ adminKey, user }) => {
                       <div className="grid grid-cols-2 gap-6">
                         {/* Profile Information */}
                         <div className="bg-white rounded-lg p-4 border">
-                          <h4 className="font-bold text-sm text-gray-800 mb-3 flex items-center gap-2">
-                            📋 Informações do Perfil
-                          </h4>
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="font-bold text-sm text-gray-800 flex items-center gap-2">
+                              📋 Informações do Perfil
+                            </h4>
+                            {isAdmin && editingUser !== u.id && (
+                              <button
+                                onClick={() => startEditUser(u)}
+                                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1"
+                              >
+                                ✏️ Editar
+                              </button>
+                            )}
+                            {editingUser === u.id && (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => saveUserEdits(u.id)}
+                                  disabled={savingUser}
+                                  className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:bg-gray-400"
+                                >
+                                  {savingUser ? '⏳...' : '✓ Salvar'}
+                                </button>
+                                <button
+                                  onClick={cancelEditUser}
+                                  className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                                >
+                                  ✕ Cancelar
+                                </button>
+                              </div>
+                            )}
+                          </div>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div>
                               <span className="text-gray-500 text-xs">Nome Completo:</span>
-                              <div className="font-medium">{u.name}</div>
+                              {editingUser === u.id ? (
+                                <input
+                                  type="text"
+                                  value={editForm.name}
+                                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                              ) : (
+                                <div className="font-medium">{u.name}</div>
+                              )}
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Email:</span>
-                              <div className="font-medium">{u.email}</div>
+                              {editingUser === u.id ? (
+                                <input
+                                  type="email"
+                                  value={editForm.email}
+                                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                />
+                              ) : (
+                                <div className="font-medium">{u.email}</div>
+                              )}
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Função:</span>
-                              <div className="font-medium capitalize">{u.role}</div>
+                              {editingUser === u.id ? (
+                                <select
+                                  value={editForm.role}
+                                  onChange={(e) => setEditForm({...editForm, role: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                >
+                                  <option value="translator">Translator</option>
+                                  <option value="pm">PM</option>
+                                  <option value="admin">Admin</option>
+                                  <option value="sales">Sales</option>
+                                </select>
+                              ) : (
+                                <div className="font-medium capitalize">{u.role}</div>
+                              )}
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Status:</span>
@@ -13035,29 +13140,61 @@ const UsersPage = ({ adminKey, user }) => {
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Valor por Página:</span>
-                              <div className="font-medium text-green-600">
-                                {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Não definido'}
-                              </div>
+                              {editingUser === u.id ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.rate_per_page}
+                                  onChange={(e) => setEditForm({...editForm, rate_per_page: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                  placeholder="Ex: 25.00"
+                                />
+                              ) : (
+                                <div className="font-medium text-green-600">
+                                  {u.rate_per_page ? `$${u.rate_per_page.toFixed(2)}` : 'Não definido'}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Valor por Palavra:</span>
-                              <div className="font-medium text-green-600">
-                                {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Não definido'}
-                              </div>
+                              {editingUser === u.id ? (
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  value={editForm.rate_per_word}
+                                  onChange={(e) => setEditForm({...editForm, rate_per_word: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                  placeholder="Ex: 0.08"
+                                />
+                              ) : (
+                                <div className="font-medium text-green-600">
+                                  {u.rate_per_word ? `$${u.rate_per_word.toFixed(3)}` : 'Não definido'}
+                                </div>
+                              )}
                             </div>
                             <div className="col-span-2">
                               <span className="text-gray-500 text-xs">Pares de Idiomas:</span>
-                              <div className="font-medium">
-                                {u.language_pairs ? (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {u.language_pairs.split(',').map((pair, idx) => (
-                                      <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
-                                        {pair.trim()}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : 'Não definido'}
-                              </div>
+                              {editingUser === u.id ? (
+                                <input
+                                  type="text"
+                                  value={editForm.language_pairs}
+                                  onChange={(e) => setEditForm({...editForm, language_pairs: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border rounded"
+                                  placeholder="Ex: Portuguese → English, Spanish → English"
+                                />
+                              ) : (
+                                <div className="font-medium">
+                                  {u.language_pairs ? (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {u.language_pairs.split(',').map((pair, idx) => (
+                                        <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                          {pair.trim()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : 'Não definido'}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <span className="text-gray-500 text-xs">Páginas Traduzidas:</span>
