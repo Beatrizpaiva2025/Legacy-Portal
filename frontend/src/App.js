@@ -1815,6 +1815,129 @@ const ResetPasswordPage = ({ resetToken, onSuccess, onCancel, t }) => {
   );
 };
 
+// ==================== VERIFICATION PAGE (PUBLIC) ====================
+const VerificationPage = ({ certificationId }) => {
+  const [verification, setVerification] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const verifyDocument = async () => {
+      try {
+        const response = await axios.get(`${API}/certifications/verify/${certificationId}`);
+        setVerification(response.data);
+      } catch (err) {
+        setError('Unable to verify certification. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    verifyDocument();
+  }, [certificationId]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8">
+        {/* Logo */}
+        <div className="text-center mb-6">
+          <img
+            src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+            alt="Legacy Translations"
+            className="mx-auto h-14 mb-4"
+          />
+          <h1 className="text-xl font-bold text-gray-800">Document Verification</h1>
+          <p className="text-sm text-gray-500">Verify the authenticity of a certified translation</p>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">Verifying document...</p>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+            <div className="text-3xl mb-2">❌</div>
+            <p className="text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Verification Result */}
+        {verification && !loading && (
+          <div className={`p-6 rounded-lg ${verification.is_valid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            {/* Status Icon */}
+            <div className="text-center mb-4">
+              <div className={`text-5xl mb-2 ${verification.is_valid ? 'text-green-500' : 'text-red-500'}`}>
+                {verification.is_valid ? '✓' : '✗'}
+              </div>
+              <p className={`font-semibold ${verification.is_valid ? 'text-green-700' : 'text-red-700'}`}>
+                {verification.message}
+              </p>
+            </div>
+
+            {/* Certificate Details */}
+            {verification.is_valid && (
+              <div className="mt-6 space-y-3 text-sm">
+                <div className="flex justify-between py-2 border-b border-green-200">
+                  <span className="text-gray-600">Certification ID:</span>
+                  <span className="font-mono font-medium">{verification.certification_id}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-green-200">
+                  <span className="text-gray-600">Certified Date:</span>
+                  <span className="font-medium">{new Date(verification.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                </div>
+                {verification.document_type && (
+                  <div className="flex justify-between py-2 border-b border-green-200">
+                    <span className="text-gray-600">Document Type:</span>
+                    <span className="font-medium capitalize">{verification.document_type.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {verification.source_language && verification.target_language && (
+                  <div className="flex justify-between py-2 border-b border-green-200">
+                    <span className="text-gray-600">Translation:</span>
+                    <span className="font-medium">{verification.source_language} → {verification.target_language}</span>
+                  </div>
+                )}
+                {verification.certifier_name && (
+                  <div className="flex justify-between py-2 border-b border-green-200">
+                    <span className="text-gray-600">Certified By:</span>
+                    <span className="font-medium">{verification.certifier_name}</span>
+                  </div>
+                )}
+                {verification.certifier_credentials && (
+                  <div className="flex justify-between py-2 border-b border-green-200">
+                    <span className="text-gray-600">Credentials:</span>
+                    <span className="font-medium">{verification.certifier_credentials}</span>
+                  </div>
+                )}
+                {verification.company_name && (
+                  <div className="flex justify-between py-2">
+                    <span className="text-gray-600">Company:</span>
+                    <span className="font-medium">{verification.company_name}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-400">
+            Legacy Translations, LLC • Certified Translation Services
+          </p>
+          <a href="https://legacytranslations.com" className="text-xs text-blue-600 hover:underline">
+            www.legacytranslations.com
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP ====================
 function App() {
   const [partner, setPartner] = useState(null);
@@ -1822,6 +1945,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('new-order');
   const [lang, setLang] = useState(getInitialLanguage);
   const [currency] = useState(getLocalCurrency);
+  const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
 
   // Get translations for current language
@@ -1833,13 +1957,33 @@ function App() {
     localStorage.setItem('ui_language', newLang);
   };
 
-  // Check for reset token in URL
+  // Check for reset token and verification route in URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('reset_token');
     if (token) {
       setResetToken(token);
     }
+
+    // Check for verification route: /#/verify/CERTIFICATION_ID
+    const hash = window.location.hash;
+    const verifyMatch = hash.match(/^#\/verify\/(.+)$/);
+    if (verifyMatch) {
+      setVerificationId(verifyMatch[1]);
+    }
+
+    // Listen for hash changes
+    const handleHashChange = () => {
+      const newHash = window.location.hash;
+      const match = newHash.match(/^#\/verify\/(.+)$/);
+      if (match) {
+        setVerificationId(match[1]);
+      } else {
+        setVerificationId(null);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Check for saved session
@@ -1883,6 +2027,11 @@ function App() {
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }
   };
+
+  // Show verification page if verification ID is present (PUBLIC)
+  if (verificationId) {
+    return <VerificationPage certificationId={verificationId} />;
+  }
 
   // Show reset password page if reset token is present
   if (resetToken) {
