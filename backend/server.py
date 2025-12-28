@@ -42,6 +42,9 @@ from botocore.exceptions import ClientError
 import base64
 import resend
 
+# QuickBooks Integration
+from quickbooks import QuickBooksClient, get_quickbooks_client
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -11971,6 +11974,426 @@ async def retry_ai_pipeline_stage(pipeline_id: str, admin_key: str, claude_api_k
             "status": "error",
             "message": f"Stage '{current_stage}' failed: {result.get('error')}"
         }
+
+
+# ==================== QUICKBOOKS INTEGRATION ====================
+
+@api_router.get("/quickbooks/connect")
+async def quickbooks_connect(admin_key: str = None):
+    """Start OAuth flow to connect to QuickBooks"""
+    try:
+        # Get stored settings from database
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        qb_client = get_quickbooks_client(settings)
+
+        # Generate state for security
+        state = secrets.token_urlsafe(32)
+
+        # Store state in database for verification
+        await db.settings.update_one(
+            {"key": "quickbooks_oauth_state"},
+            {"$set": {"value": state, "created_at": datetime.utcnow()}},
+            upsert=True
+        )
+
+        auth_url = qb_client.get_authorization_url(state=state)
+        return {"success": True, "authorization_url": auth_url}
+    except Exception as e:
+        logger.error(f"QuickBooks connect error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/quickbooks/callback")
+async def quickbooks_callback(code: str = None, state: str = None, realmId: str = None, error: str = None):
+    """Handle OAuth callback from QuickBooks"""
+    if error:
+        return HTMLResponse(content=f"""
+            <html><body>
+            <h2>QuickBooks Connection Failed</h2>
+            <p>Error: {error}</p>
+            <script>window.close();</script>
+            </body></html>
+        """)
+
+    try:
+        # Verify state
+        stored_state = await db.settings.find_one({"key": "quickbooks_oauth_state"})
+        if not stored_state or stored_state.get("value") != state:
+            return HTMLResponse(content="""
+                <html><body>
+                <h2>Security Error</h2>
+                <p>Invalid state parameter. Please try again.</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+                </body></html>
+            """)
+
+        # Exchange code for tokens
+        qb_client = get_quickbooks_client()
+        result = qb_client.exchange_code_for_tokens(code)
+
+        if result.get("success"):
+            # Store tokens and realm_id in database
+            await db.settings.update_one(
+                {"key": "quickbooks"},
+                {"$set": {
+                    "quickbooks_realm_id": realmId,
+                    "quickbooks_access_token": result.get("access_token"),
+                    "quickbooks_refresh_token": result.get("refresh_token"),
+                    "quickbooks_connected": True,
+                    "quickbooks_connected_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }},
+                upsert=True
+            )
+
+            return HTMLResponse(content="""
+                <html><body>
+                <h2>QuickBooks Connected Successfully!</h2>
+                <p>You can close this window and return to the portal.</p>
+                <script>
+                    if (window.opener) {
+                        window.opener.postMessage({type: 'quickbooks_connected', success: true}, '*');
+                    }
+                    setTimeout(() => window.close(), 2000);
+                </script>
+                </body></html>
+            """)
+        else:
+            return HTMLResponse(content=f"""
+                <html><body>
+                <h2>Connection Failed</h2>
+                <p>Error: {result.get('error')}</p>
+                <script>setTimeout(() => window.close(), 3000);</script>
+                </body></html>
+            """)
+    except Exception as e:
+        logger.error(f"QuickBooks callback error: {str(e)}")
+        return HTMLResponse(content=f"""
+            <html><body>
+            <h2>Error</h2>
+            <p>{str(e)}</p>
+            <script>setTimeout(() => window.close(), 3000);</script>
+            </body></html>
+        """)
+
+
+@api_router.get("/quickbooks/status")
+async def quickbooks_status(admin_key: str = None):
+    """Check QuickBooks connection status"""
+    try:
+        settings = await db.settings.find_one({"key": "quickbooks"})
+
+        if not settings or not settings.get("quickbooks_connected"):
+            return {"connected": False, "company_name": None}
+
+        # Test connection by getting company info
+        qb_client = get_quickbooks_client(settings)
+        result = qb_client.test_connection()
+
+        if result.get("success"):
+            return {
+                "connected": True,
+                "company_name": result.get("company_name"),
+                "connected_at": settings.get("quickbooks_connected_at")
+            }
+        else:
+            # Token might be expired, try to refresh
+            if result.get("needs_reauth"):
+                await db.settings.update_one(
+                    {"key": "quickbooks"},
+                    {"$set": {"quickbooks_connected": False}}
+                )
+            return {"connected": False, "error": result.get("error")}
+    except Exception as e:
+        logger.error(f"QuickBooks status error: {str(e)}")
+        return {"connected": False, "error": str(e)}
+
+
+@api_router.post("/quickbooks/disconnect")
+async def quickbooks_disconnect(admin_key: str = None):
+    """Disconnect from QuickBooks"""
+    try:
+        await db.settings.update_one(
+            {"key": "quickbooks"},
+            {"$set": {
+                "quickbooks_connected": False,
+                "quickbooks_access_token": None,
+                "quickbooks_refresh_token": None,
+                "quickbooks_realm_id": None,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        return {"success": True, "message": "Disconnected from QuickBooks"}
+    except Exception as e:
+        logger.error(f"QuickBooks disconnect error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/customer")
+async def quickbooks_sync_customer(
+    admin_key: str = None,
+    customer_name: str = Body(...),
+    customer_email: str = Body(None),
+    customer_phone: str = Body(None),
+    company_name: str = Body(None)
+):
+    """Create or find a customer in QuickBooks"""
+    try:
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # First try to find existing customer by email
+        if customer_email:
+            existing = qb_client.find_customer_by_email(customer_email)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    return {
+                        "success": True,
+                        "customer_id": customers[0].get("Id"),
+                        "customer_name": customers[0].get("DisplayName"),
+                        "existing": True
+                    }
+
+        # Create new customer
+        result = qb_client.create_customer(
+            display_name=customer_name,
+            email=customer_email,
+            phone=customer_phone,
+            company=company_name
+        )
+
+        if result.get("success"):
+            customer = result.get("data", {}).get("Customer", {})
+            return {
+                "success": True,
+                "customer_id": customer.get("Id"),
+                "customer_name": customer.get("DisplayName"),
+                "existing": False
+            }
+        else:
+            raise HTTPException(status_code=400, detail=result.get("error"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync customer error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/invoice")
+async def quickbooks_sync_invoice(
+    admin_key: str = None,
+    order_id: str = Body(...),
+    customer_id: str = Body(None),
+    customer_name: str = Body(None),
+    customer_email: str = Body(None),
+    send_email: bool = Body(True)
+):
+    """Create and optionally send an invoice in QuickBooks for a completed order"""
+    try:
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        # Get order details
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # Get or create customer
+        qb_customer_id = customer_id
+        if not qb_customer_id:
+            # Try to find or create customer
+            if customer_email:
+                existing = qb_client.find_customer_by_email(customer_email)
+                if existing.get("success"):
+                    customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                    if customers:
+                        qb_customer_id = customers[0].get("Id")
+
+            if not qb_customer_id:
+                # Create customer
+                cust_name = customer_name or order.get("customer_name", "Customer")
+                cust_result = qb_client.create_customer(
+                    display_name=cust_name,
+                    email=customer_email or order.get("customer_email")
+                )
+                if cust_result.get("success"):
+                    qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+                else:
+                    raise HTTPException(status_code=400, detail="Failed to create customer")
+
+        # Create line items from order
+        line_items = [{
+            "description": f"Translation Service - {order.get('document_type', 'Document')} ({order.get('source_language', 'Source')} to {order.get('target_language', 'Target')})",
+            "amount": order.get("total_price", 0),
+            "quantity": 1
+        }]
+
+        # Create invoice
+        invoice_result = qb_client.create_invoice(
+            customer_id=qb_customer_id,
+            line_items=line_items,
+            memo=f"Order #{order.get('order_number', order_id)}"
+        )
+
+        if not invoice_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create invoice: {invoice_result.get('error')}")
+
+        invoice = invoice_result.get("data", {}).get("Invoice", {})
+        invoice_id = invoice.get("Id")
+
+        # Send invoice via email if requested
+        if send_email and invoice_id:
+            send_result = qb_client.send_invoice(invoice_id, customer_email)
+            if not send_result.get("success"):
+                logger.warning(f"Failed to send invoice email: {send_result.get('error')}")
+
+        # Update order with QuickBooks info
+        await db.orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "quickbooks_invoice_id": invoice_id,
+                "quickbooks_invoice_number": invoice.get("DocNumber"),
+                "quickbooks_synced_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        return {
+            "success": True,
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("DocNumber"),
+            "invoice_link": invoice.get("InvoiceLink"),
+            "email_sent": send_email
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/contractor-payment")
+async def quickbooks_sync_contractor_payment(
+    admin_key: str = None,
+    translator_id: str = Body(...),
+    translator_name: str = Body(...),
+    translator_email: str = Body(None),
+    amount: float = Body(...),
+    description: str = Body(...),
+    order_id: str = Body(None)
+):
+    """Record a contractor (1099) payment in QuickBooks"""
+    try:
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # Find or create vendor
+        existing = qb_client.find_vendor_by_name(translator_name)
+        vendor_id = None
+
+        if existing.get("success"):
+            vendors = existing.get("data", {}).get("QueryResponse", {}).get("Vendor", [])
+            if vendors:
+                vendor_id = vendors[0].get("Id")
+
+        if not vendor_id:
+            # Create vendor as 1099 contractor
+            vendor_result = qb_client.create_vendor(
+                display_name=translator_name,
+                email=translator_email,
+                is_1099=True
+            )
+            if vendor_result.get("success"):
+                vendor_id = vendor_result.get("data", {}).get("Vendor", {}).get("Id")
+            else:
+                raise HTTPException(status_code=400, detail="Failed to create vendor")
+
+        # Create bill for the contractor payment
+        line_items = [{
+            "description": description,
+            "amount": amount
+        }]
+
+        bill_result = qb_client.create_bill(
+            vendor_id=vendor_id,
+            line_items=line_items,
+            memo=f"Payment to {translator_name}" + (f" - Order #{order_id}" if order_id else "")
+        )
+
+        if not bill_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create bill: {bill_result.get('error')}")
+
+        bill = bill_result.get("data", {}).get("Bill", {})
+
+        return {
+            "success": True,
+            "bill_id": bill.get("Id"),
+            "vendor_id": vendor_id,
+            "amount": amount
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync contractor payment error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/quickbooks/invoice/{order_id}")
+async def quickbooks_get_invoice(order_id: str, admin_key: str = None):
+    """Get QuickBooks invoice status for an order"""
+    try:
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if not order.get("quickbooks_invoice_id"):
+            return {"synced": False}
+
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            return {
+                "synced": True,
+                "invoice_id": order.get("quickbooks_invoice_id"),
+                "invoice_number": order.get("quickbooks_invoice_number"),
+                "status": "unknown",
+                "error": "QuickBooks not connected"
+            }
+
+        qb_client = get_quickbooks_client(settings)
+        result = qb_client.get_invoice(order.get("quickbooks_invoice_id"))
+
+        if result.get("success"):
+            invoice = result.get("data", {}).get("Invoice", {})
+            return {
+                "synced": True,
+                "invoice_id": invoice.get("Id"),
+                "invoice_number": invoice.get("DocNumber"),
+                "status": "Paid" if invoice.get("Balance", 1) == 0 else "Unpaid",
+                "balance": invoice.get("Balance"),
+                "total": invoice.get("TotalAmt")
+            }
+        else:
+            return {
+                "synced": True,
+                "invoice_id": order.get("quickbooks_invoice_id"),
+                "status": "unknown",
+                "error": result.get("error")
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks get invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Include the router in the main app
