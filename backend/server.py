@@ -4175,18 +4175,32 @@ async def admin_get_all_orders(admin_key: str):
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
+    # Fetch orders with projection to reduce data transfer
     orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+
+    # Calculate summary in single pass for better performance
+    total_pending = 0
+    total_paid = 0
+    total_overdue = 0
+    total_value = 0
+    pending_value = 0
 
     for order in orders:
         if '_id' in order:
             del order['_id']
 
-    # Calculate summary
-    total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
-    total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
-    total_overdue = sum(1 for o in orders if o.get("payment_status") == "overdue")
-    total_value = sum(o.get("total_price", 0) for o in orders)
-    pending_value = sum(o.get("total_price", 0) for o in orders if o.get("payment_status") == "pending")
+        payment_status = order.get("payment_status", "")
+        price = order.get("total_price", 0) or 0
+
+        total_value += price
+
+        if payment_status == "pending":
+            total_pending += 1
+            pending_value += price
+        elif payment_status == "paid":
+            total_paid += 1
+        elif payment_status == "overdue":
+            total_overdue += 1
 
     return {
         "orders": orders,
