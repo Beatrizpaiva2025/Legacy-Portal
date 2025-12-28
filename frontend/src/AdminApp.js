@@ -1914,6 +1914,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [logoStamp, setLogoStamp] = useState('');
   const [signatureImage, setSignatureImage] = useState('');
 
+  // Certificate Header Info
+  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations, LLC');
+  const [certCompanyAddress, setCertCompanyAddress] = useState('123 Business St, Suite 100');
+  const [certCompanyPhone, setCertCompanyPhone] = useState('+1 (555) 123-4567');
+  const [certCompanyEmail, setCertCompanyEmail] = useState('contact@legacytranslations.com');
+
   // Refs
   const fileInputRef = useRef(null);
   const logoLeftInputRef = useRef(null);
@@ -1972,6 +1978,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (savedLogoRight) setLogoRight(savedLogoRight);
     if (savedLogoStamp) setLogoStamp(savedLogoStamp);
     if (savedSignature) setSignatureImage(savedSignature);
+
+    // Load saved certificate header info
+    const savedCertCompanyName = localStorage.getItem('cert_company_name');
+    const savedCertCompanyAddress = localStorage.getItem('cert_company_address');
+    const savedCertCompanyPhone = localStorage.getItem('cert_company_phone');
+    const savedCertCompanyEmail = localStorage.getItem('cert_company_email');
+    if (savedCertCompanyName) setCertCompanyName(savedCertCompanyName);
+    if (savedCertCompanyAddress) setCertCompanyAddress(savedCertCompanyAddress);
+    if (savedCertCompanyPhone) setCertCompanyPhone(savedCertCompanyPhone);
+    if (savedCertCompanyEmail) setCertCompanyEmail(savedCertCompanyEmail);
 
     // Load saved general instructions
     const savedInstructions = localStorage.getItem('general_instructions');
@@ -5101,72 +5117,133 @@ tradução juramentada | certified translation`}
           {/* Certificate Logos Section */}
           <div className="bg-white rounded shadow p-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">🖼️ Certificate Logos & Signature</h3>
-            <div className="grid grid-cols-4 gap-4">
+
+            {/* Header Info Section */}
+            <div className="mb-4 p-3 bg-gray-50 rounded border">
+              <h4 className="text-[10px] font-bold text-gray-600 mb-2">📝 Certificate Header Info</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Company Name</label>
+                  <input
+                    type="text"
+                    value={certCompanyName}
+                    onChange={(e) => {
+                      setCertCompanyName(e.target.value);
+                      localStorage.setItem('cert_company_name', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="Legacy Translations, LLC"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Address</label>
+                  <input
+                    type="text"
+                    value={certCompanyAddress}
+                    onChange={(e) => {
+                      setCertCompanyAddress(e.target.value);
+                      localStorage.setItem('cert_company_address', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="123 Business St, Suite 100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Phone</label>
+                  <input
+                    type="text"
+                    value={certCompanyPhone}
+                    onChange={(e) => {
+                      setCertCompanyPhone(e.target.value);
+                      localStorage.setItem('cert_company_phone', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Email</label>
+                  <input
+                    type="text"
+                    value={certCompanyEmail}
+                    onChange={(e) => {
+                      setCertCompanyEmail(e.target.value);
+                      localStorage.setItem('cert_company_email', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="contact@legacytranslations.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Logos Grid - Made smaller */}
+            <div className="grid grid-cols-4 gap-2">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Left Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoLeft ? (
-                    <img src={logoLeft} alt="Left Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoLeft} alt="Left Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Center Logo (ATA) */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Center Logo (ATA)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Center Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoRight ? (
-                    <img src={logoRight} alt="ATA Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoRight} alt="ATA Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoRightInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoRight && <button onClick={() => removeLogo('right')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Stamp Logo */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Stamp Logo</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Stamp</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoStamp} alt="Stamp Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No stamp</span>
                   )}
                 </div>
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoStampInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Signature Image */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Signature</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Signature</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {signatureImage ? (
-                    <img src={signatureImage} alt="Signature" className="max-h-16 max-w-full object-contain" />
+                    <img src={signatureImage} alt="Signature" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No signature</span>
+                    <span className="text-[9px] text-gray-400">No signature</span>
                   )}
                 </div>
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => signatureInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
