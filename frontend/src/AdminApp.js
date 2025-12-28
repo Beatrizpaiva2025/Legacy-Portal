@@ -18,7 +18,7 @@ const STATUS_COLORS = {
   'Delivered': 'bg-teal-100 text-teal-700',
   'received': 'bg-gray-100 text-gray-700',
   'in_translation': 'bg-yellow-100 text-yellow-700',
-  'review': 'bg-purple-100 text-purple-700',
+  'review': 'bg-indigo-100 text-indigo-700',
   'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-teal-100 text-teal-700'
@@ -530,12 +530,12 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
   ];
@@ -6543,7 +6543,7 @@ tradução juramentada | certified translation`}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-1 text-[10px] rounded-full ${
-                            order.translation_status === 'review' ? 'bg-purple-100 text-purple-700' :
+                            order.translation_status === 'review' ? 'bg-indigo-100 text-indigo-700' :
                             order.translation_status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-green-100 text-green-700'
                           }`}>
@@ -7123,7 +7123,7 @@ tradução juramentada | certified translation`}
                   {includeCertification && (
                     <>
                       <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
+                      <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">🔐 Verification</span>
                     </>
                   )}
                   {includeOriginal && quickOriginalFiles.length > 0 && (
@@ -7501,7 +7501,7 @@ tradução juramentada | certified translation`}
                   <div className="flex items-center gap-2 text-xs flex-wrap">
                     {includeCover && (
                       <>
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Certificate</span>
+                        <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">Certificate</span>
                         <span className="text-gray-400">→</span>
                       </>
                     )}
@@ -7740,6 +7740,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [pageSize] = useState(50);
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
   const [assigningPM, setAssigningPM] = useState(null); // Order ID being assigned PM
+  const [openActionsDropdown, setOpenActionsDropdown] = useState(null); // Order ID with open actions dropdown
 
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
@@ -9654,7 +9655,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Document Type */}
                   <td className="px-3 py-3">
-                    <span className="text-xs px-2 py-1 bg-purple-50 text-purple-700 rounded">
+                    <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded">
                       {DOCUMENT_TYPES.find(d => d.value === order.document_type)?.label?.split('/')[0]?.trim() || order.document_type || '-'}
                     </span>
                   </td>
@@ -9853,152 +9854,142 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {isAdmin && <td className="px-3 py-3 text-right font-semibold text-gray-800">${order.total_price?.toFixed(2)}</td>}
                   {isAdmin && <td className="px-3 py-3 text-center"><span className={`px-2 py-1 rounded text-xs font-medium ${PAYMENT_COLORS[order.payment_status]}`}>{order.payment_status}</span></td>}
                   <td className="px-3 py-3 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      {/* View Documents - Always visible */}
+                    <div className="relative">
                       <button
-                        onClick={() => viewOrderDocuments(order)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-                        title="View Documents"
+                        onClick={() => setOpenActionsDropdown(openActionsDropdown === order.id ? null : order.id)}
+                        className="w-8 h-8 flex items-center justify-center border border-slate-200 text-slate-500 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors"
                       >
-                        <DocumentIcon className="w-3.5 h-3.5" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
                       </button>
-
-                      {/* PM Actions */}
-                      {isPM && (
-                        <>
-                          {/* Open Translation Tool for review */}
-                          {['in_translation', 'review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => startTranslation(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-blue-300 text-blue-600 rounded hover:bg-blue-50 transition-colors"
-                              title="Open Translation / Review"
-                            >
-                              <span className="text-xs">✍️</span>
-                            </button>
-                          )}
-                          {/* Review Side-by-Side button - when translation is in review or ready */}
-                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => openReviewModal(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors"
-                              title="Review Translation (Side-by-Side)"
-                            >
-                              <SearchIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {/* Mark as In Translation (start work) */}
-                          {order.translation_status === 'received' && order.translator_assignment_status === 'accepted' && (
-                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-amber-300 text-amber-600 rounded hover:bg-amber-50 transition-colors" title="Start Translation">
-                              <span className="text-xs">▶</span>
-                            </button>
-                          )}
-                          {/* Send to PM Review */}
-                          {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-colors" title="Send to PM Review">
-                              <EyeIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {/* From Review: Send to Client Review OR Mark as Final */}
-                          {order.translation_status === 'review' && (
-                            <>
-                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="Send to Client Review">
-                                <MailIcon className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <CheckIcon className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {/* Client Review: Back to revision or Mark as Final */}
-                          {order.translation_status === 'client_review' && (
-                            <>
-                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-yellow-300 hover:text-yellow-500 hover:bg-yellow-50 transition-colors" title="Back to Revision">
-                                <RefreshIcon className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <CheckIcon className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {/* Ready: Deliver to client */}
-                          {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-teal-300 hover:text-teal-500 hover:bg-teal-50 transition-colors" title="Deliver to Client">
-                              <SendIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </>
-                      )}
-
-                      {/* Admin Actions */}
-                      {isAdmin && (
-                        <>
-                          {['received', 'in_translation', 'review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => startTranslation(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-                              title="Open Translation Tool"
-                            >
-                              <WriteIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {/* Review Side-by-Side button - when translation is in review or ready */}
-                          {['review', 'ready', 'client_review'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => openReviewModal(order)}
-                              className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors"
-                              title="Review Translation (Side-by-Side)"
-                            >
-                              <SearchIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {order.translation_status === 'received' && (
-                            <button onClick={() => updateStatus(order.id, 'in_translation')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-amber-300 hover:text-amber-500 hover:bg-amber-50 transition-colors" title="Start">
-                              <PlayIcon className="w-3 h-3" />
-                            </button>
-                          )}
-                          {order.translation_status === 'in_translation' && (
-                            <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-colors" title="Send to PM Review">
-                              <EyeIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {order.translation_status === 'review' && (
-                            <>
-                              <button onClick={() => updateStatus(order.id, 'client_review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-orange-300 hover:text-orange-500 hover:bg-orange-50 transition-colors" title="Send to Client Review">
-                                <MailIcon className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <CheckIcon className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {order.translation_status === 'client_review' && (
-                            <>
-                              <button onClick={() => updateStatus(order.id, 'review')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-yellow-300 hover:text-yellow-500 hover:bg-yellow-50 transition-colors" title="Back to Revision">
-                                <RefreshIcon className="w-3.5 h-3.5" />
-                              </button>
-                              <button onClick={() => updateStatus(order.id, 'ready')} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-green-300 hover:text-green-500 hover:bg-green-50 transition-colors" title="Mark as Final">
-                                <CheckIcon className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                          {order.translation_status === 'ready' && (
-                            <button onClick={() => deliverOrder(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-teal-300 hover:text-teal-500 hover:bg-teal-50 transition-colors" title="Deliver">
-                              <SendIcon className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          {order.payment_status === 'pending' && (
-                            <button onClick={() => markPaid(order.id)} className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-emerald-300 hover:text-emerald-500 hover:bg-emerald-50 transition-colors" title="Mark Paid">
-                              <span className="text-xs font-medium">$</span>
-                            </button>
-                          )}
+                      {openActionsDropdown === order.id && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                          {/* View Documents */}
                           <button
-                            onClick={() => deleteOrder(order.id, order.order_number)}
-                            className="w-6 h-6 flex items-center justify-center border border-gray-200 text-gray-400 rounded hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            title="Delete Order"
+                            onClick={() => { viewOrderDocuments(order); setOpenActionsDropdown(null); }}
+                            className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                           >
-                            <TrashIcon className="w-3.5 h-3.5" />
+                            <DocumentIcon className="w-4 h-4 text-slate-400" />
+                            View Documents
                           </button>
-                        </>
+
+                          {/* Translation Tool */}
+                          {(isAdmin || isPM) && ['received', 'in_translation', 'review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => { startTranslation(order); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                              <WriteIcon className="w-4 h-4 text-blue-500" />
+                              Open Translation
+                            </button>
+                          )}
+
+                          {/* Review Side-by-Side */}
+                          {(isAdmin || isPM) && ['review', 'ready', 'client_review'].includes(order.translation_status) && (
+                            <button
+                              onClick={() => { openReviewModal(order); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
+                            >
+                              <SearchIcon className="w-4 h-4 text-emerald-500" />
+                              Review Side-by-Side
+                            </button>
+                          )}
+
+                          <div className="border-t border-slate-100 my-1"></div>
+
+                          {/* Status Actions */}
+                          {(isAdmin || isPM) && order.translation_status === 'received' && (isAdmin || order.translator_assignment_status === 'accepted') && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'in_translation'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 flex items-center gap-2"
+                            >
+                              <PlayIcon className="w-4 h-4 text-amber-500" />
+                              Start Translation
+                            </button>
+                          )}
+
+                          {(isAdmin || isPM) && order.translation_status === 'in_translation' && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 flex items-center gap-2"
+                            >
+                              <EyeIcon className="w-4 h-4 text-indigo-500" />
+                              Send to PM Review
+                            </button>
+                          )}
+
+                          {(isAdmin || isPM) && order.translation_status === 'review' && (
+                            <>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-orange-50 flex items-center gap-2"
+                              >
+                                <MailIcon className="w-4 h-4 text-orange-500" />
+                                Send to Client Review
+                              </button>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
+                              >
+                                <CheckIcon className="w-4 h-4 text-emerald-500" />
+                                Mark as Final
+                              </button>
+                            </>
+                          )}
+
+                          {(isAdmin || isPM) && order.translation_status === 'client_review' && (
+                            <>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-yellow-50 flex items-center gap-2"
+                              >
+                                <RefreshIcon className="w-4 h-4 text-yellow-500" />
+                                Back to Revision
+                              </button>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
+                              >
+                                <CheckIcon className="w-4 h-4 text-emerald-500" />
+                                Mark as Final
+                              </button>
+                            </>
+                          )}
+
+                          {(isAdmin || isPM) && order.translation_status === 'ready' && (
+                            <button
+                              onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
+                            >
+                              <SendIcon className="w-4 h-4 text-teal-500" />
+                              Deliver to Client
+                            </button>
+                          )}
+
+                          {/* Admin-only Actions */}
+                          {isAdmin && (
+                            <>
+                              <div className="border-t border-slate-100 my-1"></div>
+                              {order.payment_status === 'pending' && (
+                                <button
+                                  onClick={() => { markPaid(order.id); setOpenActionsDropdown(null); }}
+                                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
+                                >
+                                  <span className="w-4 h-4 flex items-center justify-center text-emerald-500 font-semibold">$</span>
+                                  Mark as Paid
+                                </button>
+                              )}
+                              <button
+                                onClick={() => { deleteOrder(order.id, order.order_number); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                                Delete Order
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   </td>
@@ -15043,7 +15034,7 @@ const FinancesPage = ({ adminKey }) => {
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                           proof.payment_method === 'pix'
                             ? 'bg-green-100 text-green-700'
-                            : 'bg-purple-100 text-purple-700'
+                            : 'bg-indigo-100 text-indigo-700'
                         }`}>
                           {proof.payment_method.toUpperCase()}
                         </span>
@@ -15104,7 +15095,7 @@ const FinancesPage = ({ adminKey }) => {
                     <span className={`inline-flex items-center px-2 py-1 rounded text-sm ${
                       selectedProof.payment_method === 'pix'
                         ? 'bg-green-100 text-green-700'
-                        : 'bg-purple-100 text-purple-700'
+                        : 'bg-indigo-100 text-indigo-700'
                     }`}>
                       {selectedProof.payment_method.toUpperCase()}
                     </span>
