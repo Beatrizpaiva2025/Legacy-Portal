@@ -13731,7 +13731,22 @@ const UsersPage = ({ adminKey, user }) => {
         language_pairs: newUser.language_pairs || null
       };
       const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
-      alert(response.data?.message || 'User created! Invitation email sent.');
+
+      // Show invitation link for manual sharing (email may go to spam)
+      if (response.data?.invitation_link) {
+        const copyLink = window.confirm(
+          `✅ ${response.data.message}\n\n` +
+          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `Link: ${response.data.invitation_link}`
+        );
+        if (copyLink) {
+          navigator.clipboard.writeText(response.data.invitation_link);
+          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+        }
+      } else {
+        alert(response.data?.message || 'User created!');
+      }
+
       setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
       setShowCreateForm(false);
       fetchUsers();
@@ -13762,14 +13777,28 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   const handleResendInvitation = async (userId, userName, userEmail) => {
-    if (!window.confirm(`Resend invitation email to "${userName}" (${userEmail})?`)) return;
+    if (!window.confirm(`Reenviar convite para "${userName}" (${userEmail})?`)) return;
     try {
       const response = await axios.post(`${API}/admin/auth/resend-invitation?admin_key=${adminKey}`, {
         user_id: userId
       });
-      alert(response.data?.message || 'Invitation email resent successfully!');
+
+      // Show link for manual sharing
+      if (response.data?.invitation_link) {
+        const copyLink = window.confirm(
+          `✅ ${response.data.message}\n\n` +
+          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `Link: ${response.data.invitation_link}`
+        );
+        if (copyLink) {
+          navigator.clipboard.writeText(response.data.invitation_link);
+          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+        }
+      } else {
+        alert(response.data?.message || 'Convite reenviado!');
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error resending invitation');
+      alert(err.response?.data?.detail || 'Erro ao reenviar convite');
     }
   };
 

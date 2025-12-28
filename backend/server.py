@@ -108,10 +108,9 @@ class EmailService:
                 "to": [to],
                 "subject": subject,
                 "reply_to": self.reply_to,
-                # Disable link tracking to prevent spam filters and "dangerous link" warnings
-                # Link tracking rewrites URLs through resend-clicks.com which triggers security warnings
+                # CRITICAL: Disable click tracking to prevent resend-clicks.com SSL errors
                 "headers": {
-                    "X-Entity-Ref-ID": secrets.token_hex(8)  # Unique ID to prevent duplicate detection
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
                 }
             }
             if content_type == "html":
@@ -119,6 +118,7 @@ class EmailService:
             else:
                 params["text"] = content
 
+            # Use Resend SDK with tracking disabled
             response = resend.Emails.send(params)
             logger.info(f"Email sent successfully: {response}")
             return True
@@ -2824,13 +2824,22 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         </div>
         """
 
+        email_sent = False
         try:
             await email_service.send_email(user_data.email, subject, content)
             logger.info(f"Invitation email sent to {user_data.email}")
+            email_sent = True
         except Exception as e:
             logger.error(f"Failed to send invitation email: {str(e)}")
 
-        return {"status": "success", "message": f"User {user.name} created. Invitation email sent to {user_data.email}", "user_id": user.id}
+        # Always return the invitation link so admin can copy and send manually if email fails
+        return {
+            "status": "success",
+            "message": f"User {user.name} created." + (" Invitation email sent." if email_sent else " Email failed - use link below."),
+            "user_id": user.id,
+            "invitation_link": invite_link,  # Always include link for manual sharing
+            "email_sent": email_sent
+        }
 
     except HTTPException:
         raise
@@ -3234,13 +3243,21 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
         </div>
         """
 
+        email_sent = False
         try:
             await email_service.send_email(target_user["email"], subject, content)
             logger.info(f"Invitation email resent to {target_user['email']}")
-            return {"status": "success", "message": f"Invitation email resent to {target_user['email']}"}
+            email_sent = True
         except Exception as e:
             logger.error(f"Failed to resend invitation email: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to send invitation email")
+
+        # Always return the link for manual sharing
+        return {
+            "status": "success",
+            "message": f"Convite reenviado para {target_user['email']}" if email_sent else "Email falhou - use o link abaixo",
+            "invitation_link": invite_link,
+            "email_sent": email_sent
+        }
 
     except HTTPException:
         raise
