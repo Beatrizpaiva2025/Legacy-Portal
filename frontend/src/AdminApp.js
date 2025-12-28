@@ -529,7 +529,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -7823,6 +7823,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
+    client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
     service_type: 'standard',
@@ -9244,7 +9245,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="bg-white rounded-lg shadow mb-4 p-4">
           <h3 className="text-sm font-bold text-gray-800 mb-3">📝 Create New Project</h3>
           <form onSubmit={createProject}>
-            <div className="grid grid-cols-4 gap-3 mb-3">
+            <div className="grid grid-cols-5 gap-3 mb-3">
               {/* Client Info */}
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
@@ -9266,6 +9267,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   required
                   className="w-full px-2 py-1.5 text-xs border rounded"
                   placeholder="client@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Phone (WhatsApp)</label>
+                <input
+                  type="tel"
+                  value={newProject.client_phone}
+                  onChange={(e) => setNewProject({...newProject, client_phone: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
               <div>
@@ -16544,7 +16555,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Section navigation
   const sections = [
     { id: 'overview', label: 'Visão Geral', icon: '📊' },
-    { id: 'quote', label: 'Gerar Orçamento', icon: '💰' },
     { id: 'review', label: 'Revisar Traduções', icon: '✅' },
     { id: 'team', label: 'Minha Equipe', icon: '👥' },
     { id: 'calendar', label: 'Agenda', icon: '📅' },
@@ -17601,21 +17611,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {/* Translator List */}
               <div className="border rounded-lg p-3">
                 <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
-                <div className="space-y-1">
-                  {translators.map(translator => (
-                    <button
-                      key={translator.id}
-                      onClick={() => setSelectedTranslator(translator)}
-                      className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
-                        selectedTranslator?.id === translator.id
-                          ? 'bg-teal-500 text-white'
-                          : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="font-medium">{translator.name}</div>
-                      <div className="text-[10px] opacity-70">{translator.email}</div>
-                    </button>
-                  ))}
+                <div className="space-y-1 max-h-80 overflow-y-auto">
+                  {translators.length > 0 ? (
+                    translators.map(translator => (
+                      <button
+                        key={translator.id}
+                        onClick={() => setSelectedTranslator(translator)}
+                        className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                          selectedTranslator?.id === translator.id
+                            ? 'bg-teal-500 text-white'
+                            : 'hover:bg-gray-100 border border-gray-100'
+                        }`}
+                      >
+                        <div className="font-medium">{translator.name}</div>
+                        <div className="text-[10px] opacity-70">{translator.email}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 text-xs">
+                      <p>Nenhum tradutor cadastrado.</p>
+                      <p className="mt-1">Cadastre tradutores na aba "Translators".</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -970,6 +970,7 @@ class TranslationOrder(BaseModel):
 class TranslationOrderCreate(BaseModel):
     client_name: str
     client_email: EmailStr
+    client_phone: Optional[str] = None
     service_type: str
     translate_from: str
     translate_to: str
@@ -998,6 +999,7 @@ class TranslationOrderUpdate(BaseModel):
     # NEW: Additional editable fields
     client_name: Optional[str] = None
     client_email: Optional[str] = None
+    client_phone: Optional[str] = None
     translate_from: Optional[str] = None
     translate_to: Optional[str] = None
     service_type: Optional[str] = None
