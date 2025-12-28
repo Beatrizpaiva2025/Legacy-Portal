@@ -195,7 +195,7 @@ const TRANSLATIONS = {
     errorOccurred: 'Ocorreu um erro',
     benefits: 'Benefícios da Conta Empresarial:',
     benefit1: 'Faturamento mensal',
-    benefit2: 'Chat exclusivo para suporte B2B',
+    benefit2: 'Chat de suporte exclusivo para B2B',
     benefit3: 'Processamento prioritário',
     benefit4: 'Exclusivo: Verificação Digital com QR Code',
     // Navigation
