@@ -676,8 +676,16 @@ def get_translator_assignment_email_template(translator_name: str, order_details
                                                 <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</td>
                                             </tr>
                                             <tr>
-                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Word Count:</strong></td>
-                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('word_count', 0)} words</td>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Document Type:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('document_type', 'General')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Field:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('document_category', 'General').replace('_', ' ').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Pages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('page_count', 1)} page(s)</td>
                                             </tr>
                                             <tr>
                                                 <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Deadline:</strong></td>
