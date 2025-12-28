@@ -2806,7 +2806,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}?invite_token={invite_token}#/admin"
 
         role_display = {
             'admin': 'Administrator',
@@ -2984,7 +2984,7 @@ async def admin_forgot_password(request: AdminForgotPassword):
 
             # Get frontend URL
             frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-            reset_link = f"{frontend_url}/#/admin?reset_token={reset_token}"
+            reset_link = f"{frontend_url}?reset_token={reset_token}#/admin"
 
             # Send email
             subject = "Reset Your Password - Legacy Translations Admin"
@@ -3225,7 +3225,7 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}?invite_token={invite_token}#/admin"
 
         role_display = {
             'admin': 'Administrator',
