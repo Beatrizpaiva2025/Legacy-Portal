@@ -6565,16 +6565,25 @@ async def decline_translator_assignment(token: str):
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
-    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    portal_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
 
     if status == "accepted":
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
+        # Auto-redirect to translator portal after 3 seconds
+        redirect_url = f"{portal_url}/#/translation-tool"
+        redirect_script = f'''
+        <script>
+            setTimeout(function() {{
+                window.location.href = "{redirect_url}";
+            }}, 3000);
+        </script>
+        '''
         button_html = f'''
-        <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Use your email and password to access the translator portal:</p>
-        <a href="{portal_url}/translator" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Login to Translator Portal
+        <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Você será redirecionado automaticamente em 3 segundos...</p>
+        <a href="{redirect_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Portal do Tradutor
         </a>
         '''
     elif status == "declined":
@@ -6582,16 +6591,23 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#dc3545"
         title = "Assignment Declined"
         button_html = ""
+        redirect_script = ""
     elif status == "already_responded":
         icon = "ℹ"
         color = "#6c757d"
         title = "Already Responded"
-        button_html = ""
+        button_html = f'''
+        <a href="{portal_url}/#/translation-tool" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Portal do Tradutor
+        </a>
+        '''
+        redirect_script = ""
     else:
         icon = "⚠"
         color = "#ffc107"
         title = "Error"
         button_html = ""
+        redirect_script = ""
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -6599,6 +6615,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Legacy Translations</title>
+    {redirect_script if status == "accepted" else ""}
     <style>
         body {{
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
