@@ -10583,51 +10583,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     ) : orderDocuments.length > 0 ? (
                       <div className="space-y-2">
                         {orderDocuments.map((doc, idx) => (
-                          <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center flex-1">
-                                <span className="text-2xl mr-3">
-                                  {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
-                                </span>
-                                <div className="flex-1">
-                                  <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
-                                  <div className="text-[10px] text-gray-500">
-                                    {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
-                                    {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
-                                  </div>
+                          <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
+                            <div className="flex items-center">
+                              <span className="text-2xl mr-3">
+                                {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                              </span>
+                              <div>
+                                <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
+                                <div className="text-[10px] text-gray-500">
+                                  {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => downloadDocument(doc.id, doc.filename)}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                              >
-                                <span>⬇️</span> Download
-                              </button>
                             </div>
-                            {/* Translator Assignment for each file - PM/Admin only */}
-                            {(isAdmin || isPM) && (
-                              <div className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2">
-                                <span className="text-[10px] text-gray-500">Assign to:</span>
-                                <select
-                                  value={fileTranslatorAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
-                                  onChange={(e) => {
-                                    const selected = translatorList.find(t => t.id === e.target.value);
-                                    if (selected) {
-                                      assignTranslatorToDocument(doc.id, selected.id, selected.name);
-                                    }
-                                  }}
-                                  className="flex-1 px-2 py-1 text-xs border rounded bg-white"
-                                >
-                                  <option value="">-- Select Translator --</option>
-                                  {translatorList.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                  ))}
-                                </select>
-                                {(fileTranslatorAssignments[doc.id] || doc.assigned_translator_name) && (
-                                  <span className="text-[10px] text-green-600">✓ Assigned</span>
-                                )}
-                              </div>
-                            )}
+                            <button
+                              onClick={() => downloadDocument(doc.id, doc.filename)}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                            >
+                              <span>⬇️</span> Download
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -16168,6 +16142,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [translators, setTranslators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
+
+  // Project files viewing state
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectDocuments, setProjectDocuments] = useState([]);
+  const [loadingProjectDocs, setLoadingProjectDocs] = useState(false);
+  const [fileAssignments, setFileAssignments] = useState({});
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
@@ -16455,6 +16435,59 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setNewMessage('');
   };
 
+  // View project files and assign translators
+  const viewProjectFiles = async (order) => {
+    setSelectedProject(order);
+    setLoadingProjectDocs(true);
+    setProjectDocuments([]);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      setProjectDocuments(response.data.documents || []);
+    } catch (err) {
+      console.error('Failed to fetch project documents:', err);
+    } finally {
+      setLoadingProjectDocs(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToFile = async (docId, translatorId, translatorName) => {
+    try {
+      setFileAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+      setFileAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
+    }
+  };
+
+  // Download document
+  const downloadProjectDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Erro ao baixar documento');
+    }
+  };
+
   // Load review content
   const loadReviewContent = async (order) => {
     setSelectedReview(order);
@@ -16736,7 +16769,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <tbody>
                   {orders.slice(0, 10).map(order => (
                     <tr key={order.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 font-mono text-blue-600">{order.order_number}</td>
+                      <td className="py-2 px-2">
+                        <button
+                          onClick={() => viewProjectFiles(order)}
+                          className="font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {order.order_number}
+                        </button>
+                      </td>
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
                       <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
@@ -17749,6 +17789,98 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT FILES MODAL - For assigning translators to files */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📁 Arquivos do Projeto {selectedProject.order_number}</h3>
+                <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-xs text-gray-500 mb-3">Selecione um tradutor para cada arquivo. Arquivos diferentes podem ser atribuídos a tradutores diferentes.</p>
+
+              {loadingProjectDocs ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
+                  Carregando arquivos...
+                </div>
+              ) : projectDocuments.length > 0 ? (
+                <div className="space-y-3">
+                  {projectDocuments.map((doc, idx) => (
+                    <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">
+                            {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                          </span>
+                          <div>
+                            <div className="text-sm font-medium">{doc.filename || 'Documento'}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => downloadProjectDocument(doc.id, doc.filename)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        >
+                          ⬇️ Download
+                        </button>
+                      </div>
+
+                      {/* Translator Assignment */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                        <span className="text-xs text-gray-500">Atribuir para:</span>
+                        <select
+                          value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
+                          onChange={(e) => {
+                            const selected = translators.find(t => t.id === e.target.value);
+                            if (selected) {
+                              assignTranslatorToFile(doc.id, selected.id, selected.name);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1.5 text-xs border rounded bg-white"
+                        >
+                          <option value="">-- Selecione o Tradutor --</option>
+                          {translators.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
+                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-sm">Nenhum arquivo encontrado neste projeto</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
