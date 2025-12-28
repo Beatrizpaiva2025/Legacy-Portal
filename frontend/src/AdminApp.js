@@ -528,7 +528,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
