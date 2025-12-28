@@ -2976,7 +2976,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setProofreadingResult(null);
 
     try {
-      const response = await fetch(`${API_BASE}/admin/proofread?admin_key=${encodeURIComponent(adminKey)}`, {
+      const response = await fetch(`${API}/admin/proofread?admin_key=${encodeURIComponent(adminKey)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4166,7 +4166,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       // Persist to backend
       try {
-        await axios.post(`${API_BASE_URL}/glossaries`, tmEntry, { withCredentials: true });
+        await axios.post(`${API}/glossaries`, tmEntry, { withCredentials: true });
       } catch (err) {
         // Save to localStorage as fallback
         localStorage.setItem('glossaries', JSON.stringify(newGlossaries));
@@ -8129,6 +8129,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageSize] = useState(50);
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
   const [assigningPM, setAssigningPM] = useState(null); // Order ID being assigned PM
 
@@ -8395,13 +8401,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = currentPage) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      // Build query params for pagination
+      const params = new URLSearchParams({
+        admin_key: adminKey,
+        page: page.toString(),
+        limit: pageSize.toString()
+      });
+
+      // Add filters if active
+      if (statusFilter && statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      const response = await axios.get(`${API}/admin/orders?${params.toString()}`);
       let allOrders = response.data.orders || [];
 
-      // PM only sees orders assigned to them
+      // Update pagination state
+      if (response.data.pagination) {
+        setTotalPages(response.data.pagination.total_pages || 1);
+        setTotalCount(response.data.pagination.total_count || 0);
+        setCurrentPage(response.data.pagination.page || 1);
+      }
+
+      // PM only sees orders assigned to them (filtered server-side would be better)
       if (isPM && user?.id) {
         allOrders = allOrders.filter(order =>
           order.assigned_pm_id === user.id ||
@@ -8414,6 +8439,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       console.error('Failed to fetch orders:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+      fetchOrders(newPage);
     }
   };
 
@@ -10721,6 +10754,48 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           )}
         </table>
         {filtered.length === 0 && <div className="p-8 text-center text-gray-500 text-sm">No projects found</div>}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
+            <div className="text-xs text-gray-600">
+              Showing {((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, totalCount)} of {totalCount} projects
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                ««
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                ‹ Prev
+              </button>
+              <span className="px-3 py-1 text-xs font-medium">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                Next ›
+              </button>
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-xs border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              >
+                »»
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Enhanced Project Details Modal */}
@@ -13255,15 +13330,24 @@ const ReviewPage = ({ adminKey, user }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([
-        fetchPendingSubmissions(),
-        isAdmin && fetchSuspiciousUsers(),
-        isAdmin && fetchLoginAttempts()
-      ]);
-      setLoading(false);
+      try {
+        await fetchPendingSubmissions();
+        if (isAdmin) {
+          await Promise.all([
+            fetchSuspiciousUsers(),
+            fetchLoginAttempts()
+          ]);
+        }
+      } catch (err) {
+        console.error('Error loading review data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    loadData();
-  }, [adminKey, user?.token]);
+    if (adminKey) {
+      loadData();
+    }
+  }, [adminKey]);
 
   const handleApproveSubmission = async (submissionId) => {
     try {
@@ -13647,7 +13731,22 @@ const UsersPage = ({ adminKey, user }) => {
         language_pairs: newUser.language_pairs || null
       };
       const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
-      alert(response.data?.message || 'User created! Invitation email sent.');
+
+      // Show invitation link for manual sharing (email may go to spam)
+      if (response.data?.invitation_link) {
+        const copyLink = window.confirm(
+          `✅ ${response.data.message}\n\n` +
+          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `Link: ${response.data.invitation_link}`
+        );
+        if (copyLink) {
+          navigator.clipboard.writeText(response.data.invitation_link);
+          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+        }
+      } else {
+        alert(response.data?.message || 'User created!');
+      }
+
       setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
       setShowCreateForm(false);
       fetchUsers();
@@ -13678,14 +13777,28 @@ const UsersPage = ({ adminKey, user }) => {
   };
 
   const handleResendInvitation = async (userId, userName, userEmail) => {
-    if (!window.confirm(`Resend invitation email to "${userName}" (${userEmail})?`)) return;
+    if (!window.confirm(`Reenviar convite para "${userName}" (${userEmail})?`)) return;
     try {
       const response = await axios.post(`${API}/admin/auth/resend-invitation?admin_key=${adminKey}`, {
         user_id: userId
       });
-      alert(response.data?.message || 'Invitation email resent successfully!');
+
+      // Show link for manual sharing
+      if (response.data?.invitation_link) {
+        const copyLink = window.confirm(
+          `✅ ${response.data.message}\n\n` +
+          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `Link: ${response.data.invitation_link}`
+        );
+        if (copyLink) {
+          navigator.clipboard.writeText(response.data.invitation_link);
+          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+        }
+      } else {
+        alert(response.data?.message || 'Convite reenviado!');
+      }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error resending invitation');
+      alert(err.response?.data?.detail || 'Erro ao reenviar convite');
     }
   };
 

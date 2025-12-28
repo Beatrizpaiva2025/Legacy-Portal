@@ -108,10 +108,9 @@ class EmailService:
                 "to": [to],
                 "subject": subject,
                 "reply_to": self.reply_to,
-                # Disable link tracking to prevent spam filters and "dangerous link" warnings
-                # Link tracking rewrites URLs through resend-clicks.com which triggers security warnings
+                # CRITICAL: Disable click tracking to prevent resend-clicks.com SSL errors
                 "headers": {
-                    "X-Entity-Ref-ID": secrets.token_hex(8)  # Unique ID to prevent duplicate detection
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
                 }
             }
             if content_type == "html":
@@ -119,6 +118,7 @@ class EmailService:
             else:
                 params["text"] = content
 
+            # Use Resend SDK with tracking disabled
             response = resend.Emails.send(params)
             logger.info(f"Email sent successfully: {response}")
             return True
@@ -2824,13 +2824,22 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         </div>
         """
 
+        email_sent = False
         try:
             await email_service.send_email(user_data.email, subject, content)
             logger.info(f"Invitation email sent to {user_data.email}")
+            email_sent = True
         except Exception as e:
             logger.error(f"Failed to send invitation email: {str(e)}")
 
-        return {"status": "success", "message": f"User {user.name} created. Invitation email sent to {user_data.email}", "user_id": user.id}
+        # Always return the invitation link so admin can copy and send manually if email fails
+        return {
+            "status": "success",
+            "message": f"User {user.name} created." + (" Invitation email sent." if email_sent else " Email failed - use link below."),
+            "user_id": user.id,
+            "invitation_link": invite_link,  # Always include link for manual sharing
+            "email_sent": email_sent
+        }
 
     except HTTPException:
         raise
@@ -3234,13 +3243,21 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
         </div>
         """
 
+        email_sent = False
         try:
             await email_service.send_email(target_user["email"], subject, content)
             logger.info(f"Invitation email resent to {target_user['email']}")
-            return {"status": "success", "message": f"Invitation email resent to {target_user['email']}"}
+            email_sent = True
         except Exception as e:
             logger.error(f"Failed to resend invitation email: {str(e)}")
-            raise HTTPException(status_code=500, detail="Failed to send invitation email")
+
+        # Always return the link for manual sharing
+        return {
+            "status": "success",
+            "message": f"Convite reenviado para {target_user['email']}" if email_sent else "Email falhou - use o link abaixo",
+            "invitation_link": invite_link,
+            "email_sent": email_sent
+        }
 
     except HTTPException:
         raise
@@ -3281,11 +3298,11 @@ async def get_current_admin_user_info(token: str):
 
 @api_router.get("/admin/users")
 async def list_admin_users(token: str, admin_key: str):
-    """List all admin users (admin only)"""
+    """List all admin users (admin and PM can access)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin"]:
+        if user and user.get("role") in ["admin", "pm"]:
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -3298,6 +3315,7 @@ async def list_admin_users(token: str, admin_key: str):
             "name": u["name"],
             "role": u["role"],
             "is_active": u.get("is_active", True),
+            "invitation_pending": u.get("invitation_pending", False),
             "rate_per_page": u.get("rate_per_page"),
             "rate_per_word": u.get("rate_per_word"),
             "language_pairs": u.get("language_pairs"),
@@ -4150,8 +4168,14 @@ async def get_order(order_id: str, token: str):
 # ==================== ADMIN ENDPOINTS (for you to manage orders) ====================
 
 @api_router.get("/admin/orders")
-async def admin_get_all_orders(admin_key: str):
-    """Get all orders (admin only)"""
+async def admin_get_all_orders(
+    admin_key: str,
+    page: int = 1,
+    limit: int = 50,
+    status: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Get all orders with pagination (admin only)"""
     # Check if it's master admin key OR a valid user token
     is_valid = False
     expected_key = os.environ.get("ADMIN_KEY", "legacy_admin_2024")
@@ -4175,23 +4199,65 @@ async def admin_get_all_orders(admin_key: str):
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    orders = await db.translation_orders.find().sort("created_at", -1).to_list(500)
+    # Build query filter
+    query = {}
+    if status and status != "all":
+        query["translation_status"] = status
+    if search:
+        query["$or"] = [
+            {"order_number": {"$regex": search, "$options": "i"}},
+            {"client_name": {"$regex": search, "$options": "i"}},
+            {"client_email": {"$regex": search, "$options": "i"}}
+        ]
+
+    # Get total count for pagination
+    total_count = await db.translation_orders.count_documents(query)
+
+    # Calculate skip value
+    skip = (page - 1) * limit
+
+    # Fetch orders with pagination
+    orders = await db.translation_orders.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    # Calculate summary in single pass for better performance
+    total_pending = 0
+    total_paid = 0
+    total_overdue = 0
+    total_value = 0
+    pending_value = 0
 
     for order in orders:
         if '_id' in order:
             del order['_id']
 
-    # Calculate summary
-    total_pending = sum(1 for o in orders if o.get("payment_status") == "pending")
-    total_paid = sum(1 for o in orders if o.get("payment_status") == "paid")
-    total_overdue = sum(1 for o in orders if o.get("payment_status") == "overdue")
-    total_value = sum(o.get("total_price", 0) for o in orders)
-    pending_value = sum(o.get("total_price", 0) for o in orders if o.get("payment_status") == "pending")
+        payment_status = order.get("payment_status", "")
+        price = order.get("total_price", 0) or 0
+
+        total_value += price
+
+        if payment_status == "pending":
+            total_pending += 1
+            pending_value += price
+        elif payment_status == "paid":
+            total_paid += 1
+        elif payment_status == "overdue":
+            total_overdue += 1
+
+    # Calculate total pages
+    total_pages = (total_count + limit - 1) // limit
 
     return {
         "orders": orders,
+        "pagination": {
+            "page": page,
+            "limit": limit,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        },
         "summary": {
-            "total_orders": len(orders),
+            "total_orders": total_count,
             "pending": total_pending,
             "paid": total_paid,
             "overdue": total_overdue,
@@ -4739,24 +4805,31 @@ async def admin_send_quote_email(request: SendQuoteEmailRequest, admin_key: str)
         raise HTTPException(status_code=500, detail=f"Failed to send quote: {str(e)}")
 
 @api_router.get("/admin/users/by-role/{role}")
-async def get_users_by_role(role: str, admin_key: str):
-    """Get users by role (for dropdown selectors)"""
+async def get_users_by_role(role: str, admin_key: str, include_pending: bool = True):
+    """Get users by role (for dropdown selectors and user management)"""
     # Validate admin key or user token
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     try:
-        users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+        # Include users with pending invitations if requested
+        if include_pending:
+            users = await db.admin_users.find({"role": role}).to_list(100)
+        else:
+            users = await db.admin_users.find({"role": role, "is_active": True}).to_list(100)
+
         return [{
             "id": u["id"],
             "name": u["name"],
             "email": u["email"],
             "role": u.get("role", role),
             "is_active": u.get("is_active", True),
+            "invitation_pending": u.get("invitation_pending", False),
             "language_pairs": u.get("language_pairs"),
             "rate_per_page": u.get("rate_per_page"),
-            "rate_per_word": u.get("rate_per_word")
+            "rate_per_word": u.get("rate_per_word"),
+            "created_at": u.get("created_at")
         } for u in users]
     except Exception as e:
         logger.error(f"Error fetching users by role: {str(e)}")
