@@ -6980,6 +6980,42 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
 
     raise HTTPException(status_code=404, detail="Document not found")
 
+@api_router.patch("/admin/order-documents/{doc_id}")
+async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict):
+    """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only allow admin or PM to update
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
+
+    # Fields that can be updated
+    allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status"]
+    update_dict = {k: v for k, v in update_data.items() if k in allowed_fields}
+
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # Try order_documents first
+    result = await db.order_documents.update_one(
+        {"id": doc_id},
+        {"$set": update_dict}
+    )
+
+    if result.modified_count == 0:
+        # Try main documents collection
+        result = await db.documents.update_one(
+            {"id": doc_id},
+            {"$set": update_dict}
+        )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found or no changes made")
+
+    return {"success": True, "message": "Document updated successfully"}
+
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
 

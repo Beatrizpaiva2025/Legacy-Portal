@@ -7764,6 +7764,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [projectModalTab, setProjectModalTab] = useState('details');
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
+  const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
   const [editingProject, setEditingProject] = useState(false);
@@ -8239,6 +8240,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('Error uploading document');
     } finally {
       setUploadingProjectDoc(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToDocument = async (docId, translatorId, translatorName) => {
+    try {
+      // Update local state immediately for UI feedback
+      setFileTranslatorAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      // Save to backend - update document metadata
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator to document:', err);
+      // Revert on error
+      setFileTranslatorAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
     }
   };
 
@@ -10557,25 +10583,51 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     ) : orderDocuments.length > 0 ? (
                       <div className="space-y-2">
                         {orderDocuments.map((doc, idx) => (
-                          <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
-                            <div className="flex items-center">
-                              <span className="text-2xl mr-3">
-                                {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
-                              </span>
-                              <div>
-                                <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
-                                <div className="text-[10px] text-gray-500">
-                                  {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
-                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                          <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center flex-1">
+                                <span className="text-2xl mr-3">
+                                  {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                                </span>
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
+                                  <div className="text-[10px] text-gray-500">
+                                    {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                                    {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                  </div>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => downloadDocument(doc.id, doc.filename)}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                              >
+                                <span>⬇️</span> Download
+                              </button>
                             </div>
-                            <button
-                              onClick={() => downloadDocument(doc.id, doc.filename)}
-                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                            >
-                              <span>⬇️</span> Download
-                            </button>
+                            {/* Translator Assignment for each file - PM/Admin only */}
+                            {(isAdmin || isPM) && (
+                              <div className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2">
+                                <span className="text-[10px] text-gray-500">Assign to:</span>
+                                <select
+                                  value={fileTranslatorAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
+                                  onChange={(e) => {
+                                    const selected = translatorList.find(t => t.id === e.target.value);
+                                    if (selected) {
+                                      assignTranslatorToDocument(doc.id, selected.id, selected.name);
+                                    }
+                                  }}
+                                  className="flex-1 px-2 py-1 text-xs border rounded bg-white"
+                                >
+                                  <option value="">-- Select Translator --</option>
+                                  {translatorList.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                                {(fileTranslatorAssignments[doc.id] || doc.assigned_translator_name) && (
+                                  <span className="text-[10px] text-green-600">✓ Assigned</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
