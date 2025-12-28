@@ -881,6 +881,15 @@ class AdminResetPassword(BaseModel):
     token: str
     new_password: str
 
+class AdminUserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    rate_per_page: Optional[float] = None
+    rate_per_word: Optional[float] = None
+    language_pairs: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class AdminUserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -2797,7 +2806,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}?invite_token={invite_token}#/admin"
 
         role_display = {
             'admin': 'Administrator',
@@ -2975,7 +2984,7 @@ async def admin_forgot_password(request: AdminForgotPassword):
 
             # Get frontend URL
             frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-            reset_link = f"{frontend_url}/#/admin?reset_token={reset_token}"
+            reset_link = f"{frontend_url}?reset_token={reset_token}#/admin"
 
             # Send email
             subject = "Reset Your Password - Legacy Translations Admin"
@@ -3216,7 +3225,7 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
-        invite_link = f"{frontend_url}/#/admin?invite_token={invite_token}"
+        invite_link = f"{frontend_url}?invite_token={invite_token}#/admin"
 
         role_display = {
             'admin': 'Administrator',
@@ -3351,6 +3360,73 @@ async def toggle_admin_user_active(user_id: str, admin_key: str):
         raise
     except Exception as e:
         logger.error(f"Error toggling user status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
+
+@api_router.put("/admin/users/{user_id}")
+async def update_admin_user(user_id: str, user_data: AdminUserUpdate, admin_key: str):
+    """Update admin user profile (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find user first
+        existing_user = await db.admin_users.find_one({"id": user_id})
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Build update dict from provided fields
+        update_data = {}
+        if user_data.name is not None:
+            update_data["name"] = user_data.name
+        if user_data.email is not None:
+            # Check if email already exists for another user
+            email_check = await db.admin_users.find_one({"email": user_data.email, "id": {"$ne": user_id}})
+            if email_check:
+                raise HTTPException(status_code=400, detail="Email already in use")
+            update_data["email"] = user_data.email
+        if user_data.role is not None:
+            update_data["role"] = user_data.role
+        if user_data.rate_per_page is not None:
+            update_data["rate_per_page"] = user_data.rate_per_page
+        if user_data.rate_per_word is not None:
+            update_data["rate_per_word"] = user_data.rate_per_word
+        if user_data.language_pairs is not None:
+            update_data["language_pairs"] = user_data.language_pairs
+        if user_data.is_active is not None:
+            update_data["is_active"] = user_data.is_active
+
+        if not update_data:
+            return {"status": "success", "message": "No changes to update"}
+
+        update_data["updated_at"] = datetime.now()
+
+        await db.admin_users.update_one({"id": user_id}, {"$set": update_data})
+
+        # Return updated user
+        updated_user = await db.admin_users.find_one({"id": user_id})
+        return {
+            "status": "success",
+            "message": "User updated successfully",
+            "user": {
+                "id": updated_user["id"],
+                "name": updated_user["name"],
+                "email": updated_user["email"],
+                "role": updated_user["role"],
+                "is_active": updated_user.get("is_active", True),
+                "rate_per_page": updated_user.get("rate_per_page"),
+                "rate_per_word": updated_user.get("rate_per_word"),
+                "language_pairs": updated_user.get("language_pairs")
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to update user")
 
 @api_router.delete("/admin/users/{user_id}")
