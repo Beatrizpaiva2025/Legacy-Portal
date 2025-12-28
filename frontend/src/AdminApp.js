@@ -13330,15 +13330,24 @@ const ReviewPage = ({ adminKey, user }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([
-        fetchPendingSubmissions(),
-        isAdmin && fetchSuspiciousUsers(),
-        isAdmin && fetchLoginAttempts()
-      ]);
-      setLoading(false);
+      try {
+        await fetchPendingSubmissions();
+        if (isAdmin) {
+          await Promise.all([
+            fetchSuspiciousUsers(),
+            fetchLoginAttempts()
+          ]);
+        }
+      } catch (err) {
+        console.error('Error loading review data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    loadData();
-  }, [adminKey, user?.token]);
+    if (adminKey) {
+      loadData();
+    }
+  }, [adminKey]);
 
   const handleApproveSubmission = async (submissionId) => {
     try {
