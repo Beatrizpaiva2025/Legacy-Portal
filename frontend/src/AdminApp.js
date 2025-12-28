@@ -12351,12 +12351,31 @@ const ReviewPage = ({ adminKey, user }) => {
   const [activeSection, setActiveSection] = useState('submissions'); // 'submissions' | 'security'
   const [revisionNote, setRevisionNote] = useState('');
 
+  // New states for side-by-side view
+  const [fullScreenReview, setFullScreenReview] = useState(false);
+  const [editedTranslation, setEditedTranslation] = useState('');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [filterPM, setFilterPM] = useState('all'); // 'all' or PM id
+  const [pmList, setPmList] = useState([]);
+
   const isAdmin = user?.role === 'admin';
+  const isPM = user?.role === 'pm';
 
   const fetchPendingSubmissions = async () => {
     try {
-      const response = await axios.get(`${API}/admin/translations/pending-review?admin_key=${adminKey}&token=${user?.token}`);
+      // Admin sees all, PM sees only their assigned projects
+      const endpoint = isAdmin
+        ? `${API}/admin/translations/pending-review?admin_key=${adminKey}`
+        : `${API}/admin/translations/pending-review?admin_key=${adminKey}&pm_id=${user?.id}`;
+      const response = await axios.get(endpoint);
       setPendingSubmissions(response.data || []);
+
+      // Extract unique PMs for filter dropdown (admin only)
+      if (isAdmin && response.data) {
+        const pms = [...new Set(response.data.map(s => s.assigned_pm_name).filter(Boolean))];
+        setPmList(pms);
+      }
     } catch (err) {
       console.error('Failed to fetch pending submissions:', err);
     }
@@ -12412,20 +12431,36 @@ const ReviewPage = ({ adminKey, user }) => {
     }
   }, [adminKey]);
 
+  // Load translation content when submission is selected
+  useEffect(() => {
+    if (selectedSubmission) {
+      setEditedTranslation(selectedSubmission.translation_html || selectedSubmission.translated_text || '');
+      setCurrentImageIndex(0);
+    }
+  }, [selectedSubmission]);
+
   const handleApproveSubmission = async (submissionId) => {
     try {
+      // If translation was edited, save it first
+      if (editedTranslation !== (selectedSubmission.translation_html || selectedSubmission.translated_text)) {
+        await axios.put(`${API}/admin/translations/submission/${submissionId}/update?admin_key=${adminKey}`, {
+          translation_html: editedTranslation
+        });
+      }
+
       await axios.post(`${API}/admin/translations/submission/${submissionId}/approve?admin_key=${adminKey}&token=${user?.token}`);
       fetchPendingSubmissions();
       setSelectedSubmission(null);
-      alert('Tradução aprovada e enviada ao cliente!');
+      setFullScreenReview(false);
+      alert('Translation approved and sent to client!');
     } catch (err) {
-      alert('Erro ao aprovar: ' + (err.response?.data?.detail || err.message));
+      alert('Error approving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
   const handleRequestRevision = async (submissionId) => {
     if (!revisionNote.trim()) {
-      alert('Por favor, adicione uma nota explicando as correções necessárias.');
+      alert('Please add a note explaining the corrections needed.');
       return;
     }
     try {
@@ -12435,16 +12470,162 @@ const ReviewPage = ({ adminKey, user }) => {
       fetchPendingSubmissions();
       setSelectedSubmission(null);
       setRevisionNote('');
-      alert('Revisão solicitada ao tradutor!');
+      setFullScreenReview(false);
+      alert('Revision requested from translator!');
     } catch (err) {
-      alert('Erro: ' + (err.response?.data?.detail || err.message));
+      alert('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
+
+  const handleSaveEdits = async () => {
+    if (!selectedSubmission) return;
+    setSaving(true);
+    try {
+      await axios.put(`${API}/admin/translations/submission/${selectedSubmission._id}/update?admin_key=${adminKey}`, {
+        translation_html: editedTranslation
+      });
+      alert('Changes saved!');
+      fetchPendingSubmissions();
+    } catch (err) {
+      alert('Error saving: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Filter submissions based on selected PM
+  const filteredSubmissions = filterPM === 'all'
+    ? pendingSubmissions
+    : pendingSubmissions.filter(s => s.assigned_pm_name === filterPM);
 
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <div className="text-gray-500">Carregando...</div>
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  // Full-screen side-by-side review mode
+  if (fullScreenReview && selectedSubmission) {
+    const originalImages = selectedSubmission.original_images || [];
+    const hasMultiplePages = originalImages.length > 1;
+
+    return (
+      <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
+        {/* Header */}
+        <div className="bg-gray-800 text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setFullScreenReview(false)}
+              className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm"
+            >
+              ← Back to List
+            </button>
+            <span className="font-bold">{selectedSubmission.order_number}</span>
+            <span className="text-gray-400">|</span>
+            <span className="text-sm text-gray-300">Translator: {selectedSubmission.translator_name}</span>
+            {selectedSubmission.assigned_pm_name && (
+              <>
+                <span className="text-gray-400">|</span>
+                <span className="text-sm text-gray-300">PM: {selectedSubmission.assigned_pm_name}</span>
+              </>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handleSaveEdits}
+              disabled={saving}
+              className="px-4 py-1.5 bg-blue-600 rounded hover:bg-blue-700 text-sm disabled:bg-gray-600"
+            >
+              {saving ? 'Saving...' : 'Save Edits'}
+            </button>
+            <button
+              onClick={() => handleApproveSubmission(selectedSubmission._id)}
+              className="px-4 py-1.5 bg-green-600 rounded hover:bg-green-700 text-sm"
+            >
+              ✓ Approve
+            </button>
+            <button
+              onClick={() => {
+                const note = prompt('Enter revision note for translator:');
+                if (note) {
+                  setRevisionNote(note);
+                  handleRequestRevision(selectedSubmission._id);
+                }
+              }}
+              className="px-4 py-1.5 bg-orange-500 rounded hover:bg-orange-600 text-sm"
+            >
+              ↻ Request Revision
+            </button>
+          </div>
+        </div>
+
+        {/* Side-by-side content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left panel - Original document */}
+          <div className="w-1/2 flex flex-col border-r border-gray-700">
+            <div className="bg-gray-800 text-white px-4 py-2 text-sm font-medium flex items-center justify-between">
+              <span>Original Document</span>
+              {hasMultiplePages && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setCurrentImageIndex(Math.max(0, currentImageIndex - 1))}
+                    disabled={currentImageIndex === 0}
+                    className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50"
+                  >
+                    ←
+                  </button>
+                  <span className="text-xs">Page {currentImageIndex + 1} of {originalImages.length}</span>
+                  <button
+                    onClick={() => setCurrentImageIndex(Math.min(originalImages.length - 1, currentImageIndex + 1))}
+                    disabled={currentImageIndex === originalImages.length - 1}
+                    className="px-2 py-1 bg-gray-700 rounded disabled:opacity-50"
+                  >
+                    →
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              {originalImages.length > 0 ? (
+                <img
+                  src={originalImages[currentImageIndex]?.data || originalImages[currentImageIndex]}
+                  alt={`Original page ${currentImageIndex + 1}`}
+                  className="max-w-full mx-auto shadow-lg"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  No original images available
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right panel - Translation (editable) */}
+          <div className="w-1/2 flex flex-col">
+            <div className="bg-gray-800 text-white px-4 py-2 text-sm font-medium flex items-center justify-between">
+              <span>Translation (Editable)</span>
+              <span className="text-xs text-gray-400">Click to edit</span>
+            </div>
+            <div className="flex-1 overflow-auto bg-white">
+              <div
+                contentEditable
+                className="min-h-full p-6 outline-none prose max-w-none"
+                dangerouslySetInnerHTML={{ __html: editedTranslation }}
+                onBlur={(e) => setEditedTranslation(e.target.innerHTML)}
+                style={{ minHeight: '100%' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer with notes */}
+        {selectedSubmission.translator_notes && (
+          <div className="bg-gray-800 text-white px-4 py-2 text-xs">
+            <span className="text-gray-400">Translator notes:</span> {selectedSubmission.translator_notes}
+          </div>
+        )}
       </div>
     );
   }
@@ -12453,12 +12634,34 @@ const ReviewPage = ({ adminKey, user }) => {
     <div className="p-4 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <h1 className="text-lg font-bold text-gray-800">👁️ Painel de Revisão</h1>
-        <p className="text-xs text-gray-500">
-          {isAdmin
-            ? 'Revisar traduções enviadas pelos tradutores e monitorar segurança'
-            : 'Revisar traduções enviadas pelos tradutores'}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">Review Panel</h1>
+            <p className="text-xs text-gray-500">
+              {isAdmin
+                ? 'Review translations from all PMs and translators'
+                : 'Review translations assigned to you'}
+            </p>
+          </div>
+          {/* PM Filter (Admin only) */}
+          {isAdmin && pmList.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <label className="text-xs text-gray-500">Filter by PM:</label>
+              <select
+                value={filterPM}
+                onChange={(e) => setFilterPM(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                <option value="all">All PMs ({pendingSubmissions.length})</option>
+                {pmList.map(pm => (
+                  <option key={pm} value={pm}>
+                    {pm} ({pendingSubmissions.filter(s => s.assigned_pm_name === pm).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tab navigation */}
@@ -12467,29 +12670,29 @@ const ReviewPage = ({ adminKey, user }) => {
           onClick={() => setActiveSection('submissions')}
           className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'submissions' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
         >
-          📥 Traduções Pendentes ({pendingSubmissions.length})
+          Pending Reviews ({filteredSubmissions.length})
         </button>
         {isAdmin && (
           <button
             onClick={() => setActiveSection('security')}
             className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'security' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
           >
-            🔒 Segurança {suspiciousUsers.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-xs">{suspiciousUsers.length}</span>}
+            Security {suspiciousUsers.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-xs">{suspiciousUsers.length}</span>}
           </button>
         )}
       </div>
 
       {/* Submissions Section */}
       {activeSection === 'submissions' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Pending submissions list */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">📋 Traduções para Revisar</h2>
-            {pendingSubmissions.length === 0 ? (
-              <p className="text-gray-500 text-sm">Nenhuma tradução pendente de revisão.</p>
+            <h2 className="text-sm font-bold text-gray-700 mb-3">Translations to Review</h2>
+            {filteredSubmissions.length === 0 ? (
+              <p className="text-gray-500 text-sm">No pending translations to review.</p>
             ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                {pendingSubmissions.map((sub) => (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {filteredSubmissions.map((sub) => (
                   <div
                     key={sub._id}
                     onClick={() => setSelectedSubmission(sub)}
@@ -12498,14 +12701,17 @@ const ReviewPage = ({ adminKey, user }) => {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-medium text-sm">{sub.order_number}</div>
-                        <div className="text-xs text-gray-500">Tradutor: {sub.translator_name}</div>
+                        <div className="text-xs text-gray-500">Translator: {sub.translator_name}</div>
+                        {isAdmin && sub.assigned_pm_name && (
+                          <div className="text-xs text-blue-600">PM: {sub.assigned_pm_name}</div>
+                        )}
                       </div>
                       <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">
-                        Pendente
+                        Pending
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
-                      Enviado: {new Date(sub.submitted_at).toLocaleString('pt-BR')}
+                      {new Date(sub.submitted_at).toLocaleDateString()}
                     </div>
                   </div>
                 ))}
@@ -12514,68 +12720,103 @@ const ReviewPage = ({ adminKey, user }) => {
           </div>
 
           {/* Selected submission details */}
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="lg:col-span-2 bg-white rounded-lg shadow p-4">
             {selectedSubmission ? (
               <>
-                <h2 className="text-sm font-bold text-gray-700 mb-3">📄 Detalhes: {selectedSubmission.order_number}</h2>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div><span className="text-gray-500">Tradutor:</span> {selectedSubmission.translator_name}</div>
-                    <div><span className="text-gray-500">Páginas:</span> {selectedSubmission.pages_count || 'N/A'}</div>
-                    <div><span className="text-gray-500">Enviado:</span> {new Date(selectedSubmission.submitted_at).toLocaleString('pt-BR')}</div>
-                    <div><span className="text-gray-500">Cliente:</span> {selectedSubmission.client_name || 'N/A'}</div>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-sm font-bold text-gray-700">{selectedSubmission.order_number}</h2>
+                  <button
+                    onClick={() => setFullScreenReview(true)}
+                    className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700 flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                    </svg>
+                    Open Side-by-Side Review
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2 text-xs">
+                    <div><span className="text-gray-500">Translator:</span> {selectedSubmission.translator_name}</div>
+                    <div><span className="text-gray-500">Client:</span> {selectedSubmission.client_name || 'N/A'}</div>
+                    <div><span className="text-gray-500">Submitted:</span> {new Date(selectedSubmission.submitted_at).toLocaleString()}</div>
                   </div>
+                  <div className="space-y-2 text-xs">
+                    <div><span className="text-gray-500">Pages:</span> {selectedSubmission.pages_count || 'N/A'}</div>
+                    {isAdmin && <div><span className="text-gray-500">Assigned PM:</span> {selectedSubmission.assigned_pm_name || 'N/A'}</div>}
+                    <div><span className="text-gray-500">Document:</span> {selectedSubmission.document_type || 'N/A'}</div>
+                  </div>
+                </div>
 
-                  {selectedSubmission.translator_notes && (
-                    <div className="bg-gray-50 p-2 rounded">
-                      <div className="text-xs text-gray-500 mb-1">Notas do tradutor:</div>
-                      <div className="text-sm">{selectedSubmission.translator_notes}</div>
-                    </div>
-                  )}
+                {selectedSubmission.translator_notes && (
+                  <div className="bg-blue-50 p-3 rounded mb-4">
+                    <div className="text-xs font-medium text-blue-700 mb-1">Translator Notes:</div>
+                    <div className="text-sm text-blue-800">{selectedSubmission.translator_notes}</div>
+                  </div>
+                )}
 
-                  {selectedSubmission.file_url && (
-                    <a
-                      href={selectedSubmission.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block text-center py-2 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
-                    >
-                      📎 Ver Arquivo Traduzido
-                    </a>
-                  )}
-
-                  {/* Revision note input */}
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Nota para revisão (se necessário):</label>
-                    <textarea
-                      value={revisionNote}
-                      onChange={(e) => setRevisionNote(e.target.value)}
-                      className="w-full border rounded p-2 text-sm"
-                      rows={2}
-                      placeholder="Descreva as correções necessárias..."
+                {/* Preview */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {/* Original preview */}
+                  <div className="border rounded p-2">
+                    <div className="text-xs font-medium text-gray-500 mb-2">Original (Preview)</div>
+                    {selectedSubmission.original_images?.length > 0 ? (
+                      <img
+                        src={selectedSubmission.original_images[0]?.data || selectedSubmission.original_images[0]}
+                        alt="Original"
+                        className="w-full h-40 object-contain bg-gray-100"
+                      />
+                    ) : (
+                      <div className="h-40 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
+                        No preview
+                      </div>
+                    )}
+                  </div>
+                  {/* Translation preview */}
+                  <div className="border rounded p-2">
+                    <div className="text-xs font-medium text-gray-500 mb-2">Translation (Preview)</div>
+                    <div
+                      className="h-40 overflow-hidden bg-gray-50 p-2 text-xs"
+                      dangerouslySetInnerHTML={{ __html: selectedSubmission.translation_html || selectedSubmission.translated_text || '<em>No translation content</em>' }}
                     />
                   </div>
+                </div>
 
-                  {/* Action buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApproveSubmission(selectedSubmission._id)}
-                      className="flex-1 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
-                    >
-                      ✅ Aprovar e Enviar ao Cliente
-                    </button>
-                    <button
-                      onClick={() => handleRequestRevision(selectedSubmission._id)}
-                      className="flex-1 py-2 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600"
-                    >
-                      🔄 Solicitar Revisão
-                    </button>
-                  </div>
+                {/* Revision note input */}
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-500 mb-1">Revision note (if needed):</label>
+                  <textarea
+                    value={revisionNote}
+                    onChange={(e) => setRevisionNote(e.target.value)}
+                    className="w-full border rounded p-2 text-sm"
+                    rows={2}
+                    placeholder="Describe corrections needed..."
+                  />
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleApproveSubmission(selectedSubmission._id)}
+                    className="flex-1 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                  >
+                    ✓ Approve & Send to Client
+                  </button>
+                  <button
+                    onClick={() => handleRequestRevision(selectedSubmission._id)}
+                    className="flex-1 py-2 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600"
+                  >
+                    ↻ Request Revision
+                  </button>
                 </div>
               </>
             ) : (
-              <div className="text-gray-500 text-sm text-center py-8">
-                Selecione uma tradução para ver os detalhes
+              <div className="text-gray-500 text-sm text-center py-16">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Select a translation to review
               </div>
             )}
           </div>
@@ -12587,10 +12828,10 @@ const ReviewPage = ({ adminKey, user }) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Suspicious Users */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">⚠️ Usuários Suspeitos (Múltiplos IPs)</h2>
-            <p className="text-xs text-gray-500 mb-3">Usuários que acessaram de mais de 3 IPs diferentes.</p>
+            <h2 className="text-sm font-bold text-gray-700 mb-3">Suspicious Users (Multiple IPs)</h2>
+            <p className="text-xs text-gray-500 mb-3">Users who accessed from more than 3 different IPs.</p>
             {suspiciousUsers.length === 0 ? (
-              <p className="text-gray-500 text-sm">Nenhum usuário suspeito detectado.</p>
+              <p className="text-gray-500 text-sm">No suspicious users detected.</p>
             ) : (
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {suspiciousUsers.map((usr) => (
@@ -12611,7 +12852,7 @@ const ReviewPage = ({ adminKey, user }) => {
                       onClick={() => fetchUserIpHistory(usr._id)}
                       className="mt-2 text-xs text-blue-600 hover:underline"
                     >
-                      Ver histórico de IPs →
+                      View IP history →
                     </button>
                   </div>
                 ))}
@@ -12624,12 +12865,12 @@ const ReviewPage = ({ adminKey, user }) => {
             {selectedUserIpHistory ? (
               <>
                 <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-sm font-bold text-gray-700">📍 Histórico de IPs</h2>
+                  <h2 className="text-sm font-bold text-gray-700">IP History</h2>
                   <button
                     onClick={() => setSelectedUserIpHistory(null)}
                     className="text-xs text-gray-500 hover:text-gray-700"
                   >
-                    ✕ Fechar
+                    ✕ Close
                   </button>
                 </div>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -12637,14 +12878,14 @@ const ReviewPage = ({ adminKey, user }) => {
                     <div key={idx} className="p-2 border rounded text-xs">
                       <div className="font-mono">{entry.ip}</div>
                       <div className="text-gray-500">{entry.user_agent}</div>
-                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString('pt-BR')}</div>
+                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
               <>
-                <h2 className="text-sm font-bold text-gray-700 mb-3">🕐 Últimos Logins</h2>
+                <h2 className="text-sm font-bold text-gray-700 mb-3">Recent Logins</h2>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
                   {loginAttempts.map((attempt, idx) => (
                     <div key={idx} className="p-2 border rounded text-xs flex justify-between items-center">
@@ -12654,9 +12895,9 @@ const ReviewPage = ({ adminKey, user }) => {
                       </div>
                       <div className="text-right">
                         <span className={`px-2 py-0.5 rounded ${attempt.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {attempt.success ? 'OK' : 'Falhou'}
+                          {attempt.success ? 'OK' : 'Failed'}
                         </span>
-                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString('pt-BR')}</div>
+                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString()}</div>
                       </div>
                     </div>
                   ))}
