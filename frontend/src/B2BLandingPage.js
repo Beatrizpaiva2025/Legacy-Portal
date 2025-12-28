@@ -348,6 +348,15 @@ Message: ${formData.message}
                   </svg>
                   <span className="text-blue-100">Custom pricing available</span>
                 </div>
+                <div className="flex items-start bg-gradient-to-r from-blue-800/50 to-purple-800/50 rounded-lg p-3 border border-blue-400/30">
+                  <svg className="w-6 h-6 text-yellow-300 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  <div>
+                    <span className="text-yellow-200 font-bold block">Exclusive: Digital Verification System</span>
+                    <span className="text-blue-200 text-sm">Each document includes QR code & unique serial number for instant authenticity verification by any institution</span>
+                  </div>
+                </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-yellow-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
@@ -479,19 +488,18 @@ Message: ${formData.message}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Trusted by businesses nationwide</p>
+            <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Professional Certifications & Accreditations</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
-            {/* ATA Member Logo */}
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20">
+            {/* ATA Member Logo - New logo with member number included */}
             <div className="text-center">
-              <div className="h-14 md:h-16 mx-auto mb-2 flex items-center justify-center">
+              <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="https://i.imgur.com/Swl1ClD.png"
-                  alt="ATA Member - American Translators Association"
+                  src="https://i.imgur.com/YqZK5Lv.png"
+                  alt="ATA Member - American Translators Association - Member #275993"
                   className="h-full object-contain"
                 />
               </div>
-              <div className="text-xs text-gray-500">Member #275993</div>
             </div>
 
             {/* BBB Accredited Business A+ Logo */}
@@ -503,18 +511,6 @@ Message: ${formData.message}
                   className="h-full object-contain"
                 />
               </div>
-            </div>
-
-            {/* USCIS Logo */}
-            <div className="text-center">
-              <div className="h-16 md:h-20 mx-auto mb-2 flex items-center justify-center">
-                <img
-                  src="https://i.imgur.com/djZgFkJ.png"
-                  alt="U.S. Citizenship and Immigration Services"
-                  className="h-full object-contain"
-                />
-              </div>
-              <div className="text-xs text-gray-500">Strict USCIS Compliance</div>
             </div>
           </div>
         </div>
@@ -544,7 +540,7 @@ Message: ${formData.message}
                 className="h-10 mb-4 brightness-0 invert"
               />
               <p className="text-blue-200">
-                Leader in Portuguese and Spanish Translations since 2010.
+                Professional Certified Translation Services
               </p>
             </div>
             <div>

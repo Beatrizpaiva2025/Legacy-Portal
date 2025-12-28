@@ -40,6 +40,7 @@ const TRANSLATIONS = {
     benefit1: 'Monthly invoicing',
     benefit2: 'Dedicated B2B support chat',
     benefit3: 'Priority processing',
+    benefit4: 'Exclusive: Digital Verification with QR Code',
     // Navigation
     newOrder: 'New Order',
     createNewOrder: 'Create New Order',
@@ -118,6 +119,7 @@ const TRANSLATIONS = {
     benefit1: 'Facturación mensual',
     benefit2: 'Chat de soporte B2B dedicado',
     benefit3: 'Procesamiento prioritario',
+    benefit4: 'Exclusivo: Verificación Digital con Código QR',
     // Navigation
     newOrder: 'Nuevo Pedido',
     createNewOrder: 'Crear Nuevo Pedido',
@@ -195,6 +197,7 @@ const TRANSLATIONS = {
     benefit1: 'Faturamento mensal',
     benefit2: 'Chat de suporte B2B dedicado',
     benefit3: 'Processamento prioritário',
+    benefit4: 'Exclusivo: Verificação Digital com QR Code',
     // Navigation
     newOrder: 'Novo Pedido',
     createNewOrder: 'Criar Novo Pedido',
@@ -414,6 +417,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
               <span className="text-white">{t.benefit3}</span>
             </div>
+            <div className="flex items-center gap-3 bg-white/10 rounded-lg p-3 border border-yellow-400/30">
+              <div className="w-10 h-10 bg-yellow-400/30 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-yellow-300">🔐</span>
+              </div>
+              <span className="text-yellow-200 font-semibold">{t.benefit4}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -562,6 +571,10 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <li className="flex items-start">
                   <span className="text-blue-600 mr-2">✓</span>
                   <span>{t.benefit3}</span>
+                </li>
+                <li className="flex items-start bg-yellow-50 rounded p-2 border border-yellow-200">
+                  <span className="text-yellow-600 mr-2">🔐</span>
+                  <span className="text-yellow-700 font-medium">{t.benefit4}</span>
                 </li>
               </ul>
             </div>
