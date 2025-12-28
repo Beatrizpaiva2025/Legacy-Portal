@@ -2011,11 +2011,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Auto-fill currencies based on languages
       const srcCurrency = getCurrencyFromLanguage(selectedOrder.translate_from);
       const tgtCurrency = getCurrencyFromLanguage(selectedOrder.translate_to);
-      setAiPipelineConfig(prev => ({
-        ...prev,
-        sourceCurrency: srcCurrency,
-        targetCurrency: tgtCurrency
-      }));
       setTranslatorNoteSettings(prev => ({
         ...prev,
         sourceCurrency: srcCurrency,
@@ -2048,7 +2043,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   useEffect(() => {
     if (sourceLanguage) {
       const srcCurrency = getCurrencyFromLanguage(sourceLanguage);
-      setAiPipelineConfig(prev => ({ ...prev, sourceCurrency: srcCurrency }));
       setTranslatorNoteSettings(prev => ({ ...prev, sourceCurrency: srcCurrency, exchangeRate: '' }));
     }
   }, [sourceLanguage]);
@@ -2056,7 +2050,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   useEffect(() => {
     if (targetLanguage) {
       const tgtCurrency = getCurrencyFromLanguage(targetLanguage);
-      setAiPipelineConfig(prev => ({ ...prev, targetCurrency: tgtCurrency }));
       setTranslatorNoteSettings(prev => ({ ...prev, targetCurrency: tgtCurrency, exchangeRate: '' }));
     }
   }, [targetLanguage]);
