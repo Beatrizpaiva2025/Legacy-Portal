@@ -280,7 +280,7 @@ Message: ${formData.message}
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-blue-900 mb-3">Certified Quality</h3>
-              <p className="text-gray-600">ATA member since 2010. Certified translations in full compliance with strict USCIS standards.</p>
+              <p className="text-gray-600">ATA member. Certified translations in full compliance with strict USCIS standards.</p>
             </div>
           </div>
         </div>
