@@ -529,7 +529,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -5581,37 +5581,104 @@ tradução juramentada | certified translation`}
                     <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
                   ) : selectedProjectFiles.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         {selectedProjectFiles.map((doc, idx) => (
                           <div
                             key={doc.id}
-                            onClick={() => loadProjectFile(doc)}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                            className={`p-3 rounded-lg transition-all ${
                               selectedFileId === doc.id
                                 ? 'bg-green-100 border-2 border-green-500 shadow-md'
-                                : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
+                                : 'bg-white border border-gray-200 hover:bg-blue-50'
                             }`}
                           >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
-                              selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                            }`}>
-                              {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                            <div className="flex items-center gap-3">
+                              {/* File Icon and Info - Clickable to load */}
+                              <div
+                                onClick={() => loadProjectFile(doc)}
+                                className="flex items-center gap-3 flex-1 cursor-pointer"
+                              >
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                                  selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                                }`}>
+                                  {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-medium truncate ${
+                                    selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                                  }`}>
+                                    {doc.filename || `Arquivo ${idx + 1}`}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {selectedFileId === doc.id ? '✓ Carregado - Pronto para traduzir' : 'Clique para carregar'}
+                                  </div>
+                                </div>
+                                {selectedFileId === doc.id && (
+                                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1">
+                                {/* Download Button */}
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const response = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+                                      if (response.data.file_data) {
+                                        const link = document.createElement('a');
+                                        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+                                        link.download = doc.filename || 'document.pdf';
+                                        link.click();
+                                      }
+                                    } catch (err) {
+                                      alert('Erro ao baixar arquivo');
+                                    }
+                                  }}
+                                  className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
+                                  title="Download"
+                                >
+                                  ⬇️
+                                </button>
+
+                                {/* Replace Button - File input */}
+                                <label
+                                  className="px-2 py-1.5 bg-orange-100 text-orange-600 rounded text-xs hover:bg-orange-200 transition-colors cursor-pointer"
+                                  title="Substituir arquivo"
+                                >
+                                  🔄
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*,.pdf"
+                                    onChange={async (e) => {
+                                      const file = e.target.files[0];
+                                      if (!file) return;
+                                      try {
+                                        const reader = new FileReader();
+                                        reader.onload = async () => {
+                                          const base64 = reader.result.split(',')[1];
+                                          await axios.put(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
+                                            filename: file.name,
+                                            file_data: base64,
+                                            content_type: file.type
+                                          });
+                                          // Refresh files
+                                          const response = await axios.get(`${API}/admin/orders/${selectedOrderId}/documents?admin_key=${adminKey}`);
+                                          setSelectedProjectFiles(response.data.documents || []);
+                                          setProcessingStatus(`✅ Arquivo substituído: ${file.name}`);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      } catch (err) {
+                                        alert('Erro ao substituir arquivo');
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-medium truncate ${
-                                selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
-                              }`}>
-                                {doc.filename || `Arquivo ${idx + 1}`}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {selectedFileId === doc.id ? '✓ Carregado - Pronto' : 'Clique para carregar'}
-                              </div>
-                            </div>
-                            {selectedFileId === doc.id && (
-                              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
-                                ✓
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
@@ -7764,6 +7831,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [projectModalTab, setProjectModalTab] = useState('details');
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
+  const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
   const [editingProject, setEditingProject] = useState(false);
@@ -7823,6 +7891,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
+    client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
     service_type: 'standard',
@@ -8238,6 +8307,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('Error uploading document');
     } finally {
       setUploadingProjectDoc(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToDocument = async (docId, translatorId, translatorName) => {
+    try {
+      // Update local state immediately for UI feedback
+      setFileTranslatorAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      // Save to backend - update document metadata
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator to document:', err);
+      // Revert on error
+      setFileTranslatorAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
     }
   };
 
@@ -9244,7 +9338,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="bg-white rounded-lg shadow mb-4 p-4">
           <h3 className="text-sm font-bold text-gray-800 mb-3">📝 Create New Project</h3>
           <form onSubmit={createProject}>
-            <div className="grid grid-cols-4 gap-3 mb-3">
+            <div className="grid grid-cols-5 gap-3 mb-3">
               {/* Client Info */}
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
@@ -9266,6 +9360,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   required
                   className="w-full px-2 py-1.5 text-xs border rounded"
                   placeholder="client@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Phone (WhatsApp)</label>
+                <input
+                  type="tel"
+                  value={newProject.client_phone}
+                  onChange={(e) => setNewProject({...newProject, client_phone: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
               <div>
@@ -16105,6 +16209,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [translators, setTranslators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
+
+  // Project files viewing state
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectDocuments, setProjectDocuments] = useState([]);
+  const [loadingProjectDocs, setLoadingProjectDocs] = useState(false);
+  const [fileAssignments, setFileAssignments] = useState({});
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
@@ -16392,6 +16502,59 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setNewMessage('');
   };
 
+  // View project files and assign translators
+  const viewProjectFiles = async (order) => {
+    setSelectedProject(order);
+    setLoadingProjectDocs(true);
+    setProjectDocuments([]);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      setProjectDocuments(response.data.documents || []);
+    } catch (err) {
+      console.error('Failed to fetch project documents:', err);
+    } finally {
+      setLoadingProjectDocs(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToFile = async (docId, translatorId, translatorName) => {
+    try {
+      setFileAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+      setFileAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
+    }
+  };
+
+  // Download document
+  const downloadProjectDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Erro ao baixar documento');
+    }
+  };
+
   // Load review content
   const loadReviewContent = async (order) => {
     setSelectedReview(order);
@@ -16544,7 +16707,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Section navigation
   const sections = [
     { id: 'overview', label: 'Visão Geral', icon: '📊' },
-    { id: 'quote', label: 'Gerar Orçamento', icon: '💰' },
     { id: 'review', label: 'Revisar Traduções', icon: '✅' },
     { id: 'team', label: 'Minha Equipe', icon: '👥' },
     { id: 'calendar', label: 'Agenda', icon: '📅' },
@@ -16674,7 +16836,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <tbody>
                   {orders.slice(0, 10).map(order => (
                     <tr key={order.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 font-mono text-blue-600">{order.order_number}</td>
+                      <td className="py-2 px-2">
+                        <button
+                          onClick={() => viewProjectFiles(order)}
+                          className="font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {order.order_number}
+                        </button>
+                      </td>
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
                       <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
@@ -17601,21 +17770,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {/* Translator List */}
               <div className="border rounded-lg p-3">
                 <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
-                <div className="space-y-1">
-                  {translators.map(translator => (
-                    <button
-                      key={translator.id}
-                      onClick={() => setSelectedTranslator(translator)}
-                      className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
-                        selectedTranslator?.id === translator.id
-                          ? 'bg-teal-500 text-white'
-                          : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="font-medium">{translator.name}</div>
-                      <div className="text-[10px] opacity-70">{translator.email}</div>
-                    </button>
-                  ))}
+                <div className="space-y-1 max-h-80 overflow-y-auto">
+                  {translators.length > 0 ? (
+                    translators.map(translator => (
+                      <button
+                        key={translator.id}
+                        onClick={() => setSelectedTranslator(translator)}
+                        className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                          selectedTranslator?.id === translator.id
+                            ? 'bg-teal-500 text-white'
+                            : 'hover:bg-gray-100 border border-gray-100'
+                        }`}
+                      >
+                        <div className="font-medium">{translator.name}</div>
+                        <div className="text-[10px] opacity-70">{translator.email}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 text-xs">
+                      <p>Nenhum tradutor cadastrado.</p>
+                      <p className="mt-1">Cadastre tradutores na aba "Translators".</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -17680,6 +17856,98 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT FILES MODAL - For assigning translators to files */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📁 Arquivos do Projeto {selectedProject.order_number}</h3>
+                <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-xs text-gray-500 mb-3">Selecione um tradutor para cada arquivo. Arquivos diferentes podem ser atribuídos a tradutores diferentes.</p>
+
+              {loadingProjectDocs ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
+                  Carregando arquivos...
+                </div>
+              ) : projectDocuments.length > 0 ? (
+                <div className="space-y-3">
+                  {projectDocuments.map((doc, idx) => (
+                    <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">
+                            {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                          </span>
+                          <div>
+                            <div className="text-sm font-medium">{doc.filename || 'Documento'}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => downloadProjectDocument(doc.id, doc.filename)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        >
+                          ⬇️ Download
+                        </button>
+                      </div>
+
+                      {/* Translator Assignment */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                        <span className="text-xs text-gray-500">Atribuir para:</span>
+                        <select
+                          value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
+                          onChange={(e) => {
+                            const selected = translators.find(t => t.id === e.target.value);
+                            if (selected) {
+                              assignTranslatorToFile(doc.id, selected.id, selected.name);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1.5 text-xs border rounded bg-white"
+                        >
+                          <option value="">-- Selecione o Tradutor --</option>
+                          {translators.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
+                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-sm">Nenhum arquivo encontrado neste projeto</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
