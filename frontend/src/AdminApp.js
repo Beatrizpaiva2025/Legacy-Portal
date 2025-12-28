@@ -528,9 +528,9 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
-    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -11510,6 +11510,68 @@ const SettingsPage = ({ adminKey }) => {
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
 
+  // QuickBooks Integration State
+  const [qbStatus, setQbStatus] = useState({ connected: false, company_name: null, loading: true });
+  const [qbConnecting, setQbConnecting] = useState(false);
+
+  // Check QuickBooks status on mount
+  useEffect(() => {
+    const checkQBStatus = async () => {
+      try {
+        const response = await axios.get(`${API}/quickbooks/status?admin_key=${adminKey}`);
+        setQbStatus({ ...response.data, loading: false });
+      } catch (err) {
+        console.error('Failed to check QuickBooks status:', err);
+        setQbStatus({ connected: false, loading: false, error: err.message });
+      }
+    };
+    checkQBStatus();
+
+    // Listen for OAuth callback message
+    const handleMessage = (event) => {
+      if (event.data?.type === 'quickbooks_connected' && event.data?.success) {
+        checkQBStatus();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [adminKey]);
+
+  const connectQuickBooks = async () => {
+    setQbConnecting(true);
+    try {
+      const response = await axios.get(`${API}/quickbooks/connect?admin_key=${adminKey}`);
+      if (response.data.authorization_url) {
+        // Open QuickBooks authorization in a popup
+        const width = 600;
+        const height = 700;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+        window.open(
+          response.data.authorization_url,
+          'QuickBooks Authorization',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+      }
+    } catch (err) {
+      console.error('Failed to connect to QuickBooks:', err);
+      alert('Failed to start QuickBooks connection: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setQbConnecting(false);
+    }
+  };
+
+  const disconnectQuickBooks = async () => {
+    if (!window.confirm('Are you sure you want to disconnect QuickBooks?')) return;
+    try {
+      await axios.post(`${API}/quickbooks/disconnect?admin_key=${adminKey}`);
+      setQbStatus({ connected: false, company_name: null, loading: false });
+    } catch (err) {
+      console.error('Failed to disconnect QuickBooks:', err);
+      alert('Failed to disconnect: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   // Export functions
   const exportToCSV = (data, filename) => {
     if (!data || data.length === 0) {
@@ -11839,16 +11901,42 @@ const SettingsPage = ({ adminKey }) => {
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
               <div className="flex items-center">
                 <span className="mr-2">📧</span>
-                <span>SendGrid</span>
+                <span>Resend Email</span>
               </div>
               <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
             </div>
+            {/* QuickBooks Integration */}
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
               <div className="flex items-center">
                 <span className="mr-2">📊</span>
-                <span>QuickBooks (Make.com)</span>
+                <div>
+                  <span>QuickBooks Online</span>
+                  {qbStatus.connected && qbStatus.company_name && (
+                    <span className="text-[10px] text-gray-500 ml-1">({qbStatus.company_name})</span>
+                  )}
+                </div>
               </div>
-              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+              {qbStatus.loading ? (
+                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">Checking...</span>
+              ) : qbStatus.connected ? (
+                <div className="flex items-center space-x-2">
+                  <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+                  <button
+                    onClick={disconnectQuickBooks}
+                    className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-[10px] hover:bg-red-200"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={connectQuickBooks}
+                  disabled={qbConnecting}
+                  className="px-3 py-1 bg-green-600 text-white rounded text-[10px] font-medium hover:bg-green-700 disabled:bg-gray-300"
+                >
+                  {qbConnecting ? 'Connecting...' : 'Connect'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -13764,7 +13852,7 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs, translator-payments
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs, translator-payments, quickbooks
   const [paymentProofs, setPaymentProofs] = useState([]);
   const [selectedProof, setSelectedProof] = useState(null);
   const [proofFilter, setProofFilter] = useState('pending');
@@ -13776,6 +13864,10 @@ const FinancesPage = ({ adminKey }) => {
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  // QuickBooks state
+  const [qbConnected, setQbConnected] = useState(false);
+  const [qbSyncing, setQbSyncing] = useState({});
+  const [paidOrders, setPaidOrders] = useState([]);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -13913,14 +14005,83 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // QuickBooks functions
+  const checkQuickBooksStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/quickbooks/status?admin_key=${adminKey}`);
+      setQbConnected(response.data.connected);
+    } catch (err) {
+      console.error('Failed to check QuickBooks status:', err);
+    }
+  };
+
+  const fetchPaidOrders = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+      const orders = response.data.orders || response.data || [];
+      // Filter paid orders that haven't been synced to QuickBooks
+      const paid = orders.filter(o => o.payment_status === 'paid');
+      setPaidOrders(paid);
+    } catch (err) {
+      console.error('Failed to fetch paid orders:', err);
+    }
+  };
+
+  const syncOrderToQuickBooks = async (order) => {
+    setQbSyncing(prev => ({ ...prev, [order.id]: true }));
+    try {
+      const response = await axios.post(`${API}/quickbooks/sync/invoice?admin_key=${adminKey}`, {
+        order_id: order.id,
+        customer_name: order.client_name,
+        customer_email: order.client_email,
+        send_email: true
+      });
+
+      if (response.data.success) {
+        alert(`Invoice #${response.data.invoice_number} created and sent to ${order.client_email || 'client'}!`);
+        fetchPaidOrders(); // Refresh the list
+      }
+    } catch (err) {
+      console.error('Failed to sync to QuickBooks:', err);
+      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setQbSyncing(prev => ({ ...prev, [order.id]: false }));
+    }
+  };
+
+  const syncTranslatorPaymentToQuickBooks = async (translator, amount, description) => {
+    try {
+      const response = await axios.post(`${API}/quickbooks/sync/contractor-payment?admin_key=${adminKey}`, {
+        translator_id: translator._id || translator.id,
+        translator_name: translator.name,
+        translator_email: translator.email,
+        amount: amount,
+        description: description
+      });
+
+      if (response.data.success) {
+        alert(`Contractor payment recorded in QuickBooks!`);
+      }
+    } catch (err) {
+      console.error('Failed to sync contractor payment:', err);
+      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchExpenses(), fetchPaymentProofs()]);
+      await Promise.all([fetchSummary(), fetchExpenses(), fetchPaymentProofs(), checkQuickBooksStatus()]);
       setLoading(false);
     };
     loadData();
   }, [adminKey, period]);
+
+  useEffect(() => {
+    if (activeView === 'quickbooks') {
+      fetchPaidOrders();
+    }
+  }, [activeView]);
 
   useEffect(() => {
     if (activeView === 'payment-proofs') {
@@ -14073,6 +14234,13 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'translator-payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               💰 Pagar Tradutores
+            </button>
+            <button
+              onClick={() => setActiveView('quickbooks')}
+              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'quickbooks' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              📊 QuickBooks
+              {qbConnected && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
             </button>
           </div>
         </div>
@@ -14700,6 +14868,126 @@ const FinancesPage = ({ adminKey }) => {
           </div>
         </div>
       )}
+
+      {/* QuickBooks Integration View */}
+      {activeView === 'quickbooks' && (
+        <div className="space-y-6">
+          {/* Connection Status */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <span className="text-2xl mr-3">📊</span>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-700">QuickBooks Online</h2>
+                  <p className="text-xs text-gray-500">Sync invoices and payments with QuickBooks</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {qbConnected ? (
+                  <>
+                    <span className="flex items-center px-3 py-1 bg-green-100 text-green-700 rounded text-sm">
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                      Connected
+                    </span>
+                  </>
+                ) : (
+                  <span className="flex items-center px-3 py-1 bg-gray-100 text-gray-600 rounded text-sm">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                    Not Connected - Go to Settings to connect
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {qbConnected ? (
+            <>
+              {/* Paid Orders - Ready to Invoice */}
+              <div className="bg-white rounded-lg shadow">
+                <div className="p-4 border-b bg-gray-50">
+                  <h2 className="text-sm font-bold text-gray-700">📄 Paid Orders - Create Invoices</h2>
+                  <p className="text-xs text-gray-500 mt-1">Send invoices to clients via QuickBooks</p>
+                </div>
+                <div className="p-4">
+                  {paidOrders.length === 0 ? (
+                    <p className="text-gray-500 text-sm text-center py-4">No paid orders found</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {paidOrders.map(order => (
+                        <div key={order.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3">
+                              <span className="font-medium text-sm text-gray-800">#{order.order_number}</span>
+                              <span className="text-xs text-gray-500">{order.client_name}</span>
+                              <span className="text-xs text-gray-400">{order.client_email}</span>
+                            </div>
+                            <div className="flex items-center space-x-3 mt-1">
+                              <span className="text-sm font-bold text-green-600">{formatCurrency(order.total_price)}</span>
+                              <span className="text-xs text-gray-500">{order.document_type || order.service_type}</span>
+                              {order.quickbooks_invoice_id && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                                  QB Invoice #{order.quickbooks_invoice_number}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {order.quickbooks_invoice_id ? (
+                              <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded">
+                                ✓ Synced
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => syncOrderToQuickBooks(order)}
+                                disabled={qbSyncing[order.id]}
+                                className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center"
+                              >
+                                {qbSyncing[order.id] ? (
+                                  <>
+                                    <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Syncing...
+                                  </>
+                                ) : (
+                                  <>📤 Create Invoice & Send</>
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-blue-800 mb-2">How QuickBooks Sync Works</h3>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• Click "Create Invoice & Send" to create an invoice in QuickBooks</li>
+                  <li>• QuickBooks will email the invoice to the client automatically</li>
+                  <li>• Client can pay via credit card or bank transfer through the invoice link</li>
+                  <li>• Payment will be recorded automatically in QuickBooks</li>
+                </ul>
+              </div>
+            </>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+              <span className="text-4xl mb-3 block">🔗</span>
+              <h3 className="text-lg font-medium text-yellow-800 mb-2">QuickBooks Not Connected</h3>
+              <p className="text-sm text-yellow-700 mb-4">
+                Connect your QuickBooks account to automatically create and send invoices to clients.
+              </p>
+              <p className="text-xs text-yellow-600">
+                Go to <strong>Settings → Integrations</strong> to connect QuickBooks
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -15090,7 +15378,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 
                 {/* Prohibited Use Clause */}
                 <div className="bg-red-50 p-3 rounded border border-red-200 text-xs text-gray-700 max-h-48 overflow-y-auto">
-                  <strong className="text-red-700">Prohibited Use Clause / Cláusula de Uso Proibido</strong>
+                  <strong className="text-red-700">Prohibited Use Clause</strong>
                   <p className="mt-2">
                     It is expressly <strong>PROHIBITED</strong> to use the Legacy Translations platform, its tools,
                     templates, and any company resources for any purposes other than those directly related to
@@ -15104,16 +15392,11 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <li>Unauthorized access or sharing of client information</li>
                   </ul>
                   <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded">
-                    <strong className="text-red-800">⚠️ IMMEDIATE TERMINATION CLAUSE / CLÁUSULA DE DESLIGAMENTO IMEDIATO:</strong>
+                    <strong className="text-red-800">⚠️ IMMEDIATE TERMINATION CLAUSE:</strong>
                     <p className="mt-1 text-red-800">
                       If any unauthorized use of the platform is detected, the contractor will be <strong>IMMEDIATELY TERMINATED</strong> without
                       prior notice or any notice period requirement. Legacy Translations reserves the right to pursue legal action for any
                       damages or losses resulting from such violations.
-                    </p>
-                    <p className="mt-1 text-red-800">
-                      <em>Se for detectado qualquer uso não autorizado da plataforma, o contratado será <strong>IMEDIATAMENTE DESLIGADO</strong> sem
-                      aviso prévio ou necessidade de cumprimento de prazo para desligamento. A Legacy Translations reserva-se o direito de
-                      tomar medidas legais por quaisquer danos ou perdas resultantes de tais violações.</em>
                     </p>
                   </div>
                   <p className="mt-2 font-medium text-red-700">
