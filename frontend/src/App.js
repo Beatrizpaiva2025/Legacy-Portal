@@ -372,178 +372,228 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-        {/* Language Selector - Top Right */}
-        <div className="flex justify-end mb-4">
-          <div className="flex items-center gap-2">
-            {UI_LANGUAGES.map((uiLang) => (
-              <button
-                key={uiLang.code}
-                onClick={() => changeLanguage(uiLang.code)}
-                className={`text-xl hover:scale-110 transition-transform ${
-                  lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
-                }`}
-                title={uiLang.code.toUpperCase()}
-              >
-                {uiLang.flag}
-              </button>
-            ))}
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex">
+      {/* Left Side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center items-center p-12 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-64 h-64 border border-white rounded-full"></div>
+          <div className="absolute bottom-20 right-20 w-96 h-96 border border-white rounded-full"></div>
+          <div className="absolute top-1/2 left-1/4 w-32 h-32 border border-white rounded-full"></div>
         </div>
 
-        {/* Logo */}
-        <div className="text-center mb-6">
+        {/* Content */}
+        <div className="relative z-10 text-center max-w-md">
           <img
             src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
             alt="Legacy Translations"
-            className="mx-auto mb-4 h-16"
+            className="mx-auto mb-8 h-20 brightness-0 invert"
           />
-        </div>
+          <h1 className="text-4xl font-bold text-white mb-4">Business Partner Portal</h1>
+          <p className="text-blue-200 text-lg mb-8">
+            Streamlined translation services for corporate clients
+          </p>
 
-        {/* Title and Badge */}
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">{t.businessPortal}</h1>
-          <span className="inline-block px-3 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full uppercase tracking-wide">
-            {t.corporateOnly}
-          </span>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
-            {error}
+          {/* Features */}
+          <div className="space-y-4 text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-white">✓</span>
+              </div>
+              <span className="text-white">{t.benefit1}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-white">✓</span>
+              </div>
+              <span className="text-white">{t.benefit2}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-white">✓</span>
+              </div>
+              <span className="text-white">{t.benefit3}</span>
+            </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  value={formData.company_name}
-                  onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                  placeholder="Your Company Inc."
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  value={formData.contact_name}
-                  onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                  placeholder="John Smith"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
-                <input
-                  type="tel"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-            </>
-          )}
+      {/* Right Side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-12">
+        <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-2xl w-full max-w-md">
+          {/* Language Selector */}
+          <div className="flex justify-end mb-4">
+            <div className="flex items-center gap-2">
+              {UI_LANGUAGES.map((uiLang) => (
+                <button
+                  key={uiLang.code}
+                  onClick={() => changeLanguage(uiLang.code)}
+                  className={`text-xl hover:scale-110 transition-transform ${
+                    lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                  }`}
+                  title={uiLang.code.toUpperCase()}
+                >
+                  {uiLang.flag}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
-            <input
-              type="email"
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
-              placeholder="you@company.com"
+          {/* Mobile Logo */}
+          <div className="text-center mb-6 lg:hidden">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="mx-auto mb-4 h-14"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
-            <input
-              type="password"
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all"
-              value={formData.password}
-              onChange={(e) => setFormData({...formData, password: e.target.value})}
-            />
+          {/* Title */}
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              {isLogin ? t.accessPortal : t.createAccount}
+            </h2>
+            <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full uppercase tracking-wide">
+              {t.corporateOnly}
+            </span>
           </div>
 
-          {isLogin && (
-            <div className="text-right">
-              <button
-                type="button"
-                onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
-                className="text-sm text-teal-600 hover:text-teal-700 hover:underline"
-              >
-                {t.forgotPassword}
-              </button>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              {error}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-md transition-all"
-          >
-            {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                    placeholder="Your Company Inc."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
+                    value={formData.contact_name}
+                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                    placeholder="John Smith"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
+                  <input
+                    type="tel"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+              </>
+            )}
 
-        {/* Business Account Benefits */}
-        {isLogin && (
-          <div className="mt-6 p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border border-teal-100">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t.benefit1}</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t.benefit2}</span>
-              </li>
-              <li className="flex items-start">
-                <span className="text-teal-500 mr-2">*</span>
-                <span>{t.benefit3}</span>
-              </li>
-            </ul>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
+              <input
+                type="email"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
+                value={formData.email}
+                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                placeholder="you@company.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t.password}</label>
+              <input
+                type="password"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
+                value={formData.password}
+                onChange={(e) => setFormData({...formData, password: e.target.value})}
+              />
+            </div>
+
+            {isLogin && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  {t.forgotPassword}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+            >
+              {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
+            </button>
+          </form>
+
+          {/* Mobile Benefits */}
+          {isLogin && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 lg:hidden">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>{t.benefit1}</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>{t.benefit2}</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="text-blue-600 mr-2">✓</span>
+                  <span>{t.benefit3}</span>
+                </li>
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium"
+            >
+              {isLogin ? t.noAccount : t.haveAccount}
+            </button>
           </div>
-        )}
 
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-teal-600 hover:text-teal-700 hover:underline text-sm font-medium"
-          >
-            {isLogin ? t.noAccount : t.haveAccount}
-          </button>
+          {/* Contact link */}
+          {isLogin && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-gray-500">
+                {t.notB2B}{' '}
+                <a href="mailto:contact@legacytranslations.com" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                  contact@legacytranslations.com
+                </a>
+              </p>
+            </div>
+          )}
         </div>
-
-        {/* Contact link for non-B2B clients */}
-        {isLogin && (
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-500">
-              {t.notB2B}{' '}
-              <a href="mailto:contact@legacytranslations.com" className="text-teal-600 hover:text-teal-700 hover:underline font-medium">
-                contact@legacytranslations.com
-              </a>
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Forgot Password Modal */}
       {showForgotPassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
             <h2 className="text-xl font-bold text-gray-800 mb-2">{t.resetPassword}</h2>
 
             {!resetSent ? (
@@ -555,7 +605,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                     <input
                       type="email"
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="you@company.com"
@@ -565,14 +615,14 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                     <button
                       type="button"
                       onClick={() => setShowForgotPassword(false)}
-                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                      className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
                     >
                       {t.backToLogin}
                     </button>
                     <button
                       type="submit"
                       disabled={resetLoading}
-                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 disabled:from-gray-400 disabled:to-gray-500 font-medium"
+                      className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 font-medium shadow-lg transition-all"
                     >
                       {resetLoading ? t.pleaseWait : t.sendResetLink}
                     </button>
@@ -582,12 +632,14 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             ) : (
               <>
                 <div className="text-center py-4">
-                  <div className="text-4xl mb-3">✉️</div>
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="text-3xl">✉️</span>
+                  </div>
                   <p className="text-gray-600">{t.resetEmailSent}</p>
                 </div>
                 <button
                   onClick={() => setShowForgotPassword(false)}
-                  className="w-full py-3 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg hover:from-teal-600 hover:to-cyan-700 font-medium"
+                  className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium shadow-lg transition-all"
                 >
                   {t.backToLogin}
                 </button>
