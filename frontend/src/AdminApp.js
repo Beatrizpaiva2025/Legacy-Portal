@@ -17057,7 +17057,7 @@ function AdminApp() {
 
     switch (activeTab) {
       case 'pm-dashboard':
-        return userRole === 'admin'
+        return ['admin', 'pm'].includes(userRole)
           ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
