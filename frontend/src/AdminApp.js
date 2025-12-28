@@ -1788,6 +1788,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeCover, setIncludeCover] = useState(true);
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
+  const [includeCertification, setIncludeCertification] = useState(true);
+  const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
   // Workflow Mode: 'ai', 'external', or 'ocr'
@@ -1914,6 +1916,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [logoStamp, setLogoStamp] = useState('');
   const [signatureImage, setSignatureImage] = useState('');
 
+  // Certificate Header Info
+  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations, LLC');
+  const [certCompanyAddress, setCertCompanyAddress] = useState('123 Business St, Suite 100');
+  const [certCompanyPhone, setCertCompanyPhone] = useState('+1 (555) 123-4567');
+  const [certCompanyEmail, setCertCompanyEmail] = useState('contact@legacytranslations.com');
+
   // Refs
   const fileInputRef = useRef(null);
   const logoLeftInputRef = useRef(null);
@@ -1972,6 +1980,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (savedLogoRight) setLogoRight(savedLogoRight);
     if (savedLogoStamp) setLogoStamp(savedLogoStamp);
     if (savedSignature) setSignatureImage(savedSignature);
+
+    // Load saved certificate header info
+    const savedCertCompanyName = localStorage.getItem('cert_company_name');
+    const savedCertCompanyAddress = localStorage.getItem('cert_company_address');
+    const savedCertCompanyPhone = localStorage.getItem('cert_company_phone');
+    const savedCertCompanyEmail = localStorage.getItem('cert_company_email');
+    if (savedCertCompanyName) setCertCompanyName(savedCertCompanyName);
+    if (savedCertCompanyAddress) setCertCompanyAddress(savedCertCompanyAddress);
+    if (savedCertCompanyPhone) setCertCompanyPhone(savedCertCompanyPhone);
+    if (savedCertCompanyEmail) setCertCompanyEmail(savedCertCompanyEmail);
 
     // Load saved general instructions
     const savedInstructions = localStorage.getItem('general_instructions');
@@ -3991,11 +4009,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Create document certification with QR code
+  const createCertification = async () => {
+    try {
+      const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const translationContent = translationResults.map(r => r.translatedText).join('\n');
+
+      const response = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+        order_id: selectedOrderId,
+        order_number: orderNumber,
+        document_type: documentType,
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+        page_count: translationResults.length,
+        document_content: translationContent,
+        certifier_name: translator?.name || 'Beatriz Paiva',
+        certifier_title: 'Legal Representative',
+        certifier_credentials: 'ATA Member # 275993',
+        company_name: certCompanyName || 'Legacy Translations, LLC',
+        company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
+        company_phone: certCompanyPhone || '(857) 316-7770',
+        company_email: certCompanyEmail || 'contact@legacytranslations.com',
+        client_name: selectedOrder?.client_name || ''
+      });
+
+      setCertificationData(response.data);
+      return response.data;
+    } catch (err) {
+      console.error('Failed to create certification:', err);
+      return null;
+    }
+  };
+
   // Download certificate
-  const handleDownload = (format = 'html') => {
+  const handleDownload = async (format = 'html') => {
     // Save TM if enabled
     if (saveToTM) {
       saveTranslationMemory();
+    }
+
+    // Create certification if enabled
+    let certData = certificationData;
+    if (includeCertification && !certData) {
+      certData = await createCertification();
     }
 
     const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
@@ -4118,6 +4174,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     `).join('');
 
+    // Certification verification page HTML (with QR code and serial number)
+    const certificationPageHTML = (includeCertification && certData) ? `
+    <div class="certification-verification-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="certification-box">
+            <div class="cert-header">
+                <div class="cert-icon">🔐</div>
+                <h2 class="cert-title">Document Verification</h2>
+                <p class="cert-subtitle">This certified translation can be verified online</p>
+            </div>
+
+            <div class="cert-content">
+                <div class="cert-info">
+                    <div class="cert-row">
+                        <span class="cert-label">Certification ID:</span>
+                        <span class="cert-value cert-id">${certData.certification_id}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Document Type:</span>
+                        <span class="cert-value">${documentType}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Translation:</span>
+                        <span class="cert-value">${sourceLanguage} → ${targetLanguage}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Certified Date:</span>
+                        <span class="cert-value">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Document Hash:</span>
+                        <span class="cert-value cert-hash">${certData.document_hash?.substring(0, 16)}...</span>
+                    </div>
+                </div>
+
+                <div class="cert-qr">
+                    ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" class="qr-image" />` : '<div class="qr-placeholder">QR Code</div>'}
+                    <p class="qr-instruction">Scan to verify</p>
+                </div>
+            </div>
+
+            <div class="cert-footer">
+                <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p class="cert-notice">This document has been digitally certified by Legacy Translations, LLC. Any alterations to this document will invalidate this certification.</p>
+            </div>
+        </div>
+    </div>
+    ` : '';
+
     // Original documents pages HTML (each image on separate page, title only on first)
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div class="original-documents-page">
@@ -4209,15 +4314,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .original-images-wrapper { margin-top: 20px; }
         .original-image-container { text-align: center; margin-bottom: 15px; }
         .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
+        /* Certification Verification Page Styles */
+        .certification-verification-page { page-break-before: always; padding-top: 20px; }
+        .certification-box {
+            border: 2px solid #2563eb;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px auto;
+            max-width: 600px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+        .cert-header { text-align: center; margin-bottom: 25px; }
+        .cert-icon { font-size: 40px; margin-bottom: 10px; }
+        .cert-title { font-size: 22px; color: #1e40af; margin: 0 0 5px 0; font-weight: bold; }
+        .cert-subtitle { font-size: 12px; color: #64748b; margin: 0; }
+        .cert-content { display: flex; justify-content: space-between; align-items: flex-start; gap: 30px; }
+        .cert-info { flex: 1; }
+        .cert-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #cbd5e1; }
+        .cert-row:last-child { border-bottom: none; }
+        .cert-label { font-size: 11px; color: #64748b; font-weight: 500; }
+        .cert-value { font-size: 12px; color: #1e293b; font-weight: 600; }
+        .cert-id { font-family: 'Courier New', monospace; color: #2563eb; font-size: 14px; letter-spacing: 1px; }
+        .cert-hash { font-family: 'Courier New', monospace; font-size: 10px; color: #64748b; }
+        .cert-qr { text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .qr-image { width: 120px; height: 120px; }
+        .qr-placeholder { width: 120px; height: 120px; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; color: #999; font-size: 10px; }
+        .qr-instruction { font-size: 10px; color: #64748b; margin-top: 8px; }
+        .cert-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #cbd5e1; }
+        .verify-url { font-size: 11px; color: #1e40af; margin-bottom: 10px; word-break: break-all; }
+        .cert-notice { font-size: 9px; color: #94a3b8; line-height: 1.4; max-width: 500px; margin: 0 auto; }
         @media print {
             body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             .logo-placeholder { border: 1px dashed #ccc; }
+            .certification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
+    ${certificationPageHTML}
     ${originalPagesHTML}
 </body>
 </html>`;
@@ -5101,72 +5237,133 @@ tradução juramentada | certified translation`}
           {/* Certificate Logos Section */}
           <div className="bg-white rounded shadow p-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">🖼️ Certificate Logos & Signature</h3>
-            <div className="grid grid-cols-4 gap-4">
+
+            {/* Header Info Section */}
+            <div className="mb-4 p-3 bg-gray-50 rounded border">
+              <h4 className="text-[10px] font-bold text-gray-600 mb-2">📝 Certificate Header Info</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Company Name</label>
+                  <input
+                    type="text"
+                    value={certCompanyName}
+                    onChange={(e) => {
+                      setCertCompanyName(e.target.value);
+                      localStorage.setItem('cert_company_name', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="Legacy Translations, LLC"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Address</label>
+                  <input
+                    type="text"
+                    value={certCompanyAddress}
+                    onChange={(e) => {
+                      setCertCompanyAddress(e.target.value);
+                      localStorage.setItem('cert_company_address', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="123 Business St, Suite 100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Phone</label>
+                  <input
+                    type="text"
+                    value={certCompanyPhone}
+                    onChange={(e) => {
+                      setCertCompanyPhone(e.target.value);
+                      localStorage.setItem('cert_company_phone', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-500 mb-0.5">Email</label>
+                  <input
+                    type="text"
+                    value={certCompanyEmail}
+                    onChange={(e) => {
+                      setCertCompanyEmail(e.target.value);
+                      localStorage.setItem('cert_company_email', e.target.value);
+                    }}
+                    className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="contact@legacytranslations.com"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Logos Grid - Made smaller */}
+            <div className="grid grid-cols-4 gap-2">
               {/* Left Logo (Legacy/Partner) */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Left Logo (Partner)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Left Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoLeft ? (
-                    <img src={logoLeft} alt="Left Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoLeft} alt="Left Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Center Logo (ATA) */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Center Logo (ATA)</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Center Logo</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoRight ? (
-                    <img src={logoRight} alt="ATA Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoRight} alt="ATA Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No logo</span>
                   )}
                 </div>
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoRightInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoRight && <button onClick={() => removeLogo('right')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Stamp Logo */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Stamp Logo</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Stamp</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {logoStamp ? (
-                    <img src={logoStamp} alt="Stamp Logo" className="max-h-16 max-w-full object-contain" />
+                    <img src={logoStamp} alt="Stamp Logo" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No logo</span>
+                    <span className="text-[9px] text-gray-400">No stamp</span>
                   )}
                 </div>
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => logoStampInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
               {/* Signature Image */}
               <div className="text-center">
-                <label className="block text-xs font-medium text-gray-700 mb-2">Signature</label>
-                <div className="border-2 border-dashed border-gray-300 rounded p-2 bg-white min-h-[80px] flex items-center justify-center">
+                <label className="block text-[10px] font-medium text-gray-700 mb-1">Signature</label>
+                <div className="border-2 border-dashed border-gray-300 rounded p-1 bg-white h-14 flex items-center justify-center">
                   {signatureImage ? (
-                    <img src={signatureImage} alt="Signature" className="max-h-16 max-w-full object-contain" />
+                    <img src={signatureImage} alt="Signature" className="max-h-10 max-w-full object-contain" />
                   ) : (
-                    <span className="text-xs text-gray-400">No signature</span>
+                    <span className="text-[9px] text-gray-400">No signature</span>
                   )}
                 </div>
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
-                <div className="flex justify-center gap-1 mt-2">
-                  <button onClick={() => signatureInputRef.current?.click()} className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600">Upload</button>
-                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600">🗑️</button>}
+                <div className="flex justify-center gap-1 mt-1">
+                  <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
+                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
@@ -6898,6 +7095,15 @@ tradução juramentada | certified translation`}
                     />
                     <span>Include Original Documents</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeCertification}
+                      onChange={(e) => setIncludeCertification(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>🔐 Include Verification (QR Code)</span>
+                  </label>
                 </div>
               </div>
 
@@ -6914,6 +7120,12 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
+                  {includeCertification && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
+                    </>
+                  )}
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>

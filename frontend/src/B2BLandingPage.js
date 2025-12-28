@@ -1,9 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const B2BLandingPage = () => {
+  // Check for reset_token or verify route and redirect to partner portal
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const resetToken = urlParams.get('reset_token');
+
+    // Check for verification route in hash
+    const hash = window.location.hash;
+    const verifyMatch = hash.match(/^#\/verify\/(.+)$/);
+
+    if (resetToken) {
+      // Redirect to partner portal with reset token
+      window.location.href = `/#/partner?reset_token=${resetToken}`;
+      return;
+    }
+
+    if (verifyMatch) {
+      // Already handled by hash router, but ensure it stays
+      return;
+    }
+  }, []);
+
   const [formData, setFormData] = useState({
     company_name: '',
     contact_name: '',

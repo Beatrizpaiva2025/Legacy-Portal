@@ -1050,6 +1050,70 @@ class ManualProjectCreate(BaseModel):
     # Multiple files support
     documents: Optional[list] = None  # List of {filename, data, content_type}
 
+# Document Certification Model
+class DocumentCertification(BaseModel):
+    certification_id: str = Field(default_factory=lambda: f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}")
+    order_id: Optional[str] = None
+    order_number: Optional[str] = None
+    # Document info
+    document_type: str  # birth_certificate, diploma, etc.
+    source_language: str
+    target_language: str
+    page_count: int = 1
+    # Content hash for integrity verification
+    document_hash: str  # SHA-256 hash of document content
+    # Certifier info
+    certifier_name: str
+    certifier_title: str = "Certified Translator"
+    certifier_credentials: Optional[str] = None  # ATA # 275993
+    company_name: str = "Legacy Translations, LLC"
+    company_address: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    # Client info
+    client_name: Optional[str] = None
+    # Timestamps
+    certified_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None  # Optional expiration
+    # Status
+    is_valid: bool = True
+    revoked_at: Optional[datetime] = None
+    revocation_reason: Optional[str] = None
+    # Verification
+    verification_url: Optional[str] = None
+    qr_code_data: Optional[str] = None  # Base64 QR code image
+
+class CertificationCreate(BaseModel):
+    order_id: Optional[str] = None
+    order_number: Optional[str] = None
+    document_type: str
+    source_language: str
+    target_language: str
+    page_count: int = 1
+    document_content: str  # Content to hash for verification
+    certifier_name: str
+    certifier_title: str = "Certified Translator"
+    certifier_credentials: Optional[str] = None
+    company_name: str = "Legacy Translations, LLC"
+    company_address: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    client_name: Optional[str] = None
+
+class CertificationVerifyResponse(BaseModel):
+    is_valid: bool
+    certification_id: str
+    certified_at: Optional[datetime] = None
+    document_type: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    certifier_name: Optional[str] = None
+    certifier_title: Optional[str] = None
+    certifier_credentials: Optional[str] = None
+    company_name: Optional[str] = None
+    client_name: Optional[str] = None
+    message: str
+
 # Make.com Webhook URL for QuickBooks integration
 MAKE_WEBHOOK_URL = "https://hook.us2.make.com/9qd4rfzl5re2u2t24lr94qwcqahrpt1i"
 
@@ -12423,6 +12487,239 @@ async def quickbooks_get_invoice(order_id: str, admin_key: str = None):
         raise
     except Exception as e:
         logger.error(f"QuickBooks get invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== DOCUMENT CERTIFICATION SYSTEM ====================
+
+def generate_qr_code(data: str) -> str:
+    """Generate QR code as base64 image"""
+    try:
+        import qrcode
+        from io import BytesIO
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+    except ImportError:
+        logger.warning("qrcode library not installed, skipping QR generation")
+        return None
+    except Exception as e:
+        logger.error(f"QR code generation error: {str(e)}")
+        return None
+
+@api_router.post("/certifications/create")
+async def create_certification(data: CertificationCreate, admin_key: str):
+    """Create a new document certification with unique ID and QR code"""
+    # Validate admin key
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Generate certification ID
+        cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+        # Create document hash from content
+        document_hash = hashlib.sha256(data.document_content.encode('utf-8')).hexdigest()
+
+        # Generate verification URL
+        base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+        verification_url = f"{base_url}/#/verify/{cert_id}"
+
+        # Generate QR code
+        qr_code_data = generate_qr_code(verification_url)
+
+        # Create certification record
+        certification = {
+            "certification_id": cert_id,
+            "order_id": data.order_id,
+            "order_number": data.order_number,
+            "document_type": data.document_type,
+            "source_language": data.source_language,
+            "target_language": data.target_language,
+            "page_count": data.page_count,
+            "document_hash": document_hash,
+            "certifier_name": data.certifier_name,
+            "certifier_title": data.certifier_title,
+            "certifier_credentials": data.certifier_credentials,
+            "company_name": data.company_name,
+            "company_address": data.company_address,
+            "company_phone": data.company_phone,
+            "company_email": data.company_email,
+            "client_name": data.client_name,
+            "certified_at": datetime.utcnow(),
+            "is_valid": True,
+            "verification_url": verification_url,
+            "qr_code_data": qr_code_data
+        }
+
+        # Store in database
+        await db.certifications.insert_one(certification)
+
+        logger.info(f"Created certification: {cert_id}")
+
+        return {
+            "success": True,
+            "certification_id": cert_id,
+            "verification_url": verification_url,
+            "qr_code_data": qr_code_data,
+            "document_hash": document_hash,
+            "certified_at": certification["certified_at"].isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications/verify/{certification_id}")
+async def verify_certification(certification_id: str):
+    """Public endpoint to verify a document certification"""
+    try:
+        # Find certification
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+
+        if not certification:
+            return CertificationVerifyResponse(
+                is_valid=False,
+                certification_id=certification_id,
+                message="Certification not found. This document may not be certified by Legacy Translations."
+            )
+
+        # Check if revoked
+        if certification.get("revoked_at"):
+            return CertificationVerifyResponse(
+                is_valid=False,
+                certification_id=certification_id,
+                certified_at=certification.get("certified_at"),
+                message=f"This certification was revoked on {certification.get('revoked_at').strftime('%Y-%m-%d')}. Reason: {certification.get('revocation_reason', 'Not specified')}"
+            )
+
+        # Valid certification
+        return CertificationVerifyResponse(
+            is_valid=True,
+            certification_id=certification_id,
+            certified_at=certification.get("certified_at"),
+            document_type=certification.get("document_type"),
+            source_language=certification.get("source_language"),
+            target_language=certification.get("target_language"),
+            certifier_name=certification.get("certifier_name"),
+            certifier_title=certification.get("certifier_title"),
+            certifier_credentials=certification.get("certifier_credentials"),
+            company_name=certification.get("company_name"),
+            client_name=certification.get("client_name"),
+            message="✓ This document has been certified by Legacy Translations, LLC"
+        )
+
+    except Exception as e:
+        logger.error(f"Error verifying certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications/{certification_id}")
+async def get_certification(certification_id: str, admin_key: str):
+    """Get full certification details (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+        if not certification:
+            raise HTTPException(status_code=404, detail="Certification not found")
+
+        if '_id' in certification:
+            del certification['_id']
+
+        return certification
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications")
+async def list_certifications(admin_key: str, limit: int = 50):
+    """List all certifications (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        certifications = await db.certifications.find().sort("certified_at", -1).limit(limit).to_list(limit)
+
+        for cert in certifications:
+            if '_id' in cert:
+                del cert['_id']
+
+        return {"certifications": certifications, "count": len(certifications)}
+
+    except Exception as e:
+        logger.error(f"Error listing certifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/certifications/{certification_id}/revoke")
+async def revoke_certification(certification_id: str, admin_key: str, reason: str = ""):
+    """Revoke a certification (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.certifications.update_one(
+            {"certification_id": certification_id},
+            {
+                "$set": {
+                    "is_valid": False,
+                    "revoked_at": datetime.utcnow(),
+                    "revocation_reason": reason
+                }
+            }
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Certification not found")
+
+        logger.info(f"Revoked certification: {certification_id}")
+
+        return {"success": True, "message": f"Certification {certification_id} has been revoked"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking certification: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
