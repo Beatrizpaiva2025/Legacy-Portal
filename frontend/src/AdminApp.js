@@ -5581,37 +5581,104 @@ tradução juramentada | certified translation`}
                     <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
                   ) : selectedProjectFiles.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         {selectedProjectFiles.map((doc, idx) => (
                           <div
                             key={doc.id}
-                            onClick={() => loadProjectFile(doc)}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                            className={`p-3 rounded-lg transition-all ${
                               selectedFileId === doc.id
                                 ? 'bg-green-100 border-2 border-green-500 shadow-md'
-                                : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
+                                : 'bg-white border border-gray-200 hover:bg-blue-50'
                             }`}
                           >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
-                              selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                            }`}>
-                              {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                            <div className="flex items-center gap-3">
+                              {/* File Icon and Info - Clickable to load */}
+                              <div
+                                onClick={() => loadProjectFile(doc)}
+                                className="flex items-center gap-3 flex-1 cursor-pointer"
+                              >
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                                  selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                                }`}>
+                                  {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-medium truncate ${
+                                    selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                                  }`}>
+                                    {doc.filename || `Arquivo ${idx + 1}`}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {selectedFileId === doc.id ? '✓ Carregado - Pronto para traduzir' : 'Clique para carregar'}
+                                  </div>
+                                </div>
+                                {selectedFileId === doc.id && (
+                                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1">
+                                {/* Download Button */}
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const response = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+                                      if (response.data.file_data) {
+                                        const link = document.createElement('a');
+                                        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+                                        link.download = doc.filename || 'document.pdf';
+                                        link.click();
+                                      }
+                                    } catch (err) {
+                                      alert('Erro ao baixar arquivo');
+                                    }
+                                  }}
+                                  className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
+                                  title="Download"
+                                >
+                                  ⬇️
+                                </button>
+
+                                {/* Replace Button - File input */}
+                                <label
+                                  className="px-2 py-1.5 bg-orange-100 text-orange-600 rounded text-xs hover:bg-orange-200 transition-colors cursor-pointer"
+                                  title="Substituir arquivo"
+                                >
+                                  🔄
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*,.pdf"
+                                    onChange={async (e) => {
+                                      const file = e.target.files[0];
+                                      if (!file) return;
+                                      try {
+                                        const reader = new FileReader();
+                                        reader.onload = async () => {
+                                          const base64 = reader.result.split(',')[1];
+                                          await axios.put(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
+                                            filename: file.name,
+                                            file_data: base64,
+                                            content_type: file.type
+                                          });
+                                          // Refresh files
+                                          const response = await axios.get(`${API}/admin/orders/${selectedOrderId}/documents?admin_key=${adminKey}`);
+                                          setSelectedProjectFiles(response.data.documents || []);
+                                          setProcessingStatus(`✅ Arquivo substituído: ${file.name}`);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      } catch (err) {
+                                        alert('Erro ao substituir arquivo');
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-medium truncate ${
-                                selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
-                              }`}>
-                                {doc.filename || `Arquivo ${idx + 1}`}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {selectedFileId === doc.id ? '✓ Carregado - Pronto' : 'Clique para carregar'}
-                              </div>
-                            </div>
-                            {selectedFileId === doc.id && (
-                              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
-                                ✓
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
