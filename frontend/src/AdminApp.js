@@ -17969,6 +17969,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           contentType: transData.data.content_type,
           html: transData.data.html_content
         });
+      } else if (order.translation_html) {
+        // Load translation from order's translation_html field
+        setTranslatedContent({
+          filename: 'Translation',
+          html: order.translation_html,
+          contentType: 'text/html'
+        });
+      } else {
+        // Try to fetch order details to get translation_html
+        try {
+          const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+          const orderData = orderRes.data.order || orderRes.data;
+          if (orderData.translation_html) {
+            setTranslatedContent({
+              filename: 'Translation',
+              html: orderData.translation_html,
+              contentType: 'text/html'
+            });
+          }
+        } catch (orderErr) {
+          console.error('Failed to fetch order details:', orderErr);
+        }
       }
     } catch (err) {
       console.error('Failed to load review content:', err);
