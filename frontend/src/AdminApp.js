@@ -2395,16 +2395,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
 
     if (!selectedOrderId) {
-      alert('Please select an order to link this translation');
+      alert('Please select an order to link this translation.\n\nGo to the START tab and select a project first.');
       return;
     }
 
     if (translationResults.length === 0) {
-      alert('No translation to send');
+      alert('No translation to save. Please translate the document first.');
       return;
     }
 
     setSendingToProjects(true);
+    setProcessingStatus(destination === 'save' ? '💾 Saving translation...' : '📤 Sending translation...');
     try {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
