@@ -7717,7 +7717,7 @@ tradução juramentada | certified translation`}
               {/* Upload Translation (Ready) */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
-                <p className="text-[10px] text-green-600 mb-3">Upload your translation document</p>
+                <p className="text-[10px] text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
 
                 <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                   <input
@@ -7736,6 +7736,26 @@ tradução juramentada | certified translation`}
                     </span>
                     <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
                   </label>
+                </div>
+
+                {/* Paste HTML/Text directly */}
+                <div className="mt-3">
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
+                  <textarea
+                    placeholder="Paste your translation text or HTML here..."
+                    className="w-full h-24 px-3 py-2 text-xs border border-green-200 rounded resize-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      if (text.trim()) {
+                        // Check if it looks like HTML
+                        const isHtml = text.includes('<') && text.includes('>');
+                        const html = isHtml ? text : `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${text}</div>`;
+                        setQuickTranslationHtml(html);
+                        setQuickTranslationType('html');
+                      }
+                    }}
+                    disabled={quickPackageLoading}
+                  />
                 </div>
 
                 {/* Show HTML content indicator */}
