@@ -10306,8 +10306,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="font-medium text-gray-800">{order.client_name}</span>
                         <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
-                      {/* Send translation button - shows when ready, review, or delivered (for resend) */}
-                      {['ready', 'review', 'delivered'].includes(order.translation_status) && (isAdmin || isPM) && (
+                      {/* Send translation button - Admin only - shows when ready, review, or delivered (for resend) */}
+                      {['ready', 'review', 'delivered', 'pending_admin_approval'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
                           className={`px-1 py-0.5 rounded text-[9px] ${
@@ -10588,7 +10588,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'review' && (
+                          {/* Admin only: Send to Client Review and Mark as Final */}
+                          {isAdmin && order.translation_status === 'review' && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
@@ -10607,7 +10608,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'client_review' && (
+                          {/* Admin only: Client review actions */}
+                          {isAdmin && order.translation_status === 'client_review' && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
@@ -11304,7 +11306,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                   )}
 
-                  {/* Delivery Info & Resend Option */}
+                  {/* Delivery Info & Resend Option - Admin only */}
                   {viewingOrder.translation_status === 'delivered' && (
                     <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
                       <div className="text-xs font-medium text-teal-700 mb-2">📤 Delivery Information</div>
@@ -11316,20 +11318,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="text-xs text-gray-600 mb-3">
                         Sent to: {viewingOrder.client_email}
                       </div>
-                      <button
-                        onClick={() => {
-                          setViewingOrder(null);
-                          openSendToClientModal(viewingOrder);
-                        }}
-                        className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
-                      >
-                        🔄 Resend Translation
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setViewingOrder(null);
+                            openSendToClientModal(viewingOrder);
+                          }}
+                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
+                        >
+                          🔄 Resend Translation
+                        </button>
+                      )}
                     </div>
                   )}
 
-                  {/* Translation Ready - option to send */}
-                  {viewingOrder.translation_ready && viewingOrder.translation_status !== 'delivered' && (
+                  {/* Translation Ready - option to send - Admin only */}
+                  {viewingOrder.translation_ready && viewingOrder.translation_status !== 'delivered' && isAdmin && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="text-xs font-medium text-green-700 mb-2">✅ Translation Ready</div>
                       <div className="text-xs text-gray-600 mb-3">
