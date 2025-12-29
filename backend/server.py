@@ -6271,11 +6271,15 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     elif destination == "pm":
         new_status = "pending_pm_review"
         status_message = "Translation saved and sent to PM for review"
-        translation_ready = True
+        translation_ready = False  # Not ready for client yet - PM needs to review first
     elif destination == "review":
         new_status = "pending_review"
         status_message = "Translation submitted for Admin/PM review"
-        translation_ready = True
+        translation_ready = False  # Not ready for client yet - needs review
+    elif destination == "pending_admin_approval":
+        new_status = "pending_admin_approval"
+        status_message = "Translation sent to Admin for approval"
+        translation_ready = True  # PM approved - ready for Admin to send to client
     else:
         new_status = "review"
         status_message = "Translation saved and sent to Admin for review"

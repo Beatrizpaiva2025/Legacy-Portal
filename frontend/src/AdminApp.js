@@ -10628,7 +10628,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'ready' && (
+                          {/* Admin only: Deliver to Client */}
+                          {isAdmin && order.translation_status === 'ready' && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
@@ -17679,29 +17680,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
-  // Approve translation
+  // Approve translation - PM can ONLY send to Admin
   const approveTranslation = async (sendTo) => {
     if (!selectedReview) return;
+
+    // PM can only send to Admin - enforce this
+    if (!isAdmin && sendTo !== 'pending_admin_approval') {
+      alert('PM can only send translations to Admin for approval');
+      return;
+    }
+
     setSendingAction(true);
 
     try {
-      // PM can only send to admin for approval - admin decides final delivery
       let newStatus;
       let alertMessage;
+      let translationReady = false;
 
       if (sendTo === 'pending_admin_approval') {
         newStatus = 'pending_admin_approval';
-        alertMessage = '✅ Tradução enviada para aprovação do Admin!';
-      } else if (sendTo === 'client_review') {
+        alertMessage = '✅ Translation sent to Admin for approval!';
+        translationReady = true; // Now ready for Admin to review and send to client
+      } else if (isAdmin && sendTo === 'client_review') {
+        // Admin only
         newStatus = 'client_review';
-        alertMessage = '✅ Enviado para revisão do cliente!';
-      } else {
+        alertMessage = '✅ Sent to client for review!';
+        translationReady = true;
+      } else if (isAdmin) {
+        // Admin only - mark as ready
         newStatus = 'ready';
-        alertMessage = '✅ Tradução final aprovada e enviada!';
+        alertMessage = '✅ Translation approved and ready!';
+        translationReady = true;
+      } else {
+        // Fallback for PM - always send to admin
+        newStatus = 'pending_admin_approval';
+        alertMessage = '✅ Translation sent to Admin for approval!';
+        translationReady = true;
       }
 
       await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
         translation_status: newStatus,
+        translation_ready: translationReady,
         pm_approved_at: new Date().toISOString(),
         pm_approved_by: user?.name || 'PM'
       });
