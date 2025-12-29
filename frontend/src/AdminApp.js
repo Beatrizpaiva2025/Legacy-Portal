@@ -1789,6 +1789,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [includeCertification, setIncludeCertification] = useState(true);
+  const [includeAuthenticityStatement, setIncludeAuthenticityStatement] = useState(true); // Atestado de Autenticidade
   const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
@@ -2445,9 +2446,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         } else if (destination === 'pm') {
           setProcessingStatus(`✅ Translation sent to PM for review!`);
           if (isTranslator) {
-            // Translator goes back or stays
+            // Translator stays on translation page and goes to START tab to see other projects
+            // Don't call onBack() as it navigates to 'projects' which translators don't have access to
             setTimeout(() => {
-              if (onBack) onBack();
+              // Reset the form and go back to START tab
+              setSelectedOrderId('');
+              setOrderNumber('');
+              setTranslationResults([]);
+              setOriginalImages([]);
+              setActiveSubTab('start');
+              setProcessingStatus('');
+              // Refresh assigned orders list
+              fetchAssignedOrders();
             }, 1500);
           }
         } else {
@@ -3549,8 +3559,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const execFormatCommand = (command, value = null) => {
     restoreSelection();
 
+    // Handle font size increase/decrease
+    if (command === 'increaseFontSize' || command === 'decreaseFontSize') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+
+        // Get current font size from selection or default to 12pt
+        let currentSize = 12;
+        const parentElement = range.commonAncestorContainer.parentElement;
+        if (parentElement) {
+          const computedStyle = window.getComputedStyle(parentElement);
+          currentSize = parseFloat(computedStyle.fontSize) || 12;
+        }
+
+        // Increase or decrease by 2pt
+        const newSize = command === 'increaseFontSize'
+          ? Math.min(currentSize + 2, 48)
+          : Math.max(currentSize - 2, 8);
+        span.style.fontSize = `${newSize}pt`;
+
+        try {
+          span.appendChild(range.extractContents());
+          range.insertNode(span);
+          selection.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          selection.addRange(newRange);
+        } catch (e) {
+          console.error('Error applying font size:', e);
+        }
+      }
+    }
     // Handle fontSize and fontName specially since execCommand doesn't work well for these
-    if (command === 'fontSize' || command === 'fontName') {
+    else if (command === 'fontSize' || command === 'fontName') {
       const selection = window.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
@@ -4563,7 +4606,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
@@ -6518,33 +6561,8 @@ tradução juramentada | certified translation`}
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Font</option>
-                      <option value="Times New Roman, serif">Times New Roman</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="Courier New, monospace">Courier New</option>
-                      <option value="Garamond, serif">Garamond</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Size</option>
-                      <option value="1">8pt</option>
-                      <option value="2">10pt</option>
-                      <option value="3">12pt</option>
-                      <option value="4">14pt</option>
-                      <option value="5">18pt</option>
-                      <option value="6">24pt</option>
-                      <option value="7">36pt</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="Georgia">
-                      <option value="Arial">Arial</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Times New Roman">Times</option>
-                      <option value="Courier New">Courier</option>
-                      <option value="Verdana">Verdana</option>
-                      <option value="Tahoma">Tahoma</option>
-                    </select>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
@@ -7029,8 +7047,8 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* APPROVAL TAB - Admin Only */}
-      {activeSubTab === 'deliver' && isAdmin && (
+      {/* APPROVAL TAB - Admin and Translator */}
+      {activeSubTab === 'deliver' && (isAdmin || user?.role === 'translator') && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
@@ -7288,6 +7306,15 @@ tradução juramentada | certified translation`}
                     />
                     <span>🔐 Include Verification (QR Code)</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeAuthenticityStatement}
+                      onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                  </label>
                 </div>
               </div>
 
@@ -7304,6 +7331,12 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
+                  {includeAuthenticityStatement && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
+                    </>
+                  )}
                   {includeCertification && (
                     <>
                       <span className="text-gray-400">→</span>
