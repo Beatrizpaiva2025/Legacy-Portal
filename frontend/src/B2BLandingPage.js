@@ -518,7 +518,7 @@ Message: ${formData.message}
                   className="h-full object-contain"
                 />
               </div>
-              <div className="text-xs text-gray-500">Authorized via Brazilian Government</div>
+              <div className="text-xs text-gray-500">Official Translator Partner</div>
             </div>
           </div>
 
