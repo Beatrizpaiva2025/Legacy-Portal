@@ -4508,7 +4508,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
@@ -6844,6 +6844,99 @@ tradução juramentada | certified translation`}
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* TRANSLATOR DELIVER TAB - Quality Check & Send to PM */}
+      {activeSubTab === 'deliver' && !isAdmin && !isPM && (
+        <div className="bg-white rounded shadow p-4">
+          <h2 className="text-sm font-bold mb-4">📤 Enviar Tradução para Revisão</h2>
+
+          {/* Quality Checklist */}
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-bold text-blue-700 mb-3">✅ Checklist de Qualidade</h3>
+            <p className="text-xs text-gray-600 mb-3">Verifique os itens abaixo antes de enviar:</p>
+
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Gramática e Ortografia</span>
+                  <p className="text-[10px] text-gray-500">Verifiquei erros gramaticais e de ortografia</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Terminologia</span>
+                  <p className="text-[10px] text-gray-500">Usei a terminologia correta e consistente</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Formatação</span>
+                  <p className="text-[10px] text-gray-500">A formatação está correta e consistente</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Completude</span>
+                  <p className="text-[10px] text-gray-500">Todo o conteúdo foi traduzido sem omissões</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Números e Datas</span>
+                  <p className="text-[10px] text-gray-500">Números, datas e valores estão corretos</p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
+                <div>
+                  <span className="text-xs font-medium">Nomes Próprios</span>
+                  <p className="text-[10px] text-gray-500">Nomes de pessoas, lugares e instituições estão corretos</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* Translation Notes */}
+          <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h3 className="text-sm font-bold text-gray-700 mb-2">📝 Notas para o PM (opcional)</h3>
+            <textarea
+              placeholder="Adicione observações sobre a tradução, dúvidas ou pontos que precisam de atenção..."
+              className="w-full p-2 border rounded text-xs h-20 resize-none"
+            />
+          </div>
+
+          {/* Send to PM Button */}
+          <div className="flex justify-center">
+            <button
+              onClick={() => sendToProjects('pm')}
+              disabled={sendingToProjects || translationResults.length === 0}
+              className="px-8 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
+            >
+              {sendingToProjects ? (
+                <>
+                  <span className="animate-spin">⏳</span> Enviando...
+                </>
+              ) : (
+                <>📤 Enviar para Revisão do PM</>
+              )}
+            </button>
+          </div>
+
+          <p className="text-center text-[10px] text-gray-500 mt-3">
+            Após enviar, o Project Manager irá revisar sua tradução e montar o pacote final para o cliente.
+          </p>
         </div>
       )}
 
@@ -16116,6 +16209,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [translatedContent, setTranslatedContent] = useState(null);
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
+
+  // Proofreading state for PM
+  const [pmProofreadingResult, setPmProofreadingResult] = useState(null);
+  const [pmIsProofreading, setPmIsProofreading] = useState(false);
+  const [pmProofreadingError, setPmProofreadingError] = useState('');
+
+  // Package creation state for PM
+  const [pmIncludeCertificate, setPmIncludeCertificate] = useState(true);
+  const [pmIncludeTranslation, setPmIncludeTranslation] = useState(true);
+  const [pmIncludeVerification, setPmIncludeVerification] = useState(true);
+  const [pmIncludeOriginals, setPmIncludeOriginals] = useState(true);
+  const [pmIsGeneratingPackage, setPmIsGeneratingPackage] = useState(false);
+  const [pmCertificationData, setPmCertificationData] = useState(null);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -16526,6 +16633,205 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert('❌ Erro ao solicitar correção');
     } finally {
       setSendingAction(false);
+    }
+  };
+
+  // Run proofreading analysis for PM
+  const runPmProofreading = async () => {
+    if (!translatedContent) {
+      setPmProofreadingError('Nenhuma tradução carregada para revisar');
+      return;
+    }
+    setPmIsProofreading(true);
+    setPmProofreadingError('');
+    setPmProofreadingResult(null);
+
+    try {
+      // Extract text from translation
+      let textToCheck = '';
+      if (translatedContent.html) {
+        const temp = document.createElement('div');
+        temp.innerHTML = translatedContent.html;
+        textToCheck = temp.textContent || temp.innerText || '';
+      } else if (translatedContent.data) {
+        textToCheck = atob(translatedContent.data);
+      }
+
+      const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
+        source_text: '', // We don't have the source in this context
+        translated_text: textToCheck,
+        source_language: selectedReview?.translate_from || 'Portuguese',
+        target_language: selectedReview?.translate_to || 'English',
+        document_type: selectedReview?.document_type || 'general'
+      });
+
+      if (response.data.proofreading_result) {
+        setPmProofreadingResult(response.data.proofreading_result);
+      }
+    } catch (err) {
+      console.error('Proofreading error:', err);
+      setPmProofreadingError('Erro ao executar revisão automática');
+    } finally {
+      setPmIsProofreading(false);
+    }
+  };
+
+  // Generate final package for PM
+  const generatePmPackage = async () => {
+    if (!selectedReview || !translatedContent) {
+      alert('Por favor, selecione uma tradução para gerar o pacote');
+      return;
+    }
+
+    setPmIsGeneratingPackage(true);
+
+    try {
+      // Create certification if needed
+      let certData = pmCertificationData;
+      if (pmIncludeVerification && !certData) {
+        try {
+          const certResponse = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+            order_id: selectedReview.id,
+            order_number: selectedReview.order_number,
+            document_type: selectedReview.document_type || 'general',
+            source_language: selectedReview.translate_from,
+            target_language: selectedReview.translate_to,
+            page_count: originalContents.length || 1,
+            certifier_name: user?.name || 'PM',
+            certifier_title: user?.title || 'Project Manager',
+            company_name: 'Legacy Translations, LLC',
+            client_name: selectedReview.client_name
+          });
+          certData = certResponse.data;
+          setPmCertificationData(certData);
+        } catch (certErr) {
+          console.error('Certification error:', certErr);
+        }
+      }
+
+      // Build the HTML document
+      const logoLeft = localStorage.getItem('logo_left') || '';
+      const logoRight = localStorage.getItem('logo_right') || '';
+      const logoStamp = localStorage.getItem('logo_stamp') || '';
+      const signatureImage = localStorage.getItem('signature_image') || '';
+      const certCompanyName = localStorage.getItem('cert_company_name') || 'Legacy Translations, LLC';
+      const certCompanyAddress = localStorage.getItem('cert_company_address') || '';
+      const certCompanyPhone = localStorage.getItem('cert_company_phone') || '';
+      const certCompanyEmail = localStorage.getItem('cert_company_email') || '';
+
+      // Certificate HTML
+      const certificateHTML = pmIncludeCertificate ? `
+        <div class="certificate-page" style="page-break-after: always; padding: 40px; font-family: 'Times New Roman', serif;">
+          <div class="letterhead" style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1a365d; padding-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              ${logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 60px;">` : '<div></div>'}
+              <div style="text-align: center;">
+                <h1 style="margin: 0; color: #1a365d; font-size: 24px;">${certCompanyName}</h1>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">${certCompanyAddress}</p>
+                <p style="margin: 5px 0; font-size: 12px; color: #666;">${certCompanyPhone} | ${certCompanyEmail}</p>
+              </div>
+              ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 50px;">` : '<div></div>'}
+            </div>
+          </div>
+          <h2 style="text-align: center; color: #1a365d; margin: 30px 0;">CERTIFICATE OF TRANSLATION ACCURACY</h2>
+          <p style="text-align: justify; line-height: 1.8; margin: 20px 0;">
+            I, the undersigned, do hereby certify that the following is a true and accurate translation
+            from <strong>${selectedReview.translate_from}</strong> into <strong>${selectedReview.translate_to}</strong>
+            of the document(s) attached hereto.
+          </p>
+          <p style="text-align: justify; line-height: 1.8; margin: 20px 0;">
+            <strong>Document Type:</strong> ${selectedReview.document_type || 'Official Document'}<br>
+            <strong>Client:</strong> ${selectedReview.client_name}<br>
+            <strong>Order Number:</strong> ${selectedReview.order_number}<br>
+            <strong>Number of Pages:</strong> ${originalContents.length || 1}
+          </p>
+          <div style="margin-top: 50px; display: flex; justify-content: space-between; align-items: end;">
+            <div style="text-align: center;">
+              ${signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 60px;">` : '<div style="border-bottom: 1px solid #000; width: 200px; height: 40px;"></div>'}
+              <p style="margin: 5px 0; font-size: 12px;">${user?.name || 'Project Manager'}</p>
+              <p style="margin: 0; font-size: 10px; color: #666;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            ${logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="max-height: 80px;">` : ''}
+          </div>
+        </div>
+      ` : '';
+
+      // Translation HTML
+      const translationHTML = pmIncludeTranslation ? `
+        <div class="translation-page" style="page-break-after: always; padding: 20px;">
+          ${translatedContent.html || `<pre style="white-space: pre-wrap; font-family: Arial, sans-serif;">${translatedContent.data ? atob(translatedContent.data) : ''}</pre>`}
+        </div>
+      ` : '';
+
+      // Verification page HTML
+      const verificationHTML = (pmIncludeVerification && certData) ? `
+        <div class="verification-page" style="page-break-after: always; padding: 40px; text-align: center;">
+          <div style="border: 2px solid #2563eb; border-radius: 12px; padding: 30px; max-width: 500px; margin: 50px auto;">
+            <div style="font-size: 48px; margin-bottom: 10px;">🔐</div>
+            <h2 style="color: #1e40af; margin: 0 0 10px 0;">Document Verification</h2>
+            <p style="color: #6b7280; font-size: 14px;">This certified translation can be verified online</p>
+            <div style="margin: 30px 0; text-align: left; background: #f3f4f6; padding: 20px; border-radius: 8px;">
+              <p style="margin: 10px 0;"><strong>Certification ID:</strong> <span style="font-family: monospace; color: #1e40af;">${certData.certification_id}</span></p>
+              <p style="margin: 10px 0;"><strong>Document Type:</strong> ${selectedReview.document_type || 'Official Document'}</p>
+              <p style="margin: 10px 0;"><strong>Translation:</strong> ${selectedReview.translate_from} → ${selectedReview.translate_to}</p>
+              <p style="margin: 10px 0;"><strong>Certified Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
+            ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 150px; height: 150px; margin: 20px auto;">` : ''}
+            <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">Verify at: <strong>${certData.verification_url || ''}</strong></p>
+          </div>
+        </div>
+      ` : '';
+
+      // Original documents HTML
+      const originalsHTML = pmIncludeOriginals ? originalContents.map((doc, idx) => `
+        <div class="original-page" style="page-break-after: always; padding: 20px;">
+          <h3 style="color: #6b7280; font-size: 14px; margin-bottom: 10px;">Original Document ${idx + 1}: ${doc.filename}</h3>
+          ${doc.contentType?.includes('image')
+            ? `<img src="data:${doc.contentType};base64,${doc.data}" alt="Original ${idx + 1}" style="max-width: 100%; border: 1px solid #ddd;">`
+            : doc.contentType?.includes('pdf')
+              ? `<p style="color: #666; font-style: italic;">[PDF Document: ${doc.filename}]</p>`
+              : `<pre style="white-space: pre-wrap; background: #f9f9f9; padding: 15px; border: 1px solid #ddd;">${atob(doc.data)}</pre>`
+          }
+        </div>
+      `).join('') : '';
+
+      // Complete HTML document
+      const fullHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Translation Package - ${selectedReview.order_number}</title>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; }
+              .page { page-break-after: always; }
+            }
+            body { font-family: Arial, sans-serif; }
+          </style>
+        </head>
+        <body>
+          ${certificateHTML}
+          ${translationHTML}
+          ${verificationHTML}
+          ${originalsHTML}
+        </body>
+        </html>
+      `;
+
+      // Open in new window for printing/saving
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(fullHTML);
+      printWindow.document.close();
+      printWindow.focus();
+
+      alert('✅ Pacote gerado com sucesso! Uma nova janela foi aberta para impressão/download.');
+
+    } catch (err) {
+      console.error('Package generation error:', err);
+      alert('❌ Erro ao gerar pacote');
+    } finally {
+      setPmIsGeneratingPackage(false);
     }
   };
 
@@ -17345,6 +17651,201 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   placeholder="Descreva as correções necessárias..."
                   className="w-full p-2 border rounded text-xs h-20 resize-none"
                 />
+              </div>
+
+              {/* Proofreading Section */}
+              <div className="p-4 border-t bg-indigo-50">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-indigo-700">🔍 Proofreading (Revisão de Qualidade)</h4>
+                  <button
+                    onClick={runPmProofreading}
+                    disabled={pmIsProofreading || !translatedContent}
+                    className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    {pmIsProofreading ? (
+                      <>
+                        <span className="animate-spin">⏳</span> Analisando...
+                      </>
+                    ) : (
+                      <>🔍 Executar Proofreading</>
+                    )}
+                  </button>
+                </div>
+
+                {pmProofreadingError && (
+                  <div className="p-2 bg-red-100 text-red-700 rounded text-xs mb-2">
+                    ❌ {pmProofreadingError}
+                  </div>
+                )}
+
+                {pmProofreadingResult && (
+                  <div className="space-y-2">
+                    <div className={`p-3 rounded-lg ${
+                      pmProofreadingResult.classificacao === 'APROVADO'
+                        ? 'bg-green-100 border border-green-300'
+                        : pmProofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                          ? 'bg-yellow-100 border border-yellow-300'
+                          : 'bg-red-100 border border-red-300'
+                    }`}>
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm">
+                          {pmProofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
+                           pmProofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
+                           '❌ REPROVADO'}
+                        </span>
+                        <span className="text-xs bg-white px-2 py-1 rounded">
+                          Score: {pmProofreadingResult.pontuacao_final || pmProofreadingResult.score || 'N/A'}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2 mt-2 text-[10px]">
+                        <div className="text-center">
+                          <div className="font-bold">Total</div>
+                          <div>{pmProofreadingResult.total_erros || 0}</div>
+                        </div>
+                        <div className="text-center text-red-600">
+                          <div className="font-bold">Críticos</div>
+                          <div>{pmProofreadingResult.criticos || 0}</div>
+                        </div>
+                        <div className="text-center text-orange-600">
+                          <div className="font-bold">Altos</div>
+                          <div>{pmProofreadingResult.altos || 0}</div>
+                        </div>
+                        <div className="text-center text-yellow-600">
+                          <div className="font-bold">Médios</div>
+                          <div>{pmProofreadingResult.medios || 0}</div>
+                        </div>
+                        <div className="text-center text-blue-600">
+                          <div className="font-bold">Baixos</div>
+                          <div>{pmProofreadingResult.baixos || 0}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {pmProofreadingResult.erros && pmProofreadingResult.erros.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto border rounded p-2 bg-white">
+                        <div className="text-[10px] font-medium text-gray-600 mb-1">Erros encontrados:</div>
+                        {pmProofreadingResult.erros.map((erro, idx) => (
+                          <div key={idx} className={`text-[10px] p-1.5 mb-1 rounded ${
+                            erro.severidade === 'crítico' ? 'bg-red-50 border-l-2 border-red-500' :
+                            erro.severidade === 'alto' ? 'bg-orange-50 border-l-2 border-orange-500' :
+                            erro.severidade === 'médio' ? 'bg-yellow-50 border-l-2 border-yellow-500' :
+                            'bg-blue-50 border-l-2 border-blue-500'
+                          }`}>
+                            <div className="flex justify-between">
+                              <span className="font-medium">{erro.tipo}</span>
+                              <span className="text-gray-500">{erro.severidade}</span>
+                            </div>
+                            <div className="text-gray-600 mt-0.5">{erro.descricao}</div>
+                            {erro.sugestao && (
+                              <div className="text-green-600 mt-0.5">💡 {erro.sugestao}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {pmProofreadingResult.observacoes && (
+                      <div className="p-2 bg-gray-100 rounded text-xs">
+                        <strong>Observações:</strong> {pmProofreadingResult.observacoes}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!pmProofreadingResult && !pmIsProofreading && !pmProofreadingError && (
+                  <p className="text-xs text-gray-500 text-center py-2">
+                    Clique em "Executar Proofreading" para analisar a qualidade da tradução
+                  </p>
+                )}
+              </div>
+
+              {/* Package Creation Section */}
+              <div className="p-4 border-t bg-green-50">
+                <h4 className="text-xs font-bold text-green-700 mb-3">📦 Montar Pacote Final</h4>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={pmIncludeCertificate}
+                      onChange={(e) => setPmIncludeCertificate(e.target.checked)}
+                      className="rounded text-green-600"
+                    />
+                    <span className="text-xs">📜 Certificado</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={pmIncludeTranslation}
+                      onChange={(e) => setPmIncludeTranslation(e.target.checked)}
+                      className="rounded text-green-600"
+                    />
+                    <span className="text-xs">📄 Tradução</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={pmIncludeVerification}
+                      onChange={(e) => setPmIncludeVerification(e.target.checked)}
+                      className="rounded text-green-600"
+                    />
+                    <span className="text-xs">🔐 Página de Verificação (QR)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={pmIncludeOriginals}
+                      onChange={(e) => setPmIncludeOriginals(e.target.checked)}
+                      className="rounded text-green-600"
+                    />
+                    <span className="text-xs">📑 Documentos Originais</span>
+                  </label>
+                </div>
+
+                {/* Document Order Preview */}
+                <div className="p-2 bg-white rounded border mb-3">
+                  <div className="text-[10px] text-gray-500 mb-1">Ordem do pacote:</div>
+                  <div className="flex items-center gap-1 text-xs flex-wrap">
+                    {pmIncludeCertificate && (
+                      <>
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">📜 Certificado</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    {pmIncludeTranslation && (
+                      <>
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">📄 Tradução</span>
+                        {(pmIncludeVerification || pmIncludeOriginals) && <span className="text-gray-400">→</span>}
+                      </>
+                    )}
+                    {pmIncludeVerification && (
+                      <>
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">🔐 Verificação</span>
+                        {pmIncludeOriginals && <span className="text-gray-400">→</span>}
+                      </>
+                    )}
+                    {pmIncludeOriginals && (
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">📑 Originais ({originalContents.length})</span>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={generatePmPackage}
+                  disabled={pmIsGeneratingPackage || (!pmIncludeCertificate && !pmIncludeTranslation && !pmIncludeVerification && !pmIncludeOriginals)}
+                  className="w-full py-2 bg-green-600 text-white rounded font-medium text-sm hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                >
+                  {pmIsGeneratingPackage ? (
+                    <>
+                      <span className="animate-spin">⏳</span> Gerando Pacote...
+                    </>
+                  ) : (
+                    <>📦 Gerar Pacote para Download</>
+                  )}
+                </button>
               </div>
             </div>
           )}
