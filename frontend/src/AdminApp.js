@@ -6811,7 +6811,7 @@ tradução juramentada | certified translation`}
       {/* REVIEW TAB */}
       {activeSubTab === 'review' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">✏️ Review & Edit Translation</h2>
+          <h2 className="text-sm font-bold mb-2">🔍 Proofreading & Review</h2>
 
           {/* ========== UPLOAD & PROOFREADING - ALWAYS VISIBLE AT TOP ========== */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
@@ -6822,13 +6822,47 @@ tradução juramentada | certified translation`}
                   📄 Upload Translation (Word/HTML/TXT)
                   <input
                     type="file"
-                    accept=".docx,.doc,.html,.htm,.txt,image/*"
+                    accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
                     multiple
-                    onChange={handlePmTranslationUpload}
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files);
+                      if (files.length === 0) return;
+                      setProcessingStatus('Processing uploaded translation...');
+                      for (const file of files) {
+                        const fileName = file.name.toLowerCase();
+                        try {
+                          if (fileName.endsWith('.docx')) {
+                            const html = await convertWordToHtml(file);
+                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                          } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                            const html = await readHtmlFile(file);
+                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                          } else if (fileName.endsWith('.txt')) {
+                            const text = await readTxtFile(file);
+                            const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                          } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                            const dataUrl = await new Promise((resolve) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result);
+                              reader.readAsDataURL(file);
+                            });
+                            const html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                          }
+                        } catch (err) {
+                          console.error('Upload error:', err);
+                          setProcessingStatus(`⚠️ Error: ${file.name}`);
+                        }
+                      }
+                      setProcessingStatus('✅ Translation uploaded!');
+                      setTimeout(() => setProcessingStatus(''), 3000);
+                      e.target.value = '';
+                    }}
                     className="hidden"
                   />
                 </label>
-                {(pmTranslationFiles.length > 0 || pmTranslationHtml || translationResults.length > 0) && (
+                {translationResults.length > 0 && (
                   <p className="text-xs text-green-600 mt-1 text-center">✓ Translation loaded</p>
                 )}
               </div>
@@ -6836,16 +6870,14 @@ tradução juramentada | certified translation`}
               <div>
                 <button
                   onClick={async () => {
-                    if (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length) {
+                    if (!translationResults.length) {
                       alert('Please upload or translate a document first');
                       return;
                     }
                     setIsProofreading(true);
                     setProofreadingError('');
                     try {
-                      const textToProofread = translationResults.length > 0
-                        ? translationResults.map(r => r.translatedText).join('\n\n')
-                        : pmTranslationHtml || 'No text available';
+                      const textToProofread = translationResults.map(r => r.translatedText).join('\n\n');
                       const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
                         text: textToProofread,
                         source_language: sourceLanguage,
@@ -6858,7 +6890,7 @@ tradução juramentada | certified translation`}
                       setIsProofreading(false);
                     }
                   }}
-                  disabled={isProofreading || (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length)}
+                  disabled={isProofreading || !translationResults.length}
                   className="w-full px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400"
                 >
                   {isProofreading ? '⏳ Analyzing...' : '🔍 Run Proofreading'}
@@ -7059,228 +7091,6 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* ============ Upload, Proofreading & Package Section - Available to all users ============ */}
-              {(isAdmin || isPM || user?.role === 'translator') && (
-                <div className="mt-4 border-t pt-4">
-                  {/* Upload Section */}
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
-                    <h3 className="text-sm font-bold text-gray-700 mb-3">📤 Upload Documents</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Upload Translation */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-2">Translation File</label>
-                        <label className="flex items-center justify-center px-4 py-3 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
-                          📄 Upload Translation
-                          <input
-                            type="file"
-                            accept="image/*,.pdf,.docx,.html,.htm,.txt"
-                            multiple
-                            onChange={handlePmTranslationUpload}
-                            className="hidden"
-                          />
-                        </label>
-                        {(pmTranslationFiles.length > 0 || pmTranslationHtml) && (
-                          <p className="text-xs text-green-600 mt-2">
-                            ✓ {pmTranslationFiles.length} image(s){pmTranslationHtml ? ' + HTML' : ''} loaded
-                          </p>
-                        )}
-                      </div>
-                      {/* Upload Original */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-2">Original Document</label>
-                        <label className="flex items-center justify-center px-4 py-3 bg-orange-500 text-white text-sm rounded cursor-pointer hover:bg-orange-600 transition">
-                          📎 Upload Original
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            multiple
-                            onChange={async (e) => {
-                              const files = Array.from(e.target.files);
-                              if (files.length === 0) return;
-                              setProcessingStatus('Processing original documents...');
-                              const allDocs = [];
-                              for (const file of files) {
-                                const fileName = file.name.toLowerCase();
-                                if (fileName.endsWith('.pdf')) {
-                                  try {
-                                    const images = await convertPdfToImages(file, (page, total) => {
-                                      setProcessingStatus(`Converting PDF page ${page}/${total}`);
-                                    });
-                                    images.forEach(img => {
-                                      allDocs.push({ filename: img.filename, data: img.data, type: img.type });
-                                    });
-                                  } catch (err) {
-                                    console.error('PDF conversion error:', err);
-                                  }
-                                } else if (file.type.startsWith('image/')) {
-                                  const reader = new FileReader();
-                                  const result = await new Promise((resolve, reject) => {
-                                    reader.onload = (ev) => resolve(ev.target.result);
-                                    reader.onerror = reject;
-                                    reader.readAsDataURL(file);
-                                  });
-                                  const base64 = result.split(',')[1];
-                                  allDocs.push({ filename: file.name, data: base64, type: file.type });
-                                }
-                              }
-                              if (allDocs.length > 0) {
-                                setOriginalImages(allDocs.map(d => ({
-                                  filename: d.filename,
-                                  data: d.data.startsWith('data:') ? d.data : `data:${d.type};base64,${d.data}`
-                                })));
-                              }
-                              setProcessingStatus('');
-                              e.target.value = '';
-                            }}
-                            className="hidden"
-                          />
-                        </label>
-                        {originalImages.length > 0 && (
-                          <p className="text-xs text-orange-600 mt-2">
-                            ✓ {originalImages.length} original document(s) loaded
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Proofreading Section */}
-                  <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold text-purple-700">🔍 Proofreading</h3>
-                      <button
-                        onClick={async () => {
-                          if (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length) {
-                            alert('Please upload or translate a document first');
-                            return;
-                          }
-                          setIsProofreading(true);
-                          setProofreadingError('');
-                          try {
-                            const textToProofread = translationResults.length > 0
-                              ? translationResults.map(r => r.translatedText).join('\n\n')
-                              : pmTranslationHtml || 'No text available';
-
-                            const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
-                              text: textToProofread,
-                              source_language: sourceLanguage,
-                              target_language: targetLanguage
-                            });
-                            setProofreadingResult(response.data);
-                          } catch (err) {
-                            setProofreadingError(err.response?.data?.detail || err.message);
-                          } finally {
-                            setIsProofreading(false);
-                          }
-                        }}
-                        disabled={isProofreading}
-                        className="px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-400"
-                      >
-                        {isProofreading ? '⏳ Analyzing...' : '🔍 Run Proofreading'}
-                      </button>
-                    </div>
-
-                    {proofreadingError && (
-                      <div className="p-3 bg-red-100 text-red-700 text-xs rounded mb-3">
-                        ❌ {proofreadingError}
-                      </div>
-                    )}
-
-                    {proofreadingResult && (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-4">
-                          <div className="text-center p-3 bg-white rounded border">
-                            <div className="text-2xl font-bold text-purple-600">{proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}</div>
-                            <div className="text-xs text-gray-500">Quality Score</div>
-                          </div>
-                          <div className="flex-1 text-xs">
-                            <p><strong>Summary:</strong> {proofreadingResult.resumo || proofreadingResult.summary || 'Analysis complete'}</p>
-                          </div>
-                        </div>
-                        {(proofreadingResult.erros || proofreadingResult.errors) && (
-                          <div className="p-3 bg-white rounded border text-xs">
-                            <p className="font-bold mb-2">Issues Found:</p>
-                            <ul className="list-disc pl-4 space-y-1">
-                              {(proofreadingResult.erros || proofreadingResult.errors || []).map((e, i) => (
-                                <li key={i}>{typeof e === 'string' ? e : e.description || e.erro}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Package Generator */}
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h3 className="text-sm font-bold text-blue-700 mb-3">📦 Generate Package</h3>
-
-                    {/* Package Options */}
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
-                        <input
-                          type="checkbox"
-                          checked={includeCover}
-                          onChange={(e) => setIncludeCover(e.target.checked)}
-                          className="mr-2"
-                        />
-                        <div>
-                          <div className="text-sm font-medium">📜 Certificate</div>
-                          <div className="text-xs text-gray-500">Cover letter with certification</div>
-                        </div>
-                      </label>
-
-                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
-                        <input
-                          type="checkbox"
-                          checked={true}
-                          disabled
-                          className="mr-2"
-                        />
-                        <div>
-                          <div className="text-sm font-medium">📄 Translation</div>
-                          <div className="text-xs text-gray-500">Translated document (required)</div>
-                        </div>
-                      </label>
-
-                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
-                        <input
-                          type="checkbox"
-                          checked={includeOriginal}
-                          onChange={(e) => setIncludeOriginal(e.target.checked)}
-                          className="mr-2"
-                        />
-                        <div>
-                          <div className="text-sm font-medium">📎 Original</div>
-                          <div className="text-xs text-gray-500">Original document</div>
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* Additional Options */}
-                    <div className="flex items-center gap-4 mb-4">
-                      <label className="flex items-center text-xs">
-                        <input
-                          type="checkbox"
-                          checked={includeLetterhead}
-                          onChange={(e) => setIncludeLetterhead(e.target.checked)}
-                          className="mr-2"
-                        />
-                        Include Letterhead on all pages
-                      </label>
-                    </div>
-
-                    {/* Generate Button */}
-                    <button
-                      onClick={handlePmPackageDownload}
-                      disabled={pmPackageGenerating || (translationResults.length === 0 && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
-                      className="w-full px-4 py-3 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
-                    >
-                      {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate & Download Package'}
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
