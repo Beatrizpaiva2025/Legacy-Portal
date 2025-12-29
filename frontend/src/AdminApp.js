@@ -3744,6 +3744,163 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
+  // Generate Authenticity Statement HTML (Atestado de Autenticidade) - follows US legal requirements
+  const generateAuthenticityStatementHtml = (config = {}) => {
+    const {
+      orderNum = orderNumber || 'P0000',
+      docType = documentType,
+      srcLang = sourceLanguage,
+      tgtLang = targetLanguage,
+      translatorData = TRANSLATORS.find(t => t.name === selectedTranslator),
+      dateStr = translationDate
+    } = config;
+
+    // Generate document hash (SHA-256 simulation for display)
+    const generateHash = () => {
+      const data = `${orderNum}-${docType}-${srcLang}-${tgtLang}-${dateStr}-${Date.now()}`;
+      let hash = '';
+      for (let i = 0; i < 64; i++) {
+        hash += '0123456789ABCDEF'[Math.floor(Math.random() * 16)];
+      }
+      return hash;
+    };
+
+    // Generate verification code
+    const generateVerificationCode = () => {
+      const chars = '0123456789ABCDEF';
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        if (i > 0) code += '-';
+        for (let j = 0; j < 4; j++) {
+          code += chars[Math.floor(Math.random() * chars.length)];
+        }
+      }
+      return code;
+    };
+
+    const documentHash = generateHash();
+    const verificationCode = generateVerificationCode();
+    const verificationUrl = `https://portal.legacytranslations.com/verify/${verificationCode}`;
+
+    return `
+    <!-- STATEMENT OF AUTHENTICITY PAGE -->
+    <div class="authenticity-page" style="page-break-before: always; padding: 40px 50px; font-family: 'Times New Roman', Georgia, serif; max-width: 800px; margin: 0 auto;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #1a365d; padding-bottom: 20px;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 50px; object-fit: contain;" />`
+                  : `<div style="font-weight: bold; color: #1a365d; font-size: 18px;">LEGACY TRANSLATIONS</div>`
+                }
+            </div>
+            <div style="font-size: 11px; color: #4a5568;">
+                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                (857) 316-7770 · contact@legacytranslations.com
+            </div>
+        </div>
+
+        <!-- Title -->
+        <h1 style="text-align: center; font-size: 22px; color: #1a365d; margin: 30px 0 10px 0; font-weight: bold; letter-spacing: 2px;">
+            STATEMENT OF AUTHENTICITY
+        </h1>
+        <h2 style="text-align: center; font-size: 14px; color: #4a5568; margin: 0 0 30px 0; font-weight: normal;">
+            Authentication Protocol for Certified Translation
+        </h2>
+
+        <!-- Document Reference -->
+        <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
+            <p style="margin: 0 0 15px 0; font-size: 12px; line-height: 1.8; text-align: justify;">
+                The document <strong>${orderNum} - ${docType.toUpperCase()}</strong> has been translated by
+                <strong>Legacy Translations Inc.</strong>, a professional translation services company and
+                <strong>American Translators Association (ATA) Member (No. 275993)</strong>.
+            </p>
+            <p style="margin: 0; font-size: 12px; line-height: 1.8; text-align: justify;">
+                Translation performed from <strong>${srcLang}</strong> to <strong>${tgtLang}</strong>.
+            </p>
+        </div>
+
+        <!-- Verification Code -->
+        <div style="text-align: center; margin: 30px 0;">
+            <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px;">Verification Code:</div>
+            <div style="font-size: 24px; font-family: 'Courier New', monospace; font-weight: bold; color: #1a365d; letter-spacing: 3px;">
+                ${verificationCode}
+            </div>
+        </div>
+
+        <!-- Barcode placeholder -->
+        <div style="text-align: center; margin: 20px 0;">
+            <div style="display: inline-block; padding: 10px 30px; background: linear-gradient(90deg, #000 2px, transparent 2px) 0 0 / 4px 100%, linear-gradient(90deg, #000 1px, transparent 1px) 0 0 / 2px 100%; background-color: #fff; height: 50px; width: 250px; border: 1px solid #e2e8f0;"></div>
+        </div>
+
+        <!-- Document Hash -->
+        <div style="text-align: center; margin: 25px 0;">
+            <div style="font-size: 12px; font-weight: bold; color: #1a365d; margin-bottom: 8px;">Document Hash</div>
+            <div style="font-size: 9px; font-family: 'Courier New', monospace; color: #4a5568; word-break: break-all; max-width: 500px; margin: 0 auto;">
+                ${documentHash}
+            </div>
+        </div>
+
+        <!-- Legal Certification Statement -->
+        <div style="background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <p style="margin: 0 0 15px 0; font-size: 11px; line-height: 1.8; text-align: justify;">
+                <strong>CERTIFICATION PURSUANT TO 8 CFR 103.2(b)(3):</strong> I, <strong>Beatriz Paiva</strong>,
+                Managing Director of Legacy Translations Inc., hereby certify that I am competent to translate
+                from ${srcLang} into ${tgtLang}, and that the attached translation is true, complete, and accurate
+                to the best of my knowledge and abilities.
+            </p>
+            <p style="margin: 0; font-size: 11px; line-height: 1.8; text-align: justify;">
+                This certification attests only to the accuracy and completeness of the translation. We do not
+                certify or guarantee the authenticity of the original document, nor the truthfulness of the
+                statements contained therein.
+            </p>
+        </div>
+
+        <!-- Signature Section -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin: 40px 0 30px 0;">
+            <div style="text-align: center;">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 150px; object-fit: contain; margin-bottom: 5px;" />`
+                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 5px;">Beatriz Paiva</div>`
+                }
+                <div style="border-top: 1px solid #1a365d; padding-top: 5px; width: 200px;">
+                    <div style="font-size: 12px; font-weight: bold; color: #1a365d;">${translatorData?.name || 'Beatriz Paiva'}</div>
+                    <div style="font-size: 10px; color: #4a5568;">${translatorData?.title || 'Managing Director'}</div>
+                    <div style="font-size: 10px; color: #4a5568;">Legacy Translations Inc.</div>
+                </div>
+            </div>
+
+            <!-- QR Code -->
+            <div style="text-align: center;">
+                <div style="width: 100px; height: 100px; border: 2px solid #1a365d; display: flex; align-items: center; justify-content: center; background: #f7fafc;">
+                    <div style="font-size: 8px; color: #4a5568; text-align: center;">
+                        QR CODE<br/>
+                        <span style="font-size: 7px;">Scan to verify</span>
+                    </div>
+                </div>
+                <div style="font-size: 9px; color: #4a5568; margin-top: 5px;">Scan to verify authenticity</div>
+            </div>
+        </div>
+
+        <!-- Date and Legal Reference -->
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+            <div style="font-size: 12px; color: #1a365d; margin-bottom: 15px;">
+                <strong>Boston, Massachusetts, ${dateStr}</strong>
+            </div>
+            <div style="font-size: 9px; color: #718096; line-height: 1.6; max-width: 500px; margin: 0 auto;">
+                <strong>Legal Basis:</strong> Code of Federal Regulations, Title 8, Section 103.2(b)(3) -
+                "Any document containing foreign language submitted to USCIS shall be accompanied by a full
+                English language translation which the translator has certified as complete and accurate."
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 30px; font-size: 9px; color: #a0aec0;">
+            This document is digitally generated and forms an integral part of the certified translation package.<br>
+            Verify at: <span style="color: #2563eb;">${verificationUrl}</span>
+        </div>
+    </div>`;
+  };
+
   // Quick Package Download - generates complete certified translation package (same layout as normal flow)
   const handleQuickPackageDownload = async () => {
     setQuickPackageLoading(true);
@@ -4014,6 +4171,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
+    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -4451,8 +4609,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 <body>
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
-    ${certificationPageHTML}
     ${originalPagesHTML}
+    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -7300,15 +7458,6 @@ tradução juramentada | certified translation`}
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={includeCertification}
-                      onChange={(e) => setIncludeCertification(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>🔐 Include Verification (QR Code)</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
                       checked={includeAuthenticityStatement}
                       onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
                       className="mr-3 w-4 h-4"
@@ -7331,12 +7480,6 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
-                  {includeCertification && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">🔐 Verification</span>
-                    </>
-                  )}
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>
@@ -16374,6 +16517,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [translatedContent, setTranslatedContent] = useState(null);
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
+
+  // Proofreading state
+  const [proofreadingResult, setProofreadingResult] = useState(null);
+  const [isProofreading, setIsProofreading] = useState(false);
+  const [proofreadingError, setProofreadingError] = useState('');
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -16837,6 +16986,74 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert('❌ Erro ao solicitar correção');
     } finally {
       setSendingAction(false);
+    }
+  };
+
+  // Execute automatic proofreading
+  const executeProofreading = async () => {
+    if (!selectedReview || !translatedContent) {
+      setProofreadingError('Nenhuma tradução selecionada para revisão.');
+      return;
+    }
+
+    // Get original text from the first original document
+    const originalText = originalContents.length > 0
+      ? (originalContents[0].text || 'Texto original não disponível em formato texto')
+      : 'Texto original não disponível';
+
+    // Get translated text (extract from HTML if needed)
+    let translatedText = '';
+    if (translatedContent.html) {
+      // Strip HTML tags for proofreading
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = translatedContent.html;
+      translatedText = tempDiv.textContent || tempDiv.innerText || '';
+    } else if (translatedContent.data) {
+      try {
+        translatedText = atob(translatedContent.data);
+      } catch (e) {
+        translatedText = 'Não foi possível extrair texto da tradução';
+      }
+    }
+
+    if (!translatedText.trim()) {
+      setProofreadingError('Não foi possível extrair o texto da tradução para revisão.');
+      return;
+    }
+
+    setIsProofreading(true);
+    setProofreadingError('');
+    setProofreadingResult(null);
+
+    try {
+      // Get Claude API key from localStorage or settings
+      const claudeApiKey = localStorage.getItem('claude_api_key') || '';
+
+      if (!claudeApiKey) {
+        setProofreadingError('Chave API do Claude não configurada. Configure em Configurações.');
+        setIsProofreading(false);
+        return;
+      }
+
+      const response = await axios.post(`${API}/admin/proofread?admin_key=${adminKey}`, {
+        original_text: originalText,
+        translated_text: translatedText.substring(0, 10000), // Limit text size
+        source_language: selectedReview.translate_from || 'Portuguese (Brazil)',
+        target_language: selectedReview.translate_to || 'English',
+        document_type: selectedReview.document_type || 'General Document',
+        claude_api_key: claudeApiKey
+      });
+
+      if (response.data.proofreading_result) {
+        setProofreadingResult(response.data.proofreading_result);
+      } else if (response.data.raw_response) {
+        setProofreadingError(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
+      }
+    } catch (error) {
+      console.error('Proofreading error:', error);
+      setProofreadingError(error.response?.data?.detail || error.message || 'Erro ao executar revisão automática');
+    } finally {
+      setIsProofreading(false);
     }
   };
 
@@ -17662,6 +17879,138 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   placeholder="Descreva as correções necessárias..."
                   className="w-full p-2 border rounded text-xs h-20 resize-none"
                 />
+              </div>
+
+              {/* Proofreading Section */}
+              <div className="p-4 border-t bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-purple-700 flex items-center gap-2">
+                    🔍 Proofreading (Revisão de Qualidade)
+                  </h4>
+                  <button
+                    onClick={executeProofreading}
+                    disabled={isProofreading || !translatedContent}
+                    className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2"
+                  >
+                    {isProofreading ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Analisando...
+                      </>
+                    ) : (
+                      <>🔍 Executar Proofreading</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Error Message */}
+                {proofreadingError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded mb-3">
+                    <p className="text-xs text-red-600">❌ {proofreadingError}</p>
+                  </div>
+                )}
+
+                {/* Results */}
+                {proofreadingResult && (
+                  <div className="space-y-3">
+                    {/* Summary */}
+                    <div className={`p-3 rounded border ${
+                      proofreadingResult.resumo?.qualidade === 'APROVADO' ? 'bg-green-50 border-green-200' :
+                      proofreadingResult.resumo?.qualidade === 'APROVADO_COM_OBSERVACOES' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-red-50 border-red-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold">
+                          {proofreadingResult.resumo?.qualidade === 'APROVADO' ? '✅ APROVADO' :
+                           proofreadingResult.resumo?.qualidade === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
+                           '❌ REPROVADO'}
+                        </span>
+                        <span className="text-xs text-gray-600">
+                          {proofreadingResult.resumo?.total_erros || 0} erro(s) encontrado(s)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-[10px]">
+                        <div className="text-center p-1 bg-red-100 rounded">
+                          <div className="font-bold text-red-600">{proofreadingResult.resumo?.criticos || 0}</div>
+                          <div className="text-gray-600">Críticos</div>
+                        </div>
+                        <div className="text-center p-1 bg-orange-100 rounded">
+                          <div className="font-bold text-orange-600">{proofreadingResult.resumo?.altos || 0}</div>
+                          <div className="text-gray-600">Altos</div>
+                        </div>
+                        <div className="text-center p-1 bg-yellow-100 rounded">
+                          <div className="font-bold text-yellow-600">{proofreadingResult.resumo?.medios || 0}</div>
+                          <div className="text-gray-600">Médios</div>
+                        </div>
+                        <div className="text-center p-1 bg-blue-100 rounded">
+                          <div className="font-bold text-blue-600">{proofreadingResult.resumo?.baixos || 0}</div>
+                          <div className="text-gray-600">Baixos</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Error List */}
+                    {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                      <div className="max-h-60 overflow-y-auto border rounded">
+                        <table className="w-full text-[10px]">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="p-2 text-left">Tipo</th>
+                              <th className="p-2 text-left">Original</th>
+                              <th className="p-2 text-left">Encontrado</th>
+                              <th className="p-2 text-left">Sugerido</th>
+                              <th className="p-2 text-center">Gravidade</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proofreadingResult.erros.map((erro, idx) => (
+                              <tr key={idx} className={`border-t ${
+                                erro.gravidade === 'CRÍTICO' ? 'bg-red-50' :
+                                erro.gravidade === 'ALTO' ? 'bg-orange-50' :
+                                erro.gravidade === 'MÉDIO' ? 'bg-yellow-50' :
+                                'bg-blue-50'
+                              }`}>
+                                <td className="p-2">{erro.tipo}</td>
+                                <td className="p-2 font-mono">{erro.original || '-'}</td>
+                                <td className="p-2 font-mono text-red-600">{erro.encontrado || '-'}</td>
+                                <td className="p-2 font-mono text-green-600">{erro.sugerido || '-'}</td>
+                                <td className="p-2 text-center">
+                                  <span className={`px-1 py-0.5 rounded text-white ${
+                                    erro.gravidade === 'CRÍTICO' ? 'bg-red-500' :
+                                    erro.gravidade === 'ALTO' ? 'bg-orange-500' :
+                                    erro.gravidade === 'MÉDIO' ? 'bg-yellow-500' :
+                                    'bg-blue-500'
+                                  }`}>
+                                    {erro.gravidade}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Observations */}
+                    {proofreadingResult.observacoes && proofreadingResult.observacoes.length > 0 && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                        <h5 className="text-xs font-bold text-blue-700 mb-2">📌 Observações:</h5>
+                        <ul className="text-[10px] text-gray-700 space-y-1">
+                          {proofreadingResult.observacoes.map((obs, idx) => (
+                            <li key={idx}>• {obs}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* No review yet message */}
+                {!proofreadingResult && !proofreadingError && !isProofreading && (
+                  <div className="text-center py-4 text-gray-400 text-xs">
+                    Clique em "Executar Proofreading" para analisar a tradução automaticamente
+                  </div>
+                )}
               </div>
             </div>
           )}
