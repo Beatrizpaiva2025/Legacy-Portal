@@ -16924,12 +16924,60 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         try {
           const origData = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
           if (origData.data.file_data) {
-            loadedDocs.push({
-              id: doc.id,
-              filename: doc.filename || origData.data.filename,
-              data: origData.data.file_data,
-              contentType: origData.data.content_type || 'application/pdf'
-            });
+            const contentType = origData.data.content_type || 'application/pdf';
+            const filename = doc.filename || origData.data.filename || 'document';
+            const fileData = origData.data.file_data;
+
+            // Check if it's a PDF and convert to images
+            if (contentType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf')) {
+              try {
+                // Convert base64 PDF to images
+                const pdfData = fileData.startsWith('data:') ? fileData : `data:application/pdf;base64,${fileData}`;
+                const base64Content = pdfData.split(',')[1] || fileData;
+                const binaryString = atob(base64Content);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                  bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                const pdf = await pdfjsLib.getDocument(bytes).promise;
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                  const page = await pdf.getPage(pageNum);
+                  const scale = 2;
+                  const viewport = page.getViewport({ scale });
+                  const canvas = document.createElement('canvas');
+                  const context = canvas.getContext('2d');
+                  canvas.height = viewport.height;
+                  canvas.width = viewport.width;
+                  await page.render({ canvasContext: context, viewport }).promise;
+                  const imageData = canvas.toDataURL('image/png');
+
+                  loadedDocs.push({
+                    id: `${doc.id}_page_${pageNum}`,
+                    filename: `${filename}_page_${pageNum}.png`,
+                    data: imageData,
+                    contentType: 'image/png'
+                  });
+                }
+              } catch (pdfErr) {
+                console.error('PDF conversion error:', pdfErr);
+                // Fallback: add as PDF if conversion fails
+                loadedDocs.push({
+                  id: doc.id,
+                  filename: filename,
+                  data: fileData,
+                  contentType: contentType
+                });
+              }
+            } else {
+              // Not a PDF, add as-is
+              loadedDocs.push({
+                id: doc.id,
+                filename: filename,
+                data: fileData,
+                contentType: contentType
+              });
+            }
           }
         } catch (e) {
           console.error('Failed to load document:', doc.id, e);
