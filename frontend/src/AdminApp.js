@@ -6691,14 +6691,13 @@ tradução juramentada | certified translation`}
                     💾 Save Translation
                   </button>
 
-                  {/* Translator: Send to PM Review */}
+                  {/* Translator: Go to Deliver tab for quality check */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => sendToProjects('pm')}
-                      disabled={sendingToProjects || translationResults.length === 0}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                      onClick={() => setActiveSubTab('deliver')}
+                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 flex items-center gap-2"
                     >
-                      📤 Send to PM Review
+                      Next: Quality Check & Submit <span className="ml-1">→</span>
                     </button>
                   )}
 
