@@ -533,7 +533,6 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
@@ -4811,7 +4810,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
@@ -7131,15 +7129,6 @@ tradução juramentada | certified translation`}
                     </button>
                   )}
 
-                  {/* Admin/PM: Go to Proofreading */}
-                  {(isAdmin || isPM) && (
-                    <button
-                      onClick={() => setActiveSubTab('proofreading')}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 flex items-center gap-2"
-                    >
-                      Next: Proofreading <span className="ml-1">→</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </>
@@ -19442,10 +19431,6 @@ function AdminApp() {
       case 'users':
         return ['admin', 'pm'].includes(userRole)
           ? <UsersPage adminKey={adminKey} user={user} />
-          : <div className="p-6 text-center text-gray-500">Access denied</div>;
-      case 'review':
-        return ['admin', 'pm'].includes(userRole)
-          ? <ReviewPage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
