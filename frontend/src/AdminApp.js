@@ -2173,19 +2173,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   }, [user]);
 
-  // Auto-load project when selectedOrder prop is provided (e.g., coming from Projects page)
+  // Auto-load project when selectedOrder prop is provided (e.g., coming from Projects page or PM Dashboard)
   useEffect(() => {
     const loadOrderData = async () => {
-      if (selectedOrder && selectedOrder.id && !selectedOrderId) {
+      if (selectedOrder && selectedOrder.id) {
+        // Reset state for new order
+        setSelectedOrderId(null);
+        setTranslationResults([]);
+
         // Auto-select the project to load its documents
         await selectProject(selectedOrder);
 
-        // If order has saved translation, load it and go to REVIEW tab
-        if (selectedOrder.translation_ready || selectedOrder.translation_html) {
+        // Always try to load translation for PM review orders
+        const hasTranslation = selectedOrder.translation_ready ||
+                               selectedOrder.translation_html ||
+                               ['review', 'pending_pm_review', 'pending_review'].includes(selectedOrder.translation_status);
+
+        if (hasTranslation) {
           const loaded = await loadSavedTranslation(selectedOrder);
           if (loaded) {
             setActiveSubTab('review');
             setProcessingStatus(`✅ Tradução do projeto ${selectedOrder.order_number} carregada para revisão!`);
+          } else {
+            // If loadSavedTranslation failed, try to fetch directly
+            try {
+              const response = await axios.get(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`);
+              const orderData = response.data.order || response.data;
+              if (orderData.translation_html) {
+                setTranslationResults([{
+                  translatedText: orderData.translation_html,
+                  filename: 'Translation',
+                  originalText: ''
+                }]);
+                setActiveSubTab('review');
+                setProcessingStatus(`✅ Tradução carregada!`);
+              }
+            } catch (err) {
+              console.error('Failed to load translation:', err);
+              setProcessingStatus(`⚠️ Não foi possível carregar a tradução`);
+            }
           }
         }
       }
@@ -2924,25 +2950,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const file = selectedFiles[i];
       const fileName = file.name.toLowerCase();
 
-      // PDF - convert to images
+      // PDF - store directly as data URL
       if (fileName.endsWith('.pdf')) {
-        setProcessingStatus(`Converting PDF to images: ${file.name}`);
-        try {
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
-          });
-          // Convert base64 to data URL format
-          images.forEach(img => {
-            allImages.push({
-              filename: img.filename,
-              data: `data:${img.type};base64,${img.data}`
-            });
-          });
-        } catch (err) {
-          console.error('PDF conversion error:', err);
-          setProcessingStatus(`⚠️ PDF conversion failed: ${file.name}. Try uploading as images instead.`);
-          setTimeout(() => setProcessingStatus(''), 5000);
-        }
+        setProcessingStatus(`Loading PDF: ${file.name}`);
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+        allImages.push({ filename: file.name, data: dataUrl, type: 'application/pdf' });
       }
       // Images - read as data URL
       else if (file.type.startsWith('image/')) {
@@ -2995,19 +3011,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setExternalTranslationText(text);
           setProcessingStatus(`✅ Text file loaded`);
         }
-        // PDF - convert to images
+        // PDF - store directly
         else if (fileName.endsWith('.pdf')) {
-          setProcessingStatus(`Converting PDF to images: ${file.name}`);
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+          setProcessingStatus(`Loading PDF: ${file.name}`);
+          const dataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
           });
-          // Store as full data URLs for display
-          const imageData = images.map((img, idx) => ({
-            filename: `${file.name}_page_${idx + 1}.png`,
-            data: `data:${img.type};base64,${img.data}`
-          }));
-          setExternalTranslationImages(imageData);
-          setProcessingStatus(`✅ PDF converted (${images.length} pages)`);
+          setExternalTranslationImages(prev => [...prev, { filename: file.name, data: dataUrl, type: 'application/pdf' }]);
+          setProcessingStatus(`✅ PDF loaded`);
         }
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
@@ -3773,14 +3786,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
           setQuickTranslationType('html');
         }
-        // PDF - convert to images
+        // PDF - store directly
         else if (fileName.endsWith('.pdf')) {
-          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
-          const images = await convertPdfToImages(file, (page, total) => {
-            setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
-          });
-          setQuickTranslationFiles(prev => [...prev, ...images]);
-          if (!quickTranslationHtml) setQuickTranslationType('images');
+          setQuickPackageProgress(`Loading PDF: ${file.name}`);
+          const base64 = await fileToBase64(file);
+          setQuickTranslationFiles(prev => [...prev, {
+            filename: file.name,
+            data: base64,
+            type: 'application/pdf'
+          }]);
+          if (!quickTranslationHtml) setQuickTranslationType('files');
         }
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
@@ -3820,13 +3835,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress(`Processing original ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        // PDF - convert to images automatically
+        // PDF - store directly
         if (fileName.endsWith('.pdf')) {
-          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
-          const images = await convertPdfToImages(file, (page, total) => {
-            setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+          setQuickPackageProgress(`Loading PDF: ${file.name}`);
+          const base64 = await fileToBase64(file);
+          processedFiles.push({
+            filename: file.name,
+            data: base64,
+            type: 'application/pdf'
           });
-          processedFiles.push(...images);
         }
         // Images
         else if (file.type.startsWith('image/')) {
@@ -4881,8 +4898,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
+          { id: 'translate', label: 'TRADUÇÃO', icon: '📄', roles: ['admin', 'pm', 'translator'] },
+          { id: 'review', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
@@ -17397,27 +17414,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     for (const file of selectedFiles) {
       const fileName = file.name.toLowerCase();
 
-      // PDF - convert to images
+      // PDF - store directly
       if (fileName.endsWith('.pdf')) {
-        try {
-          setProcessingStatus(`Converting PDF to images: ${file.name}`);
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
-          });
-
-          // Add converted images
-          images.forEach(img => {
-            allDocs.push({
-              filename: img.filename,
-              data: `data:${img.type};base64,${img.data}`,
-              contentType: img.type
-            });
-          });
-        } catch (err) {
-          console.error('PDF conversion error:', err);
-          setProcessingStatus(`⚠️ PDF conversion failed. Upload as images or Word/HTML instead.`);
-          setTimeout(() => setProcessingStatus(''), 5000);
-        }
+        setProcessingStatus(`Loading PDF: ${file.name}`);
+        const reader = new FileReader();
+        const result = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        allDocs.push({
+          filename: file.name,
+          data: result,
+          contentType: 'application/pdf'
+        });
       }
       // Image - read directly
       else if (file.type.startsWith('image/')) {
@@ -17462,25 +17472,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     for (const file of selectedFiles) {
       const fileName = file.name.toLowerCase();
 
-      // PDF - convert to images
+      // PDF - store directly
       if (fileName.endsWith('.pdf')) {
-        try {
-          setProcessingStatus(`Converting PDF to images: ${file.name}`);
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
-          });
-          images.forEach(img => {
-            allImages.push({
-              filename: img.filename,
-              data: img.data,
-              type: img.type
-            });
-          });
-        } catch (err) {
-          console.error('PDF conversion error:', err);
-          setProcessingStatus(`⚠️ PDF failed - use Word/HTML instead`);
-          setTimeout(() => setProcessingStatus(''), 5000);
-        }
+        setProcessingStatus(`Loading PDF: ${file.name}`);
+        const reader = new FileReader();
+        const result = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const base64 = result.split(',')[1] || result;
+        allImages.push({
+          filename: file.name,
+          data: base64,
+          type: 'application/pdf'
+        });
       }
       // HTML file
       else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -18829,7 +18835,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   {reviewQueue.map(order => (
                     <div
                       key={order.id}
-                      onClick={() => loadReviewContent(order)}
+                      onClick={() => onNavigateToTranslation(order)}
                       className="p-3 border rounded-lg hover:bg-teal-50 cursor-pointer transition-colors flex justify-between items-center"
                     >
                       <div>
