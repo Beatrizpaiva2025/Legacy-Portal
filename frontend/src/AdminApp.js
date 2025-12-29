@@ -3855,8 +3855,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         <!-- Footer -->
         <div style="text-align: center; margin-top: 40px; font-size: 9px; color: #a0aec0;">
-            This document is digitally generated and forms an integral part of the certified translation package.<br>
-            Verify at: <span style="color: #2563eb;">${verificationUrl}</span>
+            This document is digitally generated and forms an integral part of the certified translation package.
         </div>
     </div>`;
   };
