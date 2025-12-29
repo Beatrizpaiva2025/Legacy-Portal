@@ -7133,6 +7133,56 @@ tradução juramentada | certified translation`}
                   <span className="mr-2">←</span> Back: Document
                 </button>
                 <div className="flex gap-2">
+                  {/* Upload external translation - for all users */}
+                  <label className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 cursor-pointer flex items-center gap-2">
+                    📄 Upload Translation
+                    <input
+                      type="file"
+                      accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                      multiple
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files);
+                        if (files.length === 0) return;
+                        setProcessingStatus('Processing uploaded translation...');
+
+                        for (const file of files) {
+                          const fileName = file.name.toLowerCase();
+                          try {
+                            if (fileName.endsWith('.docx')) {
+                              const html = await convertWordToHtml(file);
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                              const html = await readHtmlFile(file);
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.txt')) {
+                              const text = await readTxtFile(file);
+                              const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif;">${text}</div>`;
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.pdf')) {
+                              const images = await convertPdfToImages(file, (page, total) => {
+                                setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                              });
+                              images.forEach(img => {
+                                const imgHtml = `<div class="pdf-page"><img src="data:${img.type};base64,${img.data}" style="max-width:100%;" /></div>`;
+                                setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '' }]);
+                              });
+                            } else if (file.type.startsWith('image/')) {
+                              const base64 = await fileToBase64(file);
+                              const imgHtml = `<div class="image-page"><img src="data:${file.type};base64,${base64}" style="max-width:100%;" /></div>`;
+                              setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '' }]);
+                            }
+                          } catch (err) {
+                            console.error('Upload error:', err);
+                          }
+                        }
+                        setProcessingStatus('✅ Translation uploaded!');
+                        setTimeout(() => setProcessingStatus(''), 3000);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
                   {/* Save button for all users */}
                   <button
                     onClick={() => sendToProjects('save')}
@@ -7142,14 +7192,14 @@ tradução juramentada | certified translation`}
                     💾 Save Translation
                   </button>
 
-                  {/* Translator: Send to PM Review */}
+                  {/* Next: Deliver - for translators */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => sendToProjects('pm')}
-                      disabled={sendingToProjects || translationResults.length === 0}
+                      onClick={() => setActiveSubTab('deliver')}
+                      disabled={translationResults.length === 0}
                       className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
                     >
-                      📤 Send to PM Review
+                      Next: Deliver →
                     </button>
                   )}
 
@@ -7911,6 +7961,30 @@ tradução juramentada | certified translation`}
               <p className="text-[10px] text-gray-500 mt-2 text-center">
                 Opens print window - save as PDF
               </p>
+
+              {/* Send options after package generation */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Submit Translation</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => sendToProjects('pm')}
+                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="px-4 py-3 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                  </button>
+                  <button
+                    onClick={() => sendToProjects('admin')}
+                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2 text-center">
+                  Choose where to submit your completed translation
+                </p>
+              </div>
             </>
           )}
 
