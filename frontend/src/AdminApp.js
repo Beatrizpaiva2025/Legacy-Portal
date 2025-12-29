@@ -2090,15 +2090,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
       // Filter orders assigned to this user (as translator or PM) or with pending review
-      const myOrders = (response.data.orders || []).filter(order =>
-        order.assigned_translator_id === user.id ||
-        order.assigned_pm_id === user.id ||
-        order.assigned_translator === user.name ||
-        order.assigned_pm_name === user.name ||
-        // Include orders with translation ready for review (for admin/PM)
-        (user.role === 'admin' || user.role === 'pm') && (order.translation_ready || order.translation_html)
-      ).filter(order =>
-        ['received', 'in_translation', 'review', 'pending_review', 'pending_pm_review'].includes(order.translation_status) ||
+      const myOrders = (response.data.orders || []).filter(order => {
+        // For translators: check if assigned to them
+        if (user.role === 'translator') {
+          return (
+            order.assigned_translator_id === user.id ||
+            order.assigned_translator === user.name ||
+            order.assigned_translator_name === user.name
+          );
+        }
+        // For PM: check if assigned to them or ready for review
+        if (user.role === 'pm') {
+          return (
+            order.assigned_pm_id === user.id ||
+            order.assigned_pm_name === user.name ||
+            order.translation_ready ||
+            order.translation_html
+          );
+        }
+        // For admin: show all orders with translation
+        return order.translation_ready || order.translation_html;
+      }).filter(order =>
+        // Include most statuses for translators to see their work
+        ['pending', 'quote', 'received', 'in_translation', 'review', 'pending_review', 'pending_pm_review', 'client_review', 'ready'].includes(order.translation_status) ||
         order.translation_ready
       );
       setAssignedOrders(myOrders);
@@ -4528,6 +4542,62 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Assigned Projects Section - For Translators */}
+          {user?.role === 'translator' && (
+            <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg p-4">
+              <h3 className="text-sm font-bold text-teal-800 mb-3">📋 Meus Projetos Atribuídos</h3>
+              {loadingAssigned ? (
+                <div className="text-center py-4 text-gray-500 text-sm">Carregando projetos...</div>
+              ) : assignedOrders.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {assignedOrders.map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => selectProject(order)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                        selectedOrderId === order.id
+                          ? 'bg-teal-100 border-teal-500 shadow-md'
+                          : 'bg-white border-gray-200 hover:border-teal-400 hover:shadow'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-teal-700 text-sm">{order.order_number}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded ${
+                          order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                          order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                          order.translation_status === 'review' ? 'bg-purple-100 text-purple-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {order.translation_status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mb-1">
+                        {order.translate_from} → {order.translate_to}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {order.document_type || 'Document'} • {order.page_count || 1} página(s)
+                      </div>
+                      {order.deadline && (
+                        <div className="text-[10px] text-orange-600 mt-1">
+                          ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
+                      {selectedOrderId === order.id && (
+                        <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Projeto selecionado</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="text-3xl mb-2">📭</div>
+                  <p className="text-sm">Nenhum projeto atribuído ainda</p>
+                  <p className="text-xs mt-1">Aguarde a atribuição de projetos pelo PM</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
