@@ -2963,42 +2963,69 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   };
 
   // Handle external translation upload (text or images)
-  const handleExternalTranslationUpload = (event) => {
+  const handleExternalTranslationUpload = async (event) => {
     const selectedFiles = Array.from(event.target.files);
+    if (selectedFiles.length === 0) return;
 
-    // Check if any file is a text file
-    const textFiles = selectedFiles.filter(f => f.type === 'text/plain' || f.name.endsWith('.txt'));
-    const imageFiles = selectedFiles.filter(f => !f.type.includes('text'));
+    setProcessingStatus('Processing uploaded translation...');
 
-    if (textFiles.length > 0) {
-      // Read all text files and combine
-      const textPromises = textFiles.map(file => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsText(file);
-        });
-      });
-      Promise.all(textPromises).then(texts => {
-        setExternalTranslationText(texts.join('\n\n--- Page Break ---\n\n'));
-        setProcessingStatus(`✅ ${textFiles.length} translation text file(s) uploaded`);
-      });
+    for (const file of selectedFiles) {
+      const fileName = file.name.toLowerCase();
+
+      try {
+        // Word document (.docx) - convert to HTML
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+          setProcessingStatus(`Converting Word document: ${file.name}`);
+          const html = await convertWordToHtml(file);
+          setExternalTranslationText(html);
+          setProcessingStatus(`✅ Word document converted`);
+        }
+        // HTML file - read as HTML
+        else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+          setProcessingStatus(`Reading HTML: ${file.name}`);
+          const html = await readHtmlFile(file);
+          setExternalTranslationText(html);
+          setProcessingStatus(`✅ HTML file loaded`);
+        }
+        // Text file
+        else if (fileName.endsWith('.txt') || file.type === 'text/plain') {
+          setProcessingStatus(`Reading text file: ${file.name}`);
+          const text = await readTxtFile(file);
+          setExternalTranslationText(text);
+          setProcessingStatus(`✅ Text file loaded`);
+        }
+        // PDF - convert to images
+        else if (fileName.endsWith('.pdf')) {
+          setProcessingStatus(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+          });
+          // Store as full data URLs for display
+          const imageData = images.map((img, idx) => ({
+            filename: `${file.name}_page_${idx + 1}.png`,
+            data: `data:${img.type};base64,${img.data}`
+          }));
+          setExternalTranslationImages(imageData);
+          setProcessingStatus(`✅ PDF converted (${images.length} pages)`);
+        }
+        // Images (JPG, PNG, etc.)
+        else if (file.type.startsWith('image/')) {
+          const base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+          setExternalTranslationImages(prev => [...prev, { filename: file.name, data: base64 }]);
+          setProcessingStatus(`✅ Image uploaded`);
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+        setProcessingStatus(`⚠️ Error processing ${file.name}`);
+      }
     }
 
-    if (imageFiles.length > 0) {
-      // Image/PDF - read as base64
-      const imagePromises = imageFiles.map(f => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve({ filename: f.name, data: reader.result });
-          reader.readAsDataURL(f);
-        });
-      });
-      Promise.all(imagePromises).then(images => {
-        setExternalTranslationImages(images);
-        setProcessingStatus(`✅ ${images.length} translation document(s) uploaded`);
-      });
-    }
+    setTimeout(() => setProcessingStatus(''), 3000);
+    event.target.value = '';
   };
 
   // Send external translation to Review
@@ -3041,6 +3068,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     if (results.length > 0) {
       setTranslationResults(results);
+    }
+
+    // Also populate Quick Package files for DELIVER tab
+    // Convert full data URLs to base64-only format
+    if (externalOriginalImages.length > 0) {
+      const origFiles = externalOriginalImages.map(img => {
+        const dataUrl = img.data;
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          return {
+            filename: img.filename,
+            data: matches[2], // Just the base64 part
+            type: matches[1]  // The mime type
+          };
+        }
+        return { filename: img.filename, data: dataUrl, type: 'image/png' };
+      });
+      setQuickOriginalFiles(origFiles);
+    }
+
+    if (externalTranslationImages.length > 0) {
+      const transFiles = externalTranslationImages.map(img => {
+        const dataUrl = img.data;
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          return {
+            filename: img.filename,
+            data: matches[2], // Just the base64 part
+            type: matches[1]  // The mime type
+          };
+        }
+        return { filename: img.filename, data: dataUrl, type: 'image/png' };
+      });
+      setQuickTranslationFiles(transFiles);
+      setQuickTranslationType('images');
+    } else if (externalTranslationText) {
+      // If text was pasted, convert to HTML for Quick Package
+      const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${externalTranslationText}</div>`;
+      setQuickTranslationHtml(html);
+      setQuickTranslationType('html');
     }
 
     setActiveSubTab('review');
@@ -6452,7 +6519,7 @@ tradução juramentada | certified translation`}
                     <input
                       ref={externalTranslationInputRef}
                       type="file"
-                      accept=".txt,.pdf,image/*"
+                      accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
                       onChange={handleExternalTranslationUpload}
                       className="hidden"
                     />
@@ -6462,6 +6529,14 @@ tradução juramentada | certified translation`}
                         <p className="text-xs text-green-700 font-medium">
                           {externalTranslationText ? 'Text uploaded' : `${externalTranslationImages.length} file(s) uploaded`}
                         </p>
+                        {/* Show translation image previews */}
+                        {externalTranslationImages.length > 0 && (
+                          <div className="mt-2 max-h-32 overflow-auto">
+                            {externalTranslationImages.map((img, idx) => (
+                              <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                            ))}
+                          </div>
+                        )}
                         <button className="mt-2 px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600">
                           Change File
                         </button>
@@ -6472,7 +6547,7 @@ tradução juramentada | certified translation`}
                         <button className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">
                           Upload Translation
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-1">TXT, PDF, or Image</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Word, PDF, HTML, TXT, or Image</p>
                       </div>
                     )}
                   </div>
