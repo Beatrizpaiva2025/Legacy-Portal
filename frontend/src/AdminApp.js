@@ -1889,7 +1889,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const src = CURRENCIES[translatorNoteSettings.sourceCurrency];
     const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
     const rate = translatorNoteSettings.exchangeRate;
-    const date = new Date(translatorNoteSettings.rateDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    // Add T12:00:00 to avoid timezone issues where UTC midnight shifts to previous day in local time
+    const date = new Date(translatorNoteSettings.rateDate + 'T12:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     const source = RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource);
 
     // Format: NOK 10.19 ≈ US$1.00
@@ -1911,6 +1912,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     return `${tgt.symbol}${formattedConverted}`;
   };
+
+  // Auto-fetch exchange rate when currency changes (only when translator note is enabled)
+  useEffect(() => {
+    if (translatorNoteEnabled && translatorNoteSettings.sourceCurrency && translatorNoteSettings.targetCurrency) {
+      const fetchRate = async () => {
+        setFetchingRate(true);
+        try {
+          const response = await fetch(
+            `https://api.exchangerate-api.com/v4/latest/${translatorNoteSettings.targetCurrency}`
+          );
+          const data = await response.json();
+          if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
+            setTranslatorNoteSettings(prev => ({
+              ...prev,
+              exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
+              rateDate: data.date || new Date().toISOString().split('T')[0]
+            }));
+          }
+        } catch (error) {
+          try {
+            const response = await fetch(
+              `https://api.frankfurter.app/latest?from=${translatorNoteSettings.targetCurrency}&to=${translatorNoteSettings.sourceCurrency}`
+            );
+            const data = await response.json();
+            if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
+              setTranslatorNoteSettings(prev => ({
+                ...prev,
+                exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
+                rateDate: data.date || new Date().toISOString().split('T')[0]
+              }));
+            }
+          } catch (err) {
+            console.error('Auto-fetch rate failed:', err);
+          }
+        } finally {
+          setFetchingRate(false);
+        }
+      };
+      fetchRate();
+    }
+  }, [translatorNoteEnabled, translatorNoteSettings.sourceCurrency, translatorNoteSettings.targetCurrency]);
 
   // Logo states (base64)
   const [logoLeft, setLogoLeft] = useState('');
