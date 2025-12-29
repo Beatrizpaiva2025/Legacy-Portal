@@ -16440,8 +16440,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOrders(myOrders);
 
       // Fetch translators
-      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
-      const allUsers = usersRes.data.users || [];
+      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
+      const allUsers = usersRes.data || [];
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
