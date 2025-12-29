@@ -7489,8 +7489,8 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* APPROVAL TAB - Admin and Translator */}
-      {activeSubTab === 'deliver' && (isAdmin || user?.role === 'translator') && (
+      {/* APPROVAL TAB - Admin, PM and Translator */}
+      {activeSubTab === 'deliver' && (isAdmin || isPM || user?.role === 'translator') && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
