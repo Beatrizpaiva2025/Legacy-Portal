@@ -2963,42 +2963,69 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   };
 
   // Handle external translation upload (text or images)
-  const handleExternalTranslationUpload = (event) => {
+  const handleExternalTranslationUpload = async (event) => {
     const selectedFiles = Array.from(event.target.files);
+    if (selectedFiles.length === 0) return;
 
-    // Check if any file is a text file
-    const textFiles = selectedFiles.filter(f => f.type === 'text/plain' || f.name.endsWith('.txt'));
-    const imageFiles = selectedFiles.filter(f => !f.type.includes('text'));
+    setProcessingStatus('Processing uploaded translation...');
 
-    if (textFiles.length > 0) {
-      // Read all text files and combine
-      const textPromises = textFiles.map(file => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsText(file);
-        });
-      });
-      Promise.all(textPromises).then(texts => {
-        setExternalTranslationText(texts.join('\n\n--- Page Break ---\n\n'));
-        setProcessingStatus(`✅ ${textFiles.length} translation text file(s) uploaded`);
-      });
+    for (const file of selectedFiles) {
+      const fileName = file.name.toLowerCase();
+
+      try {
+        // Word document (.docx) - convert to HTML
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+          setProcessingStatus(`Converting Word document: ${file.name}`);
+          const html = await convertWordToHtml(file);
+          setExternalTranslationText(html);
+          setProcessingStatus(`✅ Word document converted`);
+        }
+        // HTML file - read as HTML
+        else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+          setProcessingStatus(`Reading HTML: ${file.name}`);
+          const html = await readHtmlFile(file);
+          setExternalTranslationText(html);
+          setProcessingStatus(`✅ HTML file loaded`);
+        }
+        // Text file
+        else if (fileName.endsWith('.txt') || file.type === 'text/plain') {
+          setProcessingStatus(`Reading text file: ${file.name}`);
+          const text = await readTxtFile(file);
+          setExternalTranslationText(text);
+          setProcessingStatus(`✅ Text file loaded`);
+        }
+        // PDF - convert to images
+        else if (fileName.endsWith('.pdf')) {
+          setProcessingStatus(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+          });
+          // Store as full data URLs for display
+          const imageData = images.map((img, idx) => ({
+            filename: `${file.name}_page_${idx + 1}.png`,
+            data: `data:${img.type};base64,${img.data}`
+          }));
+          setExternalTranslationImages(imageData);
+          setProcessingStatus(`✅ PDF converted (${images.length} pages)`);
+        }
+        // Images (JPG, PNG, etc.)
+        else if (file.type.startsWith('image/')) {
+          const base64 = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+          });
+          setExternalTranslationImages(prev => [...prev, { filename: file.name, data: base64 }]);
+          setProcessingStatus(`✅ Image uploaded`);
+        }
+      } catch (err) {
+        console.error(`Error processing ${file.name}:`, err);
+        setProcessingStatus(`⚠️ Error processing ${file.name}`);
+      }
     }
 
-    if (imageFiles.length > 0) {
-      // Image/PDF - read as base64
-      const imagePromises = imageFiles.map(f => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve({ filename: f.name, data: reader.result });
-          reader.readAsDataURL(f);
-        });
-      });
-      Promise.all(imagePromises).then(images => {
-        setExternalTranslationImages(images);
-        setProcessingStatus(`✅ ${images.length} translation document(s) uploaded`);
-      });
-    }
+    setTimeout(() => setProcessingStatus(''), 3000);
+    event.target.value = '';
   };
 
   // Send external translation to Review
@@ -3041,6 +3068,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     if (results.length > 0) {
       setTranslationResults(results);
+    }
+
+    // Also populate Quick Package files for DELIVER tab
+    // Convert full data URLs to base64-only format
+    if (externalOriginalImages.length > 0) {
+      const origFiles = externalOriginalImages.map(img => {
+        const dataUrl = img.data;
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          return {
+            filename: img.filename,
+            data: matches[2], // Just the base64 part
+            type: matches[1]  // The mime type
+          };
+        }
+        return { filename: img.filename, data: dataUrl, type: 'image/png' };
+      });
+      setQuickOriginalFiles(origFiles);
+    }
+
+    if (externalTranslationImages.length > 0) {
+      const transFiles = externalTranslationImages.map(img => {
+        const dataUrl = img.data;
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          return {
+            filename: img.filename,
+            data: matches[2], // Just the base64 part
+            type: matches[1]  // The mime type
+          };
+        }
+        return { filename: img.filename, data: dataUrl, type: 'image/png' };
+      });
+      setQuickTranslationFiles(transFiles);
+      setQuickTranslationType('images');
+    } else if (externalTranslationText) {
+      // If text was pasted, convert to HTML for Quick Package
+      const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${externalTranslationText}</div>`;
+      setQuickTranslationHtml(html);
+      setQuickTranslationType('html');
     }
 
     setActiveSubTab('review');
@@ -6452,7 +6519,7 @@ tradução juramentada | certified translation`}
                     <input
                       ref={externalTranslationInputRef}
                       type="file"
-                      accept=".txt,.pdf,image/*"
+                      accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
                       onChange={handleExternalTranslationUpload}
                       className="hidden"
                     />
@@ -6462,6 +6529,14 @@ tradução juramentada | certified translation`}
                         <p className="text-xs text-green-700 font-medium">
                           {externalTranslationText ? 'Text uploaded' : `${externalTranslationImages.length} file(s) uploaded`}
                         </p>
+                        {/* Show translation image previews */}
+                        {externalTranslationImages.length > 0 && (
+                          <div className="mt-2 max-h-32 overflow-auto">
+                            {externalTranslationImages.map((img, idx) => (
+                              <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                            ))}
+                          </div>
+                        )}
                         <button className="mt-2 px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600">
                           Change File
                         </button>
@@ -6472,7 +6547,7 @@ tradução juramentada | certified translation`}
                         <button className="px-3 py-1.5 bg-green-500 text-white text-xs rounded hover:bg-green-600">
                           Upload Translation
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-1">TXT, PDF, or Image</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Word, PDF, HTML, TXT, or Image</p>
                       </div>
                     )}
                   </div>
@@ -6901,8 +6976,8 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* ============ PM/Admin: Upload, Proofreading & Package Section ============ */}
-              {(isAdmin || isPM) && (
+              {/* ============ Upload, Proofreading & Package Section - Available to all users ============ */}
+              {(isAdmin || isPM || user?.role === 'translator') && (
                 <div className="mt-4 border-t pt-4">
                   {/* Upload Section */}
                   <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
@@ -7133,6 +7208,56 @@ tradução juramentada | certified translation`}
                   <span className="mr-2">←</span> Back: Document
                 </button>
                 <div className="flex gap-2">
+                  {/* Upload external translation - for all users */}
+                  <label className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 cursor-pointer flex items-center gap-2">
+                    📄 Upload Translation
+                    <input
+                      type="file"
+                      accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                      multiple
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files);
+                        if (files.length === 0) return;
+                        setProcessingStatus('Processing uploaded translation...');
+
+                        for (const file of files) {
+                          const fileName = file.name.toLowerCase();
+                          try {
+                            if (fileName.endsWith('.docx')) {
+                              const html = await convertWordToHtml(file);
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                              const html = await readHtmlFile(file);
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.txt')) {
+                              const text = await readTxtFile(file);
+                              const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif;">${text}</div>`;
+                              setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
+                            } else if (fileName.endsWith('.pdf')) {
+                              const images = await convertPdfToImages(file, (page, total) => {
+                                setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                              });
+                              images.forEach(img => {
+                                const imgHtml = `<div class="pdf-page"><img src="data:${img.type};base64,${img.data}" style="max-width:100%;" /></div>`;
+                                setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '' }]);
+                              });
+                            } else if (file.type.startsWith('image/')) {
+                              const base64 = await fileToBase64(file);
+                              const imgHtml = `<div class="image-page"><img src="data:${file.type};base64,${base64}" style="max-width:100%;" /></div>`;
+                              setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '' }]);
+                            }
+                          } catch (err) {
+                            console.error('Upload error:', err);
+                          }
+                        }
+                        setProcessingStatus('✅ Translation uploaded!');
+                        setTimeout(() => setProcessingStatus(''), 3000);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+
                   {/* Save button for all users */}
                   <button
                     onClick={() => sendToProjects('save')}
@@ -7142,14 +7267,14 @@ tradução juramentada | certified translation`}
                     💾 Save Translation
                   </button>
 
-                  {/* Translator: Send to PM Review */}
+                  {/* Next: Deliver - for translators */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => sendToProjects('pm')}
-                      disabled={sendingToProjects || translationResults.length === 0}
+                      onClick={() => setActiveSubTab('deliver')}
+                      disabled={translationResults.length === 0}
                       className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
                     >
-                      📤 Send to PM Review
+                      Next: Deliver →
                     </button>
                   )}
 
@@ -7489,8 +7614,8 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* APPROVAL TAB - Admin and Translator */}
-      {activeSubTab === 'deliver' && (isAdmin || user?.role === 'translator') && (
+      {/* APPROVAL TAB - Admin, PM and Translator */}
+      {activeSubTab === 'deliver' && (isAdmin || isPM || user?.role === 'translator') && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
@@ -7592,7 +7717,7 @@ tradução juramentada | certified translation`}
               {/* Upload Translation (Ready) */}
               <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
                 <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload Ready Translation</h3>
-                <p className="text-[10px] text-green-600 mb-3">Upload your translation document</p>
+                <p className="text-[10px] text-green-600 mb-3">Upload your translation document (recommended: Word .docx)</p>
 
                 <div className={`border-2 border-dashed border-green-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-green-500'}`}>
                   <input
@@ -7611,6 +7736,26 @@ tradução juramentada | certified translation`}
                     </span>
                     <p className="text-[10px] text-gray-500 mt-1">Word (.docx), HTML, TXT, PDF, Images</p>
                   </label>
+                </div>
+
+                {/* Paste HTML/Text directly */}
+                <div className="mt-3">
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Or paste text/HTML directly:</label>
+                  <textarea
+                    placeholder="Paste your translation text or HTML here..."
+                    className="w-full h-24 px-3 py-2 text-xs border border-green-200 rounded resize-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      if (text.trim()) {
+                        // Check if it looks like HTML
+                        const isHtml = text.includes('<') && text.includes('>');
+                        const html = isHtml ? text : `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${text}</div>`;
+                        setQuickTranslationHtml(html);
+                        setQuickTranslationType('html');
+                      }
+                    }}
+                    disabled={quickPackageLoading}
+                  />
                 </div>
 
                 {/* Show HTML content indicator */}
@@ -7911,6 +8056,30 @@ tradução juramentada | certified translation`}
               <p className="text-[10px] text-gray-500 mt-2 text-center">
                 Opens print window - save as PDF
               </p>
+
+              {/* Send options after package generation */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Submit Translation</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => sendToProjects('pm')}
+                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="px-4 py-3 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
+                  </button>
+                  <button
+                    onClick={() => sendToProjects('admin')}
+                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                  >
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-2 text-center">
+                  Choose where to submit your completed translation
+                </p>
+              </div>
             </>
           )}
 
@@ -17296,12 +17465,41 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     setPmTranslationFiles(allImages);
     setPmTranslationHtml(htmlContent);
-    setProcessingStatus('');
 
-    const count = allImages.length + (htmlContent ? 1 : 0);
-    if (count > 0) {
-      alert(`✅ Translation uploaded: ${allImages.length} image(s)${htmlContent ? ' + HTML content' : ''}`);
+    // Also populate translationResults for the REVIEW editor
+    const newResults = [];
+    if (htmlContent) {
+      newResults.push({
+        translatedText: htmlContent,
+        originalText: '',
+        filename: 'uploaded_translation'
+      });
     }
+    if (allImages.length > 0) {
+      allImages.forEach((img, idx) => {
+        const imgHtml = `<div style="text-align:center;"><img src="data:${img.type || 'image/png'};base64,${img.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`;
+        newResults.push({
+          translatedText: imgHtml,
+          originalText: '',
+          filename: img.filename || `page_${idx + 1}`
+        });
+      });
+    }
+    if (newResults.length > 0) {
+      setTranslationResults(newResults);
+    }
+
+    // Also populate Quick Package variables for DELIVER tab
+    setQuickTranslationFiles(allImages);
+    if (htmlContent) {
+      setQuickTranslationHtml(htmlContent);
+      setQuickTranslationType('html');
+    } else if (allImages.length > 0) {
+      setQuickTranslationType('images');
+    }
+
+    setProcessingStatus('✅ Translation uploaded successfully!');
+    setTimeout(() => setProcessingStatus(''), 3000);
 
     event.target.value = '';
   };
