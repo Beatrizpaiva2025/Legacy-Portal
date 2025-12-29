@@ -510,12 +510,17 @@ Message: ${formData.message}
             </div>
           </div>
 
-          {/* Additional Certification Image */}
-          <div className="mt-10 flex justify-center">
+          {/* Additional Certification Images */}
+          <div className="mt-10 flex flex-wrap justify-center items-center gap-8 md:gap-12">
             <img
-              src="https://i.imgur.com/UImN4zI.png"
+              src="https://i.imgur.com/QTcTvDw.png"
               alt="Professional Certification"
-              className="max-w-full h-auto max-h-32 object-contain"
+              className="h-20 md:h-24 object-contain"
+            />
+            <img
+              src="https://i.imgur.com/cTPkw1a.png"
+              alt="Professional Certification"
+              className="h-20 md:h-24 object-contain"
             />
           </div>
         </div>
