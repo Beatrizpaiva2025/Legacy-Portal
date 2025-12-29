@@ -533,7 +533,6 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
@@ -2446,11 +2445,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         if (destination === 'save') {
           setProcessingStatus(`✅ Translation saved successfully!`);
+          // Clear status after 3 seconds for save action
+          setTimeout(() => setProcessingStatus(''), 3000);
         } else if (destination === 'pm') {
           setProcessingStatus(`✅ Translation sent to PM for review!`);
           if (isTranslator) {
             // Translator stays on translation page and goes to START tab to see other projects
-            // Don't call onBack() as it navigates to 'projects' which translators don't have access to
             setTimeout(() => {
               // Reset the form and go back to START tab
               setSelectedOrderId('');
@@ -2461,10 +2461,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setProcessingStatus('');
               // Refresh assigned orders list
               fetchAssignedOrders();
-            }, 1500);
+            }, 2000);
+          } else {
+            // For PM/Admin, just clear status after showing success
+            setTimeout(() => setProcessingStatus(''), 3000);
           }
         } else {
           setProcessingStatus(`✅ Translation sent to ${destinationLabel}!`);
+          setTimeout(() => setProcessingStatus(''), 3000);
         }
 
         // Refresh orders list
@@ -4811,7 +4815,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
@@ -6717,6 +6720,25 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✏️ Review & Edit Translation</h2>
 
+          {/* Processing Status - Important for user feedback */}
+          {processingStatus && (
+            <div className={`mb-3 p-3 rounded text-sm font-medium ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
+              'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
+            }`}>
+              {processingStatus}
+            </div>
+          )}
+
+          {/* Loading indicator when sending */}
+          {sendingToProjects && (
+            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-yellow-500 border-t-transparent"></div>
+              <span className="text-sm text-yellow-700">Processing... Please wait.</span>
+            </div>
+          )}
+
           {translationResults.length > 0 ? (
             <>
               {/* Document selector */}
@@ -7131,15 +7153,6 @@ tradução juramentada | certified translation`}
                     </button>
                   )}
 
-                  {/* Admin/PM: Go to Proofreading */}
-                  {(isAdmin || isPM) && (
-                    <button
-                      onClick={() => setActiveSubTab('proofreading')}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 flex items-center gap-2"
-                    >
-                      Next: Proofreading <span className="ml-1">→</span>
-                    </button>
-                  )}
                 </div>
               </div>
             </>
@@ -19442,10 +19455,6 @@ function AdminApp() {
       case 'users':
         return ['admin', 'pm'].includes(userRole)
           ? <UsersPage adminKey={adminKey} user={user} />
-          : <div className="p-6 text-center text-gray-500">Access denied</div>;
-      case 'review':
-        return ['admin', 'pm'].includes(userRole)
-          ? <ReviewPage adminKey={adminKey} user={user} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'settings':
         return userRole === 'admin'
