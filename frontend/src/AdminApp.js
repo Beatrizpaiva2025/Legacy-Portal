@@ -3558,8 +3558,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const execFormatCommand = (command, value = null) => {
     restoreSelection();
 
+    // Handle font size increase/decrease
+    if (command === 'increaseFontSize' || command === 'decreaseFontSize') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+
+        // Get current font size from selection or default to 12pt
+        let currentSize = 12;
+        const parentElement = range.commonAncestorContainer.parentElement;
+        if (parentElement) {
+          const computedStyle = window.getComputedStyle(parentElement);
+          currentSize = parseFloat(computedStyle.fontSize) || 12;
+        }
+
+        // Increase or decrease by 2pt
+        const newSize = command === 'increaseFontSize'
+          ? Math.min(currentSize + 2, 48)
+          : Math.max(currentSize - 2, 8);
+        span.style.fontSize = `${newSize}pt`;
+
+        try {
+          span.appendChild(range.extractContents());
+          range.insertNode(span);
+          selection.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          selection.addRange(newRange);
+        } catch (e) {
+          console.error('Error applying font size:', e);
+        }
+      }
+    }
     // Handle fontSize and fontName specially since execCommand doesn't work well for these
-    if (command === 'fontSize' || command === 'fontName') {
+    else if (command === 'fontSize' || command === 'fontName') {
       const selection = window.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
@@ -6527,33 +6560,8 @@ tradução juramentada | certified translation`}
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Font</option>
-                      <option value="Times New Roman, serif">Times New Roman</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="Courier New, monospace">Courier New</option>
-                      <option value="Garamond, serif">Garamond</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Size</option>
-                      <option value="1">8pt</option>
-                      <option value="2">10pt</option>
-                      <option value="3">12pt</option>
-                      <option value="4">14pt</option>
-                      <option value="5">18pt</option>
-                      <option value="6">24pt</option>
-                      <option value="7">36pt</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="Georgia">
-                      <option value="Arial">Arial</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Times New Roman">Times</option>
-                      <option value="Courier New">Courier</option>
-                      <option value="Verdana">Verdana</option>
-                      <option value="Tahoma">Tahoma</option>
-                    </select>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
