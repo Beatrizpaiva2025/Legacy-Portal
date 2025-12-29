@@ -7331,12 +7331,6 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
-                  {includeAuthenticityStatement && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
-                    </>
-                  )}
                   {includeCertification && (
                     <>
                       <span className="text-gray-400">→</span>
@@ -7347,6 +7341,12 @@ tradução juramentada | certified translation`}
                     <>
                       <span className="text-gray-400">→</span>
                       <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                    </>
+                  )}
+                  {includeAuthenticityStatement && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
                     </>
                   )}
                 </div>
