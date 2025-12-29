@@ -6240,6 +6240,7 @@ class TranslationData(BaseModel):
     send_to: str = "admin"  # 'pm', 'admin', or 'review'
     submitted_by: Optional[str] = None
     submitted_by_role: Optional[str] = None
+    translator_notes: Optional[str] = None  # Notes from translator to PM
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
@@ -6294,7 +6295,8 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_ready": True,
             "translation_ready_at": datetime.utcnow().isoformat(),
             "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
-            "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin")
+            "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
+            "translator_notes": data.translator_notes or ""
         }}
     )
 
