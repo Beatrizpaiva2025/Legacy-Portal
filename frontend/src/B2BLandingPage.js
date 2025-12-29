@@ -513,6 +513,15 @@ Message: ${formData.message}
               </div>
             </div>
           </div>
+
+          {/* Additional Certification Image */}
+          <div className="mt-10 flex justify-center">
+            <img
+              src="https://i.imgur.com/UImN4zI.png"
+              alt="Professional Certification"
+              className="max-w-full h-auto max-h-32 object-contain"
+            />
+          </div>
         </div>
       </section>
 
