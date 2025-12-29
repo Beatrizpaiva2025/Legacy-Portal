@@ -3843,15 +3843,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <!-- Legal Certification Statement -->
         <div style="background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
             <p style="margin: 0 0 15px 0; font-size: 11px; line-height: 1.8; text-align: justify;">
-                <strong>CERTIFICATION PURSUANT TO 8 CFR 103.2(b)(3):</strong> I, <strong>Beatriz Paiva</strong>,
-                Managing Director of Legacy Translations Inc., hereby certify that I am competent to translate
-                from ${srcLang} into ${tgtLang}, and that the attached translation is true, complete, and accurate
+                <strong>TRANSLATOR'S CERTIFICATION:</strong> I, <strong>Beatriz Paiva</strong>,
+                Legal Representative (Legacy Translations), member of the American Translators Association (ATA),
+                hereby certify that the attached translation from ${srcLang} into ${tgtLang} is true, complete, and accurate
                 to the best of my knowledge and abilities.
             </p>
             <p style="margin: 0; font-size: 11px; line-height: 1.8; text-align: justify;">
-                This certification attests only to the accuracy and completeness of the translation. We do not
-                certify or guarantee the authenticity of the original document, nor the truthfulness of the
-                statements contained therein.
+                This certification attests only to the accuracy and completeness of the translation. The translator
+                does not certify the authenticity of the original document.
             </p>
         </div>
 
@@ -3864,8 +3863,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 }
                 <div style="border-top: 1px solid #1a365d; padding-top: 5px; width: 200px;">
                     <div style="font-size: 12px; font-weight: bold; color: #1a365d;">${translatorData?.name || 'Beatriz Paiva'}</div>
-                    <div style="font-size: 10px; color: #4a5568;">${translatorData?.title || 'Managing Director'}</div>
-                    <div style="font-size: 10px; color: #4a5568;">Legacy Translations Inc.</div>
+                    <div style="font-size: 10px; color: #4a5568;">Legal Representative (Legacy Translations)</div>
+                    <div style="font-size: 10px; color: #4a5568;">ATA Member #275993</div>
                 </div>
             </div>
 
@@ -3881,15 +3880,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
         </div>
 
-        <!-- Date and Legal Reference -->
+        <!-- Date and Location -->
         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
             <div style="font-size: 12px; color: #1a365d; margin-bottom: 15px;">
                 <strong>Boston, Massachusetts, ${dateStr}</strong>
             </div>
             <div style="font-size: 9px; color: #718096; line-height: 1.6; max-width: 500px; margin: 0 auto;">
-                <strong>Legal Basis:</strong> Code of Federal Regulations, Title 8, Section 103.2(b)(3) -
-                "Any document containing foreign language submitted to USCIS shall be accompanied by a full
-                English language translation which the translator has certified as complete and accurate."
+                Legacy Translations Inc. · 867 Boylston Street, 5th Floor, #2073, Boston, MA 02116
             </div>
         </div>
 
