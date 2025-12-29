@@ -529,7 +529,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
-    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'pm', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
     { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
@@ -1789,6 +1789,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [includeCertification, setIncludeCertification] = useState(true);
+  const [includeAuthenticityStatement, setIncludeAuthenticityStatement] = useState(true); // Atestado de Autenticidade
   const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
@@ -1971,7 +1972,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
-    // Load saved logos
+    // Load saved logos from localStorage as fallback
     const savedLogoLeft = localStorage.getItem('logo_left');
     const savedLogoRight = localStorage.getItem('logo_right');
     const savedLogoStamp = localStorage.getItem('logo_stamp');
@@ -2015,6 +2016,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       loadSharedApiKey();
     }
   }, [adminKey]);
+
+  // Load shared assets (logos, stamp, signature) from backend for all users
+  useEffect(() => {
+    const loadSharedAssets = async () => {
+      if (!adminKey) return;
+      try {
+        const response = await axios.get(`${API}/admin/shared-assets?admin_key=${adminKey}`);
+        if (response.data) {
+          if (response.data.logo_left) setLogoLeft(response.data.logo_left);
+          if (response.data.logo_right) setLogoRight(response.data.logo_right);
+          if (response.data.logo_stamp) setLogoStamp(response.data.logo_stamp);
+          if (response.data.signature_image) setSignatureImage(response.data.signature_image);
+        }
+      } catch (error) {
+        console.log('Could not load shared assets from backend, using localStorage fallback');
+      }
+    };
+    loadSharedAssets();
+  }, [adminKey]);
+
+  // Function to save an individual asset to backend (admin only)
+  const saveAssetToBackend = async (assetType, value) => {
+    if (!adminKey) {
+      setProcessingStatus('❌ User not logged in');
+      return false;
+    }
+    if (user?.role !== 'admin') {
+      setProcessingStatus('❌ Only admin can save shared assets');
+      return false;
+    }
+    try {
+      const assetData = { [assetType]: value };
+      await axios.put(`${API}/admin/shared-assets?admin_key=${adminKey}`, assetData);
+      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
+      return true;
+    } catch (error) {
+      console.error('Error saving asset:', error);
+      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
+      return false;
+    }
+  };
 
   // Pre-fill from selectedOrder when coming from Projects
   useEffect(() => {
@@ -2090,15 +2132,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
       // Filter orders assigned to this user (as translator or PM) or with pending review
-      const myOrders = (response.data.orders || []).filter(order =>
-        order.assigned_translator_id === user.id ||
-        order.assigned_pm_id === user.id ||
-        order.assigned_translator === user.name ||
-        order.assigned_pm_name === user.name ||
-        // Include orders with translation ready for review (for admin/PM)
-        (user.role === 'admin' || user.role === 'pm') && (order.translation_ready || order.translation_html)
-      ).filter(order =>
-        ['received', 'in_translation', 'review', 'pending_review', 'pending_pm_review'].includes(order.translation_status) ||
+      const myOrders = (response.data.orders || []).filter(order => {
+        // For translators: check if assigned to them
+        if (user.role === 'translator') {
+          return (
+            order.assigned_translator_id === user.id ||
+            order.assigned_translator === user.name ||
+            order.assigned_translator_name === user.name
+          );
+        }
+        // For PM: check if assigned to them or ready for review
+        if (user.role === 'pm') {
+          return (
+            order.assigned_pm_id === user.id ||
+            order.assigned_pm_name === user.name ||
+            order.translation_ready ||
+            order.translation_html
+          );
+        }
+        // For admin: show all orders with translation
+        return order.translation_ready || order.translation_html;
+      }).filter(order =>
+        // Include most statuses for translators to see their work
+        ['pending', 'quote', 'received', 'in_translation', 'review', 'pending_review', 'pending_pm_review', 'client_review', 'ready'].includes(order.translation_status) ||
         order.translation_ready
       );
       setAssignedOrders(myOrders);
@@ -2390,9 +2446,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         } else if (destination === 'pm') {
           setProcessingStatus(`✅ Translation sent to PM for review!`);
           if (isTranslator) {
-            // Translator goes back or stays
+            // Translator stays on translation page and goes to START tab to see other projects
+            // Don't call onBack() as it navigates to 'projects' which translators don't have access to
             setTimeout(() => {
-              if (onBack) onBack();
+              // Reset the form and go back to START tab
+              setSelectedOrderId('');
+              setOrderNumber('');
+              setTranslationResults([]);
+              setOriginalImages([]);
+              setActiveSubTab('start');
+              setProcessingStatus('');
+              // Refresh assigned orders list
+              fetchAssignedOrders();
             }, 1500);
           }
         } else {
@@ -3494,8 +3559,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const execFormatCommand = (command, value = null) => {
     restoreSelection();
 
+    // Handle font size increase/decrease
+    if (command === 'increaseFontSize' || command === 'decreaseFontSize') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0 && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        const span = document.createElement('span');
+
+        // Get current font size from selection or default to 12pt
+        let currentSize = 12;
+        const parentElement = range.commonAncestorContainer.parentElement;
+        if (parentElement) {
+          const computedStyle = window.getComputedStyle(parentElement);
+          currentSize = parseFloat(computedStyle.fontSize) || 12;
+        }
+
+        // Increase or decrease by 2pt
+        const newSize = command === 'increaseFontSize'
+          ? Math.min(currentSize + 2, 48)
+          : Math.max(currentSize - 2, 8);
+        span.style.fontSize = `${newSize}pt`;
+
+        try {
+          span.appendChild(range.extractContents());
+          range.insertNode(span);
+          selection.removeAllRanges();
+          const newRange = document.createRange();
+          newRange.selectNodeContents(span);
+          selection.addRange(newRange);
+        } catch (e) {
+          console.error('Error applying font size:', e);
+        }
+      }
+    }
     // Handle fontSize and fontName specially since execCommand doesn't work well for these
-    if (command === 'fontSize' || command === 'fontName') {
+    else if (command === 'fontSize' || command === 'fontName') {
       const selection = window.getSelection();
       if (selection.rangeCount > 0 && !selection.isCollapsed) {
         const range = selection.getRangeAt(0);
@@ -4528,6 +4626,62 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Assigned Projects Section - For Translators */}
+          {user?.role === 'translator' && (
+            <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg p-4">
+              <h3 className="text-sm font-bold text-teal-800 mb-3">📋 Meus Projetos Atribuídos</h3>
+              {loadingAssigned ? (
+                <div className="text-center py-4 text-gray-500 text-sm">Carregando projetos...</div>
+              ) : assignedOrders.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {assignedOrders.map(order => (
+                    <div
+                      key={order.id}
+                      onClick={() => selectProject(order)}
+                      className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                        selectedOrderId === order.id
+                          ? 'bg-teal-100 border-teal-500 shadow-md'
+                          : 'bg-white border-gray-200 hover:border-teal-400 hover:shadow'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-teal-700 text-sm">{order.order_number}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded ${
+                          order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                          order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                          order.translation_status === 'review' ? 'bg-purple-100 text-purple-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {order.translation_status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 mb-1">
+                        {order.translate_from} → {order.translate_to}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {order.document_type || 'Document'} • {order.page_count || 1} página(s)
+                      </div>
+                      {order.deadline && (
+                        <div className="text-[10px] text-orange-600 mt-1">
+                          ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
+                      {selectedOrderId === order.id && (
+                        <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Projeto selecionado</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <div className="text-3xl mb-2">📭</div>
+                  <p className="text-sm">Nenhum projeto atribuído ainda</p>
+                  <p className="text-xs mt-1">Aguarde a atribuição de projetos pelo PM</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Quick Start Guide */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
@@ -5312,8 +5466,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5329,8 +5484,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5346,8 +5502,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5363,8 +5520,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
@@ -5583,37 +5741,104 @@ tradução juramentada | certified translation`}
                     <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
                   ) : selectedProjectFiles.length > 0 ? (
                     <>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         {selectedProjectFiles.map((doc, idx) => (
                           <div
                             key={doc.id}
-                            onClick={() => loadProjectFile(doc)}
-                            className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                            className={`p-3 rounded-lg transition-all ${
                               selectedFileId === doc.id
                                 ? 'bg-green-100 border-2 border-green-500 shadow-md'
-                                : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
+                                : 'bg-white border border-gray-200 hover:bg-blue-50'
                             }`}
                           >
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
-                              selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                            }`}>
-                              {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                            <div className="flex items-center gap-3">
+                              {/* File Icon and Info - Clickable to load */}
+                              <div
+                                onClick={() => loadProjectFile(doc)}
+                                className="flex items-center gap-3 flex-1 cursor-pointer"
+                              >
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                                  selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
+                                }`}>
+                                  {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className={`text-sm font-medium truncate ${
+                                    selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                                  }`}>
+                                    {doc.filename || `Arquivo ${idx + 1}`}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {selectedFileId === doc.id ? '✓ Carregado - Pronto para traduzir' : 'Clique para carregar'}
+                                  </div>
+                                </div>
+                                {selectedFileId === doc.id && (
+                                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                                    ✓
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex items-center gap-1">
+                                {/* Download Button */}
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const response = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
+                                      if (response.data.file_data) {
+                                        const link = document.createElement('a');
+                                        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+                                        link.download = doc.filename || 'document.pdf';
+                                        link.click();
+                                      }
+                                    } catch (err) {
+                                      alert('Erro ao baixar arquivo');
+                                    }
+                                  }}
+                                  className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
+                                  title="Download"
+                                >
+                                  ⬇️
+                                </button>
+
+                                {/* Replace Button - File input */}
+                                <label
+                                  className="px-2 py-1.5 bg-orange-100 text-orange-600 rounded text-xs hover:bg-orange-200 transition-colors cursor-pointer"
+                                  title="Substituir arquivo"
+                                >
+                                  🔄
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*,.pdf"
+                                    onChange={async (e) => {
+                                      const file = e.target.files[0];
+                                      if (!file) return;
+                                      try {
+                                        const reader = new FileReader();
+                                        reader.onload = async () => {
+                                          const base64 = reader.result.split(',')[1];
+                                          await axios.put(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
+                                            filename: file.name,
+                                            file_data: base64,
+                                            content_type: file.type
+                                          });
+                                          // Refresh files
+                                          const response = await axios.get(`${API}/admin/orders/${selectedOrderId}/documents?admin_key=${adminKey}`);
+                                          setSelectedProjectFiles(response.data.documents || []);
+                                          setProcessingStatus(`✅ Arquivo substituído: ${file.name}`);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      } catch (err) {
+                                        alert('Erro ao substituir arquivo');
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className={`text-sm font-medium truncate ${
-                                selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
-                              }`}>
-                                {doc.filename || `Arquivo ${idx + 1}`}
-                              </div>
-                              <div className="text-xs text-gray-400">
-                                {selectedFileId === doc.id ? '✓ Carregado - Pronto' : 'Clique para carregar'}
-                              </div>
-                            </div>
-                            {selectedFileId === doc.id && (
-                              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
-                                ✓
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
@@ -6336,33 +6561,8 @@ tradução juramentada | certified translation`}
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Font</option>
-                      <option value="Times New Roman, serif">Times New Roman</option>
-                      <option value="Arial, sans-serif">Arial</option>
-                      <option value="Georgia, serif">Georgia</option>
-                      <option value="Verdana, sans-serif">Verdana</option>
-                      <option value="Courier New, monospace">Courier New</option>
-                      <option value="Garamond, serif">Garamond</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { if(e.target.value) execFormatCommand('fontSize', e.target.value); }} className="px-1 py-1 text-[10px] border rounded">
-                      <option value="">Size</option>
-                      <option value="1">8pt</option>
-                      <option value="2">10pt</option>
-                      <option value="3">12pt</option>
-                      <option value="4">14pt</option>
-                      <option value="5">18pt</option>
-                      <option value="6">24pt</option>
-                      <option value="7">36pt</option>
-                    </select>
-                    <select onMouseDown={(e) => e.preventDefault()} onChange={(e) => { execFormatCommand('fontName', e.target.value); }} className="px-1 py-1 text-[10px] border rounded" defaultValue="Georgia">
-                      <option value="Arial">Arial</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Times New Roman">Times</option>
-                      <option value="Courier New">Courier</option>
-                      <option value="Verdana">Verdana</option>
-                      <option value="Tahoma">Tahoma</option>
-                    </select>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
@@ -7199,6 +7399,15 @@ tradução juramentada | certified translation`}
                     />
                     <span>🔐 Include Verification (QR Code)</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeAuthenticityStatement}
+                      onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                  </label>
                 </div>
               </div>
 
@@ -7215,6 +7424,12 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
+                  {includeAuthenticityStatement && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
+                    </>
+                  )}
                   {includeCertification && (
                     <>
                       <span className="text-gray-400">→</span>
@@ -7859,6 +8074,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [projectModalTab, setProjectModalTab] = useState('details');
   const [uploadingProjectDoc, setUploadingProjectDoc] = useState(false);
+  const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
   const [editingProject, setEditingProject] = useState(false);
@@ -7918,6 +8134,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [newProject, setNewProject] = useState({
     client_name: '',
     client_email: '',
+    client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
     service_type: 'standard',
@@ -8333,6 +8550,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('Error uploading document');
     } finally {
       setUploadingProjectDoc(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToDocument = async (docId, translatorId, translatorName) => {
+    try {
+      // Update local state immediately for UI feedback
+      setFileTranslatorAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      // Save to backend - update document metadata
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator to document:', err);
+      // Revert on error
+      setFileTranslatorAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
     }
   };
 
@@ -9339,7 +9581,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="bg-white rounded-lg shadow mb-4 p-4">
           <h3 className="text-sm font-bold text-gray-800 mb-3">📝 Create New Project</h3>
           <form onSubmit={createProject}>
-            <div className="grid grid-cols-4 gap-3 mb-3">
+            <div className="grid grid-cols-5 gap-3 mb-3">
               {/* Client Info */}
               <div>
                 <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
@@ -9361,6 +9603,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   required
                   className="w-full px-2 py-1.5 text-xs border rounded"
                   placeholder="client@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Phone (WhatsApp)</label>
+                <input
+                  type="tel"
+                  value={newProject.client_phone}
+                  onChange={(e) => setNewProject({...newProject, client_phone: e.target.value})}
+                  className="w-full px-2 py-1.5 text-xs border rounded"
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
               <div>
@@ -16200,6 +16452,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [translators, setTranslators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState([]);
+
+  // Project files viewing state
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectDocuments, setProjectDocuments] = useState([]);
+  const [loadingProjectDocs, setLoadingProjectDocs] = useState(false);
+  const [fileAssignments, setFileAssignments] = useState({});
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
@@ -16437,8 +16695,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOrders(myOrders);
 
       // Fetch translators
-      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}`);
-      const allUsers = usersRes.data.users || [];
+      const usersRes = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
+      const allUsers = usersRes.data || [];
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
@@ -16499,6 +16757,59 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setMessages(updatedMessages);
     localStorage.setItem(`pm_messages_${user?.id}`, JSON.stringify(updatedMessages));
     setNewMessage('');
+  };
+
+  // View project files and assign translators
+  const viewProjectFiles = async (order) => {
+    setSelectedProject(order);
+    setLoadingProjectDocs(true);
+    setProjectDocuments([]);
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      setProjectDocuments(response.data.documents || []);
+    } catch (err) {
+      console.error('Failed to fetch project documents:', err);
+    } finally {
+      setLoadingProjectDocs(false);
+    }
+  };
+
+  // Assign translator to specific document
+  const assignTranslatorToFile = async (docId, translatorId, translatorName) => {
+    try {
+      setFileAssignments(prev => ({
+        ...prev,
+        [docId]: { id: translatorId, name: translatorName }
+      }));
+
+      await axios.patch(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        assigned_translator_id: translatorId,
+        assigned_translator_name: translatorName
+      });
+    } catch (err) {
+      console.error('Failed to assign translator:', err);
+      setFileAssignments(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+      });
+    }
+  };
+
+  // Download document
+  const downloadProjectDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Erro ao baixar documento');
+    }
   };
 
   // Load review content
@@ -16852,7 +17163,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Section navigation
   const sections = [
     { id: 'overview', label: 'Visão Geral', icon: '📊' },
-    { id: 'quote', label: 'Gerar Orçamento', icon: '💰' },
     { id: 'review', label: 'Revisar Traduções', icon: '✅' },
     { id: 'team', label: 'Minha Equipe', icon: '👥' },
     { id: 'calendar', label: 'Agenda', icon: '📅' },
@@ -16982,7 +17292,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <tbody>
                   {orders.slice(0, 10).map(order => (
                     <tr key={order.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-2 font-mono text-blue-600">{order.order_number}</td>
+                      <td className="py-2 px-2">
+                        <button
+                          onClick={() => viewProjectFiles(order)}
+                          className="font-mono text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                        >
+                          {order.order_number}
+                        </button>
+                      </td>
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
                       <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
@@ -18104,21 +18421,28 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {/* Translator List */}
               <div className="border rounded-lg p-3">
                 <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
-                <div className="space-y-1">
-                  {translators.map(translator => (
-                    <button
-                      key={translator.id}
-                      onClick={() => setSelectedTranslator(translator)}
-                      className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
-                        selectedTranslator?.id === translator.id
-                          ? 'bg-teal-500 text-white'
-                          : 'hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="font-medium">{translator.name}</div>
-                      <div className="text-[10px] opacity-70">{translator.email}</div>
-                    </button>
-                  ))}
+                <div className="space-y-1 max-h-80 overflow-y-auto">
+                  {translators.length > 0 ? (
+                    translators.map(translator => (
+                      <button
+                        key={translator.id}
+                        onClick={() => setSelectedTranslator(translator)}
+                        className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                          selectedTranslator?.id === translator.id
+                            ? 'bg-teal-500 text-white'
+                            : 'hover:bg-gray-100 border border-gray-100'
+                        }`}
+                      >
+                        <div className="font-medium">{translator.name}</div>
+                        <div className="text-[10px] opacity-70">{translator.email}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 text-xs">
+                      <p>Nenhum tradutor cadastrado.</p>
+                      <p className="mt-1">Cadastre tradutores na aba "Translators".</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -18183,6 +18507,98 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT FILES MODAL - For assigning translators to files */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📁 Arquivos do Projeto {selectedProject.order_number}</h3>
+                <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-xs text-gray-500 mb-3">Selecione um tradutor para cada arquivo. Arquivos diferentes podem ser atribuídos a tradutores diferentes.</p>
+
+              {loadingProjectDocs ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
+                  Carregando arquivos...
+                </div>
+              ) : projectDocuments.length > 0 ? (
+                <div className="space-y-3">
+                  {projectDocuments.map((doc, idx) => (
+                    <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">
+                            {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                          </span>
+                          <div>
+                            <div className="text-sm font-medium">{doc.filename || 'Documento'}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => downloadProjectDocument(doc.id, doc.filename)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        >
+                          ⬇️ Download
+                        </button>
+                      </div>
+
+                      {/* Translator Assignment */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                        <span className="text-xs text-gray-500">Atribuir para:</span>
+                        <select
+                          value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
+                          onChange={(e) => {
+                            const selected = translators.find(t => t.id === e.target.value);
+                            if (selected) {
+                              assignTranslatorToFile(doc.id, selected.id, selected.name);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1.5 text-xs border rounded bg-white"
+                        >
+                          <option value="">-- Selecione o Tradutor --</option>
+                          {translators.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
+                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-sm">Nenhum arquivo encontrado neste projeto</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>

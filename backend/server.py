@@ -664,20 +664,24 @@ def get_translator_assignment_email_template(translator_name: str, order_details
                                         </p>
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                             <tr>
-                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
-                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('order_number', 'N/A')}</td>
-                                            </tr>
-                                            <tr>
-                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Client:</strong></td>
-                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('client_name', 'N/A')}</td>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Project Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('order_number', 'N/A')}</td>
                                             </tr>
                                             <tr>
                                                 <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
                                                 <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} → {order_details.get('translate_to', 'N/A').title()}</td>
                                             </tr>
                                             <tr>
-                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Word Count:</strong></td>
-                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('word_count', 0)} words</td>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Document Type:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('document_type', 'General')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Field:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('document_category', 'General').replace('_', ' ').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Pages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('page_count', 1)} page(s)</td>
                                             </tr>
                                             <tr>
                                                 <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Deadline:</strong></td>
@@ -970,6 +974,7 @@ class TranslationOrder(BaseModel):
 class TranslationOrderCreate(BaseModel):
     client_name: str
     client_email: EmailStr
+    client_phone: Optional[str] = None
     service_type: str
     translate_from: str
     translate_to: str
@@ -998,6 +1003,7 @@ class TranslationOrderUpdate(BaseModel):
     # NEW: Additional editable fields
     client_name: Optional[str] = None
     client_email: Optional[str] = None
+    client_phone: Optional[str] = None
     translate_from: Optional[str] = None
     translate_to: Optional[str] = None
     service_type: Optional[str] = None
@@ -3518,6 +3524,75 @@ async def delete_admin_user(user_id: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
+
+# ==================== SHARED ASSETS (Logos, Stamp, Signature - Global for all users) ====================
+
+class SharedAssets(BaseModel):
+    logo_left: Optional[str] = None
+    logo_right: Optional[str] = None
+    logo_stamp: Optional[str] = None
+    signature_image: Optional[str] = None
+
+@api_router.put("/admin/shared-assets")
+async def save_shared_assets(assets: SharedAssets, admin_key: str):
+    """Save shared assets (logos, stamp, signature) - Admin only"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can save shared assets
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can save shared assets")
+
+    try:
+        update_data = {"id": "shared_assets"}
+        if assets.logo_left is not None:
+            update_data["logo_left"] = assets.logo_left
+        if assets.logo_right is not None:
+            update_data["logo_right"] = assets.logo_right
+        if assets.logo_stamp is not None:
+            update_data["logo_stamp"] = assets.logo_stamp
+        if assets.signature_image is not None:
+            update_data["signature_image"] = assets.signature_image
+
+        # Upsert the shared assets document
+        await db.settings.update_one(
+            {"id": "shared_assets"},
+            {"$set": update_data},
+            upsert=True
+        )
+
+        return {"status": "success", "message": "Shared assets saved successfully"}
+    except Exception as e:
+        logger.error(f"Error saving shared assets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save assets")
+
+@api_router.get("/admin/shared-assets")
+async def get_shared_assets(admin_key: str):
+    """Get shared assets (logos, stamp, signature) - All authenticated users"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        assets = await db.settings.find_one({"id": "shared_assets"})
+        if not assets:
+            return {
+                "logo_left": "",
+                "logo_right": "",
+                "logo_stamp": "",
+                "signature_image": ""
+            }
+
+        return {
+            "logo_left": assets.get("logo_left", ""),
+            "logo_right": assets.get("logo_right", ""),
+            "logo_stamp": assets.get("logo_stamp", ""),
+            "signature_image": assets.get("signature_image", "")
+        }
+    except Exception as e:
+        logger.error(f"Error getting shared assets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get assets")
 
 # ==================== USER DOCUMENTS MANAGEMENT ====================
 
@@ -6563,16 +6638,25 @@ async def decline_translator_assignment(token: str):
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
-    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    portal_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
 
     if status == "accepted":
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
+        # Auto-redirect to translator portal after 3 seconds
+        redirect_url = f"{portal_url}/#/translation-tool"
+        redirect_script = f'''
+        <script>
+            setTimeout(function() {{
+                window.location.href = "{redirect_url}";
+            }}, 3000);
+        </script>
+        '''
         button_html = f'''
-        <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Use your email and password to access the translator portal:</p>
-        <a href="{portal_url}/translator" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Login to Translator Portal
+        <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Você será redirecionado automaticamente em 3 segundos...</p>
+        <a href="{redirect_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Portal do Tradutor
         </a>
         '''
     elif status == "declined":
@@ -6580,16 +6664,23 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#dc3545"
         title = "Assignment Declined"
         button_html = ""
+        redirect_script = ""
     elif status == "already_responded":
         icon = "ℹ"
         color = "#6c757d"
         title = "Already Responded"
-        button_html = ""
+        button_html = f'''
+        <a href="{portal_url}/#/translation-tool" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Portal do Tradutor
+        </a>
+        '''
+        redirect_script = ""
     else:
         icon = "⚠"
         color = "#ffc107"
         title = "Error"
         button_html = ""
+        redirect_script = ""
 
     return f'''<!DOCTYPE html>
 <html lang="en">
@@ -6597,6 +6688,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title} - Legacy Translations</title>
+    {redirect_script if status == "accepted" else ""}
     <style>
         body {{
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -6977,6 +7069,84 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
         }
 
     raise HTTPException(status_code=404, detail="Document not found")
+
+@api_router.patch("/admin/order-documents/{doc_id}")
+async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict):
+    """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only allow admin or PM to update
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can update document assignments")
+
+    # Fields that can be updated
+    allowed_fields = ["assigned_translator_id", "assigned_translator_name", "notes", "status"]
+    update_dict = {k: v for k, v in update_data.items() if k in allowed_fields}
+
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    # Try order_documents first
+    result = await db.order_documents.update_one(
+        {"id": doc_id},
+        {"$set": update_dict}
+    )
+
+    if result.modified_count == 0:
+        # Try main documents collection
+        result = await db.documents.update_one(
+            {"id": doc_id},
+            {"$set": update_dict}
+        )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found or no changes made")
+
+    return {"success": True, "message": "Document updated successfully"}
+
+@api_router.put("/admin/order-documents/{doc_id}")
+async def admin_replace_order_document(doc_id: str, admin_key: str, document_data: dict):
+    """Replace document content (file_data, filename, content_type)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    filename = document_data.get("filename")
+    file_data = document_data.get("file_data")
+    content_type = document_data.get("content_type", "application/pdf")
+
+    if not file_data:
+        raise HTTPException(status_code=400, detail="file_data is required")
+
+    update_dict = {
+        "data": file_data,
+        "filename": filename,
+        "content_type": content_type,
+        "replaced_at": datetime.utcnow().isoformat(),
+        "replaced_by": user_info.get("name", "Unknown")
+    }
+
+    # Try order_documents first
+    result = await db.order_documents.update_one(
+        {"id": doc_id},
+        {"$set": update_dict}
+    )
+
+    if result.modified_count == 0:
+        # Try main documents collection
+        update_dict["file_data"] = file_data  # Different field name in documents collection
+        del update_dict["data"]
+        result = await db.documents.update_one(
+            {"id": doc_id},
+            {"$set": update_dict}
+        )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {"success": True, "message": "Document replaced successfully", "filename": filename}
 
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
