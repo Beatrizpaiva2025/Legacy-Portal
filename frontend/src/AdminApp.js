@@ -5345,7 +5345,8 @@ tradução juramentada | certified translation`}
             )}
           </div>
 
-          {/* Certificate Logos Section */}
+          {/* Certificate Logos Section - Admin Only */}
+          {isAdmin && (
           <div className="bg-white rounded shadow p-4">
             <h3 className="text-xs font-bold text-gray-700 mb-3">🖼️ Certificate Logos & Signature</h3>
 
@@ -5483,6 +5484,7 @@ tradução juramentada | certified translation`}
               </div>
             </div>
           </div>
+          )}
 
           {/* Certificate Template Selector - Organized by Category */}
           <div className="bg-white rounded shadow p-3">
