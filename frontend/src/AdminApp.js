@@ -16900,8 +16900,71 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Erro ao baixar documento');
+      alert('Error downloading document');
     }
+  };
+
+  // Handle PM original document upload (with PDF to image conversion)
+  const handlePmOriginalUpload = async (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    if (selectedFiles.length === 0) return;
+
+    setProcessingStatus('Processing uploaded documents...');
+    const allDocs = [];
+
+    for (const file of selectedFiles) {
+      const fileName = file.name.toLowerCase();
+
+      // PDF - convert to images
+      if (fileName.endsWith('.pdf')) {
+        try {
+          setProcessingStatus(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
+          });
+
+          // Add converted images
+          images.forEach(img => {
+            allDocs.push({
+              filename: img.filename,
+              data: `data:${img.type};base64,${img.data}`,
+              contentType: img.type
+            });
+          });
+        } catch (err) {
+          console.error('PDF conversion error:', err);
+          alert(`Error converting PDF: ${file.name}`);
+        }
+      }
+      // Image - read directly
+      else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        const result = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        allDocs.push({
+          filename: file.name,
+          data: result,
+          contentType: file.type
+        });
+      }
+    }
+
+    if (allDocs.length > 0) {
+      // Replace all original contents with newly uploaded documents
+      setOriginalContents(allDocs);
+      setCurrentDocIndex(0);
+      setProcessingStatus('');
+      alert(`✅ ${allDocs.length} document(s) uploaded successfully!`);
+    } else {
+      setProcessingStatus('');
+    }
+
+    // Reset file input
+    event.target.value = '';
   };
 
   // Load review content
@@ -17881,9 +17944,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Original Document(s) */}
                 <div className="p-4 overflow-auto">
                   <div className="sticky top-0 bg-white py-1 z-10">
-                    <h4 className="text-sm font-bold text-gray-700 mb-2">
-                      📄 Original Documents ({originalContents.length})
-                    </h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-gray-700">
+                        📄 Original Documents ({originalContents.length})
+                      </h4>
+                      <label className="px-2 py-1 bg-orange-500 text-white text-xs rounded cursor-pointer hover:bg-orange-600">
+                        📤 Upload
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          multiple
+                          onChange={handlePmOriginalUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
                     {originalContents.length > 1 && (
                       <div className="flex items-center justify-between mb-2 bg-gray-100 rounded p-2">
                         <button
@@ -17912,15 +17987,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     )}
                   </div>
                   {originalContents.length > 0 && originalContents[currentDocIndex] ? (
-                    originalContents[currentDocIndex].contentType?.includes('image') ? (
+                    originalContents[currentDocIndex].contentType?.includes('image') || originalContents[currentDocIndex].data?.startsWith('data:image') ? (
                       <img
-                        src={`data:${originalContents[currentDocIndex].contentType};base64,${originalContents[currentDocIndex].data}`}
+                        src={originalContents[currentDocIndex].data?.startsWith('data:')
+                          ? originalContents[currentDocIndex].data
+                          : `data:${originalContents[currentDocIndex].contentType};base64,${originalContents[currentDocIndex].data}`}
                         alt="Original"
                         className="max-w-full border rounded"
                       />
                     ) : originalContents[currentDocIndex].contentType?.includes('pdf') ? (
                       <iframe
-                        src={`data:application/pdf;base64,${originalContents[currentDocIndex].data}`}
+                        src={originalContents[currentDocIndex].data?.startsWith('data:')
+                          ? originalContents[currentDocIndex].data
+                          : `data:application/pdf;base64,${originalContents[currentDocIndex].data}`}
                         className="w-full h-full border rounded"
                         title="Original PDF"
                       />
@@ -17932,7 +18011,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ) : (
                     <div className="text-center py-8 text-gray-400">
                       <div className="text-2xl mb-2">📄</div>
-                      <p className="text-xs">Documento original não encontrado</p>
+                      <p className="text-xs">Original document not found</p>
                     </div>
                   )}
                 </div>
@@ -17940,7 +18019,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Translated Document */}
                 <div className="p-4 overflow-auto">
                   <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
-                    ✍️ Tradução
+                    ✍️ Translation
                   </h4>
                   {translatedContent ? (
                     translatedContent.html ? (
@@ -17950,13 +18029,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       />
                     ) : translatedContent.contentType?.includes('image') ? (
                       <img
-                        src={`data:${translatedContent.contentType};base64,${translatedContent.data}`}
+                        src={translatedContent.data?.startsWith('data:')
+                          ? translatedContent.data
+                          : `data:${translatedContent.contentType};base64,${translatedContent.data}`}
                         alt="Translation"
                         className="max-w-full border rounded"
                       />
                     ) : translatedContent.contentType?.includes('pdf') ? (
                       <iframe
-                        src={`data:application/pdf;base64,${translatedContent.data}`}
+                        src={translatedContent.data?.startsWith('data:')
+                          ? translatedContent.data
+                          : `data:application/pdf;base64,${translatedContent.data}`}
                         className="w-full h-full border rounded"
                         title="Translation PDF"
                       />
@@ -17968,7 +18051,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   ) : (
                     <div className="text-center py-8 text-gray-400">
                       <div className="text-2xl mb-2">✍️</div>
-                      <p className="text-xs">Tradução não encontrada</p>
+                      <p className="text-xs">Translation not found</p>
                     </div>
                   )}
                 </div>
@@ -17982,7 +18065,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <textarea
                   value={correctionNotes}
                   onChange={(e) => setCorrectionNotes(e.target.value)}
-                  placeholder="Descreva as correções necessárias..."
+                  placeholder="Describe necessary corrections..."
                   className="w-full p-2 border rounded text-xs h-20 resize-none"
                 />
               </div>
