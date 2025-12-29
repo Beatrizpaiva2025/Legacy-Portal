@@ -16727,8 +16727,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
-      // Build review queue - orders with translation_status === 'review'
-      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      // Build review queue - orders ready for PM review
+      const reviewOrders = myOrders.filter(o =>
+        o.translation_status === 'review' ||
+        o.translation_status === 'pending_pm_review' ||
+        (o.translation_ready && o.translation_sent_to === 'pm')
+      );
       setReviewQueue(reviewOrders);
 
       // Calculate stats
@@ -16845,8 +16849,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setCorrectionNotes('');
     setCurrentDocIndex(0);
     setOriginalContents([]);
+    setTranslatedContent(null);
+    setPmProofreadingResult(null);
+    setPmProofreadingError('');
 
     try {
+      // Fetch the full order with translation data
+      const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const fullOrder = orderRes.data.order || orderRes.data;
+
       // Fetch documents for this order
       const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       const docs = docsRes.data.documents || [];
@@ -16870,19 +16881,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           console.error('Failed to load document:', doc.id, e);
         }
       }
+
+      // Also load images from translation_original_images if available
+      if (fullOrder.translation_original_images && fullOrder.translation_original_images.length > 0) {
+        for (const img of fullOrder.translation_original_images) {
+          if (img.data && !loadedDocs.find(d => d.filename === img.filename)) {
+            loadedDocs.push({
+              id: `img-${img.filename}`,
+              filename: img.filename,
+              data: img.data.split(',')[1] || img.data, // Handle base64 with or without prefix
+              contentType: img.data.startsWith('data:') ? img.data.split(';')[0].split(':')[1] : 'image/png'
+            });
+          }
+        }
+      }
       setOriginalContents(loadedDocs);
 
-      // Find and load translated document
-      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
-      if (translatedDoc) {
-        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+      // First, check if translation_html is saved directly in the order
+      if (fullOrder.translation_html) {
         setTranslatedContent({
-          filename: translatedDoc.filename,
-          data: transData.data.file_data,
-          contentType: transData.data.content_type,
-          html: transData.data.html_content
+          filename: 'translation.html',
+          html: fullOrder.translation_html,
+          translatorName: fullOrder.translation_translator_name,
+          translationDate: fullOrder.translation_date,
+          documentType: fullOrder.translation_document_type
         });
+      } else {
+        // Fallback: Find and load translated document from documents collection
+        const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+        if (translatedDoc) {
+          const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+          setTranslatedContent({
+            filename: translatedDoc.filename,
+            data: transData.data.file_data,
+            contentType: transData.data.content_type,
+            html: transData.data.html_content
+          });
+        }
       }
+
+      // Update selectedReview with full order data
+      setSelectedReview({ ...order, ...fullOrder });
     } catch (err) {
       console.error('Failed to load review content:', err);
     }
