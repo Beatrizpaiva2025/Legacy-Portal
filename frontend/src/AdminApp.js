@@ -19,6 +19,8 @@ const STATUS_COLORS = {
   'received': 'bg-gray-100 text-gray-700',
   'in_translation': 'bg-yellow-100 text-yellow-700',
   'review': 'bg-indigo-100 text-indigo-700',
+  'pending_pm_review': 'bg-purple-100 text-purple-700',
+  'pending_admin_approval': 'bg-blue-100 text-blue-700',
   'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-teal-100 text-teal-700'
@@ -9127,6 +9129,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'in_translation': 'In Progress',
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
+      'pending_admin_approval': 'Aguardando Admin',
       'client_review': 'Client Review',
       'ready': 'Ready',
       'delivered': 'Delivered'
@@ -16701,8 +16704,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
-      // Build review queue - orders with translation_status === 'review'
-      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      // Build review queue - orders with translation_status 'review' or 'pending_pm_review'
+      const reviewOrders = myOrders.filter(o =>
+        ['review', 'pending_pm_review'].includes(o.translation_status)
+      );
       setReviewQueue(reviewOrders);
 
       // Calculate stats
@@ -16868,9 +16873,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setSendingAction(true);
 
     try {
-      const newStatus = sendTo === 'client_review' ? 'client_review' : 'ready';
+      // PM can only send to admin for approval - admin decides final delivery
+      let newStatus;
+      let alertMessage;
+
+      if (sendTo === 'pending_admin_approval') {
+        newStatus = 'pending_admin_approval';
+        alertMessage = '✅ Tradução enviada para aprovação do Admin!';
+      } else if (sendTo === 'client_review') {
+        newStatus = 'client_review';
+        alertMessage = '✅ Enviado para revisão do cliente!';
+      } else {
+        newStatus = 'ready';
+        alertMessage = '✅ Tradução final aprovada e enviada!';
+      }
+
       await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
-        translation_status: newStatus
+        translation_status: newStatus,
+        pm_approved_at: new Date().toISOString(),
+        pm_approved_by: user?.name || 'PM'
       });
 
       // Update local state
@@ -16882,9 +16903,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOriginalContents([]);
       setTranslatedContent(null);
 
-      alert(sendTo === 'client_review'
-        ? '✅ Enviado para revisão do cliente!'
-        : '✅ Tradução final aprovada e enviada!');
+      alert(alertMessage);
     } catch (err) {
       console.error('Failed to approve:', err);
       alert('❌ Erro ao aprovar tradução');
@@ -17713,6 +17732,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     ❌ Solicitar Correção
                   </button>
                   <button
+                    onClick={() => approveTranslation('pending_admin_approval')}
+                    disabled={sendingAction}
+                    className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    📤 Enviar para Admin
+                  </button>
+                  {/* Botões desabilitados temporariamente - somente Admin pode enviar para cliente
+                  <button
                     onClick={() => approveTranslation('client_review')}
                     disabled={sendingAction}
                     className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1"
@@ -17726,6 +17753,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   >
                     ✅ Final p/ Cliente & Admin
                   </button>
+                  */}
                 </div>
               </div>
 
