@@ -3525,6 +3525,75 @@ async def delete_admin_user(user_id: str, admin_key: str):
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
+# ==================== SHARED ASSETS (Logos, Stamp, Signature - Global for all users) ====================
+
+class SharedAssets(BaseModel):
+    logo_left: Optional[str] = None
+    logo_right: Optional[str] = None
+    logo_stamp: Optional[str] = None
+    signature_image: Optional[str] = None
+
+@api_router.put("/admin/shared-assets")
+async def save_shared_assets(assets: SharedAssets, admin_key: str):
+    """Save shared assets (logos, stamp, signature) - Admin only"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can save shared assets
+    if user_info.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can save shared assets")
+
+    try:
+        update_data = {"id": "shared_assets"}
+        if assets.logo_left is not None:
+            update_data["logo_left"] = assets.logo_left
+        if assets.logo_right is not None:
+            update_data["logo_right"] = assets.logo_right
+        if assets.logo_stamp is not None:
+            update_data["logo_stamp"] = assets.logo_stamp
+        if assets.signature_image is not None:
+            update_data["signature_image"] = assets.signature_image
+
+        # Upsert the shared assets document
+        await db.settings.update_one(
+            {"id": "shared_assets"},
+            {"$set": update_data},
+            upsert=True
+        )
+
+        return {"status": "success", "message": "Shared assets saved successfully"}
+    except Exception as e:
+        logger.error(f"Error saving shared assets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save assets")
+
+@api_router.get("/admin/shared-assets")
+async def get_shared_assets(admin_key: str):
+    """Get shared assets (logos, stamp, signature) - All authenticated users"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        assets = await db.settings.find_one({"id": "shared_assets"})
+        if not assets:
+            return {
+                "logo_left": "",
+                "logo_right": "",
+                "logo_stamp": "",
+                "signature_image": ""
+            }
+
+        return {
+            "logo_left": assets.get("logo_left", ""),
+            "logo_right": assets.get("logo_right", ""),
+            "logo_stamp": assets.get("logo_stamp", ""),
+            "signature_image": assets.get("signature_image", "")
+        }
+    except Exception as e:
+        logger.error(f"Error getting shared assets: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get assets")
+
 # ==================== USER DOCUMENTS MANAGEMENT ====================
 
 @api_router.get("/admin/users/{user_id}/documents")

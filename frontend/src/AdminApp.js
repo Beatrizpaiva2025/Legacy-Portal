@@ -1971,7 +1971,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
-    // Load saved logos
+    // Load saved logos from localStorage as fallback
     const savedLogoLeft = localStorage.getItem('logo_left');
     const savedLogoRight = localStorage.getItem('logo_right');
     const savedLogoStamp = localStorage.getItem('logo_stamp');
@@ -2015,6 +2015,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       loadSharedApiKey();
     }
   }, [adminKey]);
+
+  // Load shared assets (logos, stamp, signature) from backend for all users
+  useEffect(() => {
+    const loadSharedAssets = async () => {
+      if (!adminKey) return;
+      try {
+        const response = await axios.get(`${API}/admin/shared-assets?admin_key=${adminKey}`);
+        if (response.data) {
+          if (response.data.logo_left) setLogoLeft(response.data.logo_left);
+          if (response.data.logo_right) setLogoRight(response.data.logo_right);
+          if (response.data.logo_stamp) setLogoStamp(response.data.logo_stamp);
+          if (response.data.signature_image) setSignatureImage(response.data.signature_image);
+        }
+      } catch (error) {
+        console.log('Could not load shared assets from backend, using localStorage fallback');
+      }
+    };
+    loadSharedAssets();
+  }, [adminKey]);
+
+  // Function to save an individual asset to backend (admin only)
+  const saveAssetToBackend = async (assetType, value) => {
+    if (!adminKey) {
+      setProcessingStatus('❌ User not logged in');
+      return false;
+    }
+    if (user?.role !== 'admin') {
+      setProcessingStatus('❌ Only admin can save shared assets');
+      return false;
+    }
+    try {
+      const assetData = { [assetType]: value };
+      await axios.put(`${API}/admin/shared-assets?admin_key=${adminKey}`, assetData);
+      setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
+      return true;
+    } catch (error) {
+      console.error('Error saving asset:', error);
+      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
+      return false;
+    }
+  };
 
   // Pre-fill from selectedOrder when coming from Projects
   useEffect(() => {
@@ -5381,8 +5422,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoLeftInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'left')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoLeftInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => saveAssetToBackend('logo_left', logoLeft)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoLeft && <button onClick={() => removeLogo('left')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5398,8 +5440,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoRightInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'right')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoRightInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => saveAssetToBackend('logo_right', logoRight)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoRight && <button onClick={() => removeLogo('right')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5415,8 +5458,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={logoStampInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'stamp')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => logoStampInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => saveAssetToBackend('logo_stamp', logoStamp)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && logoStamp && <button onClick={() => removeLogo('stamp')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
 
@@ -5432,8 +5476,9 @@ tradução juramentada | certified translation`}
                 </div>
                 <input ref={signatureInputRef} type="file" accept="image/*" onChange={(e) => handleLogoUpload(e, 'signature')} className="hidden" />
                 <div className="flex justify-center gap-1 mt-1">
-                  <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>
-                  {signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
+                  {user?.role === 'admin' && <button onClick={() => signatureInputRef.current?.click()} className="px-1.5 py-0.5 bg-blue-500 text-white text-[9px] rounded hover:bg-blue-600">Upload</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => saveAssetToBackend('signature_image', signatureImage)} className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] rounded hover:bg-green-600">Salvar</button>}
+                  {user?.role === 'admin' && signatureImage && <button onClick={() => removeLogo('signature')} className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] rounded hover:bg-red-600">🗑️</button>}
                 </div>
               </div>
             </div>
