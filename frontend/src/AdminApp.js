@@ -7049,59 +7049,87 @@ tradução juramentada | certified translation`}
       {/* TRANSLATOR DELIVER TAB - Quality Check & Send to PM */}
       {activeSubTab === 'deliver' && !isAdmin && !isPM && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">📤 Enviar Tradução para Revisão</h2>
+          <h2 className="text-sm font-bold mb-4">📤 Submit Translation for Review</h2>
+
+          {/* Upload External Translation */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload External Translation</h3>
+            <p className="text-xs text-gray-600 mb-3">If you completed the translation externally, upload the file here:</p>
+
+            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+              <input
+                type="file"
+                accept=".docx,.doc,.pdf,.txt,.html"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setProcessingStatus(`✅ File "${file.name}" ready for upload`);
+                  }
+                }}
+                className="hidden"
+                id="external-translation-upload"
+              />
+              <label htmlFor="external-translation-upload" className="cursor-pointer">
+                <UploadIcon className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                <span className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 inline-block">
+                  Upload Translation File
+                </span>
+                <p className="text-[10px] text-gray-500 mt-2">Supported: Word (.docx), PDF, TXT, HTML</p>
+              </label>
+            </div>
+          </div>
 
           {/* Quality Checklist */}
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-bold text-blue-700 mb-3">✅ Checklist de Qualidade</h3>
-            <p className="text-xs text-gray-600 mb-3">Verifique os itens abaixo antes de enviar:</p>
+            <h3 className="text-sm font-bold text-blue-700 mb-3">✅ Quality Checklist</h3>
+            <p className="text-xs text-gray-600 mb-3">Please verify the following items before submitting:</p>
 
             <div className="space-y-2">
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Gramática e Ortografia</span>
-                  <p className="text-[10px] text-gray-500">Verifiquei erros gramaticais e de ortografia</p>
+                  <span className="text-xs font-medium">Grammar & Spelling</span>
+                  <p className="text-[10px] text-gray-500">I have checked for grammar and spelling errors</p>
                 </div>
               </label>
 
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Terminologia</span>
-                  <p className="text-[10px] text-gray-500">Usei a terminologia correta e consistente</p>
+                  <span className="text-xs font-medium">Terminology</span>
+                  <p className="text-[10px] text-gray-500">I have used correct and consistent terminology</p>
                 </div>
               </label>
 
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Formatação</span>
-                  <p className="text-[10px] text-gray-500">A formatação está correta e consistente</p>
+                  <span className="text-xs font-medium">Formatting</span>
+                  <p className="text-[10px] text-gray-500">The formatting is correct and consistent</p>
                 </div>
               </label>
 
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Completude</span>
-                  <p className="text-[10px] text-gray-500">Todo o conteúdo foi traduzido sem omissões</p>
+                  <span className="text-xs font-medium">Completeness</span>
+                  <p className="text-[10px] text-gray-500">All content has been translated without omissions</p>
                 </div>
               </label>
 
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Números e Datas</span>
-                  <p className="text-[10px] text-gray-500">Números, datas e valores estão corretos</p>
+                  <span className="text-xs font-medium">Numbers & Dates</span>
+                  <p className="text-[10px] text-gray-500">Numbers, dates, and values are accurate</p>
                 </div>
               </label>
 
               <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
                 <div>
-                  <span className="text-xs font-medium">Nomes Próprios</span>
-                  <p className="text-[10px] text-gray-500">Nomes de pessoas, lugares e instituições estão corretos</p>
+                  <span className="text-xs font-medium">Proper Names</span>
+                  <p className="text-[10px] text-gray-500">Names of people, places, and institutions are correct</p>
                 </div>
               </label>
             </div>
@@ -7109,9 +7137,9 @@ tradução juramentada | certified translation`}
 
           {/* Translation Notes */}
           <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 className="text-sm font-bold text-gray-700 mb-2">📝 Notas para o PM (opcional)</h3>
+            <h3 className="text-sm font-bold text-gray-700 mb-2">📝 Notes for PM (optional)</h3>
             <textarea
-              placeholder="Adicione observações sobre a tradução, dúvidas ou pontos que precisam de atenção..."
+              placeholder="Add any observations about the translation, questions, or points that need attention..."
               className="w-full p-2 border rounded text-xs h-20 resize-none"
             />
           </div>
@@ -7125,16 +7153,16 @@ tradução juramentada | certified translation`}
             >
               {sendingToProjects ? (
                 <>
-                  <span className="animate-spin">⏳</span> Enviando...
+                  <span className="animate-spin">⏳</span> Sending...
                 </>
               ) : (
-                <>📤 Enviar para Revisão do PM</>
+                <>📤 Submit for PM Review</>
               )}
             </button>
           </div>
 
           <p className="text-center text-[10px] text-gray-500 mt-3">
-            Após enviar, o Project Manager irá revisar sua tradução e montar o pacote final para o cliente.
+            After submitting, the Project Manager will review your translation and prepare the final package for the client.
           </p>
         </div>
       )}
