@@ -4085,27 +4085,56 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; }
-        .translation-page { page-break-before: always; padding-top: 20px; }
+        .translation-page { page-break-before: always; padding-top: 15px; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
             text-align: left;
             font-family: 'Times New Roman', Georgia, serif;
-            font-size: 12pt;
-            line-height: 1.6;
+            font-size: 11pt;
+            line-height: 1.5;
             color: #333;
+            orphans: 4;
+            widows: 4;
         }
-        .translation-content.translation-text p { margin-bottom: 12px; text-align: justify; }
-        .translation-content.translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 8px; }
-        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 { margin: 15px 0 10px; color: #1a365d; }
-        .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 10px 0 10px 25px; }
+        .translation-content.translation-text p {
+            margin-bottom: 10px;
+            text-align: justify;
+            page-break-inside: avoid;
+        }
+        .translation-content.translation-text table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+        .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+        .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 {
+            margin: 12px 0 8px;
+            color: #1a365d;
+            page-break-after: avoid;
+        }
+        .translation-content.translation-text ul, .translation-content.translation-text ol { margin: 8px 0 8px 20px; }
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .original-documents-page { page-break-before: always; padding-top: 20px; }
-        .original-image-container { text-align: center; margin-bottom: 15px; }
-        .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-documents-page { page-break-before: always; padding-top: 15px; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
+
+        /* Bank statement / Financial document optimization */
+        .financial-doc .translation-content.translation-text {
+            font-size: 10pt;
+            line-height: 1.3;
+        }
+        .financial-doc table td { padding: 4px 6px; font-size: 9pt; }
+
         @media print {
-            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body {
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                orphans: 4;
+                widows: 4;
+            }
 
             /* Running header for HTML content pages */
             .running-header {
@@ -4521,16 +4550,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
-        .translation-page { page-break-before: always; padding-top: 20px; }
-        .page-title { font-size: 14px; font-weight: bold; text-align: center; margin: 20px 0 15px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .page-header { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 25px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; }
-        .translation-content { line-height: 1.6; font-size: 12px; }
-        .translation-content table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        .translation-content td, .translation-content th { border: 1px solid #333; padding: 6px 8px; }
-        .original-documents-page { page-break-before: always; padding-top: 20px; }
-        .original-images-wrapper { margin-top: 20px; }
-        .original-image-container { text-align: center; margin-bottom: 15px; }
-        .original-image { max-width: 100%; max-height: 600px; border: 1px solid #ddd; object-fit: contain; }
+        .translation-page { page-break-before: always; padding-top: 15px; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .page-header { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .translation-content {
+            line-height: 1.5;
+            font-size: 11pt;
+            orphans: 4;
+            widows: 4;
+        }
+        .translation-content p {
+            margin-bottom: 10px;
+            text-align: justify;
+            page-break-inside: avoid;
+        }
+        .translation-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            page-break-inside: avoid;
+        }
+        .translation-content td, .translation-content th { border: 1px solid #333; padding: 5px 6px; font-size: 10pt; }
+        .translation-content h1, .translation-content h2, .translation-content h3 { page-break-after: avoid; margin: 10px 0 8px; }
+        .original-documents-page { page-break-before: always; padding-top: 15px; }
+        .original-images-wrapper { margin-top: 15px; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         /* Certification Verification Page Styles */
         .certification-verification-page { page-break-before: always; padding-top: 20px; }
         .certification-box {
@@ -4561,9 +4606,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .verify-url { font-size: 11px; color: #1e40af; margin-bottom: 10px; word-break: break-all; }
         .cert-notice { font-size: 9px; color: #94a3b8; line-height: 1.4; max-width: 500px; margin: 0 auto; }
         @media print {
-            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body {
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                orphans: 4;
+                widows: 4;
+            }
             .logo-placeholder { border: 1px dashed #ccc; }
             .certification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            p, li { page-break-inside: avoid; }
+            h1, h2, h3, h4 { page-break-after: avoid; }
+            table { page-break-inside: avoid; }
         }
     </style>
 </head>
