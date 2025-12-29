@@ -1799,6 +1799,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [externalOriginalImages, setExternalOriginalImages] = useState([]); // Original document images
   const [externalTranslationText, setExternalTranslationText] = useState(''); // External translation text
   const [externalTranslationImages, setExternalTranslationImages] = useState([]); // External translation as images (if PDF)
+  const [translatorNotesForPM, setTranslatorNotesForPM] = useState(''); // Notes from translator to PM
 
   // Correction state
   const [correctionCommand, setCorrectionCommand] = useState('');
@@ -2397,7 +2398,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    if (translationResults.length === 0) {
+    // Check for translation content (either from AI results or external upload)
+    if (translationResults.length === 0 && !externalTranslationText) {
       alert('No translation to send');
       return;
     }
@@ -2407,8 +2409,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
 
-      // Build translation HTML (simplified for storage)
-      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      // Build translation HTML from either translation results or external text
+      const translationHTML = translationResults.length > 0
+        ? translationResults.map(r => r.translatedText).join('\n\n---\n\n')
+        : externalTranslationText;
 
       // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
@@ -2427,7 +2431,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_stamp: logoStamp,
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
-        submitted_by_role: user?.role || 'unknown'
+        submitted_by_role: user?.role || 'unknown',
+        translator_notes: translatorNotesForPM || ''
       });
 
       const destinationLabels = {
@@ -7051,33 +7056,92 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-4">📤 Submit Translation for Review</h2>
 
-          {/* Upload External Translation */}
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload External Translation</h3>
-            <p className="text-xs text-gray-600 mb-3">If you completed the translation externally, upload the file here:</p>
-
-            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
-              <input
-                type="file"
-                accept=".docx,.doc,.pdf,.txt,.html"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setProcessingStatus(`✅ File "${file.name}" ready for upload`);
-                  }
-                }}
-                className="hidden"
-                id="external-translation-upload"
-              />
-              <label htmlFor="external-translation-upload" className="cursor-pointer">
-                <UploadIcon className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                <span className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 inline-block">
-                  Upload Translation File
+          {/* Translation Status */}
+          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-600">Translation Status:</span>
+              {translationResults.length > 0 ? (
+                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                  ✅ {translationResults.length} page(s) translated
                 </span>
-                <p className="text-[10px] text-gray-500 mt-2">Supported: Word (.docx), PDF, TXT, HTML</p>
-              </label>
+              ) : externalTranslationText ? (
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                  📄 External translation loaded
+                </span>
+              ) : (
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">
+                  ⚠️ No translation yet
+                </span>
+              )}
             </div>
           </div>
+
+          {/* Upload External Translation - Only show if no translation exists */}
+          {translationResults.length === 0 && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload External Translation</h3>
+              <p className="text-xs text-gray-600 mb-3">If you completed the translation externally, upload the file here:</p>
+
+              <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+                <input
+                  type="file"
+                  accept=".docx,.doc,.txt,.html"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    setProcessingStatus(`⏳ Processing "${file.name}"...`);
+
+                    try {
+                      if (file.name.endsWith('.txt') || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+                        // Read as text
+                        const text = await file.text();
+                        setExternalTranslationText(text);
+                        setProcessingStatus(`✅ File "${file.name}" loaded successfully`);
+                      } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+                        // Read Word document using mammoth
+                        const arrayBuffer = await file.arrayBuffer();
+                        const result = await mammoth.convertToHtml({ arrayBuffer });
+                        setExternalTranslationText(result.value);
+                        setProcessingStatus(`✅ Word document "${file.name}" converted successfully`);
+                      } else {
+                        setProcessingStatus(`❌ Unsupported file type`);
+                      }
+                    } catch (err) {
+                      console.error('File processing error:', err);
+                      setProcessingStatus(`❌ Error processing file: ${err.message}`);
+                    }
+                  }}
+                  className="hidden"
+                  id="external-translation-upload-deliver"
+                />
+                <label htmlFor="external-translation-upload-deliver" className="cursor-pointer">
+                  <UploadIcon className="w-8 h-8 mx-auto mb-2 text-green-600" />
+                  <span className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 inline-block">
+                    Upload Translation File
+                  </span>
+                  <p className="text-[10px] text-gray-500 mt-2">Supported: Word (.docx), TXT, HTML</p>
+                </label>
+              </div>
+
+              {externalTranslationText && (
+                <div className="mt-3 p-2 bg-white rounded border border-green-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-green-700">✅ Translation Loaded</span>
+                    <button
+                      onClick={() => setExternalTranslationText('')}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-gray-500 max-h-20 overflow-y-auto">
+                    {externalTranslationText.substring(0, 200)}...
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Quality Checklist */}
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -7139,6 +7203,8 @@ tradução juramentada | certified translation`}
           <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
             <h3 className="text-sm font-bold text-gray-700 mb-2">📝 Notes for PM (optional)</h3>
             <textarea
+              value={translatorNotesForPM}
+              onChange={(e) => setTranslatorNotesForPM(e.target.value)}
               placeholder="Add any observations about the translation, questions, or points that need attention..."
               className="w-full p-2 border rounded text-xs h-20 resize-none"
             />
@@ -7148,7 +7214,7 @@ tradução juramentada | certified translation`}
           <div className="flex justify-center">
             <button
               onClick={() => sendToProjects('pm')}
-              disabled={sendingToProjects || translationResults.length === 0}
+              disabled={sendingToProjects || (translationResults.length === 0 && !externalTranslationText)}
               className="px-8 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
             >
               {sendingToProjects ? (
@@ -16727,8 +16793,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
-      // Build review queue - orders with translation_status === 'review'
-      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      // Build review queue - orders ready for PM review
+      const reviewOrders = myOrders.filter(o =>
+        o.translation_status === 'review' ||
+        o.translation_status === 'pending_pm_review' ||
+        (o.translation_ready && o.translation_sent_to === 'pm')
+      );
       setReviewQueue(reviewOrders);
 
       // Calculate stats
@@ -16845,8 +16915,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setCorrectionNotes('');
     setCurrentDocIndex(0);
     setOriginalContents([]);
+    setTranslatedContent(null);
+    setPmProofreadingResult(null);
+    setPmProofreadingError('');
 
     try {
+      // Fetch the full order with translation data
+      const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const fullOrder = orderRes.data.order || orderRes.data;
+
       // Fetch documents for this order
       const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       const docs = docsRes.data.documents || [];
@@ -16870,19 +16947,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           console.error('Failed to load document:', doc.id, e);
         }
       }
+
+      // Also load images from translation_original_images if available
+      if (fullOrder.translation_original_images && fullOrder.translation_original_images.length > 0) {
+        for (const img of fullOrder.translation_original_images) {
+          if (img.data && !loadedDocs.find(d => d.filename === img.filename)) {
+            loadedDocs.push({
+              id: `img-${img.filename}`,
+              filename: img.filename,
+              data: img.data.split(',')[1] || img.data, // Handle base64 with or without prefix
+              contentType: img.data.startsWith('data:') ? img.data.split(';')[0].split(':')[1] : 'image/png'
+            });
+          }
+        }
+      }
       setOriginalContents(loadedDocs);
 
-      // Find and load translated document
-      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
-      if (translatedDoc) {
-        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+      // First, check if translation_html is saved directly in the order
+      if (fullOrder.translation_html) {
         setTranslatedContent({
-          filename: translatedDoc.filename,
-          data: transData.data.file_data,
-          contentType: transData.data.content_type,
-          html: transData.data.html_content
+          filename: 'translation.html',
+          html: fullOrder.translation_html,
+          translatorName: fullOrder.translation_translator_name,
+          translationDate: fullOrder.translation_date,
+          documentType: fullOrder.translation_document_type
         });
+      } else {
+        // Fallback: Find and load translated document from documents collection
+        const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+        if (translatedDoc) {
+          const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
+          setTranslatedContent({
+            filename: translatedDoc.filename,
+            data: transData.data.file_data,
+            contentType: transData.data.content_type,
+            html: transData.data.html_content
+          });
+        }
       }
+
+      // Update selectedReview with full order data
+      setSelectedReview({ ...order, ...fullOrder });
     } catch (err) {
       console.error('Failed to load review content:', err);
     }
@@ -17860,6 +17965,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <p className="text-xs text-gray-500">
                     Cliente: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
                   </p>
+                  {selectedReview.translator_notes && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                      <p className="text-xs text-blue-600 font-medium">📝 Translator Notes:</p>
+                      <p className="text-xs text-blue-800">{selectedReview.translator_notes}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button
