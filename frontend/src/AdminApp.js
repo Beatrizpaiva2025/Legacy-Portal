@@ -6976,8 +6976,8 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
-              {/* ============ PM/Admin: Upload, Proofreading & Package Section ============ */}
-              {(isAdmin || isPM) && (
+              {/* ============ Upload, Proofreading & Package Section - Available to all users ============ */}
+              {(isAdmin || isPM || user?.role === 'translator') && (
                 <div className="mt-4 border-t pt-4">
                   {/* Upload Section */}
                   <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
@@ -17445,12 +17445,41 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
     setPmTranslationFiles(allImages);
     setPmTranslationHtml(htmlContent);
-    setProcessingStatus('');
 
-    const count = allImages.length + (htmlContent ? 1 : 0);
-    if (count > 0) {
-      alert(`✅ Translation uploaded: ${allImages.length} image(s)${htmlContent ? ' + HTML content' : ''}`);
+    // Also populate translationResults for the REVIEW editor
+    const newResults = [];
+    if (htmlContent) {
+      newResults.push({
+        translatedText: htmlContent,
+        originalText: '',
+        filename: 'uploaded_translation'
+      });
     }
+    if (allImages.length > 0) {
+      allImages.forEach((img, idx) => {
+        const imgHtml = `<div style="text-align:center;"><img src="data:${img.type || 'image/png'};base64,${img.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`;
+        newResults.push({
+          translatedText: imgHtml,
+          originalText: '',
+          filename: img.filename || `page_${idx + 1}`
+        });
+      });
+    }
+    if (newResults.length > 0) {
+      setTranslationResults(newResults);
+    }
+
+    // Also populate Quick Package variables for DELIVER tab
+    setQuickTranslationFiles(allImages);
+    if (htmlContent) {
+      setQuickTranslationHtml(htmlContent);
+      setQuickTranslationType('html');
+    } else if (allImages.length > 0) {
+      setQuickTranslationType('images');
+    }
+
+    setProcessingStatus('✅ Translation uploaded successfully!');
+    setTimeout(() => setProcessingStatus(''), 3000);
 
     event.target.value = '';
   };
