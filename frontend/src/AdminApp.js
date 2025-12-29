@@ -2395,16 +2395,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
 
     if (!selectedOrderId) {
-      alert('Please select an order to link this translation');
+      alert('Please select an order to link this translation.\n\nGo to the START tab and select a project first.');
       return;
     }
 
     if (translationResults.length === 0) {
-      alert('No translation to send');
+      alert('No translation to save. Please translate the document first.');
       return;
     }
 
     setSendingToProjects(true);
+    setProcessingStatus(destination === 'save' ? '💾 Saving translation...' : '📤 Sending translation...');
     try {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
@@ -6878,6 +6879,229 @@ tradução juramentada | certified translation`}
                 </div>
               )}
 
+              {/* ============ PM/Admin: Upload, Proofreading & Package Section ============ */}
+              {(isAdmin || isPM) && (
+                <div className="mt-4 border-t pt-4">
+                  {/* Upload Section */}
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+                    <h3 className="text-sm font-bold text-gray-700 mb-3">📤 Upload Documents</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Upload Translation */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Translation File</label>
+                        <label className="flex items-center justify-center px-4 py-3 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
+                          📄 Upload Translation
+                          <input
+                            type="file"
+                            accept="image/*,.pdf,.docx,.html,.htm,.txt"
+                            multiple
+                            onChange={handlePmTranslationUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {(pmTranslationFiles.length > 0 || pmTranslationHtml) && (
+                          <p className="text-xs text-green-600 mt-2">
+                            ✓ {pmTranslationFiles.length} image(s){pmTranslationHtml ? ' + HTML' : ''} loaded
+                          </p>
+                        )}
+                      </div>
+                      {/* Upload Original */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Original Document</label>
+                        <label className="flex items-center justify-center px-4 py-3 bg-orange-500 text-white text-sm rounded cursor-pointer hover:bg-orange-600 transition">
+                          📎 Upload Original
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            multiple
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files);
+                              if (files.length === 0) return;
+                              setProcessingStatus('Processing original documents...');
+                              const allDocs = [];
+                              for (const file of files) {
+                                const fileName = file.name.toLowerCase();
+                                if (fileName.endsWith('.pdf')) {
+                                  try {
+                                    const images = await convertPdfToImages(file, (page, total) => {
+                                      setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                                    });
+                                    images.forEach(img => {
+                                      allDocs.push({ filename: img.filename, data: img.data, type: img.type });
+                                    });
+                                  } catch (err) {
+                                    console.error('PDF conversion error:', err);
+                                  }
+                                } else if (file.type.startsWith('image/')) {
+                                  const reader = new FileReader();
+                                  const result = await new Promise((resolve, reject) => {
+                                    reader.onload = (ev) => resolve(ev.target.result);
+                                    reader.onerror = reject;
+                                    reader.readAsDataURL(file);
+                                  });
+                                  const base64 = result.split(',')[1];
+                                  allDocs.push({ filename: file.name, data: base64, type: file.type });
+                                }
+                              }
+                              if (allDocs.length > 0) {
+                                setOriginalImages(allDocs.map(d => ({
+                                  filename: d.filename,
+                                  data: d.data.startsWith('data:') ? d.data : `data:${d.type};base64,${d.data}`
+                                })));
+                              }
+                              setProcessingStatus('');
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                        {originalImages.length > 0 && (
+                          <p className="text-xs text-orange-600 mt-2">
+                            ✓ {originalImages.length} original document(s) loaded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Proofreading Section */}
+                  <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-bold text-purple-700">🔍 Proofreading</h3>
+                      <button
+                        onClick={async () => {
+                          if (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length) {
+                            alert('Please upload or translate a document first');
+                            return;
+                          }
+                          setIsProofreading(true);
+                          setProofreadingError('');
+                          try {
+                            const textToProofread = translationResults.length > 0
+                              ? translationResults.map(r => r.translatedText).join('\n\n')
+                              : pmTranslationHtml || 'No text available';
+
+                            const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
+                              text: textToProofread,
+                              source_language: sourceLanguage,
+                              target_language: targetLanguage
+                            });
+                            setProofreadingResult(response.data);
+                          } catch (err) {
+                            setProofreadingError(err.response?.data?.detail || err.message);
+                          } finally {
+                            setIsProofreading(false);
+                          }
+                        }}
+                        disabled={isProofreading}
+                        className="px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-400"
+                      >
+                        {isProofreading ? '⏳ Analyzing...' : '🔍 Run Proofreading'}
+                      </button>
+                    </div>
+
+                    {proofreadingError && (
+                      <div className="p-3 bg-red-100 text-red-700 text-xs rounded mb-3">
+                        ❌ {proofreadingError}
+                      </div>
+                    )}
+
+                    {proofreadingResult && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                          <div className="text-center p-3 bg-white rounded border">
+                            <div className="text-2xl font-bold text-purple-600">{proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}</div>
+                            <div className="text-xs text-gray-500">Quality Score</div>
+                          </div>
+                          <div className="flex-1 text-xs">
+                            <p><strong>Summary:</strong> {proofreadingResult.resumo || proofreadingResult.summary || 'Analysis complete'}</p>
+                          </div>
+                        </div>
+                        {(proofreadingResult.erros || proofreadingResult.errors) && (
+                          <div className="p-3 bg-white rounded border text-xs">
+                            <p className="font-bold mb-2">Issues Found:</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              {(proofreadingResult.erros || proofreadingResult.errors || []).map((e, i) => (
+                                <li key={i}>{typeof e === 'string' ? e : e.description || e.erro}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Package Generator */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h3 className="text-sm font-bold text-blue-700 mb-3">📦 Generate Package</h3>
+
+                    {/* Package Options */}
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
+                        <input
+                          type="checkbox"
+                          checked={includeCover}
+                          onChange={(e) => setIncludeCover(e.target.checked)}
+                          className="mr-2"
+                        />
+                        <div>
+                          <div className="text-sm font-medium">📜 Certificate</div>
+                          <div className="text-xs text-gray-500">Cover letter with certification</div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          disabled
+                          className="mr-2"
+                        />
+                        <div>
+                          <div className="text-sm font-medium">📄 Translation</div>
+                          <div className="text-xs text-gray-500">Translated document (required)</div>
+                        </div>
+                      </label>
+
+                      <label className="flex items-center p-3 bg-white rounded border cursor-pointer hover:bg-blue-100 transition">
+                        <input
+                          type="checkbox"
+                          checked={includeOriginal}
+                          onChange={(e) => setIncludeOriginal(e.target.checked)}
+                          className="mr-2"
+                        />
+                        <div>
+                          <div className="text-sm font-medium">📎 Original</div>
+                          <div className="text-xs text-gray-500">Original document</div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Additional Options */}
+                    <div className="flex items-center gap-4 mb-4">
+                      <label className="flex items-center text-xs">
+                        <input
+                          type="checkbox"
+                          checked={includeLetterhead}
+                          onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                          className="mr-2"
+                        />
+                        Include Letterhead on all pages
+                      </label>
+                    </div>
+
+                    {/* Generate Button */}
+                    <button
+                      onClick={handlePmPackageDownload}
+                      disabled={pmPackageGenerating || (translationResults.length === 0 && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
+                      className="w-full px-4 py-3 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                    >
+                      {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate & Download Package'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
                 <button
@@ -10082,8 +10306,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="font-medium text-gray-800">{order.client_name}</span>
                         <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
-                      {/* Send translation button - shows when ready, review, or delivered (for resend) */}
-                      {['ready', 'review', 'delivered'].includes(order.translation_status) && (isAdmin || isPM) && (
+                      {/* Send translation button - Admin only - shows when ready, review, or delivered (for resend) */}
+                      {['ready', 'review', 'delivered', 'pending_admin_approval'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
                           className={`px-1 py-0.5 rounded text-[9px] ${
@@ -10364,7 +10588,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'review' && (
+                          {/* Admin only: Send to Client Review and Mark as Final */}
+                          {isAdmin && order.translation_status === 'review' && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
@@ -10383,7 +10608,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'client_review' && (
+                          {/* Admin only: Client review actions */}
+                          {isAdmin && order.translation_status === 'client_review' && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
@@ -10402,7 +10628,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {(isAdmin || isPM) && order.translation_status === 'ready' && (
+                          {/* Admin only: Deliver to Client */}
+                          {isAdmin && order.translation_status === 'ready' && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
@@ -11080,7 +11307,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                   )}
 
-                  {/* Delivery Info & Resend Option */}
+                  {/* Delivery Info & Resend Option - Admin only */}
                   {viewingOrder.translation_status === 'delivered' && (
                     <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
                       <div className="text-xs font-medium text-teal-700 mb-2">📤 Delivery Information</div>
@@ -11092,20 +11319,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="text-xs text-gray-600 mb-3">
                         Sent to: {viewingOrder.client_email}
                       </div>
-                      <button
-                        onClick={() => {
-                          setViewingOrder(null);
-                          openSendToClientModal(viewingOrder);
-                        }}
-                        className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
-                      >
-                        🔄 Resend Translation
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setViewingOrder(null);
+                            openSendToClientModal(viewingOrder);
+                          }}
+                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
+                        >
+                          🔄 Resend Translation
+                        </button>
+                      )}
                     </div>
                   )}
 
-                  {/* Translation Ready - option to send */}
-                  {viewingOrder.translation_ready && viewingOrder.translation_status !== 'delivered' && (
+                  {/* Translation Ready - option to send - Admin only */}
+                  {viewingOrder.translation_ready && viewingOrder.translation_status !== 'delivered' && isAdmin && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                       <div className="text-xs font-medium text-green-700 mb-2">✅ Translation Ready</div>
                       <div className="text-xs text-gray-600 mb-3">
@@ -17066,8 +17295,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Generate PM Package (same format as Quick Package)
   const handlePmPackageDownload = async () => {
-    if (pmTranslationFiles.length === 0 && !pmTranslationHtml && originalContents.length === 0) {
-      alert('Please upload translation and/or original documents first');
+    // Check for any translation source: pmTranslationFiles, pmTranslationHtml, or translationResults
+    const hasTranslation = pmTranslationFiles.length > 0 || pmTranslationHtml || translationResults.length > 0;
+    // Check for any original source: originalContents or originalImages
+    const hasOriginal = originalContents.length > 0 || originalImages.length > 0;
+
+    if (!hasTranslation) {
+      alert('Please upload or create a translation first');
       return;
     }
 
@@ -17173,9 +17407,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
         <div class="header-line"></div>`;
 
-    // Translation pages
+    // Translation pages - use pmTranslationHtml, pmTranslationFiles, or translationResults
     let translationPagesHTML = '';
 
+    // Priority 1: PM uploaded HTML content
     if (pmTranslationHtml) {
       translationPagesHTML = `
     <div class="translation-text-page">
@@ -17190,7 +17425,24 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
     </div>`;
     }
+    // Priority 2: translationResults from workspace
+    else if (translationResults.length > 0 && pmTranslationFiles.length === 0) {
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n');
+      translationPagesHTML = `
+    <div class="translation-text-page">
+        ${includeLetterhead ? `
+        <div class="running-header">
+            ${letterheadHTML}
+        </div>
+        <div class="running-header-spacer"></div>
+        ` : ''}
+        <div class="translation-content translation-text">
+            ${translationHTML}
+        </div>
+    </div>`;
+    }
 
+    // Add PM uploaded translation images
     if (pmTranslationFiles.length > 0) {
       translationPagesHTML += pmTranslationFiles.map((file, idx) => `
     <div class="translation-page">
@@ -17201,10 +17453,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     </div>`).join('');
     }
 
-    // Original document pages (from originalContents)
-    const originalPagesHTML = (includeOriginal && originalContents.length > 0) ? originalContents.map((doc, idx) => {
-      const imgSrc = doc.data?.startsWith('data:') ? doc.data : `data:${doc.contentType || 'image/png'};base64,${doc.data}`;
-      return `
+    // Original document pages - use originalContents or originalImages
+    let originalPagesHTML = '';
+    const origDocs = originalContents.length > 0 ? originalContents : originalImages;
+
+    if (includeOriginal && origDocs.length > 0) {
+      originalPagesHTML = origDocs.map((doc, idx) => {
+        const imgSrc = doc.data?.startsWith('data:') ? doc.data : `data:${doc.contentType || doc.type || 'image/png'};base64,${doc.data}`;
+        return `
     <div class="original-documents-page">
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
@@ -17212,7 +17468,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <img src="${imgSrc}" alt="Original page ${idx + 1}" class="original-image" />
         </div>
     </div>`;
-    }).join('') : '';
+      }).join('');
+    }
 
     // Complete HTML
     const fullHTML = `<!DOCTYPE html>
@@ -17301,7 +17558,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     </style>
 </head>
 <body>
-    ${coverLetterHTML}
+    ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
 </body>
@@ -17423,29 +17680,47 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
-  // Approve translation
+  // Approve translation - PM can ONLY send to Admin
   const approveTranslation = async (sendTo) => {
     if (!selectedReview) return;
+
+    // PM can only send to Admin - enforce this
+    if (!isAdmin && sendTo !== 'pending_admin_approval') {
+      alert('PM can only send translations to Admin for approval');
+      return;
+    }
+
     setSendingAction(true);
 
     try {
-      // PM can only send to admin for approval - admin decides final delivery
       let newStatus;
       let alertMessage;
+      let translationReady = false;
 
       if (sendTo === 'pending_admin_approval') {
         newStatus = 'pending_admin_approval';
-        alertMessage = '✅ Tradução enviada para aprovação do Admin!';
-      } else if (sendTo === 'client_review') {
+        alertMessage = '✅ Translation sent to Admin for approval!';
+        translationReady = true; // Now ready for Admin to review and send to client
+      } else if (isAdmin && sendTo === 'client_review') {
+        // Admin only
         newStatus = 'client_review';
-        alertMessage = '✅ Enviado para revisão do cliente!';
-      } else {
+        alertMessage = '✅ Sent to client for review!';
+        translationReady = true;
+      } else if (isAdmin) {
+        // Admin only - mark as ready
         newStatus = 'ready';
-        alertMessage = '✅ Tradução final aprovada e enviada!';
+        alertMessage = '✅ Translation approved and ready!';
+        translationReady = true;
+      } else {
+        // Fallback for PM - always send to admin
+        newStatus = 'pending_admin_approval';
+        alertMessage = '✅ Translation sent to Admin for approval!';
+        translationReady = true;
       }
 
       await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
         translation_status: newStatus,
+        translation_ready: translationReady,
         pm_approved_at: new Date().toISOString(),
         pm_approved_by: user?.name || 'PM'
       });

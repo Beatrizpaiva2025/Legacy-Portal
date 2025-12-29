@@ -6263,15 +6263,27 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
 
     # Determine status based on destination
     destination = data.send_to or "admin"
-    if destination == "pm":
+    if destination == "save":
+        # Just saving - keep current status or set to 'in_progress' (draft)
+        new_status = order.get("translation_status") or "in_progress"
+        status_message = "Translation saved successfully"
+        translation_ready = False  # Not ready yet, just saved
+    elif destination == "pm":
         new_status = "pending_pm_review"
         status_message = "Translation saved and sent to PM for review"
+        translation_ready = False  # Not ready for client yet - PM needs to review first
     elif destination == "review":
         new_status = "pending_review"
         status_message = "Translation submitted for Admin/PM review"
+        translation_ready = False  # Not ready for client yet - needs review
+    elif destination == "pending_admin_approval":
+        new_status = "pending_admin_approval"
+        status_message = "Translation sent to Admin for approval"
+        translation_ready = True  # PM approved - ready for Admin to send to client
     else:
         new_status = "review"
         status_message = "Translation saved and sent to Admin for review"
+        translation_ready = True
 
     # Update order with translation data
     await db.translation_orders.update_one(
@@ -6292,7 +6304,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_logo_stamp": data.logo_stamp,
             "translation_status": new_status,
             "translation_sent_to": destination,
-            "translation_ready": True,
+            "translation_ready": translation_ready,
             "translation_ready_at": datetime.utcnow().isoformat(),
             "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
             "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
