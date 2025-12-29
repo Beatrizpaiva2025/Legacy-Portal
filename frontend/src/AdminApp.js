@@ -2940,7 +2940,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           });
         } catch (err) {
           console.error('PDF conversion error:', err);
-          setProcessingStatus(`❌ Error converting PDF: ${file.name}`);
+          setProcessingStatus(`⚠️ PDF conversion failed: ${file.name}. Try uploading as images instead.`);
+          setTimeout(() => setProcessingStatus(''), 5000);
         }
       }
       // Images - read as data URL
@@ -6795,11 +6796,76 @@ tradução juramentada | certified translation`}
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✏️ Review & Edit Translation</h2>
 
+          {/* ========== UPLOAD & PROOFREADING - ALWAYS VISIBLE AT TOP ========== */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              {/* Upload Translation */}
+              <div>
+                <label className="flex items-center justify-center px-4 py-2 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
+                  📄 Upload Translation (Word/HTML/TXT)
+                  <input
+                    type="file"
+                    accept=".docx,.doc,.html,.htm,.txt,image/*"
+                    multiple
+                    onChange={handlePmTranslationUpload}
+                    className="hidden"
+                  />
+                </label>
+                {(pmTranslationFiles.length > 0 || pmTranslationHtml || translationResults.length > 0) && (
+                  <p className="text-xs text-green-600 mt-1 text-center">✓ Translation loaded</p>
+                )}
+              </div>
+              {/* Proofreading */}
+              <div>
+                <button
+                  onClick={async () => {
+                    if (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length) {
+                      alert('Please upload or translate a document first');
+                      return;
+                    }
+                    setIsProofreading(true);
+                    setProofreadingError('');
+                    try {
+                      const textToProofread = translationResults.length > 0
+                        ? translationResults.map(r => r.translatedText).join('\n\n')
+                        : pmTranslationHtml || 'No text available';
+                      const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
+                        text: textToProofread,
+                        source_language: sourceLanguage,
+                        target_language: targetLanguage
+                      });
+                      setProofreadingResult(response.data);
+                    } catch (err) {
+                      setProofreadingError(err.response?.data?.detail || err.message);
+                    } finally {
+                      setIsProofreading(false);
+                    }
+                  }}
+                  disabled={isProofreading || (!translationResults.length && !pmTranslationHtml && !pmTranslationFiles.length)}
+                  className="w-full px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                  {isProofreading ? '⏳ Analyzing...' : '🔍 Run Proofreading'}
+                </button>
+              </div>
+            </div>
+            {/* Proofreading Results */}
+            {proofreadingError && (
+              <div className="p-2 bg-red-100 text-red-700 text-xs rounded mb-2">❌ {proofreadingError}</div>
+            )}
+            {proofreadingResult && (
+              <div className="p-2 bg-purple-100 rounded text-xs">
+                <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
+                {proofreadingResult.resumo && <span className="ml-2 text-gray-600">- {proofreadingResult.resumo}</span>}
+              </div>
+            )}
+          </div>
+
           {/* Processing Status - Important for user feedback */}
           {processingStatus && (
             <div className={`mb-3 p-3 rounded text-sm font-medium ${
               processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
               processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
+              processingStatus.includes('Error') ? 'bg-red-100 text-red-700 border border-red-300' :
               'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
             }`}>
               {processingStatus}
@@ -17349,7 +17415,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           });
         } catch (err) {
           console.error('PDF conversion error:', err);
-          alert(`Error converting PDF: ${file.name}`);
+          setProcessingStatus(`⚠️ PDF conversion failed. Upload as images or Word/HTML instead.`);
+          setTimeout(() => setProcessingStatus(''), 5000);
         }
       }
       // Image - read directly
@@ -17411,7 +17478,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           });
         } catch (err) {
           console.error('PDF conversion error:', err);
-          alert(`Error converting PDF: ${file.name}`);
+          setProcessingStatus(`⚠️ PDF failed - use Word/HTML instead`);
+          setTimeout(() => setProcessingStatus(''), 5000);
         }
       }
       // HTML file
