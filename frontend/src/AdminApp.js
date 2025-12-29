@@ -3843,7 +3843,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <!-- Legal Certification Statement -->
         <div style="background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
             <p style="margin: 0 0 15px 0; font-size: 11px; line-height: 1.8; text-align: justify;">
-                <strong>TRANSLATOR'S CERTIFICATION:</strong> I, <strong>Beatriz Paiva</strong>,
+                <strong>CERTIFICATE OF TRANSLATION AUTHENTICITY:</strong> I, <strong>Beatriz Paiva</strong>,
                 Legal Representative (Legacy Translations), member of the American Translators Association (ATA),
                 hereby certify that the attached translation from ${srcLang} into ${tgtLang} is true, complete, and accurate
                 to the best of my knowledge and abilities.
