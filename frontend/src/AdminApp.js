@@ -2173,19 +2173,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   }, [user]);
 
-  // Auto-load project when selectedOrder prop is provided (e.g., coming from Projects page)
+  // Auto-load project when selectedOrder prop is provided (e.g., coming from Projects page or PM Dashboard)
   useEffect(() => {
     const loadOrderData = async () => {
-      if (selectedOrder && selectedOrder.id && !selectedOrderId) {
+      if (selectedOrder && selectedOrder.id) {
+        // Reset state for new order
+        setSelectedOrderId(null);
+        setTranslationResults([]);
+
         // Auto-select the project to load its documents
         await selectProject(selectedOrder);
 
-        // If order has saved translation, load it and go to REVIEW tab
-        if (selectedOrder.translation_ready || selectedOrder.translation_html) {
+        // Always try to load translation for PM review orders
+        const hasTranslation = selectedOrder.translation_ready ||
+                               selectedOrder.translation_html ||
+                               ['review', 'pending_pm_review', 'pending_review'].includes(selectedOrder.translation_status);
+
+        if (hasTranslation) {
           const loaded = await loadSavedTranslation(selectedOrder);
           if (loaded) {
             setActiveSubTab('review');
             setProcessingStatus(`✅ Tradução do projeto ${selectedOrder.order_number} carregada para revisão!`);
+          } else {
+            // If loadSavedTranslation failed, try to fetch directly
+            try {
+              const response = await axios.get(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`);
+              const orderData = response.data.order || response.data;
+              if (orderData.translation_html) {
+                setTranslationResults([{
+                  translatedText: orderData.translation_html,
+                  filename: 'Translation',
+                  originalText: ''
+                }]);
+                setActiveSubTab('review');
+                setProcessingStatus(`✅ Tradução carregada!`);
+              }
+            } catch (err) {
+              console.error('Failed to load translation:', err);
+              setProcessingStatus(`⚠️ Não foi possível carregar a tradução`);
+            }
           }
         }
       }
