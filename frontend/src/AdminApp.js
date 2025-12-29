@@ -19,6 +19,8 @@ const STATUS_COLORS = {
   'received': 'bg-gray-100 text-gray-700',
   'in_translation': 'bg-yellow-100 text-yellow-700',
   'review': 'bg-indigo-100 text-indigo-700',
+  'pending_pm_review': 'bg-purple-100 text-purple-700',
+  'pending_admin_approval': 'bg-blue-100 text-blue-700',
   'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-teal-100 text-teal-700'
@@ -531,7 +533,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
     { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
     { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
-    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin', 'pm'] },
+    { id: 'review', label: 'Review', icon: '👁️', roles: ['admin'] },
     { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
@@ -9127,6 +9129,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'in_translation': 'In Progress',
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
+      'pending_admin_approval': 'Pending Admin',
       'client_review': 'Client Review',
       'ready': 'Ready',
       'delivered': 'Delivered'
@@ -16701,8 +16704,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
-      // Build review queue - orders with translation_status === 'review'
-      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
+      // Build review queue - orders with translation_status 'review' or 'pending_pm_review'
+      const reviewOrders = myOrders.filter(o =>
+        ['review', 'pending_pm_review'].includes(o.translation_status)
+      );
       setReviewQueue(reviewOrders);
 
       // Calculate stats
@@ -16868,9 +16873,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setSendingAction(true);
 
     try {
-      const newStatus = sendTo === 'client_review' ? 'client_review' : 'ready';
+      // PM can only send to admin for approval - admin decides final delivery
+      let newStatus;
+      let alertMessage;
+
+      if (sendTo === 'pending_admin_approval') {
+        newStatus = 'pending_admin_approval';
+        alertMessage = '✅ Tradução enviada para aprovação do Admin!';
+      } else if (sendTo === 'client_review') {
+        newStatus = 'client_review';
+        alertMessage = '✅ Enviado para revisão do cliente!';
+      } else {
+        newStatus = 'ready';
+        alertMessage = '✅ Tradução final aprovada e enviada!';
+      }
+
       await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
-        translation_status: newStatus
+        translation_status: newStatus,
+        pm_approved_at: new Date().toISOString(),
+        pm_approved_by: user?.name || 'PM'
       });
 
       // Update local state
@@ -16882,9 +16903,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOriginalContents([]);
       setTranslatedContent(null);
 
-      alert(sendTo === 'client_review'
-        ? '✅ Enviado para revisão do cliente!'
-        : '✅ Tradução final aprovada e enviada!');
+      alert(alertMessage);
     } catch (err) {
       console.error('Failed to approve:', err);
       alert('❌ Erro ao aprovar tradução');
@@ -17032,19 +17051,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Section navigation
   const sections = [
-    { id: 'overview', label: 'Visão Geral', icon: '📊' },
-    { id: 'review', label: 'Revisar Traduções', icon: '✅' },
-    { id: 'team', label: 'Minha Equipe', icon: '👥' },
-    { id: 'calendar', label: 'Agenda', icon: '📅' },
-    { id: 'reports', label: 'Relatórios', icon: '📈' },
-    { id: 'messages', label: 'Mensagens', icon: '💬' }
+    { id: 'overview', label: 'Overview', icon: '📊' },
+    { id: 'review', label: 'Review Translations', icon: '✅' },
+    { id: 'team', label: 'My Team', icon: '👥' },
+    { id: 'calendar', label: 'Calendar', icon: '📅' },
+    { id: 'reports', label: 'Reports', icon: '📈' },
+    { id: 'messages', label: 'Messages', icon: '💬' }
   ];
 
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
-        <span className="ml-3 text-gray-600">Carregando dashboard...</span>
+        <span className="ml-3 text-gray-600">Loading dashboard...</span>
       </div>
     );
   }
@@ -17055,13 +17074,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-800">🎯 PM Dashboard</h1>
-          <p className="text-sm text-gray-500">Bem-vindo(a), {user?.name}</p>
+          <p className="text-sm text-gray-500">Welcome, {user?.name}</p>
         </div>
         <button
           onClick={fetchDashboardData}
           className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1"
         >
-          <RefreshIcon className="w-3 h-3" /> Atualizar
+          <RefreshIcon className="w-3 h-3" /> Refresh
         </button>
       </div>
 
@@ -17094,69 +17113,69 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           {/* Stats Cards */}
           <div className="grid grid-cols-6 gap-3">
             <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-[10px] text-gray-500 uppercase">Total Projetos</div>
+              <div className="text-[10px] text-gray-500 uppercase">Total Projects</div>
               <div className="text-2xl font-bold text-gray-800">{stats.totalProjects}</div>
             </div>
             <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Em Andamento</div>
+              <div className="text-[10px] uppercase opacity-80">In Progress</div>
               <div className="text-2xl font-bold">{stats.inProgress}</div>
             </div>
             <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Aguardando Revisão</div>
+              <div className="text-[10px] uppercase opacity-80">Awaiting Review</div>
               <div className="text-2xl font-bold">{stats.awaitingReview}</div>
             </div>
             <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Concluídos</div>
+              <div className="text-[10px] uppercase opacity-80">Completed</div>
               <div className="text-2xl font-bold">{stats.completed}</div>
             </div>
             <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">No Prazo</div>
+              <div className="text-[10px] uppercase opacity-80">On Time</div>
               <div className="text-2xl font-bold">{stats.onTime}</div>
             </div>
             <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
-              <div className="text-[10px] uppercase opacity-80">Atrasados</div>
+              <div className="text-[10px] uppercase opacity-80">Delayed</div>
               <div className="text-2xl font-bold">{stats.delayed}</div>
             </div>
           </div>
 
           {/* Quick Actions */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Ações Rápidas</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">⚡ Quick Actions</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveSection('review')}
                 className="px-4 py-2 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center gap-2"
               >
-                ✅ Revisar Traduções ({reviewQueue.length})
+                ✅ Review Translations ({reviewQueue.length})
               </button>
               <button
                 onClick={() => setActiveSection('team')}
                 className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-2"
               >
-                👥 Ver Equipe
+                👥 View Team
               </button>
               <button
                 onClick={() => setActiveSection('calendar')}
                 className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 flex items-center gap-2"
               >
-                📅 Ver Prazos
+                📅 View Deadlines
               </button>
             </div>
           </div>
 
           {/* Recent Projects */}
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Projetos Recentes</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📋 Recent Projects</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-2">Código</th>
-                    <th className="text-left py-2 px-2">Cliente</th>
-                    <th className="text-left py-2 px-2">Idiomas</th>
-                    <th className="text-left py-2 px-2">Tradutor</th>
+                    <th className="text-left py-2 px-2">Code</th>
+                    <th className="text-left py-2 px-2">Client</th>
+                    <th className="text-left py-2 px-2">Languages</th>
+                    <th className="text-left py-2 px-2">Translator</th>
                     <th className="text-left py-2 px-2">Status</th>
-                    <th className="text-left py-2 px-2">Prazo</th>
+                    <th className="text-left py-2 px-2">Deadline</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -17439,7 +17458,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
               {/* Recent Clients */}
               <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-sm font-bold text-gray-800 mb-3">👤 Clientes Recentes</h3>
+                <h3 className="text-sm font-bold text-gray-800 mb-3">👤 Recent Clients</h3>
                 <div className="space-y-2 max-h-40 overflow-auto">
                   {orders.slice(0, 5).map(order => (
                     <div
@@ -17651,11 +17670,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           {!selectedReview ? (
             /* Review Queue List */
             <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-bold text-gray-800 mb-3">📥 Fila de Revisão ({reviewQueue.length})</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-3">📥 Review Queue ({reviewQueue.length})</h3>
               {reviewQueue.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-4xl mb-2">✅</div>
-                  <p>Nenhuma tradução aguardando revisão</p>
+                  <p>No translations awaiting review</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -17669,15 +17688,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
                         <div className="text-xs text-gray-500">{order.client_name}</div>
                         <div className="text-[10px] text-gray-400">
-                          {order.translate_from} → {order.translate_to} • Tradutor: {order.assigned_translator || 'N/A'}
+                          {order.translate_from} → {order.translate_to} • Translator: {order.assigned_translator || 'N/A'}
                         </div>
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-gray-600">
-                          {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                          {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : 'No deadline'}
                         </div>
                         <button className="mt-1 px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600">
-                          Revisar →
+                          Review →
                         </button>
                       </div>
                     </div>
@@ -17695,13 +17714,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
                     className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                   >
-                    ← Voltar para fila
+                    ← Back to queue
                   </button>
                   <h3 className="text-lg font-bold text-gray-800">
-                    Revisão: {selectedReview.order_number}
+                    Review: {selectedReview.order_number}
                   </h3>
                   <p className="text-xs text-gray-500">
-                    Cliente: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
+                    Client: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -17710,22 +17729,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     disabled={sendingAction}
                     className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
                   >
-                    ❌ Solicitar Correção
+                    ❌ Request Correction
                   </button>
                   <button
-                    onClick={() => approveTranslation('client_review')}
+                    onClick={() => approveTranslation('pending_admin_approval')}
                     disabled={sendingAction}
-                    className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 disabled:bg-gray-400 flex items-center gap-1"
+                    className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
                   >
-                    👁️ Review p/ Cliente
+                    📤 Send to Admin
                   </button>
-                  <button
-                    onClick={() => approveTranslation('ready')}
-                    disabled={sendingAction}
-                    className="px-4 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-1"
-                  >
-                    ✅ Final p/ Cliente & Admin
-                  </button>
+                  {/* Disabled - Only Admin can send to client */}
                 </div>
               </div>
 
@@ -17735,7 +17748,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="p-4 overflow-auto">
                   <div className="sticky top-0 bg-white py-1 z-10">
                     <h4 className="text-sm font-bold text-gray-700 mb-2">
-                      📄 Documentos Originais ({originalContents.length})
+                      📄 Original Documents ({originalContents.length})
                     </h4>
                     {originalContents.length > 1 && (
                       <div className="flex items-center justify-between mb-2 bg-gray-100 rounded p-2">
@@ -17744,7 +17757,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           disabled={currentDocIndex === 0}
                           className="px-2 py-1 text-xs bg-white rounded border disabled:opacity-50"
                         >
-                          ◀ Anterior
+                          ◀ Previous
                         </button>
                         <span className="text-xs font-medium">
                           {currentDocIndex + 1} / {originalContents.length}
@@ -17754,7 +17767,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           disabled={currentDocIndex >= originalContents.length - 1}
                           className="px-2 py-1 text-xs bg-white rounded border disabled:opacity-50"
                         >
-                          Próximo ▶
+                          Next ▶
                         </button>
                       </div>
                     )}
@@ -17830,7 +17843,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {/* Correction Notes */}
               <div className="p-4 border-t bg-gray-50">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  📝 Notas de Correção (para enviar ao tradutor):
+                  📝 Correction Notes (to send to translator):
                 </label>
                 <textarea
                   value={correctionNotes}
@@ -17980,7 +17993,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'team' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">👥 Minha Equipe de Tradutores</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">👥 My Translator Team</h3>
             <div className="grid grid-cols-3 gap-3">
               {translators.map(translator => {
                 const translatorOrders = orders.filter(o =>
@@ -18014,17 +18027,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="grid grid-cols-2 gap-2 text-center mt-3">
                       <div className="bg-white rounded p-2">
                         <div className="text-lg font-bold text-yellow-600">{activeOrders.length}</div>
-                        <div className="text-[9px] text-gray-500">Em Andamento</div>
+                        <div className="text-[9px] text-gray-500">In Progress</div>
                       </div>
                       <div className="bg-white rounded p-2">
                         <div className="text-lg font-bold text-green-600">{completedOrders.length}</div>
-                        <div className="text-[9px] text-gray-500">Concluídos</div>
+                        <div className="text-[9px] text-gray-500">Completed</div>
                       </div>
                     </div>
 
                     {activeOrders.length > 0 && (
                       <div className="mt-3 pt-2 border-t">
-                        <div className="text-[10px] font-medium text-gray-600 mb-1">Projetos Ativos:</div>
+                        <div className="text-[10px] font-medium text-gray-600 mb-1">Active Projects:</div>
                         {activeOrders.slice(0, 3).map((order, idx) => (
                           <div key={idx} className="flex justify-between text-[10px] py-0.5">
                             <span className="text-blue-600 font-mono">{order.order_number}</span>
@@ -18054,7 +18067,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'calendar' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📅 Agenda de Prazos</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📅 Deadline Calendar</h3>
             <div className="space-y-2">
               {getUpcomingDeadlines().map(order => (
                 <div
@@ -18111,7 +18124,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'reports' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📈 Relatórios do PM</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">📈 PM Reports</h3>
 
             {/* Summary Stats */}
             <div className="grid grid-cols-4 gap-4 mb-6">
@@ -18129,17 +18142,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="text-3xl font-bold text-teal-600">
                   {stats.totalProjects > 0 ? Math.round((stats.onTime / stats.totalProjects) * 100) : 0}%
                 </div>
-                <div className="text-xs text-gray-600">Entregas no Prazo</div>
+                <div className="text-xs text-gray-600">On-Time Delivery</div>
               </div>
               <div className="bg-purple-50 rounded-lg p-4 text-center">
                 <div className="text-3xl font-bold text-purple-600">{translators.length}</div>
-                <div className="text-xs text-gray-600">Tradutores na Equipe</div>
+                <div className="text-xs text-gray-600">Team Translators</div>
               </div>
             </div>
 
             {/* Status Distribution */}
             <div className="mb-6">
-              <h4 className="text-xs font-medium text-gray-600 mb-2">Distribuição por Status</h4>
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Status Distribution</h4>
               <div className="flex h-6 rounded-lg overflow-hidden">
                 {[
                   { status: 'received', color: 'bg-gray-400', count: orders.filter(o => o.translation_status === 'received').length },
@@ -18161,24 +18174,24 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ))}
               </div>
               <div className="flex justify-between text-[9px] text-gray-500 mt-1">
-                <span>Recebido</span>
-                <span>Em Tradução</span>
-                <span>Revisão</span>
-                <span>Pronto</span>
-                <span>Entregue</span>
+                <span>Received</span>
+                <span>In Translation</span>
+                <span>Review</span>
+                <span>Ready</span>
+                <span>Delivered</span>
               </div>
             </div>
 
             {/* Translator Performance */}
             <div>
-              <h4 className="text-xs font-medium text-gray-600 mb-2">Desempenho dos Tradutores</h4>
+              <h4 className="text-xs font-medium text-gray-600 mb-2">Translator Performance</h4>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="text-left py-2 px-2">Tradutor</th>
-                    <th className="text-center py-2 px-2">Ativos</th>
-                    <th className="text-center py-2 px-2">Concluídos</th>
-                    <th className="text-center py-2 px-2">No Prazo</th>
+                    <th className="text-left py-2 px-2">Translator</th>
+                    <th className="text-center py-2 px-2">Active</th>
+                    <th className="text-center py-2 px-2">Completed</th>
+                    <th className="text-center py-2 px-2">On Time</th>
                   </tr>
                 </thead>
                 <tbody>
