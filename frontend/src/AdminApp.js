@@ -2907,22 +2907,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     Promise.all(imagePromises).then(images => setOriginalImages(images));
   };
 
-  // Handle external original document upload
-  const handleExternalOriginalUpload = (event) => {
+  // Handle external original document upload (with PDF to image conversion)
+  const handleExternalOriginalUpload = async (event) => {
     const selectedFiles = Array.from(event.target.files);
-    const imagePromises = selectedFiles.map(file => {
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve({ filename: file.name, data: reader.result });
-        reader.readAsDataURL(file);
-      });
-    });
-    Promise.all(imagePromises).then(images => {
-      setExternalOriginalImages(images);
+    if (selectedFiles.length === 0) return;
+
+    setProcessingStatus('📤 Processing original documents...');
+    const allImages = [];
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      const fileName = file.name.toLowerCase();
+
+      // PDF - convert to images
+      if (fileName.endsWith('.pdf')) {
+        setProcessingStatus(`Converting PDF to images: ${file.name}`);
+        try {
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
+          });
+          // Convert base64 to data URL format
+          images.forEach(img => {
+            allImages.push({
+              filename: img.filename,
+              data: `data:${img.type};base64,${img.data}`
+            });
+          });
+        } catch (err) {
+          console.error('PDF conversion error:', err);
+          setProcessingStatus(`❌ Error converting PDF: ${file.name}`);
+        }
+      }
+      // Images - read as data URL
+      else if (file.type.startsWith('image/')) {
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        });
+        allImages.push({ filename: file.name, data: dataUrl });
+      }
+    }
+
+    if (allImages.length > 0) {
+      setExternalOriginalImages(allImages);
       // Also set as originalImages for certificate generation
-      setOriginalImages(images);
-      setProcessingStatus(`✅ ${images.length} original document(s) uploaded`);
-    });
+      setOriginalImages(allImages);
+      setProcessingStatus(`✅ ${allImages.length} original page(s) uploaded`);
+    }
   };
 
   // Handle external translation upload (text or images)
@@ -6400,7 +6432,7 @@ tradução juramentada | certified translation`}
                         <button className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600">
                           Upload Original
                         </button>
-                        <p className="text-[10px] text-gray-500 mt-1">Image or PDF</p>
+                        <p className="text-[10px] text-gray-500 mt-1">Image or PDF (auto-converted)</p>
                       </div>
                     )}
                   </div>
@@ -7414,7 +7446,7 @@ tradução juramentada | certified translation`}
                     <span className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded hover:bg-orange-700">
                       Upload Originals
                     </span>
-                    <p className="text-[10px] text-gray-500 mt-1">Multiple files allowed (images)</p>
+                    <p className="text-[10px] text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
                   </label>
                 </div>
 
