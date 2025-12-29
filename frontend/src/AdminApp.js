@@ -17308,8 +17308,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Generate PM Package (same format as Quick Package)
   const handlePmPackageDownload = async () => {
-    // Check for any translation source: pmTranslationFiles, pmTranslationHtml, or translationResults
-    const hasTranslation = pmTranslationFiles.length > 0 || pmTranslationHtml || translationResults.length > 0;
+    // Check for any translation source: pmTranslationFiles, pmTranslationHtml, translatedContent, or translationResults
+    const hasTranslation = pmTranslationFiles.length > 0 || pmTranslationHtml || translatedContent || translationResults.length > 0;
     // Check for any original source: originalContents or originalImages
     const hasOriginal = originalContents.length > 0 || originalImages.length > 0;
 
@@ -17438,7 +17438,23 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
     </div>`;
     }
-    // Priority 2: translationResults from workspace
+    // Priority 2: translatedContent from PM Dashboard (loaded from database)
+    else if (translatedContent && pmTranslationFiles.length === 0) {
+      const translationHTML = translatedContent.html || translatedContent.data || '';
+      translationPagesHTML = `
+    <div class="translation-text-page">
+        ${includeLetterhead ? `
+        <div class="running-header">
+            ${letterheadHTML}
+        </div>
+        <div class="running-header-spacer"></div>
+        ` : ''}
+        <div class="translation-content translation-text">
+            ${translationHTML}
+        </div>
+    </div>`;
+    }
+    // Priority 3: translationResults from Translation Workspace
     else if (translationResults.length > 0 && pmTranslationFiles.length === 0) {
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n');
       translationPagesHTML = `
@@ -18552,45 +18568,56 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             /* Side-by-Side Review View */
             <div className="bg-white rounded-lg shadow">
               {/* Review Header */}
-              <div className="p-4 border-b flex justify-between items-center">
-                <div>
-                  <button
-                    onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
-                    className="text-gray-500 hover:text-gray-700 text-sm mb-1"
-                  >
-                    ← Back to queue
-                  </button>
-                  <h3 className="text-lg font-bold text-gray-800">
-                    Review: {selectedReview.order_number}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    Client: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
-                  </p>
+              <div className="p-4 border-b">
+                <div className="flex justify-between items-center mb-2">
+                  <div>
+                    <button
+                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
+                      className="text-gray-500 hover:text-gray-700 text-sm mb-1"
+                    >
+                      ← Back to queue
+                    </button>
+                    <h3 className="text-lg font-bold text-gray-800">
+                      Review: {selectedReview.order_number}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Client: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={requestCorrection}
+                      disabled={sendingAction}
+                      className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                    >
+                      ❌ Request Correction
+                    </button>
+                    <button
+                      onClick={() => approveTranslation('pending_admin_approval')}
+                      disabled={sendingAction}
+                      className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
+                    >
+                      {sendingAction ? '⏳ Sending...' : '📤 Send to Admin'}
+                    </button>
+                    <button
+                      onClick={handlePmPackageDownload}
+                      disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-1"
+                    >
+                      {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={requestCorrection}
-                    disabled={sendingAction}
-                    className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
-                  >
-                    ❌ Request Correction
-                  </button>
-                  <button
-                    onClick={() => approveTranslation('pending_admin_approval')}
-                    disabled={sendingAction}
-                    className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
-                  >
-                    📤 Send to Admin
-                  </button>
-                  <button
-                    onClick={handlePmPackageDownload}
-                    disabled={pmPackageGenerating || (pmTranslationFiles.length === 0 && !pmTranslationHtml && originalContents.length === 0)}
-                    className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-1"
-                  >
-                    {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
-                  </button>
-                  {/* Disabled - Only Admin can send to client */}
-                </div>
+                {/* Processing Status for PM */}
+                {(sendingAction || processingStatus) && (
+                  <div className={`mx-4 mb-2 p-2 rounded text-sm ${
+                    processingStatus?.includes('❌') ? 'bg-red-100 text-red-700' :
+                    processingStatus?.includes('✅') ? 'bg-green-100 text-green-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {sendingAction && !processingStatus ? '⏳ Processing...' : processingStatus}
+                  </div>
+                )}
               </div>
 
               {/* Side by Side Content */}
