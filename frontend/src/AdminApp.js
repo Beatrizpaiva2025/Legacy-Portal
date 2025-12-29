@@ -16566,6 +16566,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
 
+  // PM Package Generation state
+  const [pmTranslationFiles, setPmTranslationFiles] = useState([]);  // Images for translation
+  const [pmTranslationHtml, setPmTranslationHtml] = useState('');    // HTML content for translation
+  const [pmPackageGenerating, setPmPackageGenerating] = useState(false);
+
   // Proofreading state
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
@@ -16967,12 +16972,366 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     event.target.value = '';
   };
 
+  // Handle PM translation upload (with PDF to image conversion and HTML/Word support)
+  const handlePmTranslationUpload = async (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    if (selectedFiles.length === 0) return;
+
+    setProcessingStatus('Processing translation files...');
+    const allImages = [];
+    let htmlContent = '';
+
+    for (const file of selectedFiles) {
+      const fileName = file.name.toLowerCase();
+
+      // PDF - convert to images
+      if (fileName.endsWith('.pdf')) {
+        try {
+          setProcessingStatus(`Converting PDF to images: ${file.name}`);
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF page ${page}/${total}: ${file.name}`);
+          });
+          images.forEach(img => {
+            allImages.push({
+              filename: img.filename,
+              data: img.data,
+              type: img.type
+            });
+          });
+        } catch (err) {
+          console.error('PDF conversion error:', err);
+          alert(`Error converting PDF: ${file.name}`);
+        }
+      }
+      // HTML file
+      else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+        const reader = new FileReader();
+        const content = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+        htmlContent = content;
+      }
+      // Word document
+      else if (fileName.endsWith('.docx')) {
+        try {
+          setProcessingStatus(`Converting Word document: ${file.name}`);
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer });
+          htmlContent = result.value;
+        } catch (err) {
+          console.error('Word conversion error:', err);
+          alert(`Error converting Word document: ${file.name}`);
+        }
+      }
+      // Plain text
+      else if (fileName.endsWith('.txt')) {
+        const reader = new FileReader();
+        const content = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+        htmlContent = `<pre style="white-space: pre-wrap; font-family: 'Times New Roman', serif;">${content}</pre>`;
+      }
+      // Image files
+      else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        const result = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const base64 = result.split(',')[1];
+        allImages.push({
+          filename: file.name,
+          data: base64,
+          type: file.type
+        });
+      }
+    }
+
+    setPmTranslationFiles(allImages);
+    setPmTranslationHtml(htmlContent);
+    setProcessingStatus('');
+
+    const count = allImages.length + (htmlContent ? 1 : 0);
+    if (count > 0) {
+      alert(`✅ Translation uploaded: ${allImages.length} image(s)${htmlContent ? ' + HTML content' : ''}`);
+    }
+
+    event.target.value = '';
+  };
+
+  // Generate PM Package (same format as Quick Package)
+  const handlePmPackageDownload = async () => {
+    if (pmTranslationFiles.length === 0 && !pmTranslationHtml && originalContents.length === 0) {
+      alert('Please upload translation and/or original documents first');
+      return;
+    }
+
+    setPmPackageGenerating(true);
+    setProcessingStatus('Generating package...');
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const order = selectedReview;
+    const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
+    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+
+    // Cover Letter HTML (same as Quick Package)
+    const coverLetterHTML = `
+    <!-- COVER LETTER PAGE -->
+    <div class="cover-page">
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
+            </div>
+        </div>
+
+        <div class="order-number">Order # <strong>${order?.order_number || orderNumber || 'P0000'}</strong></div>
+        <h1 class="main-title">${certTitle}</h1>
+        <div class="subtitle">
+            Translation of a <strong>${order?.document_type || documentType || 'Document'}</strong> from <strong>${order?.source_language || sourceLanguage || 'Portuguese'}</strong> to<br>
+            <strong>${order?.target_language || targetLanguage || 'English'}</strong>
+        </div>
+
+        ${(() => {
+          let templateParagraphs;
+          if (selectedCertificateTemplate.startsWith('custom-')) {
+            const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+            templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          } else {
+            templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+          }
+          return templateParagraphs.map(paragraph => {
+            const processedParagraph = paragraph
+              .replace(/\{\{sourceLanguage\}\}/g, order?.source_language || sourceLanguage || 'Portuguese')
+              .replace(/\{\{targetLanguage\}\}/g, order?.target_language || targetLanguage || 'English');
+            return `<p class="body-text">${processedParagraph}</p>`;
+          }).join('\n        ');
+        })()}
+
+        <div class="footer-section">
+            <div class="signature-block">
+                ${signatureImage
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
+                <div class="signature-name">${user?.full_name || 'Beatriz Paiva'}</div>
+                <div class="signature-title">Legal Representative (Legacy Translations)</div>
+                <div class="signature-date">Dated: ${translationDate}</div>
+            </div>
+            <div class="stamp-container">
+                ${logoStamp
+                  ? `<img src="${logoStamp}" alt="Stamp" style="width: 140px; height: 140px; object-fit: contain;" />`
+                  : `<div class="stamp">
+                    <div class="stamp-text-top">CERTIFIED TRANSLATOR</div>
+                    <div class="stamp-center">
+                        <div class="stamp-company">LEGACY TRANSLATIONS</div>
+                        <div class="stamp-ata">ATA # 275993</div>
+                    </div>
+                </div>`}
+            </div>
+        </div>
+    </div>`;
+
+    // Letterhead for all pages
+    const letterheadHTML = `
+        <div class="header">
+            <div class="logo-left">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-width: 120px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder"><span style="text-align:center;">LEGACY<br/>TRANSLATIONS</span></div>`}
+            </div>
+            <div class="header-center">
+                <div class="company-name">Legacy Translations</div>
+                <div class="company-address">
+                    867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                    (857) 316-7770 · contact@legacytranslations.com
+                </div>
+            </div>
+            <div class="logo-right">
+                ${logoRight
+                  ? `<img src="${logoRight}" alt="ATA Logo" style="max-width: 80px; max-height: 50px; object-fit: contain;" />`
+                  : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
+            </div>
+        </div>
+        <div class="header-line"></div>`;
+
+    // Translation pages
+    let translationPagesHTML = '';
+
+    if (pmTranslationHtml) {
+      translationPagesHTML = `
+    <div class="translation-text-page">
+        ${includeLetterhead ? `
+        <div class="running-header">
+            ${letterheadHTML}
+        </div>
+        <div class="running-header-spacer"></div>
+        ` : ''}
+        <div class="translation-content translation-text">
+            ${pmTranslationHtml}
+        </div>
+    </div>`;
+    }
+
+    if (pmTranslationFiles.length > 0) {
+      translationPagesHTML += pmTranslationFiles.map((file, idx) => `
+    <div class="translation-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="translation-content">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
+        </div>
+    </div>`).join('');
+    }
+
+    // Original document pages (from originalContents)
+    const originalPagesHTML = (includeOriginal && originalContents.length > 0) ? originalContents.map((doc, idx) => {
+      const imgSrc = doc.data?.startsWith('data:') ? doc.data : `data:${doc.contentType || 'image/png'};base64,${doc.data}`;
+      return `
+    <div class="original-documents-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        <div class="original-image-container">
+            <img src="${imgSrc}" alt="Original page ${idx + 1}" class="original-image" />
+        </div>
+    </div>`;
+    }).join('') : '';
+
+    // Complete HTML
+    const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${certTitle} - ${order?.order_number || 'Document'}</title>
+    <style>
+        @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+            padding: 40px 50px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+        }
+        .header-line {
+            height: 2px;
+            background: #93C5FD;
+            margin-bottom: 15px;
+        }
+        .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
+        .logo-left img { max-width: 100%; max-height: 100%; }
+        .logo-placeholder {
+            width: 120px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; color: #999; background: #fafafa;
+        }
+        .header-center { text-align: center; flex: 1; padding: 0 20px; }
+        .company-name { font-size: 16px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .company-address { font-size: 10px; line-height: 1.4; color: #333; }
+        .logo-right { width: 80px; height: 50px; display: flex; align-items: center; justify-content: flex-end; }
+        .logo-right img { max-width: 100%; max-height: 100%; }
+        .logo-placeholder-right {
+            width: 80px; height: 50px; border: 1px dashed #ccc;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 9px; color: #1a365d; background: #fafafa; text-align: center; font-style: italic;
+        }
+        .order-number { text-align: right; margin-bottom: 30px; font-size: 13px; }
+        .main-title { text-align: center; font-size: 28px; font-weight: normal; margin-bottom: 25px; color: #1a365d; }
+        .subtitle { text-align: center; font-size: 14px; margin-bottom: 35px; line-height: 1.6; }
+        .body-text { text-align: justify; margin-bottom: 18px; line-height: 1.7; font-size: 13px; }
+        .footer-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+        .signature-block { text-align: left; }
+        .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
+        .signature-title { font-size: 11px; color: #666; }
+        .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
+        .stamp-container { text-align: right; }
+        .stamp {
+            width: 140px; height: 140px; border: 3px solid #1a365d; border-radius: 50%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-family: Arial, sans-serif; color: #1a365d;
+        }
+        .stamp-text-top { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
+        .stamp-center { text-align: center; margin: 5px 0; }
+        .stamp-company { font-size: 9px; font-weight: bold; }
+        .stamp-ata { font-size: 8px; }
+        .cover-page { page-break-after: always; }
+        .translation-page { page-break-after: always; }
+        .translation-text-page { page-break-after: always; }
+        .original-documents-page { page-break-after: always; }
+        .translation-content { margin-top: 10px; }
+        .translation-image { max-width: 100%; height: auto; }
+        .translation-text { font-size: 12px; line-height: 1.6; }
+        .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
+        .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
+        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
+        .page-title { font-size: 18px; font-weight: bold; color: #1a365d; margin-bottom: 15px; text-align: center; }
+        .original-image-container { text-align: center; }
+        .original-image { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .running-header { position: running(header); }
+        .running-header-spacer { height: 80px; }
+        @page { @top-center { content: element(header); } }
+        @media print {
+            body { padding: 0; }
+            .cover-page, .translation-page, .translation-text-page, .original-documents-page { page-break-after: always; }
+        }
+    </style>
+</head>
+<body>
+    ${coverLetterHTML}
+    ${translationPagesHTML}
+    ${originalPagesHTML}
+</body>
+</html>`;
+
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(fullHTML);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      };
+    }
+
+    setPmPackageGenerating(false);
+    setProcessingStatus('');
+  };
+
   // Load review content
   const loadReviewContent = async (order) => {
     setSelectedReview(order);
     setCorrectionNotes('');
     setCurrentDocIndex(0);
     setOriginalContents([]);
+    // Reset PM package state
+    setPmTranslationFiles([]);
+    setPmTranslationHtml('');
 
     try {
       // Fetch documents for this order
@@ -17935,6 +18294,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   >
                     📤 Send to Admin
                   </button>
+                  <button
+                    onClick={handlePmPackageDownload}
+                    disabled={pmPackageGenerating || (pmTranslationFiles.length === 0 && !pmTranslationHtml && originalContents.length === 0)}
+                    className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-1"
+                  >
+                    {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
+                  </button>
                   {/* Disabled - Only Admin can send to client */}
                 </div>
               </div>
@@ -18018,9 +18384,27 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Translated Document */}
                 <div className="p-4 overflow-auto">
-                  <h4 className="text-sm font-bold text-gray-700 mb-2 sticky top-0 bg-white py-1">
-                    ✍️ Translation
-                  </h4>
+                  <div className="sticky top-0 bg-white py-1 z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-gray-700">
+                        ✍️ Translation {(pmTranslationFiles.length > 0 || pmTranslationHtml) &&
+                          <span className="text-green-600 text-xs ml-2">
+                            ({pmTranslationFiles.length} images{pmTranslationHtml ? ' + HTML' : ''})
+                          </span>
+                        }
+                      </h4>
+                      <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
+                        📤 Upload Translation
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,.docx,.html,.htm,.txt"
+                          multiple
+                          onChange={handlePmTranslationUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
                   {translatedContent ? (
                     translatedContent.html ? (
                       <div
@@ -18048,10 +18432,32 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         {atob(translatedContent.data)}
                       </div>
                     )
+                  ) : (pmTranslationFiles.length > 0 || pmTranslationHtml) ? (
+                    <div>
+                      {/* Show PM uploaded HTML content */}
+                      {pmTranslationHtml && (
+                        <div
+                          className="border rounded p-4 bg-white mb-4"
+                          dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                        />
+                      )}
+                      {/* Show PM uploaded images */}
+                      {pmTranslationFiles.map((file, idx) => (
+                        <div key={idx} className="mb-4">
+                          <p className="text-xs text-gray-500 mb-1">📎 {file.filename}</p>
+                          <img
+                            src={`data:${file.type || 'image/png'};base64,${file.data}`}
+                            alt={`Translation page ${idx + 1}`}
+                            className="max-w-full border rounded"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   ) : (
                     <div className="text-center py-8 text-gray-400">
                       <div className="text-2xl mb-2">✍️</div>
                       <p className="text-xs">Translation not found</p>
+                      <p className="text-xs mt-2">Use "Upload Translation" to add files</p>
                     </div>
                   )}
                 </div>
