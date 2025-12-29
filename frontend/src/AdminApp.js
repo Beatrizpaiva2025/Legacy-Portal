@@ -3840,58 +3840,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
         </div>
 
-        <!-- Legal Certification Statement -->
-        <div style="background: #fffbeb; border: 1px solid #fbbf24; border-radius: 8px; padding: 20px; margin: 25px 0;">
-            <p style="margin: 0 0 15px 0; font-size: 11px; line-height: 1.8; text-align: justify;">
-                <strong>CERTIFICATE OF TRANSLATION AUTHENTICITY:</strong> I, <strong>Beatriz Paiva</strong>,
-                Legal Representative (Legacy Translations), member of the American Translators Association (ATA),
-                hereby certify that the attached translation from ${srcLang} into ${tgtLang} is true, complete, and accurate
-                to the best of my knowledge and abilities.
-            </p>
-            <p style="margin: 0; font-size: 11px; line-height: 1.8; text-align: justify;">
-                This certification attests only to the accuracy and completeness of the translation. The translator
-                does not certify the authenticity of the original document.
-            </p>
-        </div>
-
-        <!-- Signature Section -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin: 40px 0 30px 0;">
-            <div style="text-align: center;">
-                ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 40px; max-width: 150px; object-fit: contain; margin-bottom: 5px;" />`
-                  : `<div style="font-family: 'Brush Script MT', cursive; font-size: 24px; color: #1a365d; margin-bottom: 5px;">Beatriz Paiva</div>`
-                }
-                <div style="border-top: 1px solid #1a365d; padding-top: 5px; width: 200px;">
-                    <div style="font-size: 12px; font-weight: bold; color: #1a365d;">${translatorData?.name || 'Beatriz Paiva'}</div>
-                    <div style="font-size: 10px; color: #4a5568;">Legal Representative (Legacy Translations)</div>
-                    <div style="font-size: 10px; color: #4a5568;">ATA Member #275993</div>
-                </div>
-            </div>
-
-            <!-- QR Code -->
-            <div style="text-align: center;">
-                <div style="width: 100px; height: 100px; border: 2px solid #1a365d; display: flex; align-items: center; justify-content: center; background: #f7fafc;">
+        <!-- QR Code -->
+        <div style="text-align: center; margin: 40px 0;">
+            <div style="display: inline-block;">
+                <div style="width: 120px; height: 120px; border: 2px solid #1a365d; display: flex; align-items: center; justify-content: center; background: #f7fafc; margin: 0 auto;">
                     <div style="font-size: 8px; color: #4a5568; text-align: center;">
                         QR CODE<br/>
                         <span style="font-size: 7px;">Scan to verify</span>
                     </div>
                 </div>
-                <div style="font-size: 9px; color: #4a5568; margin-top: 5px;">Scan to verify authenticity</div>
-            </div>
-        </div>
-
-        <!-- Date and Location -->
-        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-            <div style="font-size: 12px; color: #1a365d; margin-bottom: 15px;">
-                <strong>Boston, Massachusetts, ${dateStr}</strong>
-            </div>
-            <div style="font-size: 9px; color: #718096; line-height: 1.6; max-width: 500px; margin: 0 auto;">
-                Legacy Translations Inc. · 867 Boylston Street, 5th Floor, #2073, Boston, MA 02116
+                <div style="font-size: 10px; color: #4a5568; margin-top: 8px;">Scan to verify authenticity</div>
             </div>
         </div>
 
         <!-- Footer -->
-        <div style="text-align: center; margin-top: 30px; font-size: 9px; color: #a0aec0;">
+        <div style="text-align: center; margin-top: 40px; font-size: 9px; color: #a0aec0;">
             This document is digitally generated and forms an integral part of the certified translation package.<br>
             Verify at: <span style="color: #2563eb;">${verificationUrl}</span>
         </div>
