@@ -1789,6 +1789,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [includeCertification, setIncludeCertification] = useState(true);
+  const [includeAuthenticityStatement, setIncludeAuthenticityStatement] = useState(true); // Atestado de Autenticidade
   const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
@@ -4605,7 +4606,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRANSLATE', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'REVIEW', icon: '✏️', roles: ['admin', 'pm', 'translator'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
@@ -7046,8 +7047,8 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* APPROVAL TAB - Admin Only */}
-      {activeSubTab === 'deliver' && isAdmin && (
+      {/* APPROVAL TAB - Admin and Translator */}
+      {activeSubTab === 'deliver' && (isAdmin || user?.role === 'translator') && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
@@ -7305,6 +7306,15 @@ tradução juramentada | certified translation`}
                     />
                     <span>🔐 Include Verification (QR Code)</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeAuthenticityStatement}
+                      onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                      className="mr-3 w-4 h-4"
+                    />
+                    <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                  </label>
                 </div>
               </div>
 
@@ -7321,6 +7331,12 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
+                  {includeAuthenticityStatement && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
+                    </>
+                  )}
                   {includeCertification && (
                     <>
                       <span className="text-gray-400">→</span>
