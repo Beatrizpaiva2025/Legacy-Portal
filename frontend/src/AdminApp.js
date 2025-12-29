@@ -1799,7 +1799,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [externalOriginalImages, setExternalOriginalImages] = useState([]); // Original document images
   const [externalTranslationText, setExternalTranslationText] = useState(''); // External translation text
   const [externalTranslationImages, setExternalTranslationImages] = useState([]); // External translation as images (if PDF)
-  const [translatorNotesForPM, setTranslatorNotesForPM] = useState(''); // Notes from translator to PM
 
   // Correction state
   const [correctionCommand, setCorrectionCommand] = useState('');
@@ -1889,8 +1888,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const src = CURRENCIES[translatorNoteSettings.sourceCurrency];
     const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
     const rate = translatorNoteSettings.exchangeRate;
-    // Add T12:00:00 to avoid timezone issues where UTC midnight shifts to previous day in local time
-    const date = new Date(translatorNoteSettings.rateDate + 'T12:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    const date = new Date(translatorNoteSettings.rateDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     const source = RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource);
 
     // Format: NOK 10.19 ≈ US$1.00
@@ -1912,47 +1910,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
     return `${tgt.symbol}${formattedConverted}`;
   };
-
-  // Auto-fetch exchange rate when currency changes (only when translator note is enabled)
-  useEffect(() => {
-    if (translatorNoteEnabled && translatorNoteSettings.sourceCurrency && translatorNoteSettings.targetCurrency) {
-      const fetchRate = async () => {
-        setFetchingRate(true);
-        try {
-          const response = await fetch(
-            `https://api.exchangerate-api.com/v4/latest/${translatorNoteSettings.targetCurrency}`
-          );
-          const data = await response.json();
-          if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
-            setTranslatorNoteSettings(prev => ({
-              ...prev,
-              exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
-              rateDate: data.date || new Date().toISOString().split('T')[0]
-            }));
-          }
-        } catch (error) {
-          try {
-            const response = await fetch(
-              `https://api.frankfurter.app/latest?from=${translatorNoteSettings.targetCurrency}&to=${translatorNoteSettings.sourceCurrency}`
-            );
-            const data = await response.json();
-            if (data.rates && data.rates[translatorNoteSettings.sourceCurrency]) {
-              setTranslatorNoteSettings(prev => ({
-                ...prev,
-                exchangeRate: data.rates[translatorNoteSettings.sourceCurrency].toFixed(4),
-                rateDate: data.date || new Date().toISOString().split('T')[0]
-              }));
-            }
-          } catch (err) {
-            console.error('Auto-fetch rate failed:', err);
-          }
-        } finally {
-          setFetchingRate(false);
-        }
-      };
-      fetchRate();
-    }
-  }, [translatorNoteEnabled, translatorNoteSettings.sourceCurrency, translatorNoteSettings.targetCurrency]);
 
   // Logo states (base64)
   const [logoLeft, setLogoLeft] = useState('');
@@ -2440,8 +2397,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    // Check for translation content (either from AI results or external upload)
-    if (translationResults.length === 0 && !externalTranslationText) {
+    if (translationResults.length === 0) {
       alert('No translation to send');
       return;
     }
@@ -2451,10 +2407,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
 
-      // Build translation HTML from either translation results or external text
-      const translationHTML = translationResults.length > 0
-        ? translationResults.map(r => r.translatedText).join('\n\n---\n\n')
-        : externalTranslationText;
+      // Build translation HTML (simplified for storage)
+      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
 
       // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
@@ -2473,8 +2427,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_stamp: logoStamp,
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
-        submitted_by_role: user?.role || 'unknown',
-        translator_notes: translatorNotesForPM || ''
+        submitted_by_role: user?.role || 'unknown'
       });
 
       const destinationLabels = {
@@ -3791,6 +3744,122 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
+  // Generate Authenticity Statement HTML (Atestado de Autenticidade) - follows US legal requirements
+  const generateAuthenticityStatementHtml = (config = {}) => {
+    const {
+      orderNum = orderNumber || 'P0000',
+      docType = documentType,
+      srcLang = sourceLanguage,
+      tgtLang = targetLanguage,
+      translatorData = TRANSLATORS.find(t => t.name === selectedTranslator),
+      dateStr = translationDate
+    } = config;
+
+    // Generate document hash (SHA-256 simulation for display)
+    const generateHash = () => {
+      const data = `${orderNum}-${docType}-${srcLang}-${tgtLang}-${dateStr}-${Date.now()}`;
+      let hash = '';
+      for (let i = 0; i < 64; i++) {
+        hash += '0123456789ABCDEF'[Math.floor(Math.random() * 16)];
+      }
+      return hash;
+    };
+
+    // Generate verification code
+    const generateVerificationCode = () => {
+      const chars = '0123456789ABCDEF';
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        if (i > 0) code += '-';
+        for (let j = 0; j < 4; j++) {
+          code += chars[Math.floor(Math.random() * chars.length)];
+        }
+      }
+      return code;
+    };
+
+    const documentHash = generateHash();
+    const verificationCode = generateVerificationCode();
+    const verificationUrl = `https://portal.legacytranslations.com/verify/${verificationCode}`;
+
+    return `
+    <!-- STATEMENT OF AUTHENTICITY PAGE -->
+    <div class="authenticity-page" style="page-break-before: always; padding: 40px 50px; font-family: 'Times New Roman', Georgia, serif; max-width: 800px; margin: 0 auto;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #1a365d; padding-bottom: 20px;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
+                ${logoLeft
+                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 50px; object-fit: contain;" />`
+                  : `<div style="font-weight: bold; color: #1a365d; font-size: 18px;">LEGACY TRANSLATIONS</div>`
+                }
+            </div>
+            <div style="font-size: 11px; color: #4a5568;">
+                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                (857) 316-7770 · contact@legacytranslations.com
+            </div>
+        </div>
+
+        <!-- Title -->
+        <h1 style="text-align: center; font-size: 22px; color: #1a365d; margin: 30px 0 10px 0; font-weight: bold; letter-spacing: 2px;">
+            STATEMENT OF AUTHENTICITY
+        </h1>
+        <h2 style="text-align: center; font-size: 14px; color: #4a5568; margin: 0 0 30px 0; font-weight: normal;">
+            Authentication Protocol for Certified Translation
+        </h2>
+
+        <!-- Document Reference -->
+        <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
+            <p style="margin: 0 0 15px 0; font-size: 12px; line-height: 1.8; text-align: justify;">
+                The document <strong>${orderNum} - ${docType.toUpperCase()}</strong> has been translated by
+                <strong>Legacy Translations Inc.</strong>, a professional translation services company and
+                <strong>American Translators Association (ATA) Member (No. 275993)</strong>.
+            </p>
+            <p style="margin: 0; font-size: 12px; line-height: 1.8; text-align: justify;">
+                Translation performed from <strong>${srcLang}</strong> to <strong>${tgtLang}</strong>.
+            </p>
+        </div>
+
+        <!-- Verification Code -->
+        <div style="text-align: center; margin: 30px 0;">
+            <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px;">Verification Code:</div>
+            <div style="font-size: 24px; font-family: 'Courier New', monospace; font-weight: bold; color: #1a365d; letter-spacing: 3px;">
+                ${verificationCode}
+            </div>
+        </div>
+
+        <!-- Barcode placeholder -->
+        <div style="text-align: center; margin: 20px 0;">
+            <div style="display: inline-block; padding: 10px 30px; background: linear-gradient(90deg, #000 2px, transparent 2px) 0 0 / 4px 100%, linear-gradient(90deg, #000 1px, transparent 1px) 0 0 / 2px 100%; background-color: #fff; height: 50px; width: 250px; border: 1px solid #e2e8f0;"></div>
+        </div>
+
+        <!-- Document Hash -->
+        <div style="text-align: center; margin: 25px 0;">
+            <div style="font-size: 12px; font-weight: bold; color: #1a365d; margin-bottom: 8px;">Document Hash</div>
+            <div style="font-size: 9px; font-family: 'Courier New', monospace; color: #4a5568; word-break: break-all; max-width: 500px; margin: 0 auto;">
+                ${documentHash}
+            </div>
+        </div>
+
+        <!-- QR Code -->
+        <div style="text-align: center; margin: 40px 0;">
+            <div style="display: inline-block;">
+                <div style="width: 120px; height: 120px; border: 2px solid #1a365d; display: flex; align-items: center; justify-content: center; background: #f7fafc; margin: 0 auto;">
+                    <div style="font-size: 8px; color: #4a5568; text-align: center;">
+                        QR CODE<br/>
+                        <span style="font-size: 7px;">Scan to verify</span>
+                    </div>
+                </div>
+                <div style="font-size: 10px; color: #4a5568; margin-top: 8px;">Scan to verify authenticity</div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 40px; font-size: 9px; color: #a0aec0;">
+            This document is digitally generated and forms an integral part of the certified translation package.
+        </div>
+    </div>`;
+  };
+
   // Quick Package Download - generates complete certified translation package (same layout as normal flow)
   const handleQuickPackageDownload = async () => {
     setQuickPackageLoading(true);
@@ -4061,6 +4130,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
+    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -4498,8 +4568,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 <body>
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
-    ${certificationPageHTML}
     ${originalPagesHTML}
+    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -6738,13 +6808,14 @@ tradução juramentada | certified translation`}
                     💾 Save Translation
                   </button>
 
-                  {/* Translator: Go to Deliver tab for quality check */}
+                  {/* Translator: Send to PM Review */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => setActiveSubTab('deliver')}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 flex items-center gap-2"
+                      onClick={() => sendToProjects('pm')}
+                      disabled={sendingToProjects || translationResults.length === 0}
+                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
                     >
-                      Next: Quality Check & Submit <span className="ml-1">→</span>
+                      📤 Send to PM Review
                     </button>
                   )}
 
@@ -7093,190 +7164,8 @@ tradução juramentada | certified translation`}
         </div>
       )}
 
-      {/* TRANSLATOR DELIVER TAB - Quality Check & Send to PM */}
-      {activeSubTab === 'deliver' && !isAdmin && !isPM && (
-        <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">📤 Submit Translation for Review</h2>
-
-          {/* Translation Status */}
-          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-600">Translation Status:</span>
-              {translationResults.length > 0 ? (
-                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-                  ✅ {translationResults.length} page(s) translated
-                </span>
-              ) : externalTranslationText ? (
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                  📄 External translation loaded
-                </span>
-              ) : (
-                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full">
-                  ⚠️ No translation yet
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Upload External Translation - Only show if no translation exists */}
-          {translationResults.length === 0 && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h3 className="text-sm font-bold text-green-700 mb-2">📄 Upload External Translation</h3>
-              <p className="text-xs text-gray-600 mb-3">If you completed the translation externally, upload the file here:</p>
-
-              <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
-                <input
-                  type="file"
-                  accept=".docx,.doc,.txt,.html"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-
-                    setProcessingStatus(`⏳ Processing "${file.name}"...`);
-
-                    try {
-                      if (file.name.endsWith('.txt') || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
-                        // Read as text
-                        const text = await file.text();
-                        setExternalTranslationText(text);
-                        setProcessingStatus(`✅ File "${file.name}" loaded successfully`);
-                      } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-                        // Read Word document using mammoth
-                        const arrayBuffer = await file.arrayBuffer();
-                        const result = await mammoth.convertToHtml({ arrayBuffer });
-                        setExternalTranslationText(result.value);
-                        setProcessingStatus(`✅ Word document "${file.name}" converted successfully`);
-                      } else {
-                        setProcessingStatus(`❌ Unsupported file type`);
-                      }
-                    } catch (err) {
-                      console.error('File processing error:', err);
-                      setProcessingStatus(`❌ Error processing file: ${err.message}`);
-                    }
-                  }}
-                  className="hidden"
-                  id="external-translation-upload-deliver"
-                />
-                <label htmlFor="external-translation-upload-deliver" className="cursor-pointer">
-                  <UploadIcon className="w-8 h-8 mx-auto mb-2 text-green-600" />
-                  <span className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 inline-block">
-                    Upload Translation File
-                  </span>
-                  <p className="text-[10px] text-gray-500 mt-2">Supported: Word (.docx), TXT, HTML</p>
-                </label>
-              </div>
-
-              {externalTranslationText && (
-                <div className="mt-3 p-2 bg-white rounded border border-green-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-green-700">✅ Translation Loaded</span>
-                    <button
-                      onClick={() => setExternalTranslationText('')}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-gray-500 max-h-20 overflow-y-auto">
-                    {externalTranslationText.substring(0, 200)}...
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Quality Checklist */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-bold text-blue-700 mb-3">✅ Quality Checklist</h3>
-            <p className="text-xs text-gray-600 mb-3">Please verify the following items before submitting:</p>
-
-            <div className="space-y-2">
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Grammar & Spelling</span>
-                  <p className="text-[10px] text-gray-500">I have checked for grammar and spelling errors</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Terminology</span>
-                  <p className="text-[10px] text-gray-500">I have used correct and consistent terminology</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Formatting</span>
-                  <p className="text-[10px] text-gray-500">The formatting is correct and consistent</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Completeness</span>
-                  <p className="text-[10px] text-gray-500">All content has been translated without omissions</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Numbers & Dates</span>
-                  <p className="text-[10px] text-gray-500">Numbers, dates, and values are accurate</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                <input type="checkbox" className="mt-0.5 rounded text-blue-600" />
-                <div>
-                  <span className="text-xs font-medium">Proper Names</span>
-                  <p className="text-[10px] text-gray-500">Names of people, places, and institutions are correct</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Translation Notes */}
-          <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 className="text-sm font-bold text-gray-700 mb-2">📝 Notes for PM (optional)</h3>
-            <textarea
-              value={translatorNotesForPM}
-              onChange={(e) => setTranslatorNotesForPM(e.target.value)}
-              placeholder="Add any observations about the translation, questions, or points that need attention..."
-              className="w-full p-2 border rounded text-xs h-20 resize-none"
-            />
-          </div>
-
-          {/* Send to PM Button */}
-          <div className="flex justify-center">
-            <button
-              onClick={() => sendToProjects('pm')}
-              disabled={sendingToProjects || (translationResults.length === 0 && !externalTranslationText)}
-              className="px-8 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-            >
-              {sendingToProjects ? (
-                <>
-                  <span className="animate-spin">⏳</span> Sending...
-                </>
-              ) : (
-                <>📤 Submit for PM Review</>
-              )}
-            </button>
-          </div>
-
-          <p className="text-center text-[10px] text-gray-500 mt-3">
-            After submitting, the Project Manager will review your translation and prepare the final package for the client.
-          </p>
-        </div>
-      )}
-
-      {/* APPROVAL TAB - Admin Only */}
-      {activeSubTab === 'deliver' && isAdmin && (
+      {/* APPROVAL TAB - Admin and Translator */}
+      {activeSubTab === 'deliver' && (isAdmin || user?.role === 'translator') && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
@@ -7528,15 +7417,6 @@ tradução juramentada | certified translation`}
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={includeCertification}
-                      onChange={(e) => setIncludeCertification(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>🔐 Include Verification (QR Code)</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
                       checked={includeAuthenticityStatement}
                       onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
                       className="mr-3 w-4 h-4"
@@ -7559,22 +7439,16 @@ tradução juramentada | certified translation`}
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                     📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
                   </span>
-                  {includeAuthenticityStatement && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
-                    </>
-                  )}
-                  {includeCertification && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">🔐 Verification</span>
-                    </>
-                  )}
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>
                       <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                    </>
+                  )}
+                  {includeAuthenticityStatement && (
+                    <>
+                      <span className="text-gray-400">→</span>
+                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
                     </>
                   )}
                 </div>
@@ -16603,18 +16477,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [correctionNotes, setCorrectionNotes] = useState('');
   const [sendingAction, setSendingAction] = useState(false);
 
-  // Proofreading state for PM
-  const [pmProofreadingResult, setPmProofreadingResult] = useState(null);
-  const [pmIsProofreading, setPmIsProofreading] = useState(false);
-  const [pmProofreadingError, setPmProofreadingError] = useState('');
-
-  // Package creation state for PM
-  const [pmIncludeCertificate, setPmIncludeCertificate] = useState(true);
-  const [pmIncludeTranslation, setPmIncludeTranslation] = useState(true);
-  const [pmIncludeVerification, setPmIncludeVerification] = useState(true);
-  const [pmIncludeOriginals, setPmIncludeOriginals] = useState(true);
-  const [pmIsGeneratingPackage, setPmIsGeneratingPackage] = useState(false);
-  const [pmCertificationData, setPmCertificationData] = useState(null);
+  // Proofreading state
+  const [proofreadingResult, setProofreadingResult] = useState(null);
+  const [isProofreading, setIsProofreading] = useState(false);
+  const [proofreadingError, setProofreadingError] = useState('');
 
   const [stats, setStats] = useState({
     totalProjects: 0,
@@ -16835,12 +16701,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const translatorsList = allUsers.filter(u => u.role === 'translator');
       setTranslators(translatorsList);
 
-      // Build review queue - orders ready for PM review
-      const reviewOrders = myOrders.filter(o =>
-        o.translation_status === 'review' ||
-        o.translation_status === 'pending_pm_review' ||
-        (o.translation_ready && o.translation_sent_to === 'pm')
-      );
+      // Build review queue - orders with translation_status === 'review'
+      const reviewOrders = myOrders.filter(o => o.translation_status === 'review');
       setReviewQueue(reviewOrders);
 
       // Calculate stats
@@ -16957,15 +16819,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setCorrectionNotes('');
     setCurrentDocIndex(0);
     setOriginalContents([]);
-    setTranslatedContent(null);
-    setPmProofreadingResult(null);
-    setPmProofreadingError('');
 
     try {
-      // Fetch the full order with translation data
-      const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
-      const fullOrder = orderRes.data.order || orderRes.data;
-
       // Fetch documents for this order
       const docsRes = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       const docs = docsRes.data.documents || [];
@@ -16989,47 +16844,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           console.error('Failed to load document:', doc.id, e);
         }
       }
-
-      // Also load images from translation_original_images if available
-      if (fullOrder.translation_original_images && fullOrder.translation_original_images.length > 0) {
-        for (const img of fullOrder.translation_original_images) {
-          if (img.data && !loadedDocs.find(d => d.filename === img.filename)) {
-            loadedDocs.push({
-              id: `img-${img.filename}`,
-              filename: img.filename,
-              data: img.data.split(',')[1] || img.data, // Handle base64 with or without prefix
-              contentType: img.data.startsWith('data:') ? img.data.split(';')[0].split(':')[1] : 'image/png'
-            });
-          }
-        }
-      }
       setOriginalContents(loadedDocs);
 
-      // First, check if translation_html is saved directly in the order
-      if (fullOrder.translation_html) {
+      // Find and load translated document
+      const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
+      if (translatedDoc) {
+        const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
         setTranslatedContent({
-          filename: 'translation.html',
-          html: fullOrder.translation_html,
-          translatorName: fullOrder.translation_translator_name,
-          translationDate: fullOrder.translation_date,
-          documentType: fullOrder.translation_document_type
+          filename: translatedDoc.filename,
+          data: transData.data.file_data,
+          contentType: transData.data.content_type,
+          html: transData.data.html_content
         });
-      } else {
-        // Fallback: Find and load translated document from documents collection
-        const translatedDoc = docs.find(d => d.document_type === 'translation' || d.filename?.includes('translation'));
-        if (translatedDoc) {
-          const transData = await axios.get(`${API}/admin/order-documents/${translatedDoc.id}/download?admin_key=${adminKey}`);
-          setTranslatedContent({
-            filename: translatedDoc.filename,
-            data: transData.data.file_data,
-            contentType: transData.data.content_type,
-            html: transData.data.html_content
-          });
-        }
       }
-
-      // Update selectedReview with full order data
-      setSelectedReview({ ...order, ...fullOrder });
     } catch (err) {
       console.error('Failed to load review content:', err);
     }
@@ -17121,202 +16948,71 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
-  // Run proofreading analysis for PM
-  const runPmProofreading = async () => {
-    if (!translatedContent) {
-      setPmProofreadingError('Nenhuma tradução carregada para revisar');
+  // Execute automatic proofreading
+  const executeProofreading = async () => {
+    if (!selectedReview || !translatedContent) {
+      setProofreadingError('Nenhuma tradução selecionada para revisão.');
       return;
     }
-    setPmIsProofreading(true);
-    setPmProofreadingError('');
-    setPmProofreadingResult(null);
+
+    // Get original text from the first original document
+    const originalText = originalContents.length > 0
+      ? (originalContents[0].text || 'Texto original não disponível em formato texto')
+      : 'Texto original não disponível';
+
+    // Get translated text (extract from HTML if needed)
+    let translatedText = '';
+    if (translatedContent.html) {
+      // Strip HTML tags for proofreading
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = translatedContent.html;
+      translatedText = tempDiv.textContent || tempDiv.innerText || '';
+    } else if (translatedContent.data) {
+      try {
+        translatedText = atob(translatedContent.data);
+      } catch (e) {
+        translatedText = 'Não foi possível extrair texto da tradução';
+      }
+    }
+
+    if (!translatedText.trim()) {
+      setProofreadingError('Não foi possível extrair o texto da tradução para revisão.');
+      return;
+    }
+
+    setIsProofreading(true);
+    setProofreadingError('');
+    setProofreadingResult(null);
 
     try {
-      // Extract text from translation
-      let textToCheck = '';
-      if (translatedContent.html) {
-        const temp = document.createElement('div');
-        temp.innerHTML = translatedContent.html;
-        textToCheck = temp.textContent || temp.innerText || '';
-      } else if (translatedContent.data) {
-        textToCheck = atob(translatedContent.data);
+      // Get Claude API key from localStorage or settings
+      const claudeApiKey = localStorage.getItem('claude_api_key') || '';
+
+      if (!claudeApiKey) {
+        setProofreadingError('Chave API do Claude não configurada. Configure em Configurações.');
+        setIsProofreading(false);
+        return;
       }
 
-      const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
-        source_text: '', // We don't have the source in this context
-        translated_text: textToCheck,
-        source_language: selectedReview?.translate_from || 'Portuguese',
-        target_language: selectedReview?.translate_to || 'English',
-        document_type: selectedReview?.document_type || 'general'
+      const response = await axios.post(`${API}/admin/proofread?admin_key=${adminKey}`, {
+        original_text: originalText,
+        translated_text: translatedText.substring(0, 10000), // Limit text size
+        source_language: selectedReview.translate_from || 'Portuguese (Brazil)',
+        target_language: selectedReview.translate_to || 'English',
+        document_type: selectedReview.document_type || 'General Document',
+        claude_api_key: claudeApiKey
       });
 
       if (response.data.proofreading_result) {
-        setPmProofreadingResult(response.data.proofreading_result);
+        setProofreadingResult(response.data.proofreading_result);
+      } else if (response.data.raw_response) {
+        setProofreadingError(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
       }
-    } catch (err) {
-      console.error('Proofreading error:', err);
-      setPmProofreadingError('Erro ao executar revisão automática');
+    } catch (error) {
+      console.error('Proofreading error:', error);
+      setProofreadingError(error.response?.data?.detail || error.message || 'Erro ao executar revisão automática');
     } finally {
-      setPmIsProofreading(false);
-    }
-  };
-
-  // Generate final package for PM
-  const generatePmPackage = async () => {
-    if (!selectedReview || !translatedContent) {
-      alert('Por favor, selecione uma tradução para gerar o pacote');
-      return;
-    }
-
-    setPmIsGeneratingPackage(true);
-
-    try {
-      // Create certification if needed
-      let certData = pmCertificationData;
-      if (pmIncludeVerification && !certData) {
-        try {
-          const certResponse = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
-            order_id: selectedReview.id,
-            order_number: selectedReview.order_number,
-            document_type: selectedReview.document_type || 'general',
-            source_language: selectedReview.translate_from,
-            target_language: selectedReview.translate_to,
-            page_count: originalContents.length || 1,
-            certifier_name: user?.name || 'PM',
-            certifier_title: user?.title || 'Project Manager',
-            company_name: 'Legacy Translations, LLC',
-            client_name: selectedReview.client_name
-          });
-          certData = certResponse.data;
-          setPmCertificationData(certData);
-        } catch (certErr) {
-          console.error('Certification error:', certErr);
-        }
-      }
-
-      // Build the HTML document
-      const logoLeft = localStorage.getItem('logo_left') || '';
-      const logoRight = localStorage.getItem('logo_right') || '';
-      const logoStamp = localStorage.getItem('logo_stamp') || '';
-      const signatureImage = localStorage.getItem('signature_image') || '';
-      const certCompanyName = localStorage.getItem('cert_company_name') || 'Legacy Translations, LLC';
-      const certCompanyAddress = localStorage.getItem('cert_company_address') || '';
-      const certCompanyPhone = localStorage.getItem('cert_company_phone') || '';
-      const certCompanyEmail = localStorage.getItem('cert_company_email') || '';
-
-      // Certificate HTML
-      const certificateHTML = pmIncludeCertificate ? `
-        <div class="certificate-page" style="page-break-after: always; padding: 40px; font-family: 'Times New Roman', serif;">
-          <div class="letterhead" style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #1a365d; padding-bottom: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              ${logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 60px;">` : '<div></div>'}
-              <div style="text-align: center;">
-                <h1 style="margin: 0; color: #1a365d; font-size: 24px;">${certCompanyName}</h1>
-                <p style="margin: 5px 0; font-size: 12px; color: #666;">${certCompanyAddress}</p>
-                <p style="margin: 5px 0; font-size: 12px; color: #666;">${certCompanyPhone} | ${certCompanyEmail}</p>
-              </div>
-              ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 50px;">` : '<div></div>'}
-            </div>
-          </div>
-          <h2 style="text-align: center; color: #1a365d; margin: 30px 0;">CERTIFICATE OF TRANSLATION ACCURACY</h2>
-          <p style="text-align: justify; line-height: 1.8; margin: 20px 0;">
-            I, the undersigned, do hereby certify that the following is a true and accurate translation
-            from <strong>${selectedReview.translate_from}</strong> into <strong>${selectedReview.translate_to}</strong>
-            of the document(s) attached hereto.
-          </p>
-          <p style="text-align: justify; line-height: 1.8; margin: 20px 0;">
-            <strong>Document Type:</strong> ${selectedReview.document_type || 'Official Document'}<br>
-            <strong>Client:</strong> ${selectedReview.client_name}<br>
-            <strong>Order Number:</strong> ${selectedReview.order_number}<br>
-            <strong>Number of Pages:</strong> ${originalContents.length || 1}
-          </p>
-          <div style="margin-top: 50px; display: flex; justify-content: space-between; align-items: end;">
-            <div style="text-align: center;">
-              ${signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 60px;">` : '<div style="border-bottom: 1px solid #000; width: 200px; height: 40px;"></div>'}
-              <p style="margin: 5px 0; font-size: 12px;">${user?.name || 'Project Manager'}</p>
-              <p style="margin: 0; font-size: 10px; color: #666;">Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-            ${logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="max-height: 80px;">` : ''}
-          </div>
-        </div>
-      ` : '';
-
-      // Translation HTML
-      const translationHTML = pmIncludeTranslation ? `
-        <div class="translation-page" style="page-break-after: always; padding: 20px;">
-          ${translatedContent.html || `<pre style="white-space: pre-wrap; font-family: Arial, sans-serif;">${translatedContent.data ? atob(translatedContent.data) : ''}</pre>`}
-        </div>
-      ` : '';
-
-      // Verification page HTML
-      const verificationHTML = (pmIncludeVerification && certData) ? `
-        <div class="verification-page" style="page-break-after: always; padding: 40px; text-align: center;">
-          <div style="border: 2px solid #2563eb; border-radius: 12px; padding: 30px; max-width: 500px; margin: 50px auto;">
-            <div style="font-size: 48px; margin-bottom: 10px;">🔐</div>
-            <h2 style="color: #1e40af; margin: 0 0 10px 0;">Document Verification</h2>
-            <p style="color: #6b7280; font-size: 14px;">This certified translation can be verified online</p>
-            <div style="margin: 30px 0; text-align: left; background: #f3f4f6; padding: 20px; border-radius: 8px;">
-              <p style="margin: 10px 0;"><strong>Certification ID:</strong> <span style="font-family: monospace; color: #1e40af;">${certData.certification_id}</span></p>
-              <p style="margin: 10px 0;"><strong>Document Type:</strong> ${selectedReview.document_type || 'Official Document'}</p>
-              <p style="margin: 10px 0;"><strong>Translation:</strong> ${selectedReview.translate_from} → ${selectedReview.translate_to}</p>
-              <p style="margin: 10px 0;"><strong>Certified Date:</strong> ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-            </div>
-            ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" style="width: 150px; height: 150px; margin: 20px auto;">` : ''}
-            <p style="font-size: 12px; color: #6b7280; margin-top: 20px;">Verify at: <strong>${certData.verification_url || ''}</strong></p>
-          </div>
-        </div>
-      ` : '';
-
-      // Original documents HTML
-      const originalsHTML = pmIncludeOriginals ? originalContents.map((doc, idx) => `
-        <div class="original-page" style="page-break-after: always; padding: 20px;">
-          <h3 style="color: #6b7280; font-size: 14px; margin-bottom: 10px;">Original Document ${idx + 1}: ${doc.filename}</h3>
-          ${doc.contentType?.includes('image')
-            ? `<img src="data:${doc.contentType};base64,${doc.data}" alt="Original ${idx + 1}" style="max-width: 100%; border: 1px solid #ddd;">`
-            : doc.contentType?.includes('pdf')
-              ? `<p style="color: #666; font-style: italic;">[PDF Document: ${doc.filename}]</p>`
-              : `<pre style="white-space: pre-wrap; background: #f9f9f9; padding: 15px; border: 1px solid #ddd;">${atob(doc.data)}</pre>`
-          }
-        </div>
-      `).join('') : '';
-
-      // Complete HTML document
-      const fullHTML = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>Translation Package - ${selectedReview.order_number}</title>
-          <style>
-            @media print {
-              body { margin: 0; padding: 0; }
-              .page { page-break-after: always; }
-            }
-            body { font-family: Arial, sans-serif; }
-          </style>
-        </head>
-        <body>
-          ${certificateHTML}
-          ${translationHTML}
-          ${verificationHTML}
-          ${originalsHTML}
-        </body>
-        </html>
-      `;
-
-      // Open in new window for printing/saving
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(fullHTML);
-      printWindow.document.close();
-      printWindow.focus();
-
-      alert('✅ Pacote gerado com sucesso! Uma nova janela foi aberta para impressão/download.');
-
-    } catch (err) {
-      console.error('Package generation error:', err);
-      alert('❌ Erro ao gerar pacote');
-    } finally {
-      setPmIsGeneratingPackage(false);
+      setIsProofreading(false);
     }
   };
 
@@ -18007,12 +17703,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <p className="text-xs text-gray-500">
                     Cliente: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
                   </p>
-                  {selectedReview.translator_notes && (
-                    <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                      <p className="text-xs text-blue-600 font-medium">📝 Translator Notes:</p>
-                      <p className="text-xs text-blue-800">{selectedReview.translator_notes}</p>
-                    </div>
-                  )}
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -18151,17 +17841,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </div>
 
               {/* Proofreading Section */}
-              <div className="p-4 border-t bg-indigo-50">
+              <div className="p-4 border-t bg-white">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold text-indigo-700">🔍 Proofreading (Revisão de Qualidade)</h4>
+                  <h4 className="text-sm font-bold text-purple-700 flex items-center gap-2">
+                    🔍 Proofreading (Revisão de Qualidade)
+                  </h4>
                   <button
-                    onClick={runPmProofreading}
-                    disabled={pmIsProofreading || !translatedContent}
-                    className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:bg-gray-400 flex items-center gap-1"
+                    onClick={executeProofreading}
+                    disabled={isProofreading || !translatedContent}
+                    className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2"
                   >
-                    {pmIsProofreading ? (
+                    {isProofreading ? (
                       <>
-                        <span className="animate-spin">⏳</span> Analisando...
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Analisando...
                       </>
                     ) : (
                       <>🔍 Executar Proofreading</>
@@ -18169,180 +17862,114 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </button>
                 </div>
 
-                {pmProofreadingError && (
-                  <div className="p-2 bg-red-100 text-red-700 rounded text-xs mb-2">
-                    ❌ {pmProofreadingError}
+                {/* Error Message */}
+                {proofreadingError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded mb-3">
+                    <p className="text-xs text-red-600">❌ {proofreadingError}</p>
                   </div>
                 )}
 
-                {pmProofreadingResult && (
-                  <div className="space-y-2">
-                    <div className={`p-3 rounded-lg ${
-                      pmProofreadingResult.classificacao === 'APROVADO'
-                        ? 'bg-green-100 border border-green-300'
-                        : pmProofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
-                          ? 'bg-yellow-100 border border-yellow-300'
-                          : 'bg-red-100 border border-red-300'
+                {/* Results */}
+                {proofreadingResult && (
+                  <div className="space-y-3">
+                    {/* Summary */}
+                    <div className={`p-3 rounded border ${
+                      proofreadingResult.resumo?.qualidade === 'APROVADO' ? 'bg-green-50 border-green-200' :
+                      proofreadingResult.resumo?.qualidade === 'APROVADO_COM_OBSERVACOES' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-red-50 border-red-200'
                     }`}>
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-sm">
-                          {pmProofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
-                           pmProofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold">
+                          {proofreadingResult.resumo?.qualidade === 'APROVADO' ? '✅ APROVADO' :
+                           proofreadingResult.resumo?.qualidade === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APROVADO COM OBSERVAÇÕES' :
                            '❌ REPROVADO'}
                         </span>
-                        <span className="text-xs bg-white px-2 py-1 rounded">
-                          Score: {pmProofreadingResult.pontuacao_final || pmProofreadingResult.score || 'N/A'}%
+                        <span className="text-xs text-gray-600">
+                          {proofreadingResult.resumo?.total_erros || 0} erro(s) encontrado(s)
                         </span>
                       </div>
-                      <div className="grid grid-cols-5 gap-2 mt-2 text-[10px]">
-                        <div className="text-center">
-                          <div className="font-bold">Total</div>
-                          <div>{pmProofreadingResult.total_erros || 0}</div>
+                      <div className="grid grid-cols-4 gap-2 text-[10px]">
+                        <div className="text-center p-1 bg-red-100 rounded">
+                          <div className="font-bold text-red-600">{proofreadingResult.resumo?.criticos || 0}</div>
+                          <div className="text-gray-600">Críticos</div>
                         </div>
-                        <div className="text-center text-red-600">
-                          <div className="font-bold">Críticos</div>
-                          <div>{pmProofreadingResult.criticos || 0}</div>
+                        <div className="text-center p-1 bg-orange-100 rounded">
+                          <div className="font-bold text-orange-600">{proofreadingResult.resumo?.altos || 0}</div>
+                          <div className="text-gray-600">Altos</div>
                         </div>
-                        <div className="text-center text-orange-600">
-                          <div className="font-bold">Altos</div>
-                          <div>{pmProofreadingResult.altos || 0}</div>
+                        <div className="text-center p-1 bg-yellow-100 rounded">
+                          <div className="font-bold text-yellow-600">{proofreadingResult.resumo?.medios || 0}</div>
+                          <div className="text-gray-600">Médios</div>
                         </div>
-                        <div className="text-center text-yellow-600">
-                          <div className="font-bold">Médios</div>
-                          <div>{pmProofreadingResult.medios || 0}</div>
-                        </div>
-                        <div className="text-center text-blue-600">
-                          <div className="font-bold">Baixos</div>
-                          <div>{pmProofreadingResult.baixos || 0}</div>
+                        <div className="text-center p-1 bg-blue-100 rounded">
+                          <div className="font-bold text-blue-600">{proofreadingResult.resumo?.baixos || 0}</div>
+                          <div className="text-gray-600">Baixos</div>
                         </div>
                       </div>
                     </div>
 
-                    {pmProofreadingResult.erros && pmProofreadingResult.erros.length > 0 && (
-                      <div className="max-h-40 overflow-y-auto border rounded p-2 bg-white">
-                        <div className="text-[10px] font-medium text-gray-600 mb-1">Erros encontrados:</div>
-                        {pmProofreadingResult.erros.map((erro, idx) => (
-                          <div key={idx} className={`text-[10px] p-1.5 mb-1 rounded ${
-                            erro.severidade === 'crítico' ? 'bg-red-50 border-l-2 border-red-500' :
-                            erro.severidade === 'alto' ? 'bg-orange-50 border-l-2 border-orange-500' :
-                            erro.severidade === 'médio' ? 'bg-yellow-50 border-l-2 border-yellow-500' :
-                            'bg-blue-50 border-l-2 border-blue-500'
-                          }`}>
-                            <div className="flex justify-between">
-                              <span className="font-medium">{erro.tipo}</span>
-                              <span className="text-gray-500">{erro.severidade}</span>
-                            </div>
-                            <div className="text-gray-600 mt-0.5">{erro.descricao}</div>
-                            {erro.sugestao && (
-                              <div className="text-green-600 mt-0.5">💡 {erro.sugestao}</div>
-                            )}
-                          </div>
-                        ))}
+                    {/* Error List */}
+                    {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                      <div className="max-h-60 overflow-y-auto border rounded">
+                        <table className="w-full text-[10px]">
+                          <thead className="bg-gray-100 sticky top-0">
+                            <tr>
+                              <th className="p-2 text-left">Tipo</th>
+                              <th className="p-2 text-left">Original</th>
+                              <th className="p-2 text-left">Encontrado</th>
+                              <th className="p-2 text-left">Sugerido</th>
+                              <th className="p-2 text-center">Gravidade</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proofreadingResult.erros.map((erro, idx) => (
+                              <tr key={idx} className={`border-t ${
+                                erro.gravidade === 'CRÍTICO' ? 'bg-red-50' :
+                                erro.gravidade === 'ALTO' ? 'bg-orange-50' :
+                                erro.gravidade === 'MÉDIO' ? 'bg-yellow-50' :
+                                'bg-blue-50'
+                              }`}>
+                                <td className="p-2">{erro.tipo}</td>
+                                <td className="p-2 font-mono">{erro.original || '-'}</td>
+                                <td className="p-2 font-mono text-red-600">{erro.encontrado || '-'}</td>
+                                <td className="p-2 font-mono text-green-600">{erro.sugerido || '-'}</td>
+                                <td className="p-2 text-center">
+                                  <span className={`px-1 py-0.5 rounded text-white ${
+                                    erro.gravidade === 'CRÍTICO' ? 'bg-red-500' :
+                                    erro.gravidade === 'ALTO' ? 'bg-orange-500' :
+                                    erro.gravidade === 'MÉDIO' ? 'bg-yellow-500' :
+                                    'bg-blue-500'
+                                  }`}>
+                                    {erro.gravidade}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
 
-                    {pmProofreadingResult.observacoes && (
-                      <div className="p-2 bg-gray-100 rounded text-xs">
-                        <strong>Observações:</strong> {pmProofreadingResult.observacoes}
+                    {/* Observations */}
+                    {proofreadingResult.observacoes && proofreadingResult.observacoes.length > 0 && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                        <h5 className="text-xs font-bold text-blue-700 mb-2">📌 Observações:</h5>
+                        <ul className="text-[10px] text-gray-700 space-y-1">
+                          {proofreadingResult.observacoes.map((obs, idx) => (
+                            <li key={idx}>• {obs}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
                 )}
 
-                {!pmProofreadingResult && !pmIsProofreading && !pmProofreadingError && (
-                  <p className="text-xs text-gray-500 text-center py-2">
-                    Clique em "Executar Proofreading" para analisar a qualidade da tradução
-                  </p>
-                )}
-              </div>
-
-              {/* Package Creation Section */}
-              <div className="p-4 border-t bg-green-50">
-                <h4 className="text-xs font-bold text-green-700 mb-3">📦 Montar Pacote Final</h4>
-
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={pmIncludeCertificate}
-                      onChange={(e) => setPmIncludeCertificate(e.target.checked)}
-                      className="rounded text-green-600"
-                    />
-                    <span className="text-xs">📜 Certificado</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={pmIncludeTranslation}
-                      onChange={(e) => setPmIncludeTranslation(e.target.checked)}
-                      className="rounded text-green-600"
-                    />
-                    <span className="text-xs">📄 Tradução</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={pmIncludeVerification}
-                      onChange={(e) => setPmIncludeVerification(e.target.checked)}
-                      className="rounded text-green-600"
-                    />
-                    <span className="text-xs">🔐 Página de Verificação (QR)</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 p-2 bg-white rounded border cursor-pointer hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={pmIncludeOriginals}
-                      onChange={(e) => setPmIncludeOriginals(e.target.checked)}
-                      className="rounded text-green-600"
-                    />
-                    <span className="text-xs">📑 Documentos Originais</span>
-                  </label>
-                </div>
-
-                {/* Document Order Preview */}
-                <div className="p-2 bg-white rounded border mb-3">
-                  <div className="text-[10px] text-gray-500 mb-1">Ordem do pacote:</div>
-                  <div className="flex items-center gap-1 text-xs flex-wrap">
-                    {pmIncludeCertificate && (
-                      <>
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">📜 Certificado</span>
-                        <span className="text-gray-400">→</span>
-                      </>
-                    )}
-                    {pmIncludeTranslation && (
-                      <>
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">📄 Tradução</span>
-                        {(pmIncludeVerification || pmIncludeOriginals) && <span className="text-gray-400">→</span>}
-                      </>
-                    )}
-                    {pmIncludeVerification && (
-                      <>
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">🔐 Verificação</span>
-                        {pmIncludeOriginals && <span className="text-gray-400">→</span>}
-                      </>
-                    )}
-                    {pmIncludeOriginals && (
-                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">📑 Originais ({originalContents.length})</span>
-                    )}
+                {/* No review yet message */}
+                {!proofreadingResult && !proofreadingError && !isProofreading && (
+                  <div className="text-center py-4 text-gray-400 text-xs">
+                    Clique em "Executar Proofreading" para analisar a tradução automaticamente
                   </div>
-                </div>
-
-                <button
-                  onClick={generatePmPackage}
-                  disabled={pmIsGeneratingPackage || (!pmIncludeCertificate && !pmIncludeTranslation && !pmIncludeVerification && !pmIncludeOriginals)}
-                  className="w-full py-2 bg-green-600 text-white rounded font-medium text-sm hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
-                >
-                  {pmIsGeneratingPackage ? (
-                    <>
-                      <span className="animate-spin">⏳</span> Gerando Pacote...
-                    </>
-                  ) : (
-                    <>📦 Gerar Pacote para Download</>
-                  )}
-                </button>
+                )}
               </div>
             </div>
           )}
