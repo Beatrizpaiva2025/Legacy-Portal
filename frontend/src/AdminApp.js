@@ -2445,9 +2445,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         } else if (destination === 'pm') {
           setProcessingStatus(`✅ Translation sent to PM for review!`);
           if (isTranslator) {
-            // Translator goes back or stays
+            // Translator stays on translation page and goes to START tab to see other projects
+            // Don't call onBack() as it navigates to 'projects' which translators don't have access to
             setTimeout(() => {
-              if (onBack) onBack();
+              // Reset the form and go back to START tab
+              setSelectedOrderId('');
+              setOrderNumber('');
+              setTranslationResults([]);
+              setOriginalImages([]);
+              setActiveSubTab('start');
+              setProcessingStatus('');
+              // Refresh assigned orders list
+              fetchAssignedOrders();
             }, 1500);
           }
         } else {
