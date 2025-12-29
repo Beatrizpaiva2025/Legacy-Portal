@@ -508,6 +508,18 @@ Message: ${formData.message}
               </div>
               <div className="text-xs text-gray-500">100% Acceptance Guaranteed</div>
             </div>
+
+            {/* World Bank Logo */}
+            <div className="text-center">
+              <div className="h-14 md:h-16 mx-auto mb-2 flex items-center justify-center">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/The_World_Bank_logo.svg/320px-The_World_Bank_logo.svg.png"
+                  alt="World Bank"
+                  className="h-full object-contain"
+                />
+              </div>
+              <div className="text-xs text-gray-500">Authorized via Brazilian Government</div>
+            </div>
           </div>
 
           {/* Additional Certification Images */}
