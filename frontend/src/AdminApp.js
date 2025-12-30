@@ -3303,9 +3303,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Save translation pairs to Translation Memory after successful proofreading
   const saveToTranslationMemory = async (originalText, translatedText, score) => {
-    // Only save if proofreading score is good (>= 80%)
-    if (score < 80) {
-      console.log('TM not saved: score below 80%');
+    // Only save if proofreading score is good (>= 85% - blue/green quality only)
+    if (score < 85) {
+      console.log('TM not saved: score below 85%');
       return;
     }
 
@@ -3340,17 +3340,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         return;
       }
 
-      // Send to backend
+      // Send to backend with score for quality tracking
       await axios.post(`${API}/admin/translation-memory?admin_key=${adminKey}`, {
         sourceLang: sourceLanguage,
         targetLang: targetLanguage,
         field: documentType || 'General',
         documentType: documentType,
+        score: score,  // Include score so higher quality translations can replace lower ones
         entries: entries
       });
 
-      console.log(`✅ Saved ${entries.length} entries to Translation Memory`);
-      setProcessingStatus(`✅ Proofreading complete! ${entries.length} pairs saved to TM`);
+      console.log(`✅ Saved ${entries.length} entries to Translation Memory (score: ${score}%)`);
+      setProcessingStatus(`✅ Proofreading complete! ${entries.length} pairs saved to TM (${score}%)`);
     } catch (error) {
       console.error('Failed to save to Translation Memory:', error);
       // Don't show error to user - TM save is optional
@@ -8547,7 +8548,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <span className="text-lg">🧠</span>
               <div>
                 <h2 className="text-sm font-bold">Translation Memory</h2>
-                <p className="text-xs text-gray-500">Automatically collected from approved translations (score ≥ 80%)</p>
+                <p className="text-xs text-gray-500">Automatically collected from high-quality translations (score ≥ 85%)</p>
               </div>
             </div>
             <div className="flex space-x-2">
@@ -8655,6 +8656,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <th className="px-3 py-2 text-left font-medium">Source Text</th>
                       <th className="px-3 py-2 text-left font-medium">Target Text</th>
                       <th className="px-3 py-2 text-left font-medium">Field</th>
+                      <th className="px-3 py-2 text-center font-medium">Score</th>
                       <th className="px-3 py-2 text-center font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -8670,6 +8672,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.target}>{tm.target}</td>
                         <td className="px-3 py-2">
                           <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{tm.field || 'General'}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                            (tm.score || 0) >= 95 ? 'bg-green-100 text-green-700' :
+                            (tm.score || 0) >= 85 ? 'bg-blue-100 text-blue-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {tm.score ? `${tm.score}%` : '-'}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
@@ -8701,7 +8712,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-2">🧠</div>
                 <p className="text-sm font-medium mb-1">No Translation Memory entries yet</p>
-                <p className="text-xs">TM entries are automatically added after proofreading translations with a score ≥ 80%</p>
+                <p className="text-xs">TM entries are automatically added after proofreading translations with a score ≥ 85%</p>
               </div>
             )}
           </div>

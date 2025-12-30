@@ -8447,12 +8447,14 @@ class TranslationMemoryEntry(BaseModel):
     source: str
     target: str
     context: Optional[str] = None
+    score: Optional[float] = None  # Proofreading score for quality tracking
 
 class TranslationMemoryCreate(BaseModel):
     sourceLang: str
     targetLang: str
     field: Optional[str] = "General"
     documentType: Optional[str] = None
+    score: Optional[float] = None  # Overall proofreading score
     entries: List[TranslationMemoryEntry]
 
 @api_router.get("/admin/translation-memory")
@@ -8506,13 +8508,26 @@ async def add_translation_memory(data: TranslationMemoryCreate, admin_key: str):
             "source": entry.source.strip()
         })
 
+        # Get the score (from entry or from data)
+        new_score = entry.score or data.score or 0
+
         if existing:
-            # Update if target is different
-            if existing.get("target") != entry.target.strip():
+            existing_score = existing.get("score", 0) or 0
+
+            # Only update if new score is higher OR target is different and scores are equal
+            if new_score > existing_score:
                 await db.translation_memory.update_one(
                     {"id": existing["id"]},
-                    {"$set": {"target": entry.target.strip(), "updated_at": datetime.utcnow()}}
+                    {"$set": {
+                        "target": entry.target.strip(),
+                        "score": new_score,
+                        "updated_at": datetime.utcnow()
+                    }}
                 )
+                added_count += 1  # Count as updated
+            elif existing.get("target") != entry.target.strip() and new_score == existing_score:
+                # Same score but different translation - keep existing (first wins)
+                pass
             continue
 
         tm_entry = {
@@ -8523,6 +8538,7 @@ async def add_translation_memory(data: TranslationMemoryCreate, admin_key: str):
             "documentType": data.documentType,
             "source": entry.source.strip(),
             "target": entry.target.strip(),
+            "score": new_score,
             "context": entry.context,
             "created_at": datetime.utcnow(),
             "created_by": user_info.get("user_id", "system")
