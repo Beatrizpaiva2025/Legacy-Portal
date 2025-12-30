@@ -8072,6 +8072,15 @@ tradução juramentada | certified translation`}
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeAuthenticityStatement}
+                      onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
+                  </label>
                 </div>
               </div>
 
@@ -8821,36 +8830,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         const newWindow = window.open('', '_blank');
         newWindow.document.write(response.data.html_content);
         newWindow.document.close();
-      }
-    } catch (err) {
-      console.error('Failed to download translation:', err);
-      alert('Error downloading translation');
-    }
-  };
-
-  // Download translation without authenticity statement (last page)
-  const downloadWithoutAuthenticity = async (order) => {
-    try {
-      const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
-      if (response.data.has_html_translation && response.data.html_content) {
-        let html = response.data.html_content;
-        // Remove the authenticity statement section
-        html = html.replace(/<!-- STATEMENT OF AUTHENTICITY PAGE -->[\s\S]*?<div class="authenticity-page"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/gi, '');
-        // Also try simpler pattern
-        html = html.replace(/<div[^>]*class="authenticity-page"[^>]*>[\s\S]*?(?=<\/body>|$)/gi, '');
-
-        // Download as HTML
-        const blob = new Blob([html], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `translation_${order.order_number}_no_auth.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else {
-        alert('No HTML translation available for this order');
       }
     } catch (err) {
       console.error('Failed to download translation:', err);
@@ -10748,17 +10727,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <SendIcon className="w-4 h-4 text-teal-500" />
                               Deliver to Client
-                            </button>
-                          )}
-
-                          {/* Admin only: Download without Authenticity Statement */}
-                          {isAdmin && ['ready', 'delivered', 'final'].includes(order.translation_status) && (
-                            <button
-                              onClick={() => { downloadWithoutAuthenticity(order); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 flex items-center gap-2"
-                            >
-                              <DocumentIcon className="w-4 h-4 text-amber-500" />
-                              Exclude STATEMENT OF AUTHENTICITY
                             </button>
                           )}
 
