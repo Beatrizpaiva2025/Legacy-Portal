@@ -23,7 +23,8 @@ const STATUS_COLORS = {
   'pending_admin_approval': 'bg-blue-100 text-blue-700',
   'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
-  'delivered': 'bg-teal-100 text-teal-700'
+  'delivered': 'bg-teal-100 text-teal-700',
+  'final': 'bg-purple-100 text-purple-700'
 };
 
 const PAYMENT_COLORS = {
@@ -8606,6 +8607,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     if (isPM) fetchTranslatorStats();
   }, []);
 
+  // Re-fetch orders when status filter changes
+  useEffect(() => {
+    fetchOrders(1); // Reset to first page when filter changes
+  }, [statusFilter]);
+
   const fetchUsers = async () => {
     try {
       const [pmRes, transRes] = await Promise.all([
@@ -9517,7 +9523,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'pending_admin_approval': 'Pending Admin',
       'client_review': 'Client Review',
       'ready': 'Ready',
-      'delivered': 'Delivered'
+      'delivered': 'Delivered',
+      'final': 'Final'
     };
     return labels[status] || status;
   };
@@ -9951,7 +9958,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].map((s) => (
+            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -10711,6 +10718,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <SendIcon className="w-4 h-4 text-teal-500" />
                               Deliver to Client
+                            </button>
+                          )}
+
+                          {/* Admin only: Mark as Final (project completed) */}
+                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'ready') && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-purple-50 flex items-center gap-2"
+                            >
+                              <CheckIcon className="w-4 h-4 text-purple-500" />
+                              Mark as Final
                             </button>
                           )}
 
