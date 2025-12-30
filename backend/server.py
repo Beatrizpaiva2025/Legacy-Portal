@@ -7397,6 +7397,60 @@ CRITICAL INSTRUCTIONS:
         raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
 
 
+async def fetch_matching_instructions(source_lang: str, target_lang: str, document_type: str = None) -> str:
+    """Fetch translation instructions that match the language pair and document type.
+
+    Matches instructions where:
+    - sourceLang matches source_lang OR is "All Languages"
+    - targetLang matches target_lang OR is "All Languages"
+    - documentType matches document_type OR is "All Documents"
+    """
+    try:
+        # Build query to match instructions
+        instructions = await db.translation_instructions.find().to_list(100)
+
+        matching_instructions = []
+        for instr in instructions:
+            # Check source language match
+            instr_source = instr.get("sourceLang", "All Languages")
+            source_match = instr_source == "All Languages" or instr_source == source_lang
+
+            # Check target language match
+            instr_target = instr.get("targetLang", "All Languages")
+            target_match = instr_target == "All Languages" or instr_target == target_lang
+
+            # Check document type match
+            instr_doc_type = instr.get("documentType", "All Documents")
+            doc_match = instr_doc_type == "All Documents" or (document_type and instr_doc_type.lower() in document_type.lower())
+
+            if source_match and target_match and doc_match:
+                matching_instructions.append(instr)
+
+        if not matching_instructions:
+            return ""
+
+        # Build instruction text
+        instruction_text = "\n\n═══════════════════════════════════════════════════════════════════\n"
+        instruction_text += "              CUSTOM TRANSLATION INSTRUCTIONS\n"
+        instruction_text += "═══════════════════════════════════════════════════════════════════\n\n"
+
+        for instr in matching_instructions:
+            title = instr.get("title", "Instruction")
+            content = instr.get("content", "")
+            field = instr.get("field", "")
+
+            instruction_text += f"📋 {title}"
+            if field and field != "All Fields":
+                instruction_text += f" [{field}]"
+            instruction_text += f"\n{content}\n\n"
+
+        return instruction_text
+
+    except Exception as e:
+        logger.error(f"Error fetching instructions: {str(e)}")
+        return ""
+
+
 @api_router.post("/admin/translate")
 async def admin_translate(request: TranslateRequest, admin_key: str):
     """Translate text using Claude API (admin translation workspace)"""
@@ -7417,10 +7471,17 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     try:
         # Build the prompt based on action
         if request.action == 'translate':
-            # Build additional instructions
-            additional_instructions = ""
+            # Fetch saved instructions from database that match this translation
+            saved_instructions = await fetch_matching_instructions(
+                source_lang=request.source_language,
+                target_lang=request.target_language,
+                document_type=request.document_type
+            )
+
+            # Build additional instructions (user-provided + saved)
+            additional_instructions = saved_instructions
             if request.general_instructions:
-                additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
+                additional_instructions += f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
 
             # Build currency conversion instructions if translator_note is enabled
             currency_conversion_instructions = ""
