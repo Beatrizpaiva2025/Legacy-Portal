@@ -8485,6 +8485,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [assigningPM, setAssigningPM] = useState(null); // Order ID being assigned PM
   const [openActionsDropdown, setOpenActionsDropdown] = useState(null); // Order ID with open actions dropdown
 
+  // Delivery Modal state
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryModalOrder, setDeliveryModalOrder] = useState(null);
+  const [deliveryTranslationHtml, setDeliveryTranslationHtml] = useState('');
+  const [deliverySending, setDeliverySending] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState('');
+
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
   const [translatorsWithStatus, setTranslatorsWithStatus] = useState([]); // List of translators with details
@@ -8771,6 +8778,50 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
+    }
+  };
+
+  // Open delivery modal with translation preview
+  const openDeliveryModal = async (order) => {
+    setDeliveryModalOrder(order);
+    setDeliveryStatus('');
+    setShowDeliveryModal(true);
+
+    // Fetch the translation HTML
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const orderData = response.data.order || response.data;
+      setDeliveryTranslationHtml(orderData.translation_html || '');
+    } catch (err) {
+      console.error('Failed to fetch translation:', err);
+      setDeliveryTranslationHtml('<p style="color: red;">Erro ao carregar tradução</p>');
+    }
+  };
+
+  // Send translation by email
+  const sendDeliveryEmail = async () => {
+    if (!deliveryModalOrder) return;
+
+    setDeliverySending(true);
+    setDeliveryStatus('Enviando email...');
+
+    try {
+      await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`);
+      setDeliveryStatus('✅ Email enviado com sucesso!');
+      fetchOrders();
+
+      // Close modal after success
+      setTimeout(() => {
+        setShowDeliveryModal(false);
+        setDeliveryModalOrder(null);
+        setDeliveryTranslationHtml('');
+        setDeliveryStatus('');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to send email:', err);
+      setDeliveryStatus('❌ Erro ao enviar email: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeliverySending(false);
     }
   };
 
@@ -10775,14 +10826,25 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {/* Admin only: Deliver to Client */}
+                          {/* Admin only: Preview & Send Translation */}
+                          {isAdmin && ['ready', 'pending_admin_approval', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
+                            <button
+                              onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                              <MailIcon className="w-4 h-4 text-blue-500" />
+                              📧 Preview & Send Email
+                            </button>
+                          )}
+
+                          {/* Admin only: Deliver to Client (quick) */}
                           {isAdmin && order.translation_status === 'ready' && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
                             >
                               <SendIcon className="w-4 h-4 text-teal-500" />
-                              Deliver to Client
+                              Deliver to Client (Quick)
                             </button>
                           )}
 
@@ -11711,6 +11773,92 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               >
                 {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend' : '📤 Send')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Preview Modal */}
+      {showDeliveryModal && deliveryModalOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold text-lg">📧 Preview & Send Translation</h3>
+                <p className="text-xs opacity-80">
+                  {deliveryModalOrder.order_number} - {deliveryModalOrder.client_name} ({deliveryModalOrder.client_email})
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); setDeliveryTranslationHtml(''); }}
+                className="text-white hover:text-gray-200 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Translation Preview */}
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-700">📄 Translation Preview</h4>
+                <span className={`px-2 py-1 text-xs rounded ${STATUS_COLORS[deliveryModalOrder.translation_status] || 'bg-gray-100'}`}>
+                  {getStatusLabel(deliveryModalOrder.translation_status)}
+                </span>
+              </div>
+
+              {deliveryTranslationHtml ? (
+                <div
+                  className="bg-white border rounded-lg p-4 shadow-inner prose max-w-none"
+                  style={{ minHeight: '300px' }}
+                  dangerouslySetInnerHTML={{ __html: deliveryTranslationHtml }}
+                />
+              ) : (
+                <div className="bg-white border rounded-lg p-8 text-center text-gray-400">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                  <p>Loading translation...</p>
+                </div>
+              )}
+            </div>
+
+            {/* Status Message */}
+            {deliveryStatus && (
+              <div className={`px-4 py-2 text-sm text-center ${
+                deliveryStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                deliveryStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {deliveryStatus}
+              </div>
+            )}
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t bg-gray-100 rounded-b-lg flex justify-between items-center">
+              <div className="text-xs text-gray-500">
+                <strong>Client:</strong> {deliveryModalOrder.client_email}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); }}
+                  className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendDeliveryEmail}
+                  disabled={deliverySending || !deliveryTranslationHtml}
+                  className="px-6 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-300 text-sm font-medium flex items-center gap-2"
+                >
+                  {deliverySending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>📧 Send to Client</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
