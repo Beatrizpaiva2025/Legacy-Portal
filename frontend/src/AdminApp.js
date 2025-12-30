@@ -4150,7 +4150,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
@@ -4594,7 +4594,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
@@ -4709,7 +4709,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>${certTitle}</title>
+    <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4871,7 +4871,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${translationType === 'sworn' ? 'sworn' : 'certified'}_translation_${orderNumber || 'document'}.html`;
+      a.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.html`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -5920,6 +5920,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     }}
                                   />
                                 </label>
+
+                                {/* Use filename for Cover Letter */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Extract filename without extension and clean it up
+                                    const filename = doc.filename || 'Document';
+                                    const nameWithoutExt = filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ').replace(/-/g, ' ');
+                                    setDocumentType(nameWithoutExt);
+                                    setProcessingStatus(`✅ Document type set to: "${nameWithoutExt}"`);
+                                  }}
+                                  className="px-2 py-1.5 bg-purple-100 text-purple-600 rounded text-xs hover:bg-purple-200 transition-colors"
+                                  title="Usar nome do arquivo na Capa"
+                                >
+                                  📋
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -6250,13 +6266,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => {
                         // Download Translation as HTML
                         const htmlContent = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Translation - ${documentType || 'Document'}</title>
+<html><head><meta charset="UTF-8"><title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation</title>
 <style>body{font-family:Georgia,serif;max-width:800px;margin:0 auto;padding:40px;line-height:1.8;}</style></head>
 <body>${translationResults.map((r, i) => `<div style="margin-bottom:30px;"><h3>Page ${i + 1}</h3>${r.translatedText}</div>`).join('')}</body></html>`;
                         const blob = new Blob([htmlContent], { type: 'text/html' });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `translation_${orderNumber || 'document'}.html`;
+                        link.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation.html`;
                         link.click();
                       }}
                       className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 flex items-center justify-center gap-1"
@@ -6277,7 +6293,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         const blob = new Blob([txtContent], { type: 'text/plain' });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `translation_${orderNumber || 'document'}.txt`;
+                        link.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation.txt`;
                         link.click();
                       }}
                       className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center justify-center gap-1"
@@ -6599,33 +6615,51 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {selectedProjectFiles.map((doc, idx) => (
                       <div
                         key={doc.id}
-                        onClick={() => loadProjectFile(doc)}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
+                        className={`p-3 rounded-lg transition-all ${
                           selectedFileId === doc.id
                             ? 'bg-green-100 border-2 border-green-500 shadow-md'
                             : 'bg-white border border-gray-200 hover:bg-blue-100 hover:border-blue-400 hover:shadow'
                         }`}
                       >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
-                          selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
-                        }`}>
-                          {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-medium truncate ${
-                            selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                        <div
+                          onClick={() => loadProjectFile(doc)}
+                          className="flex items-center gap-3 cursor-pointer"
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${
+                            selectedFileId === doc.id ? 'bg-green-500 text-white' : 'bg-gray-100'
                           }`}>
-                            {doc.filename || `File ${idx + 1}`}
+                            {doc.filename?.toLowerCase().endsWith('.pdf') ? '📄' : '🖼️'}
                           </div>
-                          <div className="text-xs text-gray-400">
-                            {selectedFileId === doc.id ? '✓ Loaded - Ready' : 'Click to load'}
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-sm font-medium truncate ${
+                              selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
+                            }`}>
+                              {doc.filename || `File ${idx + 1}`}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {selectedFileId === doc.id ? '✓ Loaded - Ready' : 'Click to load'}
+                            </div>
                           </div>
+                          {selectedFileId === doc.id && (
+                            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
+                              ✓
+                            </div>
+                          )}
                         </div>
-                        {selectedFileId === doc.id && (
-                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-sm">
-                            ✓
-                          </div>
-                        )}
+                        {/* Use filename for Cover */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const filename = doc.filename || 'Document';
+                            const nameWithoutExt = filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' ').replace(/-/g, ' ');
+                            setDocumentType(nameWithoutExt);
+                            setProcessingStatus(`✅ Document type: "${nameWithoutExt}"`);
+                          }}
+                          className="mt-2 w-full px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 transition-colors"
+                          title="Use this filename for Cover Letter"
+                        >
+                          📋 Use for Cover
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -18519,7 +18553,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${user?.full_name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">Legal Representative (Legacy Translations)</div>
