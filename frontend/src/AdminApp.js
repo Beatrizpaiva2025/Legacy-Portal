@@ -6921,9 +6921,149 @@ tradução juramentada | certified translation`}
               <div className="p-2 bg-red-100 text-red-700 text-xs rounded mb-2">❌ {proofreadingError}</div>
             )}
             {proofreadingResult && (
-              <div className="p-2 bg-purple-100 rounded text-xs">
-                <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
-                {proofreadingResult.resumo && <span className="ml-2 text-gray-600">- {proofreadingResult.resumo}</span>}
+              <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                {/* Score and Summary */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      proofreadingResult.classificacao === 'APROVADO'
+                        ? 'bg-green-500 text-white'
+                        : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}>
+                      {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
+                       proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ COM OBSERVAÇÕES' :
+                       '❌ REPROVADO'}
+                    </span>
+                    <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
+                  </div>
+                  {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                    <button
+                      onClick={applyAllProofreadingCorrections}
+                      disabled={proofreadingResult.erros.every(e => e.applied)}
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      ✅ Aplicar Todas Correções
+                    </button>
+                  )}
+                </div>
+                {proofreadingResult.resumo && (
+                  <p className="text-xs text-gray-600 mb-2">📝 {proofreadingResult.resumo}</p>
+                )}
+
+                {/* Error Summary Counts */}
+                {proofreadingResult.total_erros > 0 && (
+                  <div className="flex gap-2 mb-3 flex-wrap">
+                    <span className="px-2 py-1 bg-gray-200 rounded text-xs">
+                      Total: <strong>{proofreadingResult.total_erros || 0}</strong>
+                    </span>
+                    {proofreadingResult.criticos > 0 && (
+                      <span className="px-2 py-1 bg-red-200 text-red-700 rounded text-xs">
+                        Críticos: <strong>{proofreadingResult.criticos}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.altos > 0 && (
+                      <span className="px-2 py-1 bg-orange-200 text-orange-700 rounded text-xs">
+                        Altos: <strong>{proofreadingResult.altos}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.medios > 0 && (
+                      <span className="px-2 py-1 bg-yellow-200 text-yellow-700 rounded text-xs">
+                        Médios: <strong>{proofreadingResult.medios}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.baixos > 0 && (
+                      <span className="px-2 py-1 bg-blue-200 text-blue-700 rounded text-xs">
+                        Baixos: <strong>{proofreadingResult.baixos}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Suggestions Table */}
+                {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
+                          <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proofreadingResult.erros.map((erro, idx) => {
+                          const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                          const errorType = erro.tipo || 'Geral';
+                          const foundText = erro.encontrado || erro.original || erro.traducao_errada || '';
+                          const suggestionText = erro.sugestao || erro.correcao || '';
+                          const explanation = erro.explicacao || erro.descricao || '';
+
+                          return (
+                            <tr key={idx} className={`border-t ${
+                              erro.applied ? 'bg-green-50 opacity-60' :
+                              severity === 'CRÍTICO' ? 'bg-red-50' :
+                              severity === 'ALTO' ? 'bg-orange-50' :
+                              severity === 'MÉDIO' ? 'bg-yellow-50' :
+                              'bg-blue-50'
+                            }`}>
+                              <td className="px-2 py-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
+                                  severity === 'ALTO' ? 'bg-orange-500 text-white' :
+                                  severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
+                                  'bg-blue-500 text-white'
+                                }`}>
+                                  {severity}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 text-gray-700">{errorType}</td>
+                              <td className="px-2 py-2 text-red-600 max-w-[150px] truncate" title={`${foundText}\n\n${explanation}`}>
+                                {erro.applied ? <s>{foundText}</s> : foundText || '-'}
+                              </td>
+                              <td className="px-2 py-2 text-green-600 max-w-[150px] truncate" title={suggestionText}>
+                                {suggestionText || '-'}
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {erro.applied ? (
+                                  <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
+                                ) : foundText && suggestionText ? (
+                                  <button
+                                    onClick={() => applyProofreadingCorrection(erro, idx)}
+                                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                  >
+                                    Aplicar
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-400 text-[10px]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* No Errors Message */}
+                {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && proofreadingResult.pontuacao_final >= 85 && (
+                  <div className="p-3 bg-green-100 border border-green-300 rounded text-center mt-2">
+                    <span className="text-green-700 text-xs font-medium">
+                      ✅ Nenhum erro encontrado na tradução!
+                    </span>
+                  </div>
+                )}
+
+                {/* Observations */}
+                {proofreadingResult.observacoes && typeof proofreadingResult.observacoes === 'string' && (
+                  <div className="p-2 bg-gray-100 border border-gray-200 rounded mt-2">
+                    <p className="text-xs text-gray-600">💡 {proofreadingResult.observacoes}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
