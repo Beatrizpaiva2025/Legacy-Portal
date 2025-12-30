@@ -4709,7 +4709,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>${certTitle}</title>
+    <title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation</title>
     <style>
         @page { size: ${pageSizeCSS}; margin: 0.6in 0.75in; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -4871,7 +4871,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${translationType === 'sworn' ? 'sworn' : 'certified'}_translation_${orderNumber || 'document'}.html`;
+      a.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_${translationType === 'sworn' ? 'Sworn' : 'Certified'}_Translation.html`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -6250,13 +6250,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => {
                         // Download Translation as HTML
                         const htmlContent = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Translation - ${documentType || 'Document'}</title>
+<html><head><meta charset="UTF-8"><title>${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation</title>
 <style>body{font-family:Georgia,serif;max-width:800px;margin:0 auto;padding:40px;line-height:1.8;}</style></head>
 <body>${translationResults.map((r, i) => `<div style="margin-bottom:30px;"><h3>Page ${i + 1}</h3>${r.translatedText}</div>`).join('')}</body></html>`;
                         const blob = new Blob([htmlContent], { type: 'text/html' });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `translation_${orderNumber || 'document'}.html`;
+                        link.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation.html`;
                         link.click();
                       }}
                       className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 flex items-center justify-center gap-1"
@@ -6277,7 +6277,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         const blob = new Blob([txtContent], { type: 'text/plain' });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(blob);
-                        link.download = `translation_${orderNumber || 'document'}.txt`;
+                        link.download = `${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}_Translation.txt`;
                         link.click();
                       }}
                       className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center justify-center gap-1"
