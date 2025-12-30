@@ -1830,6 +1830,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     terms: []
   });
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
+  const [termSearchQuery, setTermSearchQuery] = useState(''); // Search filter for glossary terms
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
   // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
@@ -2865,6 +2866,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       field: gloss.field || 'All Fields',
       terms: gloss.terms || []
     });
+    setTermSearchQuery('');
     setShowGlossaryModal(true);
   };
 
@@ -8302,7 +8304,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             </div>
             <button
-              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] }); setShowGlossaryModal(true); }}
+              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', sourceLang: 'Portuguese (Brazil)', targetLang: 'English', bidirectional: true, field: 'All Fields', terms: [] }); setTermSearchQuery(''); setShowGlossaryModal(true); }}
               className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
             >
               <span className="mr-1">+</span> Add
@@ -8539,84 +8541,142 @@ tradução juramentada | certified translation`}
                 </div>
               </div>
 
-              {/* Terms List */}
+              {/* Terms List with Search */}
               {glossaryForm.terms.length > 0 && (
-                <div className="border rounded max-h-64 overflow-y-auto">
-                  <div className="flex justify-between items-center px-2 py-1 bg-gray-100 border-b">
-                    <span className="text-xs font-medium">{glossaryForm.terms.length} terms loaded</span>
-                    <button
-                      onClick={() => {
-                        if (window.confirm('Clear all terms?')) {
-                          setGlossaryForm({...glossaryForm, terms: []});
-                        }
-                      }}
-                      className="text-[10px] text-red-600 hover:underline"
-                    >
-                      Clear All
-                    </button>
+                <div className="border rounded">
+                  {/* Header with count, search and actions */}
+                  <div className="px-3 py-2 bg-gray-100 border-b">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-gray-700">📚 {glossaryForm.terms.length} terms loaded</span>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Clear all terms? This cannot be undone.')) {
+                            setGlossaryForm({...glossaryForm, terms: []});
+                            setTermSearchQuery('');
+                          }
+                        }}
+                        className="px-2 py-1 text-[10px] text-red-600 bg-red-50 rounded hover:bg-red-100"
+                      >
+                        🗑️ Clear All
+                      </button>
+                    </div>
+                    {/* Search Input */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={termSearchQuery}
+                        onChange={(e) => setTermSearchQuery(e.target.value)}
+                        placeholder="🔍 Search terms..."
+                        className="w-full px-3 py-1.5 text-xs border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                      />
+                      {termSearchQuery && (
+                        <button
+                          onClick={() => setTermSearchQuery('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {termSearchQuery && (
+                      <p className="text-[10px] text-blue-600 mt-1">
+                        Showing {glossaryForm.terms.filter(t =>
+                          t.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                          t.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                          (t.notes && t.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                        ).length} of {glossaryForm.terms.length} terms
+                      </p>
+                    )}
                   </div>
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">{glossaryForm.sourceLang}</th>
-                        <th className="px-2 py-1.5 text-left">{glossaryForm.targetLang}</th>
-                        <th className="px-2 py-1.5 text-left">Notes</th>
-                        <th className="px-2 py-1.5 w-16 text-center">🗑️</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {glossaryForm.terms.map((term, idx) => (
-                        <tr key={term.id} className="hover:bg-gray-50">
-                          <td className="px-2 py-1.5">
-                            <input
-                              type="text"
-                              value={term.source}
-                              onChange={(e) => {
-                                const updated = [...glossaryForm.terms];
-                                updated[idx].source = e.target.value;
-                                setGlossaryForm({...glossaryForm, terms: updated});
-                              }}
-                              className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                            />
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <input
-                              type="text"
-                              value={term.target}
-                              onChange={(e) => {
-                                const updated = [...glossaryForm.terms];
-                                updated[idx].target = e.target.value;
-                                setGlossaryForm({...glossaryForm, terms: updated});
-                              }}
-                              className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                            />
-                          </td>
-                          <td className="px-2 py-1.5">
-                            <input
-                              type="text"
-                              value={term.notes || ''}
-                              onChange={(e) => {
-                                const updated = [...glossaryForm.terms];
-                                updated[idx].notes = e.target.value;
-                                setGlossaryForm({...glossaryForm, terms: updated});
-                              }}
-                              className="w-full px-1 py-0.5 text-xs text-gray-500 border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                              placeholder="notes..."
-                            />
-                          </td>
-                          <td className="px-2 py-1.5 text-center">
-                            <button
-                              onClick={() => removeTermFromGlossary(term.id)}
-                              className="text-red-500 hover:text-red-700 px-1"
-                              title="Delete term"
-                            >
-                              🗑️
-                            </button>
-                          </td>
+
+                  {/* Terms Table */}
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">{glossaryForm.sourceLang}</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">{glossaryForm.targetLang}</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Notes</th>
+                          <th className="px-2 py-2 w-20 text-center font-medium text-gray-600">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y">
+                        {glossaryForm.terms
+                          .map((term, originalIdx) => ({ term, originalIdx }))
+                          .filter(({ term }) =>
+                            !termSearchQuery ||
+                            term.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                            term.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                            (term.notes && term.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                          )
+                          .map(({ term, originalIdx }) => (
+                            <tr key={term.id} className="hover:bg-blue-50 group">
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.source}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].source = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.target}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].target = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.notes || ''}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].notes = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs text-gray-500 border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                  placeholder="Add notes..."
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete "${term.source} → ${term.target}"?`)) {
+                                      removeTermFromGlossary(term.id);
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-red-500 hover:text-white hover:bg-red-500 rounded transition-all opacity-50 group-hover:opacity-100"
+                                  title="Delete this term"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* No results message */}
+                  {termSearchQuery && glossaryForm.terms.filter(t =>
+                    t.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                    t.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                    (t.notes && t.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                  ).length === 0 && (
+                    <div className="p-4 text-center text-gray-500 text-xs">
+                      No terms found matching "{termSearchQuery}"
+                    </div>
+                  )}
                 </div>
               )}
             </div>
