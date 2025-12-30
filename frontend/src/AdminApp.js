@@ -1820,7 +1820,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [showGlossaryModal, setShowGlossaryModal] = useState(false);
   const [editingInstruction, setEditingInstruction] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(null);
-  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
+  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
   const [glossaryForm, setGlossaryForm] = useState({
     name: '',
     sourceLang: 'Portuguese (Brazil)',
@@ -4922,7 +4922,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRADUÇÃO', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
             key={tab.id}
@@ -5259,64 +5260,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             )}
           </div>
-
-          {/* Instruction Modal */}
-          {showInstructionModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-                <div className="p-4 border-b">
-                  <h3 className="font-bold">{editingInstruction ? 'Edit' : 'Add'} Translation Instruction</h3>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Source Language</label>
-                      <select
-                        value={instructionForm.sourceLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Target Language</label>
-                      <select
-                        value={instructionForm.targetLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={instructionForm.title}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, title: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                      placeholder="e.g., Birth Certificate Guidelines"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Instructions</label>
-                    <textarea
-                      value={instructionForm.content}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, content: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded h-32"
-                      placeholder="Enter translation guidelines and instructions..."
-                    />
-                  </div>
-                </div>
-                <div className="p-4 border-t flex justify-end space-x-2">
-                  <button onClick={() => setShowInstructionModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSaveInstruction} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Certificate Preview - LIVE with Editable Fields */}
           <div className="bg-white rounded shadow p-4">
@@ -8365,6 +8308,327 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <p className="text-xs">No glossaries/TM yet. Click "Add" to upload one.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* INSTRUCTIONS TAB */}
+      {activeSubTab === 'instructions' && (
+        <div className="bg-white rounded shadow">
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📋</span>
+              <div>
+                <h2 className="text-sm font-bold">Translation Instructions</h2>
+                <p className="text-xs text-gray-500">Manage custom instructions for specific document types and language pairs</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setEditingInstruction(null);
+                setInstructionForm({
+                  title: '',
+                  sourceLang: 'Portuguese (Brazil)',
+                  targetLang: 'English',
+                  field: 'All Fields',
+                  documentType: 'All Documents',
+                  content: ''
+                });
+                setShowInstructionModal(true);
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+            >
+              <span className="mr-1">+</span> Add Instruction
+            </button>
+          </div>
+          <div className="p-4">
+            {/* Filters */}
+            <div className="flex space-x-3 mb-4">
+              <select
+                value={resourcesFilter.language}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, language: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Languages</option>
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+              <select
+                value={resourcesFilter.field}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, field: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Fields</option>
+                <option>Financial</option>
+                <option>Education</option>
+                <option>Legal</option>
+                <option>Medical</option>
+                <option>Technical</option>
+                <option>General</option>
+                <option>Personal Documents</option>
+              </select>
+            </div>
+
+            {/* Instructions List */}
+            {instructions.filter(instr =>
+              (resourcesFilter.language === 'All Languages' || instr.sourceLang === resourcesFilter.language || instr.targetLang === resourcesFilter.language) &&
+              (resourcesFilter.field === 'All Fields' || instr.field === resourcesFilter.field)
+            ).length > 0 ? (
+              <div className="space-y-2">
+                {instructions
+                  .filter(instr =>
+                    (resourcesFilter.language === 'All Languages' || instr.sourceLang === resourcesFilter.language || instr.targetLang === resourcesFilter.language) &&
+                    (resourcesFilter.field === 'All Fields' || instr.field === resourcesFilter.field)
+                  )
+                  .map((instr) => (
+                  <div key={instr.id} className="p-3 border rounded hover:bg-gray-50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-gray-800">{instr.title}</span>
+                          {instr.isDefault && (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Default</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                            {instr.sourceLang || 'PT'} → {instr.targetLang || 'EN'}
+                          </span>
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{instr.field || 'General'}</span>
+                          {instr.documentType && instr.documentType !== 'All Documents' && (
+                            <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px]">{instr.documentType}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 line-clamp-2">{instr.content}</p>
+                      </div>
+                      <div className="flex space-x-1 ml-2">
+                        <button
+                          onClick={() => {
+                            setEditingInstruction(instr);
+                            setInstructionForm({
+                              title: instr.title,
+                              sourceLang: instr.sourceLang || 'Portuguese (Brazil)',
+                              targetLang: instr.targetLang || 'English',
+                              field: instr.field || 'All Fields',
+                              documentType: instr.documentType || 'All Documents',
+                              content: instr.content
+                            });
+                            setShowInstructionModal(true);
+                          }}
+                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Delete instruction "${instr.title}"?`)) {
+                              try {
+                                await axios.delete(`${API}/admin/translation-instructions/${instr.id}?admin_key=${adminKey}`);
+                                setInstructions(instructions.filter(i => i.id !== instr.id));
+                              } catch (err) {
+                                alert('Failed to delete instruction');
+                              }
+                            }
+                          }}
+                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📋</div>
+                <p className="text-sm font-medium mb-1">No instructions yet</p>
+                <p className="text-xs">Click "Add Instruction" to create custom translation guidelines.</p>
+                <p className="text-xs text-gray-400 mt-2">Instructions help the AI follow specific rules for document types, terminology, and formatting.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Instruction Modal - Outside all tabs so it's always available */}
+      {showInstructionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b">
+              <h3 className="font-bold">{editingInstruction ? 'Edit' : 'Add'} Translation Instruction</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={instructionForm.title}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, title: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-400"
+                  placeholder="e.g., Birth Certificate Guidelines"
+                />
+              </div>
+
+              {/* Language Pair */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Source Language</label>
+                  <select
+                    value={instructionForm.sourceLang}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Target Language</label>
+                  <select
+                    value={instructionForm.targetLang}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Field and Document Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Field</label>
+                  <select
+                    value={instructionForm.field}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, field: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option>All Fields</option>
+                    <option>Financial</option>
+                    <option>Education</option>
+                    <option>Legal</option>
+                    <option>Medical</option>
+                    <option>Technical</option>
+                    <option>General</option>
+                    <option>Personal Documents</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Document Type</label>
+                  <select
+                    value={instructionForm.documentType}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, documentType: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option>All Documents</option>
+                    <option>Birth Certificate</option>
+                    <option>Marriage Certificate</option>
+                    <option>Death Certificate</option>
+                    <option>Diploma</option>
+                    <option>Academic Transcript</option>
+                    <option>Driver's License</option>
+                    <option>ID Card</option>
+                    <option>Passport</option>
+                    <option>Bank Statement</option>
+                    <option>Tax Return</option>
+                    <option>Contract</option>
+                    <option>Power of Attorney</option>
+                    <option>Court Document</option>
+                    <option>Medical Record</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Instructions Content */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Instructions *</label>
+                <textarea
+                  value={instructionForm.content}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, content: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-lg h-48 font-mono"
+                  placeholder="Enter translation guidelines and instructions...
+
+Examples:
+- Always translate 'Certidão de Nascimento' as 'Birth Certificate'
+- Keep original names in their original form
+- Format dates as MM/DD/YYYY
+- Use American English spelling
+- Preserve all official stamps and seals descriptions"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  These instructions will be included in the AI prompt when translating matching documents.
+                </p>
+              </div>
+
+              {/* Example Instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs font-medium text-blue-700 mb-2">💡 Suggested Instructions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'Keep names in original form',
+                    'Use formal register',
+                    'Format dates as MM/DD/YYYY',
+                    'American English spelling',
+                    'Preserve formatting',
+                    'Include [sic] for errors'
+                  ].map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setInstructionForm({
+                        ...instructionForm,
+                        content: instructionForm.content + (instructionForm.content ? '\n- ' : '- ') + suggestion
+                      })}
+                      className="px-2 py-1 text-[10px] bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100"
+                    >
+                      + {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => setShowInstructionModal(false)}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!instructionForm.title || !instructionForm.content) {
+                    alert('Please fill in the title and instructions');
+                    return;
+                  }
+                  try {
+                    const payload = {
+                      title: instructionForm.title,
+                      sourceLang: instructionForm.sourceLang,
+                      targetLang: instructionForm.targetLang,
+                      field: instructionForm.field,
+                      documentType: instructionForm.documentType,
+                      content: instructionForm.content
+                    };
+
+                    if (editingInstruction) {
+                      await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, payload);
+                      setInstructions(instructions.map(i => i.id === editingInstruction.id ? { ...i, ...payload } : i));
+                    } else {
+                      const response = await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, payload);
+                      setInstructions([...instructions, { id: response.data.id || Date.now(), ...payload }]);
+                    }
+                    setShowInstructionModal(false);
+                    setProcessingStatus('✅ Instruction saved!');
+                    setTimeout(() => setProcessingStatus(''), 3000);
+                  } catch (err) {
+                    alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save Instruction
+              </button>
+            </div>
           </div>
         </div>
       )}
