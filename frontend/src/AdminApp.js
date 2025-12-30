@@ -3303,9 +3303,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Save translation pairs to Translation Memory after successful proofreading
   const saveToTranslationMemory = async (originalText, translatedText, score) => {
-    // Only save if proofreading score is good (>= 80%)
-    if (score < 80) {
-      console.log('TM not saved: score below 80%');
+    // Only save if proofreading score is good (>= 85% - blue/green quality only)
+    if (score < 85) {
+      console.log('TM not saved: score below 85%');
       return;
     }
 
@@ -8548,7 +8548,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <span className="text-lg">🧠</span>
               <div>
                 <h2 className="text-sm font-bold">Translation Memory</h2>
-                <p className="text-xs text-gray-500">Automatically collected from approved translations (score ≥ 80%)</p>
+                <p className="text-xs text-gray-500">Automatically collected from high-quality translations (score ≥ 85%)</p>
               </div>
             </div>
             <div className="flex space-x-2">
@@ -8712,7 +8712,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-2">🧠</div>
                 <p className="text-sm font-medium mb-1">No Translation Memory entries yet</p>
-                <p className="text-xs">TM entries are automatically added after proofreading translations with a score ≥ 80%</p>
+                <p className="text-xs">TM entries are automatically added after proofreading translations with a score ≥ 85%</p>
               </div>
             )}
           </div>
