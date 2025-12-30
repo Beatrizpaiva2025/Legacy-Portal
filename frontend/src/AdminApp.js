@@ -4036,6 +4036,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
         </div>
+        <div class="header-line"></div>
 
         <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
         <h1 class="main-title">${certTitle}</h1>
@@ -4477,6 +4478,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>`}
             </div>
         </div>
+        <div class="header-line"></div>
 
         <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
         <h1 class="main-title">${certTitle}</h1>
@@ -17683,6 +17685,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   : `<div class="logo-placeholder-right"><span>ata<br/>Member #275993</span></div>`}
             </div>
         </div>
+        <div class="header-line"></div>
 
         <div class="order-number">Order # <strong>${order?.order_number || orderNumber || 'P0000'}</strong></div>
         <h1 class="main-title">${certTitle}</h1>
