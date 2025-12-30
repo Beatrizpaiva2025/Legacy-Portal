@@ -1820,7 +1820,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [showGlossaryModal, setShowGlossaryModal] = useState(false);
   const [editingInstruction, setEditingInstruction] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(null);
-  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
+  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'All Languages', targetLang: 'All Languages', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
   const [glossaryForm, setGlossaryForm] = useState({
     name: '',
     sourceLang: 'Portuguese (Brazil)',
@@ -8328,8 +8328,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 setEditingInstruction(null);
                 setInstructionForm({
                   title: '',
-                  sourceLang: 'Portuguese (Brazil)',
-                  targetLang: 'English',
+                  sourceLang: 'All Languages',
+                  targetLang: 'All Languages',
                   field: 'All Fields',
                   documentType: 'All Documents',
                   content: ''
@@ -8479,6 +8479,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
                     className="w-full px-3 py-2 text-sm border rounded-lg"
                   >
+                    <option value="All Languages">All Languages</option>
                     {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
@@ -8489,6 +8490,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
                     className="w-full px-3 py-2 text-sm border rounded-lg"
                   >
+                    <option value="All Languages">All Languages</option>
                     {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
