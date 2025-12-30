@@ -3200,8 +3200,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
-    if (!erro.encontrado || !erro.sugestao) {
-      alert('Cannot apply correction: missing data');
+    // Handle both field name conventions (encontrado/original and sugestao/correcao)
+    const foundText = erro.encontrado || erro.original || erro.traducao_errada;
+    const suggestionText = erro.sugestao || erro.correcao;
+
+    if (!foundText || !suggestionText) {
+      alert('Cannot apply correction: missing original text or suggestion');
       return;
     }
 
@@ -3210,8 +3214,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Replace the found text with the suggestion
     const updatedHtml = currentResult.translatedText.replace(
-      new RegExp(erro.encontrado.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-      erro.sugestao
+      new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+      suggestionText
     );
 
     // Update translation results
@@ -3242,10 +3246,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     let updatedHtml = currentResult.translatedText;
     const updatedErros = proofreadingResult.erros.map(erro => {
-      if (erro.encontrado && erro.sugestao && !erro.applied) {
+      // Handle both field name conventions
+      const foundText = erro.encontrado || erro.original || erro.traducao_errada;
+      const suggestionText = erro.sugestao || erro.correcao;
+
+      if (foundText && suggestionText && !erro.applied) {
         updatedHtml = updatedHtml.replace(
-          new RegExp(erro.encontrado.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-          erro.sugestao
+          new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+          suggestionText
         );
         return { ...erro, applied: true };
       }
@@ -7378,48 +7386,60 @@ tradução juramentada | certified translation`}
                               </tr>
                             </thead>
                             <tbody>
-                              {proofreadingResult.erros.map((erro, idx) => (
-                                <tr key={idx} className={`border-t ${
-                                  erro.applied ? 'bg-green-50 opacity-60' :
-                                  erro.severidade === 'CRÍTICO' ? 'bg-red-50' :
-                                  erro.severidade === 'ALTO' ? 'bg-orange-50' :
-                                  erro.severidade === 'MÉDIO' ? 'bg-yellow-50' :
-                                  'bg-blue-50'
-                                }`}>
-                                  <td className="px-2 py-2">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                      erro.severidade === 'CRÍTICO' ? 'bg-red-500 text-white' :
-                                      erro.severidade === 'ALTO' ? 'bg-orange-500 text-white' :
-                                      erro.severidade === 'MÉDIO' ? 'bg-yellow-500 text-white' :
-                                      'bg-blue-500 text-white'
-                                    }`}>
-                                      {erro.severidade}
-                                    </span>
-                                  </td>
-                                  <td className="px-2 py-2 text-gray-700">{erro.tipo}</td>
-                                  <td className="px-2 py-2 text-gray-600 max-w-[120px] truncate" title={erro.original}>
-                                    {erro.original}
-                                  </td>
-                                  <td className="px-2 py-2 text-red-600 max-w-[120px] truncate" title={erro.encontrado}>
-                                    {erro.applied ? <s>{erro.encontrado}</s> : erro.encontrado}
-                                  </td>
-                                  <td className="px-2 py-2 text-green-600 max-w-[120px] truncate" title={erro.sugestao}>
-                                    {erro.sugestao}
-                                  </td>
-                                  <td className="px-2 py-2 text-center">
-                                    {erro.applied ? (
-                                      <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
-                                    ) : (
-                                      <button
-                                        onClick={() => applyProofreadingCorrection(erro, idx)}
-                                        className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                                      >
-                                        Aplicar
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
+                              {proofreadingResult.erros.map((erro, idx) => {
+                                // Handle both field name conventions
+                                const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                                const errorType = erro.tipo || 'Geral';
+                                const originalText = erro.original || erro.traducao_errada || '';
+                                const foundText = erro.encontrado || erro.original || erro.traducao_errada || '';
+                                const suggestionText = erro.sugestao || erro.correcao || '';
+                                const explanation = erro.explicacao || erro.descricao || '';
+
+                                return (
+                                  <tr key={idx} className={`border-t ${
+                                    erro.applied ? 'bg-green-50 opacity-60' :
+                                    severity === 'CRÍTICO' ? 'bg-red-50' :
+                                    severity === 'ALTO' ? 'bg-orange-50' :
+                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                    'bg-blue-50'
+                                  }`}>
+                                    <td className="px-2 py-2">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
+                                        severity === 'ALTO' ? 'bg-orange-500 text-white' :
+                                        severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
+                                        'bg-blue-500 text-white'
+                                      }`}>
+                                        {severity}
+                                      </span>
+                                    </td>
+                                    <td className="px-2 py-2 text-gray-700">{errorType}</td>
+                                    <td className="px-2 py-2 text-gray-600 max-w-[120px] truncate" title={originalText || explanation}>
+                                      {originalText || explanation || '-'}
+                                    </td>
+                                    <td className="px-2 py-2 text-red-600 max-w-[120px] truncate" title={foundText}>
+                                      {erro.applied ? <s>{foundText}</s> : foundText || '-'}
+                                    </td>
+                                    <td className="px-2 py-2 text-green-600 max-w-[120px] truncate" title={suggestionText}>
+                                      {suggestionText || '-'}
+                                    </td>
+                                    <td className="px-2 py-2 text-center">
+                                      {erro.applied ? (
+                                        <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
+                                      ) : foundText && suggestionText ? (
+                                        <button
+                                          onClick={() => applyProofreadingCorrection(erro, idx)}
+                                          className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                        >
+                                          Aplicar
+                                        </button>
+                                      ) : (
+                                        <span className="text-gray-400 text-[10px]">-</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
