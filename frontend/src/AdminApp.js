@@ -6160,22 +6160,88 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </button>
                   </div>
 
+                  {/* Correction Command - Also available in Translation tab */}
+                  <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      📝 Send Command to Claude (correct/modify translation)
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={correctionCommand}
+                        onChange={(e) => setCorrectionCommand(e.target.value)}
+                        placeholder='e.g., "Fix formatting" or "Change word X to Y"'
+                        className="flex-1 px-2 py-1.5 text-xs border rounded"
+                      />
+                      <button
+                        onClick={handleApplyCorrection}
+                        disabled={!correctionCommand.trim() || applyingCorrection}
+                        className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
+                      >
+                        {applyingCorrection ? '⏳' : '✨ Apply'}
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Download Options */}
                   <div className="flex gap-2 pt-2 border-t border-green-200">
-                    <button
-                      onClick={() => {
-                        // Download Original
-                        originalImages.forEach((img, idx) => {
-                          const link = document.createElement('a');
-                          link.href = img.data;
-                          link.download = `original_${idx + 1}_${img.filename || 'document'}`;
-                          link.click();
-                        });
-                      }}
-                      className="flex-1 px-3 py-2 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 flex items-center justify-center gap-1"
-                    >
-                      📄 Download Original ({originalImages.length})
-                    </button>
+                    <div className="flex-1 relative group">
+                      <button
+                        onClick={() => {
+                          // Download Original as-is
+                          originalImages.forEach((img, idx) => {
+                            const link = document.createElement('a');
+                            link.href = img.data;
+                            link.download = `original_${idx + 1}_${img.filename || 'document'}`;
+                            link.click();
+                          });
+                        }}
+                        className="w-full px-3 py-2 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 flex items-center justify-center gap-1"
+                      >
+                        📄 Download Original ({originalImages.length})
+                      </button>
+                      {/* Dropdown for PDF to Image conversion */}
+                      {originalImages.some(img => img.type === 'application/pdf' || img.filename?.toLowerCase().endsWith('.pdf')) && (
+                        <button
+                          onClick={async () => {
+                            setProcessingStatus('Converting PDF to images...');
+                            try {
+                              for (let idx = 0; idx < originalImages.length; idx++) {
+                                const img = originalImages[idx];
+                                // If it's already an image, download directly
+                                if (img.data.startsWith('data:image')) {
+                                  const link = document.createElement('a');
+                                  link.href = img.data;
+                                  link.download = `original_page_${idx + 1}.png`;
+                                  link.click();
+                                } else if (img.data.startsWith('data:application/pdf') || img.type === 'application/pdf') {
+                                  // Convert PDF to images using backend
+                                  const base64Data = img.data.includes(',') ? img.data.split(',')[1] : img.data;
+                                  const response = await axios.post(`${API}/admin/pdf-to-images?admin_key=${adminKey}`, {
+                                    file_base64: base64Data,
+                                    filename: img.filename || 'document.pdf'
+                                  });
+                                  if (response.data.images) {
+                                    response.data.images.forEach((pageImg, pageIdx) => {
+                                      const link = document.createElement('a');
+                                      link.href = pageImg.data;
+                                      link.download = `original_page_${pageIdx + 1}.png`;
+                                      link.click();
+                                    });
+                                  }
+                                }
+                              }
+                              setProcessingStatus('✅ Images downloaded!');
+                            } catch (err) {
+                              setProcessingStatus('❌ Failed to convert: ' + err.message);
+                            }
+                          }}
+                          className="mt-1 w-full px-3 py-1.5 bg-orange-50 text-orange-600 text-[10px] rounded border border-orange-200 hover:bg-orange-100"
+                        >
+                          🖼️ Download as Images (PNG)
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={() => {
                         // Download Translation as HTML

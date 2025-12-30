@@ -8441,6 +8441,49 @@ async def delete_glossary(glossary_id: str, admin_key: str):
     return {"status": "success"}
 
 
+# ==================== PDF TO IMAGE CONVERSION ====================
+
+class PDFToImageRequest(BaseModel):
+    file_base64: str
+    filename: str
+
+@api_router.post("/admin/pdf-to-images")
+async def convert_pdf_to_images(request: PDFToImageRequest, admin_key: str):
+    """Convert PDF to images for visualization"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Decode PDF
+        pdf_bytes = base64.b64decode(request.file_base64)
+
+        # Open PDF with PyMuPDF
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+        images = []
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            # Convert to image with 2x zoom for better quality
+            pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
+            img_bytes = pix.tobytes("png")
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            images.append({
+                "page": page_num + 1,
+                "data": f"data:image/png;base64,{img_base64}",
+                "width": pix.width,
+                "height": pix.height
+            })
+
+        doc.close()
+
+        return {"status": "success", "images": images, "total_pages": len(images)}
+
+    except Exception as e:
+        logger.error(f"PDF to image conversion error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to convert PDF: {str(e)}")
+
+
 # ==================== TRANSLATION MEMORY ====================
 
 class TranslationMemoryEntry(BaseModel):
