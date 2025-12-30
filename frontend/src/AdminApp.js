@@ -1833,6 +1833,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [termSearchQuery, setTermSearchQuery] = useState(''); // Search filter for glossary terms
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
+  // Translation Memory state
+  const [translationMemories, setTranslationMemories] = useState([]);
+  const [tmFilter, setTmFilter] = useState({ sourceLang: '', targetLang: '' });
+
   // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
   const [translatorNoteEnabled, setTranslatorNoteEnabled] = useState(false);
   const [translatorNoteSettings, setTranslatorNoteSettings] = useState({
@@ -1892,7 +1896,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const src = CURRENCIES[translatorNoteSettings.sourceCurrency];
     const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
     const rate = translatorNoteSettings.exchangeRate;
-    const date = new Date(translatorNoteSettings.rateDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    // Fix: Parse date directly to avoid timezone conversion issues
+    const dateParts = translatorNoteSettings.rateDate.split('-');
+    const date = `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`; // MM/DD/YYYY format
     const source = RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource);
 
     // Format: NOK 10.19 ≈ US$1.00
@@ -2375,12 +2381,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Fetch resources from backend
   const fetchResources = async () => {
     try {
-      const [instrRes, glossRes] = await Promise.all([
+      const requests = [
         axios.get(`${API}/admin/translation-instructions?admin_key=${adminKey}`),
         axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`)
-      ]);
-      setInstructions(instrRes.data.instructions || []);
-      setGlossaries(glossRes.data.glossaries || []);
+      ];
+
+      // Only fetch TM for admin users
+      if (isAdmin) {
+        requests.push(axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`));
+      }
+
+      const results = await Promise.all(requests);
+      setInstructions(results[0].data.instructions || []);
+      setGlossaries(results[1].data.glossaries || []);
+
+      if (isAdmin && results[2]) {
+        setTranslationMemories(results[2].data.memories || []);
+      }
     } catch (err) {
       console.error('Failed to fetch resources:', err);
     }
@@ -3188,6 +3205,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       if (data.proofreading_result) {
         setProofreadingResult(data.proofreading_result);
+
+        // Auto-save to Translation Memory if score is good
+        const score = data.proofreading_result.pontuacao_final || data.proofreading_result.score || 0;
+        const currentResult = translationResults[selectedResultIndex];
+        if (currentResult?.originalText && currentResult?.translatedText) {
+          saveToTranslationMemory(currentResult.originalText, currentResult.translatedText, score);
+        }
       } else if (data.raw_response) {
         // Show raw response if JSON parsing failed
         setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response}`);
@@ -3275,6 +3299,62 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ...proofreadingResult,
       erros: updatedErros
     });
+  };
+
+  // Save translation pairs to Translation Memory after successful proofreading
+  const saveToTranslationMemory = async (originalText, translatedText, score) => {
+    // Only save if proofreading score is good (>= 80%)
+    if (score < 80) {
+      console.log('TM not saved: score below 80%');
+      return;
+    }
+
+    try {
+      // Extract sentence pairs by splitting on common sentence delimiters
+      const extractSentences = (text) => {
+        // Remove HTML tags for comparison
+        const cleanText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        // Split by sentence-ending punctuation
+        const sentences = cleanText.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 10);
+        return sentences;
+      };
+
+      const sourceSentences = extractSentences(originalText);
+      const targetSentences = extractSentences(translatedText);
+
+      // Create pairs (best effort alignment)
+      const entries = [];
+      const minLength = Math.min(sourceSentences.length, targetSentences.length);
+
+      for (let i = 0; i < minLength; i++) {
+        if (sourceSentences[i]?.trim() && targetSentences[i]?.trim()) {
+          entries.push({
+            source: sourceSentences[i].trim(),
+            target: targetSentences[i].trim()
+          });
+        }
+      }
+
+      if (entries.length === 0) {
+        console.log('No sentence pairs extracted for TM');
+        return;
+      }
+
+      // Send to backend
+      await axios.post(`${API}/admin/translation-memory?admin_key=${adminKey}`, {
+        sourceLang: sourceLanguage,
+        targetLang: targetLanguage,
+        field: documentType || 'General',
+        documentType: documentType,
+        entries: entries
+      });
+
+      console.log(`✅ Saved ${entries.length} entries to Translation Memory`);
+      setProcessingStatus(`✅ Proofreading complete! ${entries.length} pairs saved to TM`);
+    } catch (error) {
+      console.error('Failed to save to Translation Memory:', error);
+      // Don't show error to user - TM save is optional
+    }
   };
 
   // Convert file to base64
@@ -4922,7 +5002,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRADUÇÃO', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] },
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
@@ -8452,6 +8533,175 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {(isAdmin || isPM) ? 'Click "Add Instruction" to create custom translation guidelines.' : 'No translation guidelines have been created yet.'}
                 </p>
                 <p className="text-xs text-gray-400 mt-2">Instructions help the AI follow specific rules for document types, terminology, and formatting.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TRANSLATION MEMORY TAB - Admin Only */}
+      {activeSubTab === 'tm' && isAdmin && (
+        <div className="bg-white rounded shadow">
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">🧠</span>
+              <div>
+                <h2 className="text-sm font-bold">Translation Memory</h2>
+                <p className="text-xs text-gray-500">Automatically collected from approved translations (score ≥ 80%)</p>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await axios.get(`${API}/admin/translation-memory/download?admin_key=${adminKey}&format=csv`);
+                    const blob = new Blob([response.data.content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.data.filename;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                  } catch (err) {
+                    alert('Failed to download: ' + err.message);
+                  }
+                }}
+                className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center"
+              >
+                📥 Download CSV
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await axios.get(`${API}/admin/translation-memory/download?admin_key=${adminKey}&format=tmx`);
+                    const blob = new Blob([response.data.content], { type: 'application/xml' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.data.filename;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                  } catch (err) {
+                    alert('Failed to download: ' + err.message);
+                  }
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+              >
+                📥 Download TMX
+              </button>
+              <button
+                onClick={async () => {
+                  if (!window.confirm('Clear ALL Translation Memory entries? This cannot be undone.')) return;
+                  try {
+                    await axios.delete(`${API}/admin/translation-memory?admin_key=${adminKey}`);
+                    setProcessingStatus('✅ Translation Memory cleared');
+                    // Refresh TM list
+                    const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
+                    setTranslationMemories(res.data.memories || []);
+                  } catch (err) {
+                    alert('Failed to clear: ' + err.message);
+                  }
+                }}
+                className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded hover:bg-red-200 flex items-center"
+              >
+                🗑️ Clear All
+              </button>
+            </div>
+          </div>
+          <div className="p-4">
+            {/* Filters */}
+            <div className="flex space-x-3 mb-4">
+              <select
+                value={tmFilter.sourceLang}
+                onChange={(e) => setTmFilter({ ...tmFilter, sourceLang: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option value="">All Source Languages</option>
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+              <select
+                value={tmFilter.targetLang}
+                onChange={(e) => setTmFilter({ ...tmFilter, targetLang: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option value="">All Target Languages</option>
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+              <button
+                onClick={async () => {
+                  try {
+                    let url = `${API}/admin/translation-memory?admin_key=${adminKey}`;
+                    if (tmFilter.sourceLang) url += `&sourceLang=${encodeURIComponent(tmFilter.sourceLang)}`;
+                    if (tmFilter.targetLang) url += `&targetLang=${encodeURIComponent(tmFilter.targetLang)}`;
+                    const res = await axios.get(url);
+                    setTranslationMemories(res.data.memories || []);
+                  } catch (err) {
+                    alert('Failed to load TM: ' + err.message);
+                  }
+                }}
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {/* TM Entries Table */}
+            {translationMemories.length > 0 ? (
+              <div className="border rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">Languages</th>
+                      <th className="px-3 py-2 text-left font-medium">Source Text</th>
+                      <th className="px-3 py-2 text-left font-medium">Target Text</th>
+                      <th className="px-3 py-2 text-left font-medium">Field</th>
+                      <th className="px-3 py-2 text-center font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {translationMemories.slice(0, 100).map((tm) => (
+                      <tr key={tm.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                            {tm.sourceLang?.substring(0, 10)} → {tm.targetLang?.substring(0, 10)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 max-w-xs truncate" title={tm.source}>{tm.source}</td>
+                        <td className="px-3 py-2 max-w-xs truncate" title={tm.target}>{tm.target}</td>
+                        <td className="px-3 py-2">
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{tm.field || 'General'}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm('Delete this TM entry?')) return;
+                              try {
+                                await axios.delete(`${API}/admin/translation-memory/${tm.id}?admin_key=${adminKey}`);
+                                setTranslationMemories(translationMemories.filter(t => t.id !== tm.id));
+                              } catch (err) {
+                                alert('Failed to delete: ' + err.message);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {translationMemories.length > 100 && (
+                  <div className="p-2 bg-gray-50 text-center text-xs text-gray-500">
+                    Showing 100 of {translationMemories.length} entries. Download to see all.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">🧠</div>
+                <p className="text-sm font-medium mb-1">No Translation Memory entries yet</p>
+                <p className="text-xs">TM entries are automatically added after proofreading translations with a score ≥ 80%</p>
               </div>
             )}
           </div>

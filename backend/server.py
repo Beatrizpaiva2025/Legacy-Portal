@@ -7397,6 +7397,60 @@ CRITICAL INSTRUCTIONS:
         raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
 
 
+async def fetch_matching_instructions(source_lang: str, target_lang: str, document_type: str = None) -> str:
+    """Fetch translation instructions that match the language pair and document type.
+
+    Matches instructions where:
+    - sourceLang matches source_lang OR is "All Languages"
+    - targetLang matches target_lang OR is "All Languages"
+    - documentType matches document_type OR is "All Documents"
+    """
+    try:
+        # Build query to match instructions
+        instructions = await db.translation_instructions.find().to_list(100)
+
+        matching_instructions = []
+        for instr in instructions:
+            # Check source language match
+            instr_source = instr.get("sourceLang", "All Languages")
+            source_match = instr_source == "All Languages" or instr_source == source_lang
+
+            # Check target language match
+            instr_target = instr.get("targetLang", "All Languages")
+            target_match = instr_target == "All Languages" or instr_target == target_lang
+
+            # Check document type match
+            instr_doc_type = instr.get("documentType", "All Documents")
+            doc_match = instr_doc_type == "All Documents" or (document_type and instr_doc_type.lower() in document_type.lower())
+
+            if source_match and target_match and doc_match:
+                matching_instructions.append(instr)
+
+        if not matching_instructions:
+            return ""
+
+        # Build instruction text
+        instruction_text = "\n\n═══════════════════════════════════════════════════════════════════\n"
+        instruction_text += "              CUSTOM TRANSLATION INSTRUCTIONS\n"
+        instruction_text += "═══════════════════════════════════════════════════════════════════\n\n"
+
+        for instr in matching_instructions:
+            title = instr.get("title", "Instruction")
+            content = instr.get("content", "")
+            field = instr.get("field", "")
+
+            instruction_text += f"📋 {title}"
+            if field and field != "All Fields":
+                instruction_text += f" [{field}]"
+            instruction_text += f"\n{content}\n\n"
+
+        return instruction_text
+
+    except Exception as e:
+        logger.error(f"Error fetching instructions: {str(e)}")
+        return ""
+
+
 @api_router.post("/admin/translate")
 async def admin_translate(request: TranslateRequest, admin_key: str):
     """Translate text using Claude API (admin translation workspace)"""
@@ -7417,10 +7471,17 @@ async def admin_translate(request: TranslateRequest, admin_key: str):
     try:
         # Build the prompt based on action
         if request.action == 'translate':
-            # Build additional instructions
-            additional_instructions = ""
+            # Fetch saved instructions from database that match this translation
+            saved_instructions = await fetch_matching_instructions(
+                source_lang=request.source_language,
+                target_lang=request.target_language,
+                document_type=request.document_type
+            )
+
+            # Build additional instructions (user-provided + saved)
+            additional_instructions = saved_instructions
             if request.general_instructions:
-                additional_instructions = f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
+                additional_instructions += f"\n\nADDITIONAL USER INSTRUCTIONS:\n{request.general_instructions}"
 
             # Build currency conversion instructions if translator_note is enabled
             currency_conversion_instructions = ""
@@ -8190,6 +8251,8 @@ class TranslationInstructionCreate(BaseModel):
     targetLang: str
     title: str
     content: str
+    field: Optional[str] = "All Fields"
+    documentType: Optional[str] = "All Documents"
 
 class GlossaryTerm(BaseModel):
     id: Optional[int] = None
@@ -8239,8 +8302,8 @@ async def create_translation_instruction(data: TranslationInstructionCreate, adm
         "id": str(uuid.uuid4()),
         "sourceLang": data.sourceLang,
         "targetLang": data.targetLang,
-        "field": getattr(data, 'field', 'All Fields'),
-        "documentType": getattr(data, 'documentType', 'All Documents'),
+        "field": data.field,
+        "documentType": data.documentType,
         "title": data.title,
         "content": data.content,
         "created_at": datetime.utcnow()
@@ -8267,8 +8330,8 @@ async def update_translation_instruction(instruction_id: str, data: TranslationI
         {"$set": {
             "sourceLang": data.sourceLang,
             "targetLang": data.targetLang,
-            "field": getattr(data, 'field', 'All Fields'),
-            "documentType": getattr(data, 'documentType', 'All Documents'),
+            "field": data.field,
+            "documentType": data.documentType,
             "title": data.title,
             "content": data.content
         }}
@@ -8376,6 +8439,200 @@ async def delete_glossary(glossary_id: str, admin_key: str):
         raise HTTPException(status_code=404, detail="Glossary not found")
 
     return {"status": "success"}
+
+
+# ==================== TRANSLATION MEMORY ====================
+
+class TranslationMemoryEntry(BaseModel):
+    source: str
+    target: str
+    context: Optional[str] = None
+
+class TranslationMemoryCreate(BaseModel):
+    sourceLang: str
+    targetLang: str
+    field: Optional[str] = "General"
+    documentType: Optional[str] = None
+    entries: List[TranslationMemoryEntry]
+
+@api_router.get("/admin/translation-memory")
+async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
+    """Get all translation memory entries - ADMIN ONLY"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can access TM
+    if user_info.get("role") != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin can access Translation Memory")
+
+    # Build query filter
+    query = {}
+    if sourceLang:
+        query["sourceLang"] = sourceLang
+    if targetLang:
+        query["targetLang"] = targetLang
+
+    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(500)
+    for mem in memories:
+        if '_id' in mem:
+            del mem['_id']
+        if mem.get("created_at"):
+            mem["created_at"] = mem["created_at"].isoformat()
+
+    return {"memories": memories}
+
+@api_router.post("/admin/translation-memory")
+async def add_translation_memory(data: TranslationMemoryCreate, admin_key: str):
+    """Add translation memory entries after proofreading"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # All roles can add TM entries (from proofreading)
+    if not data.entries:
+        return {"status": "success", "added": 0}
+
+    added_count = 0
+    for entry in data.entries:
+        # Skip empty entries
+        if not entry.source.strip() or not entry.target.strip():
+            continue
+
+        # Check if entry already exists (avoid duplicates)
+        existing = await db.translation_memory.find_one({
+            "sourceLang": data.sourceLang,
+            "targetLang": data.targetLang,
+            "source": entry.source.strip()
+        })
+
+        if existing:
+            # Update if target is different
+            if existing.get("target") != entry.target.strip():
+                await db.translation_memory.update_one(
+                    {"id": existing["id"]},
+                    {"$set": {"target": entry.target.strip(), "updated_at": datetime.utcnow()}}
+                )
+            continue
+
+        tm_entry = {
+            "id": str(uuid.uuid4()),
+            "sourceLang": data.sourceLang,
+            "targetLang": data.targetLang,
+            "field": data.field,
+            "documentType": data.documentType,
+            "source": entry.source.strip(),
+            "target": entry.target.strip(),
+            "context": entry.context,
+            "created_at": datetime.utcnow(),
+            "created_by": user_info.get("user_id", "system")
+        }
+        await db.translation_memory.insert_one(tm_entry)
+        added_count += 1
+
+    return {"status": "success", "added": added_count}
+
+@api_router.delete("/admin/translation-memory/{entry_id}")
+async def delete_translation_memory(entry_id: str, admin_key: str):
+    """Delete a translation memory entry - ADMIN ONLY"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can delete TM
+    if user_info.get("role") != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin can delete Translation Memory")
+
+    result = await db.translation_memory.delete_one({"id": entry_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    return {"status": "success"}
+
+@api_router.delete("/admin/translation-memory")
+async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
+    """Clear translation memory entries - ADMIN ONLY"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can clear TM
+    if user_info.get("role") != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin can clear Translation Memory")
+
+    query = {}
+    if sourceLang:
+        query["sourceLang"] = sourceLang
+    if targetLang:
+        query["targetLang"] = targetLang
+
+    result = await db.translation_memory.delete_many(query)
+
+    return {"status": "success", "deleted": result.deleted_count}
+
+@api_router.get("/admin/translation-memory/download")
+async def download_translation_memory(admin_key: str, format: str = "csv", sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
+    """Download translation memory as CSV or TMX - ADMIN ONLY"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin can download TM
+    if user_info.get("role") != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin can download Translation Memory")
+
+    # Build query filter
+    query = {}
+    if sourceLang:
+        query["sourceLang"] = sourceLang
+    if targetLang:
+        query["targetLang"] = targetLang
+
+    memories = await db.translation_memory.find(query).sort("created_at", -1).to_list(10000)
+
+    if format.lower() == "tmx":
+        # Generate TMX (Translation Memory eXchange) format
+        tmx_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        tmx_content += '<!DOCTYPE tmx SYSTEM "tmx14.dtd">\n'
+        tmx_content += '<tmx version="1.4">\n'
+        tmx_content += '  <header creationtool="Legacy Portal" creationtoolversion="1.0" datatype="plaintext" segtype="sentence" adminlang="en-US" srclang="*all*" o-tmf="Legacy Portal"/>\n'
+        tmx_content += '  <body>\n'
+
+        for mem in memories:
+            src_lang_code = mem.get("sourceLang", "pt-BR").replace(" ", "-").replace("(", "").replace(")", "")[:5]
+            tgt_lang_code = mem.get("targetLang", "en-US").replace(" ", "-").replace("(", "").replace(")", "")[:5]
+            source_text = mem.get("source", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            target_text = mem.get("target", "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+            tmx_content += f'    <tu>\n'
+            tmx_content += f'      <tuv xml:lang="{src_lang_code}">\n'
+            tmx_content += f'        <seg>{source_text}</seg>\n'
+            tmx_content += f'      </tuv>\n'
+            tmx_content += f'      <tuv xml:lang="{tgt_lang_code}">\n'
+            tmx_content += f'        <seg>{target_text}</seg>\n'
+            tmx_content += f'      </tuv>\n'
+            tmx_content += f'    </tu>\n'
+
+        tmx_content += '  </body>\n'
+        tmx_content += '</tmx>'
+
+        return JSONResponse(content={"format": "tmx", "content": tmx_content, "filename": f"translation_memory_{datetime.now().strftime('%Y%m%d')}.tmx"})
+
+    else:
+        # Generate CSV format
+        csv_lines = ["Source Language,Target Language,Field,Source Text,Target Text,Created At"]
+        for mem in memories:
+            src_lang = mem.get("sourceLang", "").replace(",", ";")
+            tgt_lang = mem.get("targetLang", "").replace(",", ";")
+            field = mem.get("field", "").replace(",", ";")
+            source = mem.get("source", "").replace(",", ";").replace("\n", " ")
+            target = mem.get("target", "").replace(",", ";").replace("\n", " ")
+            created = mem.get("created_at", "").isoformat() if hasattr(mem.get("created_at", ""), 'isoformat') else str(mem.get("created_at", ""))
+            csv_lines.append(f'"{src_lang}","{tgt_lang}","{field}","{source}","{target}","{created}"')
+
+        csv_content = "\n".join(csv_lines)
+        return JSONResponse(content={"format": "csv", "content": csv_content, "filename": f"translation_memory_{datetime.now().strftime('%Y%m%d')}.csv"})
 
 
 # ==================== CUSTOMER MODELS ====================
