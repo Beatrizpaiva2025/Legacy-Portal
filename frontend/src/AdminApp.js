@@ -19525,19 +19525,18 @@ function AdminApp() {
     }
   };
 
-  const handleLogout = async () => {
-    // Try to logout from server if we have a token
-    if (user?.token) {
-      try {
-        await axios.post(`${API}/admin/auth/logout?token=${user.token}`);
-      } catch (e) {
-        // Ignore logout errors
-      }
-    }
+  const handleLogout = () => {
+    // Clear local state immediately (don't wait for server)
     setAdminKey(null);
     setUser(null);
     localStorage.removeItem('admin_key');
     localStorage.removeItem('admin_user');
+
+    // Try to notify server in background (fire and forget)
+    if (user?.token) {
+      axios.post(`${API}/admin/auth/logout?token=${user.token}`).catch(() => {});
+    }
+
     window.location.href = '/#/admin';
   };
 
