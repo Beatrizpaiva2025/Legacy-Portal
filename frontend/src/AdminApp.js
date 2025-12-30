@@ -4257,11 +4257,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             align-items: center;
             margin-bottom: 10px;
             padding-bottom: 10px;
+            border: none;
         }
         .header-line {
-            height: 2px;
-            background: #93C5FD;
+            height: 3px;
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
             margin-bottom: 15px;
+            border: none;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -4724,11 +4726,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             align-items: center;
             margin-bottom: 10px;
             padding-bottom: 10px;
+            border: none;
         }
         .header-line {
-            height: 2px;
-            background: #93C5FD;
+            height: 3px;
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
             margin-bottom: 15px;
+            border: none;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
@@ -18660,11 +18664,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             align-items: center;
             margin-bottom: 10px;
             padding-bottom: 10px;
+            border: none;
         }
         .header-line {
-            height: 2px;
-            background: #93C5FD;
+            height: 3px;
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
             margin-bottom: 15px;
+            border: none;
         }
         .logo-left { width: 120px; height: 50px; display: flex; align-items: center; }
         .logo-left img { max-width: 100%; max-height: 100%; }
