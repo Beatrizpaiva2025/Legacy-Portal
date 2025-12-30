@@ -576,12 +576,8 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
             key={item.id}
             onClick={() => {
               if (item.id === 'mia-bot') {
-                // Open MIA Bot chat widget
-                if (window.MiaWidget) {
-                  window.MiaWidget.open();
-                } else {
-                  window.open('https://mia-atendimento-1.onrender.com', '_blank', 'width=400,height=600');
-                }
+                // Open MIA Bot admin control panel
+                window.open('https://mia-atendimento-1.onrender.com/admin/controle/', '_blank');
               } else {
                 setActiveTab(item.id);
               }
