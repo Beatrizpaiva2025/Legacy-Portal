@@ -539,7 +539,8 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
-    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] }
+    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
+    { id: 'mia-bot', label: 'MIA Bot', icon: '🤖', roles: ['admin'], isExternal: true }
   ];
 
   // Filter menu items based on user role
@@ -573,10 +574,23 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => setActiveTab(item.id)}
+            onClick={() => {
+              if (item.id === 'mia-bot') {
+                // Open MIA Bot chat widget
+                if (window.MiaWidget) {
+                  window.MiaWidget.open();
+                } else {
+                  window.open('https://mia-atendimento-1.onrender.com', '_blank', 'width=400,height=600');
+                }
+              } else {
+                setActiveTab(item.id);
+              }
+            }}
             className={`flex items-center px-3 py-1.5 rounded transition-colors ${
               activeTab === item.id
                 ? 'bg-teal-600 text-white'
+                : item.id === 'mia-bot'
+                ? 'text-purple-300 hover:bg-purple-700 bg-purple-900/50'
                 : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
