@@ -1820,7 +1820,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [showGlossaryModal, setShowGlossaryModal] = useState(false);
   const [editingInstruction, setEditingInstruction] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(null);
-  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '' });
+  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
   const [glossaryForm, setGlossaryForm] = useState({
     name: '',
     sourceLang: 'Portuguese (Brazil)',
@@ -1830,6 +1830,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     terms: []
   });
   const [newTerm, setNewTerm] = useState({ source: '', target: '', notes: '' });
+  const [termSearchQuery, setTermSearchQuery] = useState(''); // Search filter for glossary terms
   const [resourcesFilter, setResourcesFilter] = useState({ language: 'All Languages', field: 'All Fields' });
 
   // Translator's Note for Financial Documents (Bank Statements, Tax Returns)
@@ -2865,6 +2866,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       field: gloss.field || 'All Fields',
       terms: gloss.terms || []
     });
+    setTermSearchQuery('');
     setShowGlossaryModal(true);
   };
 
@@ -4920,7 +4922,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'translate', label: 'TRADUÇÃO', icon: '📄', roles: ['admin', 'pm', 'translator'] },
           { id: 'review', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
             key={tab.id}
@@ -5257,325 +5260,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             )}
           </div>
-
-          {/* Instruction Modal */}
-          {showInstructionModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4">
-                <div className="p-4 border-b">
-                  <h3 className="font-bold">{editingInstruction ? 'Edit' : 'Add'} Translation Instruction</h3>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Source Language</label>
-                      <select
-                        value={instructionForm.sourceLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Target Language</label>
-                      <select
-                        value={instructionForm.targetLang}
-                        onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Title</label>
-                    <input
-                      type="text"
-                      value={instructionForm.title}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, title: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded"
-                      placeholder="e.g., Birth Certificate Guidelines"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Instructions</label>
-                    <textarea
-                      value={instructionForm.content}
-                      onChange={(e) => setInstructionForm({ ...instructionForm, content: e.target.value })}
-                      className="w-full px-2 py-1.5 text-xs border rounded h-32"
-                      placeholder="Enter translation guidelines and instructions..."
-                    />
-                  </div>
-                </div>
-                <div className="p-4 border-t flex justify-end space-x-2">
-                  <button onClick={() => setShowInstructionModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSaveInstruction} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Glossary Modal */}
-          {showGlossaryModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="p-4 border-b">
-                  <h3 className="font-bold">{editingGlossary ? 'Edit' : 'Add'} Glossary / TM</h3>
-                </div>
-                <div className="p-4 space-y-3">
-                  {/* Name and Field */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={glossaryForm.name}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, name: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                        placeholder="e.g., Legal Terms PT-EN"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Field</label>
-                      <select
-                        value={glossaryForm.field}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, field: e.target.value })}
-                        className="w-full px-2 py-1.5 text-xs border rounded"
-                      >
-                        <option>All Fields</option>
-                        <option>Financial</option>
-                        <option>Education</option>
-                        <option>General</option>
-                        <option>Personal Documents</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Language Pair */}
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                    <label className="block text-xs font-bold mb-2">🌐 Language Pair</label>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={glossaryForm.sourceLang}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, sourceLang: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                      <span className="text-lg font-bold text-blue-600">
-                        {glossaryForm.bidirectional ? '↔' : '→'}
-                      </span>
-                      <select
-                        value={glossaryForm.targetLang}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, targetLang: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                      >
-                        {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                      </select>
-                    </div>
-                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={glossaryForm.bidirectional}
-                        onChange={(e) => setGlossaryForm({ ...glossaryForm, bidirectional: e.target.checked })}
-                        className="rounded text-blue-600"
-                      />
-                      <span className="text-xs text-blue-700">
-                        <strong>Bidirectional:</strong> Terms work both ways (PT → EN and EN → PT)
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* Add Single Term */}
-                  <div className="border-t pt-3">
-                    <label className="block text-xs font-medium mb-2">Add Single Term</label>
-                    <div className="flex space-x-2">
-                      <input
-                        type="text"
-                        value={newTerm.source}
-                        onChange={(e) => setNewTerm({ ...newTerm, source: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Source term"
-                      />
-                      <input
-                        type="text"
-                        value={newTerm.target}
-                        onChange={(e) => setNewTerm({ ...newTerm, target: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Target term"
-                      />
-                      <input
-                        type="text"
-                        value={newTerm.notes}
-                        onChange={(e) => setNewTerm({ ...newTerm, notes: e.target.value })}
-                        className="flex-1 px-2 py-1.5 text-xs border rounded"
-                        placeholder="Notes (optional)"
-                      />
-                      <button onClick={addTermToGlossary} className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">+</button>
-                    </div>
-                  </div>
-
-                  {/* Bulk Upload Terms */}
-                  <div className="border-t pt-3">
-                    <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms (Paste Entire Glossary)</label>
-                    <div className="bg-green-50 border border-green-200 rounded p-2 mb-2">
-                      <p className="text-[10px] text-green-700">
-                        <strong>Format:</strong> One term per line: <code className="bg-green-100 px-1">{glossaryForm.sourceLang} | {glossaryForm.targetLang} | notes (optional)</code>
-                      </p>
-                      {glossaryForm.bidirectional && (
-                        <p className="text-[10px] text-green-600 mt-1">
-                          ↔ <strong>Bidirectional enabled:</strong> Terms will work in both translation directions automatically!
-                        </p>
-                      )}
-                    </div>
-                    <textarea
-                      value={bulkTermsText}
-                      onChange={(e) => setBulkTermsText(e.target.value)}
-                      placeholder={`certidão de nascimento | birth certificate | legal document
-carteira de identidade | identity card | ID document
-CPF | individual taxpayer number | Brazilian tax ID
-registro civil | civil registry
-cartório | notary office | public registry
-certidão de casamento | marriage certificate
-certidão de óbito | death certificate
-reconhecimento de firma | notarized signature
-autenticação | authentication
-tradução juramentada | certified translation`}
-                      className="w-full px-2 py-1.5 text-xs border rounded h-40 font-mono resize-y"
-                    />
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-gray-500">
-                        {bulkTermsText.trim() ? `${bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} valid terms detected` : 'Paste your glossary above'}
-                      </span>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => setBulkTermsText('')}
-                          className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                        >
-                          Clear
-                        </button>
-                        <button
-                          onClick={() => {
-                            const lines = bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|'));
-                            const newTerms = lines.map(line => {
-                              const parts = line.split('|').map(p => p.trim());
-                              return {
-                                id: Date.now() + Math.random(),
-                                source: parts[0] || '',
-                                target: parts[1] || '',
-                                notes: parts[2] || ''
-                              };
-                            }).filter(t => t.source && t.target);
-
-                            if (newTerms.length > 0) {
-                              setGlossaryForm({
-                                ...glossaryForm,
-                                terms: [...glossaryForm.terms, ...newTerms]
-                              });
-                              setBulkTermsText('');
-                              alert(`✅ Added ${newTerms.length} terms to glossary!`);
-                            } else {
-                              alert('No valid terms found. Use format: source | target | notes');
-                            }
-                          }}
-                          disabled={!bulkTermsText.trim()}
-                          className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                        >
-                          📥 Import {bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} Terms
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Terms List */}
-                  {glossaryForm.terms.length > 0 && (
-                    <div className="border rounded max-h-64 overflow-y-auto">
-                      <div className="flex justify-between items-center px-2 py-1 bg-gray-100 border-b">
-                        <span className="text-xs font-medium">{glossaryForm.terms.length} terms loaded</span>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Clear all terms?')) {
-                              setGlossaryForm({...glossaryForm, terms: []});
-                            }
-                          }}
-                          className="text-[10px] text-red-600 hover:underline"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      <table className="w-full text-xs">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-1.5 text-left">{glossaryForm.sourceLang}</th>
-                            <th className="px-2 py-1.5 text-left">{glossaryForm.targetLang}</th>
-                            <th className="px-2 py-1.5 text-left">Notes</th>
-                            <th className="px-2 py-1.5 w-16 text-center">🗑️</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {glossaryForm.terms.map((term, idx) => (
-                            <tr key={term.id} className="hover:bg-gray-50">
-                              <td className="px-2 py-1.5">
-                                <input
-                                  type="text"
-                                  value={term.source}
-                                  onChange={(e) => {
-                                    const updated = [...glossaryForm.terms];
-                                    updated[idx].source = e.target.value;
-                                    setGlossaryForm({...glossaryForm, terms: updated});
-                                  }}
-                                  className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                                />
-                              </td>
-                              <td className="px-2 py-1.5">
-                                <input
-                                  type="text"
-                                  value={term.target}
-                                  onChange={(e) => {
-                                    const updated = [...glossaryForm.terms];
-                                    updated[idx].target = e.target.value;
-                                    setGlossaryForm({...glossaryForm, terms: updated});
-                                  }}
-                                  className="w-full px-1 py-0.5 text-xs border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                                />
-                              </td>
-                              <td className="px-2 py-1.5">
-                                <input
-                                  type="text"
-                                  value={term.notes || ''}
-                                  onChange={(e) => {
-                                    const updated = [...glossaryForm.terms];
-                                    updated[idx].notes = e.target.value;
-                                    setGlossaryForm({...glossaryForm, terms: updated});
-                                  }}
-                                  className="w-full px-1 py-0.5 text-xs text-gray-500 border-0 bg-transparent hover:bg-white hover:border focus:bg-white focus:border focus:border-blue-400 rounded"
-                                  placeholder="notes..."
-                                />
-                              </td>
-                              <td className="px-2 py-1.5 text-center">
-                                <button
-                                  onClick={() => removeTermFromGlossary(term.id)}
-                                  className="text-red-500 hover:text-red-700 px-1"
-                                  title="Delete term"
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 border-t flex justify-end space-x-2">
-                  <button onClick={() => setShowGlossaryModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
-                  <button onClick={handleSaveGlossary} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Certificate Preview - LIVE with Editable Fields */}
           <div className="bg-white rounded shadow p-4">
@@ -6921,9 +6605,149 @@ tradução juramentada | certified translation`}
               <div className="p-2 bg-red-100 text-red-700 text-xs rounded mb-2">❌ {proofreadingError}</div>
             )}
             {proofreadingResult && (
-              <div className="p-2 bg-purple-100 rounded text-xs">
-                <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
-                {proofreadingResult.resumo && <span className="ml-2 text-gray-600">- {proofreadingResult.resumo}</span>}
+              <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                {/* Score and Summary */}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      proofreadingResult.classificacao === 'APROVADO'
+                        ? 'bg-green-500 text-white'
+                        : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}>
+                      {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
+                       proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ COM OBSERVAÇÕES' :
+                       '❌ REPROVADO'}
+                    </span>
+                    <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
+                  </div>
+                  {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                    <button
+                      onClick={applyAllProofreadingCorrections}
+                      disabled={proofreadingResult.erros.every(e => e.applied)}
+                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      ✅ Aplicar Todas Correções
+                    </button>
+                  )}
+                </div>
+                {proofreadingResult.resumo && (
+                  <p className="text-xs text-gray-600 mb-2">📝 {proofreadingResult.resumo}</p>
+                )}
+
+                {/* Error Summary Counts */}
+                {proofreadingResult.total_erros > 0 && (
+                  <div className="flex gap-2 mb-3 flex-wrap">
+                    <span className="px-2 py-1 bg-gray-200 rounded text-xs">
+                      Total: <strong>{proofreadingResult.total_erros || 0}</strong>
+                    </span>
+                    {proofreadingResult.criticos > 0 && (
+                      <span className="px-2 py-1 bg-red-200 text-red-700 rounded text-xs">
+                        Críticos: <strong>{proofreadingResult.criticos}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.altos > 0 && (
+                      <span className="px-2 py-1 bg-orange-200 text-orange-700 rounded text-xs">
+                        Altos: <strong>{proofreadingResult.altos}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.medios > 0 && (
+                      <span className="px-2 py-1 bg-yellow-200 text-yellow-700 rounded text-xs">
+                        Médios: <strong>{proofreadingResult.medios}</strong>
+                      </span>
+                    )}
+                    {proofreadingResult.baixos > 0 && (
+                      <span className="px-2 py-1 bg-blue-200 text-blue-700 rounded text-xs">
+                        Baixos: <strong>{proofreadingResult.baixos}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Suggestions Table */}
+                {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
+                          <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
+                          <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proofreadingResult.erros.map((erro, idx) => {
+                          const severity = erro.severidade || erro.gravidade || 'MÉDIO';
+                          const errorType = erro.tipo || 'Geral';
+                          const foundText = erro.encontrado || erro.original || erro.traducao_errada || '';
+                          const suggestionText = erro.sugestao || erro.correcao || '';
+                          const explanation = erro.explicacao || erro.descricao || '';
+
+                          return (
+                            <tr key={idx} className={`border-t ${
+                              erro.applied ? 'bg-green-50 opacity-60' :
+                              severity === 'CRÍTICO' ? 'bg-red-50' :
+                              severity === 'ALTO' ? 'bg-orange-50' :
+                              severity === 'MÉDIO' ? 'bg-yellow-50' :
+                              'bg-blue-50'
+                            }`}>
+                              <td className="px-2 py-2">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
+                                  severity === 'ALTO' ? 'bg-orange-500 text-white' :
+                                  severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
+                                  'bg-blue-500 text-white'
+                                }`}>
+                                  {severity}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 text-gray-700">{errorType}</td>
+                              <td className="px-2 py-2 text-red-600 max-w-[150px] truncate" title={`${foundText}\n\n${explanation}`}>
+                                {erro.applied ? <s>{foundText}</s> : foundText || '-'}
+                              </td>
+                              <td className="px-2 py-2 text-green-600 max-w-[150px] truncate" title={suggestionText}>
+                                {suggestionText || '-'}
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {erro.applied ? (
+                                  <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
+                                ) : foundText && suggestionText ? (
+                                  <button
+                                    onClick={() => applyProofreadingCorrection(erro, idx)}
+                                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
+                                  >
+                                    Aplicar
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-400 text-[10px]">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* No Errors Message */}
+                {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && proofreadingResult.pontuacao_final >= 85 && (
+                  <div className="p-3 bg-green-100 border border-green-300 rounded text-center mt-2">
+                    <span className="text-green-700 text-xs font-medium">
+                      ✅ Nenhum erro encontrado na tradução!
+                    </span>
+                  </div>
+                )}
+
+                {/* Observations */}
+                {proofreadingResult.observacoes && typeof proofreadingResult.observacoes === 'string' && (
+                  <div className="p-2 bg-gray-100 border border-gray-200 rounded mt-2">
+                    <p className="text-xs text-gray-600">💡 {proofreadingResult.observacoes}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -8423,7 +8247,7 @@ tradução juramentada | certified translation`}
               </div>
             </div>
             <button
-              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', language: 'All Languages', field: 'All Fields', terms: [] }); setShowGlossaryModal(true); }}
+              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', sourceLang: 'Portuguese (Brazil)', targetLang: 'English', bidirectional: true, field: 'All Fields', terms: [] }); setTermSearchQuery(''); setShowGlossaryModal(true); }}
               className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
             >
               <span className="mr-1">+</span> Add
@@ -8484,6 +8308,646 @@ tradução juramentada | certified translation`}
                 <p className="text-xs">No glossaries/TM yet. Click "Add" to upload one.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* INSTRUCTIONS TAB */}
+      {activeSubTab === 'instructions' && (
+        <div className="bg-white rounded shadow">
+          <div className="p-4 border-b flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">📋</span>
+              <div>
+                <h2 className="text-sm font-bold">Translation Instructions</h2>
+                <p className="text-xs text-gray-500">Manage custom instructions for specific document types and language pairs</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setEditingInstruction(null);
+                setInstructionForm({
+                  title: '',
+                  sourceLang: 'Portuguese (Brazil)',
+                  targetLang: 'English',
+                  field: 'All Fields',
+                  documentType: 'All Documents',
+                  content: ''
+                });
+                setShowInstructionModal(true);
+              }}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+            >
+              <span className="mr-1">+</span> Add Instruction
+            </button>
+          </div>
+          <div className="p-4">
+            {/* Filters */}
+            <div className="flex space-x-3 mb-4">
+              <select
+                value={resourcesFilter.language}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, language: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Languages</option>
+                {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+              <select
+                value={resourcesFilter.field}
+                onChange={(e) => setResourcesFilter({ ...resourcesFilter, field: e.target.value })}
+                className="px-3 py-1.5 text-xs border rounded"
+              >
+                <option>All Fields</option>
+                <option>Financial</option>
+                <option>Education</option>
+                <option>Legal</option>
+                <option>Medical</option>
+                <option>Technical</option>
+                <option>General</option>
+                <option>Personal Documents</option>
+              </select>
+            </div>
+
+            {/* Instructions List */}
+            {instructions.filter(instr =>
+              (resourcesFilter.language === 'All Languages' || instr.sourceLang === resourcesFilter.language || instr.targetLang === resourcesFilter.language) &&
+              (resourcesFilter.field === 'All Fields' || instr.field === resourcesFilter.field)
+            ).length > 0 ? (
+              <div className="space-y-2">
+                {instructions
+                  .filter(instr =>
+                    (resourcesFilter.language === 'All Languages' || instr.sourceLang === resourcesFilter.language || instr.targetLang === resourcesFilter.language) &&
+                    (resourcesFilter.field === 'All Fields' || instr.field === resourcesFilter.field)
+                  )
+                  .map((instr) => (
+                  <div key={instr.id} className="p-3 border rounded hover:bg-gray-50">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-gray-800">{instr.title}</span>
+                          {instr.isDefault && (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-[10px]">Default</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
+                            {instr.sourceLang || 'PT'} → {instr.targetLang || 'EN'}
+                          </span>
+                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{instr.field || 'General'}</span>
+                          {instr.documentType && instr.documentType !== 'All Documents' && (
+                            <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px]">{instr.documentType}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 line-clamp-2">{instr.content}</p>
+                      </div>
+                      <div className="flex space-x-1 ml-2">
+                        <button
+                          onClick={() => {
+                            setEditingInstruction(instr);
+                            setInstructionForm({
+                              title: instr.title,
+                              sourceLang: instr.sourceLang || 'Portuguese (Brazil)',
+                              targetLang: instr.targetLang || 'English',
+                              field: instr.field || 'All Fields',
+                              documentType: instr.documentType || 'All Documents',
+                              content: instr.content
+                            });
+                            setShowInstructionModal(true);
+                          }}
+                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (window.confirm(`Delete instruction "${instr.title}"?`)) {
+                              try {
+                                await axios.delete(`${API}/admin/translation-instructions/${instr.id}?admin_key=${adminKey}`);
+                                setInstructions(instructions.filter(i => i.id !== instr.id));
+                              } catch (err) {
+                                alert('Failed to delete instruction');
+                              }
+                            }
+                          }}
+                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📋</div>
+                <p className="text-sm font-medium mb-1">No instructions yet</p>
+                <p className="text-xs">Click "Add Instruction" to create custom translation guidelines.</p>
+                <p className="text-xs text-gray-400 mt-2">Instructions help the AI follow specific rules for document types, terminology, and formatting.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Instruction Modal - Outside all tabs so it's always available */}
+      {showInstructionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b">
+              <h3 className="font-bold">{editingInstruction ? 'Edit' : 'Add'} Translation Instruction</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={instructionForm.title}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, title: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-400"
+                  placeholder="e.g., Birth Certificate Guidelines"
+                />
+              </div>
+
+              {/* Language Pair */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Source Language</label>
+                  <select
+                    value={instructionForm.sourceLang}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Target Language</label>
+                  <select
+                    value={instructionForm.targetLang}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Field and Document Type */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Field</label>
+                  <select
+                    value={instructionForm.field}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, field: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option>All Fields</option>
+                    <option>Financial</option>
+                    <option>Education</option>
+                    <option>Legal</option>
+                    <option>Medical</option>
+                    <option>Technical</option>
+                    <option>General</option>
+                    <option>Personal Documents</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Document Type</label>
+                  <select
+                    value={instructionForm.documentType}
+                    onChange={(e) => setInstructionForm({ ...instructionForm, documentType: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border rounded-lg"
+                  >
+                    <option>All Documents</option>
+                    <option>Birth Certificate</option>
+                    <option>Marriage Certificate</option>
+                    <option>Death Certificate</option>
+                    <option>Diploma</option>
+                    <option>Academic Transcript</option>
+                    <option>Driver's License</option>
+                    <option>ID Card</option>
+                    <option>Passport</option>
+                    <option>Bank Statement</option>
+                    <option>Tax Return</option>
+                    <option>Contract</option>
+                    <option>Power of Attorney</option>
+                    <option>Court Document</option>
+                    <option>Medical Record</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Instructions Content */}
+              <div>
+                <label className="block text-xs font-medium mb-1">Instructions *</label>
+                <textarea
+                  value={instructionForm.content}
+                  onChange={(e) => setInstructionForm({ ...instructionForm, content: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border rounded-lg h-48 font-mono"
+                  placeholder="Enter translation guidelines and instructions...
+
+Examples:
+- Always translate 'Certidão de Nascimento' as 'Birth Certificate'
+- Keep original names in their original form
+- Format dates as MM/DD/YYYY
+- Use American English spelling
+- Preserve all official stamps and seals descriptions"
+                />
+                <p className="text-[10px] text-gray-500 mt-1">
+                  These instructions will be included in the AI prompt when translating matching documents.
+                </p>
+              </div>
+
+              {/* Example Instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs font-medium text-blue-700 mb-2">💡 Suggested Instructions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    'Keep names in original form',
+                    'Use formal register',
+                    'Format dates as MM/DD/YYYY',
+                    'American English spelling',
+                    'Preserve formatting',
+                    'Include [sic] for errors'
+                  ].map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setInstructionForm({
+                        ...instructionForm,
+                        content: instructionForm.content + (instructionForm.content ? '\n- ' : '- ') + suggestion
+                      })}
+                      className="px-2 py-1 text-[10px] bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-100"
+                    >
+                      + {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button
+                onClick={() => setShowInstructionModal(false)}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!instructionForm.title || !instructionForm.content) {
+                    alert('Please fill in the title and instructions');
+                    return;
+                  }
+                  try {
+                    const payload = {
+                      title: instructionForm.title,
+                      sourceLang: instructionForm.sourceLang,
+                      targetLang: instructionForm.targetLang,
+                      field: instructionForm.field,
+                      documentType: instructionForm.documentType,
+                      content: instructionForm.content
+                    };
+
+                    if (editingInstruction) {
+                      await axios.put(`${API}/admin/translation-instructions/${editingInstruction.id}?admin_key=${adminKey}`, payload);
+                      setInstructions(instructions.map(i => i.id === editingInstruction.id ? { ...i, ...payload } : i));
+                    } else {
+                      const response = await axios.post(`${API}/admin/translation-instructions?admin_key=${adminKey}`, payload);
+                      setInstructions([...instructions, { id: response.data.id || Date.now(), ...payload }]);
+                    }
+                    setShowInstructionModal(false);
+                    setProcessingStatus('✅ Instruction saved!');
+                    setTimeout(() => setProcessingStatus(''), 3000);
+                  } catch (err) {
+                    alert('Failed to save instruction: ' + (err.response?.data?.detail || err.message));
+                  }
+                }}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Save Instruction
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Glossary Modal - Outside all tabs so it's always available */}
+      {showGlossaryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b">
+              <h3 className="font-bold">{editingGlossary ? 'Edit' : 'Add'} Glossary / TM</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              {/* Name and Field */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={glossaryForm.name}
+                    onChange={(e) => setGlossaryForm({ ...glossaryForm, name: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                    placeholder="e.g., Legal Terms PT-EN"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Field</label>
+                  <select
+                    value={glossaryForm.field}
+                    onChange={(e) => setGlossaryForm({ ...glossaryForm, field: e.target.value })}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option>All Fields</option>
+                    <option>Financial</option>
+                    <option>Education</option>
+                    <option>General</option>
+                    <option>Personal Documents</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Language Pair */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <label className="block text-xs font-bold mb-2">🌐 Language Pair</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={glossaryForm.sourceLang}
+                    onChange={(e) => setGlossaryForm({ ...glossaryForm, sourceLang: e.target.value })}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                  <span className="text-lg font-bold text-blue-600">
+                    {glossaryForm.bidirectional ? '↔' : '→'}
+                  </span>
+                  <select
+                    value={glossaryForm.targetLang}
+                    onChange={(e) => setGlossaryForm({ ...glossaryForm, targetLang: e.target.value })}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                  >
+                    {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={glossaryForm.bidirectional}
+                    onChange={(e) => setGlossaryForm({ ...glossaryForm, bidirectional: e.target.checked })}
+                    className="rounded text-blue-600"
+                  />
+                  <span className="text-xs text-blue-700">
+                    <strong>Bidirectional:</strong> Terms work both ways (PT → EN and EN → PT)
+                  </span>
+                </label>
+              </div>
+
+              {/* Add Single Term */}
+              <div className="border-t pt-3">
+                <label className="block text-xs font-medium mb-2">Add Single Term</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={newTerm.source}
+                    onChange={(e) => setNewTerm({ ...newTerm, source: e.target.value })}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                    placeholder="Source term"
+                  />
+                  <input
+                    type="text"
+                    value={newTerm.target}
+                    onChange={(e) => setNewTerm({ ...newTerm, target: e.target.value })}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                    placeholder="Target term"
+                  />
+                  <input
+                    type="text"
+                    value={newTerm.notes}
+                    onChange={(e) => setNewTerm({ ...newTerm, notes: e.target.value })}
+                    className="flex-1 px-2 py-1.5 text-xs border rounded"
+                    placeholder="Notes (optional)"
+                  />
+                  <button onClick={addTermToGlossary} className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700">+</button>
+                </div>
+              </div>
+
+              {/* Bulk Upload Terms */}
+              <div className="border-t pt-3">
+                <label className="block text-xs font-medium mb-2">📤 Bulk Upload Terms (Paste Entire Glossary)</label>
+                <div className="bg-green-50 border border-green-200 rounded p-2 mb-2">
+                  <p className="text-[10px] text-green-700">
+                    <strong>Format:</strong> One term per line: <code className="bg-green-100 px-1">{glossaryForm.sourceLang} | {glossaryForm.targetLang} | notes (optional)</code>
+                  </p>
+                  {glossaryForm.bidirectional && (
+                    <p className="text-[10px] text-green-600 mt-1">
+                      ↔ <strong>Bidirectional enabled:</strong> Terms will work in both translation directions automatically!
+                    </p>
+                  )}
+                </div>
+                <textarea
+                  value={bulkTermsText}
+                  onChange={(e) => setBulkTermsText(e.target.value)}
+                  placeholder={`certidão de nascimento | birth certificate | legal document
+carteira de identidade | identity card | ID document
+CPF | individual taxpayer number | Brazilian tax ID
+registro civil | civil registry
+cartório | notary office | public registry
+certidão de casamento | marriage certificate
+certidão de óbito | death certificate
+reconhecimento de firma | notarized signature
+autenticação | authentication
+tradução juramentada | certified translation`}
+                  className="w-full px-2 py-1.5 text-xs border rounded h-40 font-mono resize-y"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-gray-500">
+                    {bulkTermsText.trim() ? `${bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} valid terms detected` : 'Paste your glossary above'}
+                  </span>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setBulkTermsText('')}
+                      className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={() => {
+                        const lines = bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|'));
+                        const newTerms = lines.map(line => {
+                          const parts = line.split('|').map(p => p.trim());
+                          return {
+                            id: Date.now() + Math.random(),
+                            source: parts[0] || '',
+                            target: parts[1] || '',
+                            notes: parts[2] || ''
+                          };
+                        }).filter(t => t.source && t.target);
+
+                        if (newTerms.length > 0) {
+                          setGlossaryForm({
+                            ...glossaryForm,
+                            terms: [...glossaryForm.terms, ...newTerms]
+                          });
+                          setBulkTermsText('');
+                          alert(`✅ Added ${newTerms.length} terms to glossary!`);
+                        } else {
+                          alert('No valid terms found. Use format: source | target | notes');
+                        }
+                      }}
+                      disabled={!bulkTermsText.trim()}
+                      className="px-4 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      📥 Import {bulkTermsText.trim().split('\n').filter(l => l.trim() && l.includes('|')).length} Terms
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Terms List with Search */}
+              {glossaryForm.terms.length > 0 && (
+                <div className="border rounded">
+                  {/* Header with count, search and actions */}
+                  <div className="px-3 py-2 bg-gray-100 border-b">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs font-bold text-gray-700">📚 {glossaryForm.terms.length} terms loaded</span>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('Clear all terms? This cannot be undone.')) {
+                            setGlossaryForm({...glossaryForm, terms: []});
+                            setTermSearchQuery('');
+                          }
+                        }}
+                        className="px-2 py-1 text-[10px] text-red-600 bg-red-50 rounded hover:bg-red-100"
+                      >
+                        🗑️ Clear All
+                      </button>
+                    </div>
+                    {/* Search Input */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={termSearchQuery}
+                        onChange={(e) => setTermSearchQuery(e.target.value)}
+                        placeholder="🔍 Search terms..."
+                        className="w-full px-3 py-1.5 text-xs border rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                      />
+                      {termSearchQuery && (
+                        <button
+                          onClick={() => setTermSearchQuery('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                    {termSearchQuery && (
+                      <p className="text-[10px] text-blue-600 mt-1">
+                        Showing {glossaryForm.terms.filter(t =>
+                          t.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                          t.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                          (t.notes && t.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                        ).length} of {glossaryForm.terms.length} terms
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Terms Table */}
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">{glossaryForm.sourceLang}</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">{glossaryForm.targetLang}</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-600">Notes</th>
+                          <th className="px-2 py-2 w-20 text-center font-medium text-gray-600">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {glossaryForm.terms
+                          .map((term, originalIdx) => ({ term, originalIdx }))
+                          .filter(({ term }) =>
+                            !termSearchQuery ||
+                            term.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                            term.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                            (term.notes && term.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                          )
+                          .map(({ term, originalIdx }) => (
+                            <tr key={term.id} className="hover:bg-blue-50 group">
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.source}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].source = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.target}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].target = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5">
+                                <input
+                                  type="text"
+                                  value={term.notes || ''}
+                                  onChange={(e) => {
+                                    const updated = [...glossaryForm.terms];
+                                    updated[originalIdx].notes = e.target.value;
+                                    setGlossaryForm({...glossaryForm, terms: updated});
+                                  }}
+                                  className="w-full px-2 py-1 text-xs text-gray-500 border border-transparent bg-transparent hover:border-gray-300 hover:bg-white focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 rounded transition-all"
+                                  placeholder="Add notes..."
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete "${term.source} → ${term.target}"?`)) {
+                                      removeTermFromGlossary(term.id);
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-red-500 hover:text-white hover:bg-red-500 rounded transition-all opacity-50 group-hover:opacity-100"
+                                  title="Delete this term"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* No results message */}
+                  {termSearchQuery && glossaryForm.terms.filter(t =>
+                    t.source.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                    t.target.toLowerCase().includes(termSearchQuery.toLowerCase()) ||
+                    (t.notes && t.notes.toLowerCase().includes(termSearchQuery.toLowerCase()))
+                  ).length === 0 && (
+                    <div className="p-4 text-center text-gray-500 text-xs">
+                      No terms found matching "{termSearchQuery}"
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t flex justify-end space-x-2">
+              <button onClick={() => setShowGlossaryModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSaveGlossary} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            </div>
           </div>
         </div>
       )}
