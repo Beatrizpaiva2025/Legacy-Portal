@@ -4150,7 +4150,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
@@ -4594,7 +4594,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">${translator?.title || 'Managing Director'}</div>
@@ -18519,7 +18519,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         <div class="footer-section">
             <div class="signature-block">
                 ${signatureImage
-                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px; object-fit: contain; margin-bottom: 2px;" />`
+                  ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
                 <div class="signature-name">${user?.full_name || 'Beatriz Paiva'}</div>
                 <div class="signature-title">Legal Representative (Legacy Translations)</div>
