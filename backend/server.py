@@ -161,6 +161,39 @@ class EmailService:
             logger.error(f"Failed to send email with attachment: {str(e)}")
             raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
 
+    async def send_email_with_multiple_attachments(self, to: str, subject: str, content: str,
+                                                    attachments: list):
+        """Send email with multiple file attachments via Resend
+        attachments: list of dicts with keys: content (base64), filename, content_type
+        """
+        try:
+            attachment_list = []
+            for att in attachments:
+                file_bytes = base64.b64decode(att["content"])
+                attachment_list.append({
+                    "filename": att["filename"],
+                    "content": list(file_bytes),
+                })
+
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+                "reply_to": self.reply_to,
+                "html": content,
+                "headers": {
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
+                },
+                "attachments": attachment_list
+            }
+
+            response = resend.Emails.send(params)
+            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully: {response}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send email with multiple attachments: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email with attachments: {str(e)}")
+
     async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
         """Send order confirmation email using professional template"""
         subject = f"Translation Order Confirmation - {order_details.get('reference', 'N/A')}"
@@ -6315,9 +6348,14 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
     return {"success": True, "message": status_message}
 
+class AttachmentsSelection(BaseModel):
+    include_workspace: bool = True
+    additional_document_ids: List[str] = []
+
 class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
+    attachments: Optional[AttachmentsSelection] = None
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
@@ -6329,6 +6367,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     # Handle both with and without request body
     bcc_email = request.bcc_email if request else None
     notify_pm = request.notify_pm if request else False
+    attachments_selection = request.attachments if request else None
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -6350,6 +6389,8 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     # Track what was sent
     pm_notified = False
     bcc_sent = False
+    all_attachments = []
+    attachment_filenames = []
 
     # Send emails
     try:
@@ -6359,45 +6400,63 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
         # Debug logging
         logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}")
-        if has_html_translation:
-            logger.info(f"translation_html length: {len(has_html_translation)} chars")
 
-        # Prepare attachment data
-        attachment_data = None
-        attachment_filename = None
-        attachment_type = None
+        # Determine what to include based on selection (or default behavior)
+        include_workspace = True
+        additional_doc_ids = []
 
-        if has_file_attachment:
-            # Use uploaded file
-            attachment_data = order["translated_file"]
-            attachment_filename = order["translated_filename"]
-            attachment_type = order.get("translated_file_type", "application/pdf")
-            logger.info(f"Using uploaded file: {attachment_filename}")
-        elif has_html_translation:
-            # Generate HTML file from translation_html
+        if attachments_selection:
+            include_workspace = attachments_selection.include_workspace
+            additional_doc_ids = attachments_selection.additional_document_ids or []
+
+        # Add workspace translation if selected
+        if include_workspace and has_html_translation:
             translation_html_content = generate_translation_html_for_email(order)
-            # Convert to base64
-            attachment_data = base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8')
-            attachment_filename = f"Translation_{order['order_number']}.html"
-            attachment_type = "text/html"
-            logger.info(f"Generated HTML attachment: {attachment_filename}, size: {len(attachment_data)} bytes")
-        else:
-            logger.warning(f"No translation content found for order {order.get('order_number')}")
+            all_attachments.append({
+                "content": base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8'),
+                "filename": f"Translation_{order['order_number']}.html",
+                "content_type": "text/html"
+            })
+            attachment_filenames.append(f"Translation_{order['order_number']}.html")
+            logger.info(f"Added workspace translation to attachments")
 
-        has_attachment = attachment_data is not None
+        # Add additional documents if selected
+        if additional_doc_ids:
+            for doc_id in additional_doc_ids:
+                # Check if it's a string ID for order documents
+                if isinstance(doc_id, str) and not doc_id.startswith('temp-'):
+                    doc = await db.order_documents.find_one({"id": doc_id})
+                    if doc and doc.get("file_data"):
+                        all_attachments.append({
+                            "content": doc["file_data"],
+                            "filename": doc.get("filename", f"document_{doc_id}.pdf"),
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(doc.get("filename", f"document_{doc_id}.pdf"))
+                        logger.info(f"Added document {doc_id} to attachments: {doc.get('filename')}")
+
+        # Fallback: if no attachments selected but order has translated_file, use that
+        if not all_attachments and has_file_attachment:
+            all_attachments.append({
+                "content": order["translated_file"],
+                "filename": order["translated_filename"],
+                "content_type": order.get("translated_file_type", "application/pdf")
+            })
+            attachment_filenames.append(order["translated_filename"])
+            logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
+
+        has_attachments = len(all_attachments) > 0
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
 
-        if has_attachment:
-            # Send to client WITH attachment
-            await email_service.send_email_with_attachment(
+        if has_attachments:
+            # Send to client WITH attachment(s)
+            await email_service.send_email_with_multiple_attachments(
                 order["client_email"],
                 f"Your Translation is Ready - {order['order_number']}",
                 email_html,
-                attachment_data,
-                attachment_filename,
-                attachment_type
+                all_attachments
             )
         else:
             # Send to client WITHOUT attachment
@@ -6417,14 +6476,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 </div>
                 {email_html}
                 """
-                if has_attachment:
-                    await email_service.send_email_with_attachment(
+                if has_attachments:
+                    await email_service.send_email_with_multiple_attachments(
                         bcc_email,
                         bcc_subject,
                         bcc_html,
-                        attachment_data,
-                        attachment_filename,
-                        attachment_type
+                        all_attachments
                     )
                 else:
                     await email_service.send_email(bcc_email, bcc_subject, bcc_html)
@@ -6488,15 +6545,15 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         return {
             "status": "success",
             "message": "Order delivered and emails sent",
-            "attachment_sent": has_attachment,
-            "attachment_filename": attachment_filename,
-            "attachment_type": attachment_type,
+            "attachment_sent": has_attachments,
+            "attachments_sent": len(all_attachments),
+            "attachment_filenames": attachment_filenames,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
             "debug": {
                 "had_file": has_file_attachment,
                 "had_html": bool(has_html_translation),
-                "html_length": len(has_html_translation) if has_html_translation else 0
+                "total_attachments": len(all_attachments)
             }
         }
 

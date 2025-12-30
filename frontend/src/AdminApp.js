@@ -9396,6 +9396,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [sendingToClient, setSendingToClient] = useState(false);
   const [sendBccEmail, setSendBccEmail] = useState(''); // BCC email address
   const [notifyPM, setNotifyPM] = useState(true); // Notify assigned PM
+  const [additionalAttachments, setAdditionalAttachments] = useState([]); // Multiple uploaded files
+  const [selectedAttachments, setSelectedAttachments] = useState({ workspace: true, uploaded: [] }); // Which attachments to send
 
   // Translator Assignment Modal state
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
@@ -9747,9 +9749,32 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const openSendToClientModal = async (order) => {
     setSendingOrder(order);
     setTranslatedDocInfo(null);
+    setAdditionalAttachments([]);
+    setSelectedAttachments({ workspace: true, uploaded: [] });
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
+      // Also load existing order documents as potential attachments
+      const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      if (docsResponse.data.documents) {
+        // Filter to show signed/translated documents
+        const existingDocs = docsResponse.data.documents.filter(d =>
+          d.filename?.toLowerCase().includes('signed') ||
+          d.filename?.toLowerCase().includes('translation') ||
+          d.document_type === 'translation'
+        );
+        if (existingDocs.length > 0) {
+          setAdditionalAttachments(existingDocs.map(d => ({
+            id: d.id,
+            filename: d.filename,
+            isExisting: true
+          })));
+          setSelectedAttachments(prev => ({
+            ...prev,
+            uploaded: existingDocs.map(d => d.id)
+          }));
+        }
+      }
     } catch (err) {
       console.error('Failed to get translated document info:', err);
       setTranslatedDocInfo({ has_translated_document: false });
@@ -9777,22 +9802,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Upload new translated document
-  const uploadTranslatedDocument = async (orderId, file) => {
+  // Upload new translated document(s) - supports multiple files
+  const uploadTranslatedDocument = async (orderId, files) => {
+    const fileList = Array.isArray(files) ? files : [files];
     setUploadingFile(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      await axios.post(`${API}/admin/orders/${orderId}/upload-translation?admin_key=${adminKey}`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      for (const file of fileList) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadResponse = await axios.post(`${API}/admin/orders/${orderId}/upload-translation?admin_key=${adminKey}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        // Add to additional attachments list
+        const newAttachment = {
+          id: uploadResponse.data.document_id || `temp-${Date.now()}-${file.name}`,
+          filename: file.name,
+          isExisting: true
+        };
+        setAdditionalAttachments(prev => [...prev, newAttachment]);
+        setSelectedAttachments(prev => ({
+          ...prev,
+          uploaded: [...prev.uploaded, newAttachment.id]
+        }));
+      }
       // Refresh doc info
       const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
-      alert('Document uploaded successfully!');
+      alert(`${fileList.length} arquivo(s) enviado(s) com sucesso!`);
     } catch (err) {
       console.error('Failed to upload translation:', err);
-      alert('Error uploading document');
+      alert('Erro ao enviar arquivo');
     } finally {
       setUploadingFile(false);
     }
@@ -9802,18 +9841,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const sendTranslationToClient = async (orderId) => {
     setSendingToClient(true);
     try {
+      // Prepare selected attachments info
+      const attachmentsToSend = {
+        include_workspace: selectedAttachments.workspace && translatedDocInfo?.has_html_translation,
+        additional_document_ids: selectedAttachments.uploaded
+      };
+
       const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, {
         bcc_email: sendBccEmail || null,
-        notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false
+        notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false,
+        attachments: attachmentsToSend
       });
 
       let message = '✅ Email enviado para o cliente!\n\n';
 
-      if (response.data.attachment_sent) {
+      if (response.data.attachments_sent > 0) {
+        message += `📎 ${response.data.attachments_sent} anexo(s) enviado(s)\n`;
+        if (response.data.attachment_filenames) {
+          message += `   Arquivos: ${response.data.attachment_filenames.join(', ')}\n`;
+        }
+      } else if (response.data.attachment_sent) {
         message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
       } else {
         message += '⚠️ Sem anexo (nenhum arquivo de tradução encontrado)\n';
-        // Show debug info if no attachment
         if (response.data.debug) {
           message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
         }
@@ -9828,7 +9878,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       alert(message);
       setSendingOrder(null);
-      setSendBccEmail(''); // Reset BCC field
+      setSendBccEmail('');
+      setAdditionalAttachments([]);
+      setSelectedAttachments({ workspace: true, uploaded: [] });
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
@@ -12492,86 +12544,114 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Tradução para Anexar:</div>
                 {!translatedDocInfo ? (
                   <div className="text-center py-2 text-gray-500 text-[10px]">Carregando...</div>
-                ) : translatedDocInfo.has_translated_document ? (
-                  <div className="space-y-2">
-                    {/* Show HTML translation from workspace */}
-                    {translatedDocInfo.has_html_translation && (
-                      <div className="p-2 bg-green-50 border border-green-200 rounded">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center">
-                            <span className="text-green-600 mr-1">✅</span>
-                            <span className="text-[10px] text-green-800 font-medium">Tradução do Workspace</span>
-                          </div>
-                          <button
-                            onClick={() => downloadTranslatedDocument(sendingOrder.id, 'translation.html')}
-                            className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
-                          >
-                            👁️ Preview
-                          </button>
-                        </div>
-                        {translatedDocInfo.translation_settings && (
-                          <div className="text-[9px] text-gray-600 space-y-0.5 mt-1 border-t border-green-200 pt-1">
-                            <div>📝 Tipo: {translatedDocInfo.translation_settings.document_type || 'N/A'}</div>
-                            <div>🌐 {translatedDocInfo.translation_settings.source_language} → {translatedDocInfo.translation_settings.target_language}</div>
-                            {translatedDocInfo.translation_settings.translator_name && (
-                              <div>👤 Tradutor: {translatedDocInfo.translation_settings.translator_name}</div>
-                            )}
-                            {translatedDocInfo.translation_settings.submitted_by && (
-                              <div>📤 Enviado por: {translatedDocInfo.translation_settings.submitted_by}</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Show uploaded file */}
-                    {translatedDocInfo.has_file_attachment && (
-                      <div className="p-2 bg-blue-50 border border-blue-200 rounded">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <span className="text-blue-600 mr-1">📎</span>
-                            <span className="text-[10px] text-blue-800 font-medium">
-                              Arquivo: {translatedDocInfo.translated_filename || 'documento.pdf'}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => downloadTranslatedDocument(sendingOrder.id, translatedDocInfo.translated_filename)}
-                            className="px-2 py-0.5 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700"
-                          >
-                            ⬇️ Download
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Priority notice */}
-                    {translatedDocInfo.has_file_attachment && translatedDocInfo.has_html_translation && (
-                      <div className="p-1.5 bg-yellow-50 border border-yellow-200 rounded text-[9px] text-yellow-700">
-                        ⚠️ O arquivo PDF terá prioridade sobre a tradução do workspace
-                      </div>
-                    )}
-                  </div>
                 ) : (
-                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
-                    <div className="text-[10px] text-yellow-800">⚠️ Nenhuma tradução anexada</div>
-                    <div className="text-[9px] text-yellow-600 mt-1">
-                      Faça upload de um arquivo abaixo ou complete a tradução no Workspace
-                    </div>
+                  <div className="space-y-2">
+                    {/* Workspace translation with checkbox */}
+                    {translatedDocInfo.has_html_translation && (
+                      <div className={`p-2 rounded border ${selectedAttachments.workspace ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedAttachments.workspace}
+                            onChange={(e) => setSelectedAttachments(prev => ({ ...prev, workspace: e.target.checked }))}
+                            className="w-4 h-4 text-green-600 rounded"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-green-800 font-medium">✅ Tradução do Workspace</span>
+                              <button
+                                onClick={(e) => { e.preventDefault(); downloadTranslatedDocument(sendingOrder.id, 'translation.html'); }}
+                                className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
+                              >
+                                👁️ Preview
+                              </button>
+                            </div>
+                            {translatedDocInfo.translation_settings && (
+                              <div className="text-[9px] text-gray-600 mt-1">
+                                📝 {translatedDocInfo.translation_settings.document_type || 'N/A'} •
+                                {translatedDocInfo.translation_settings.source_language} → {translatedDocInfo.translation_settings.target_language}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Additional attachments with checkboxes */}
+                    {additionalAttachments.length > 0 && (
+                      <div className="space-y-1">
+                        {additionalAttachments.map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className={`p-2 rounded border ${selectedAttachments.uploaded.includes(attachment.id) ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}
+                          >
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedAttachments.uploaded.includes(attachment.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedAttachments(prev => ({ ...prev, uploaded: [...prev.uploaded, attachment.id] }));
+                                  } else {
+                                    setSelectedAttachments(prev => ({ ...prev, uploaded: prev.uploaded.filter(id => id !== attachment.id) }));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 rounded"
+                              />
+                              <div className="flex-1 flex items-center justify-between">
+                                <span className="text-[10px] text-blue-800 font-medium truncate">
+                                  📎 Arquivo: {attachment.filename}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setAdditionalAttachments(prev => prev.filter(a => a.id !== attachment.id));
+                                    setSelectedAttachments(prev => ({ ...prev, uploaded: prev.uploaded.filter(id => id !== attachment.id) }));
+                                  }}
+                                  className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] hover:bg-red-200"
+                                  title="Remover"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* No attachments warning */}
+                    {!translatedDocInfo.has_html_translation && additionalAttachments.length === 0 && (
+                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <div className="text-[10px] text-yellow-800">⚠️ Nenhuma tradução anexada</div>
+                        <div className="text-[9px] text-yellow-600 mt-1">
+                          Faça upload de arquivos abaixo ou complete a tradução no Workspace
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selection summary */}
+                    {(translatedDocInfo.has_html_translation || additionalAttachments.length > 0) && (
+                      <div className="p-1.5 bg-gray-100 rounded text-[9px] text-gray-600">
+                        📋 {(selectedAttachments.workspace && translatedDocInfo.has_html_translation ? 1 : 0) + selectedAttachments.uploaded.length} arquivo(s) selecionado(s) para envio
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* Upload new document - External translation */}
+              {/* Upload new document - External translation (supports multiple) */}
               <div className="mb-3">
                 <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload Tradução Externa:</div>
                 <input
                   type="file"
                   id="translationFile"
                   accept=".pdf,.doc,.docx,.html"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    if (e.target.files[0]) {
-                      uploadTranslatedDocument(sendingOrder.id, e.target.files[0]);
+                    if (e.target.files && e.target.files.length > 0) {
+                      uploadTranslatedDocument(sendingOrder.id, Array.from(e.target.files));
                     }
                   }}
                 />
@@ -12579,7 +12659,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   htmlFor="translationFile"
                   className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
                 >
-                  {uploadingFile ? 'Enviando...' : '📁 Selecionar arquivo (PDF, DOC, HTML)'}
+                  {uploadingFile ? 'Enviando...' : '📁 Selecionar arquivo(s) (PDF, DOC, HTML)'}
                 </label>
                 <div className="text-[9px] text-gray-400 mt-1 text-center">
                   Para traduções feitas fora do sistema
