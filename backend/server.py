@@ -8190,6 +8190,8 @@ class TranslationInstructionCreate(BaseModel):
     targetLang: str
     title: str
     content: str
+    field: Optional[str] = "All Fields"
+    documentType: Optional[str] = "All Documents"
 
 class GlossaryTerm(BaseModel):
     id: Optional[int] = None
@@ -8239,8 +8241,8 @@ async def create_translation_instruction(data: TranslationInstructionCreate, adm
         "id": str(uuid.uuid4()),
         "sourceLang": data.sourceLang,
         "targetLang": data.targetLang,
-        "field": getattr(data, 'field', 'All Fields'),
-        "documentType": getattr(data, 'documentType', 'All Documents'),
+        "field": data.field,
+        "documentType": data.documentType,
         "title": data.title,
         "content": data.content,
         "created_at": datetime.utcnow()
@@ -8267,8 +8269,8 @@ async def update_translation_instruction(instruction_id: str, data: TranslationI
         {"$set": {
             "sourceLang": data.sourceLang,
             "targetLang": data.targetLang,
-            "field": getattr(data, 'field', 'All Fields'),
-            "documentType": getattr(data, 'documentType', 'All Documents'),
+            "field": data.field,
+            "documentType": data.documentType,
             "title": data.title,
             "content": data.content
         }}
