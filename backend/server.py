@@ -7959,6 +7959,138 @@ Responda APENAS com o JSON válido."""
     return prompt
 
 
+# Simple proofreading request model (no claude_api_key required)
+class SimpleProofreadRequest(BaseModel):
+    text: str
+    source_language: str = "Portuguese"
+    target_language: str = "English"
+    document_type: str = "General Document"
+
+
+@api_router.post("/ai/proofread")
+async def ai_simple_proofread(request: SimpleProofreadRequest, admin_key: str):
+    """
+    Simple proofreading endpoint - checks translation quality without original text
+    Uses server-side Claude API key
+    """
+    # Validate admin key or user token
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Get Claude API key from environment
+    claude_api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY")
+    if not claude_api_key:
+        raise HTTPException(status_code=500, detail="Claude API key not configured on server")
+
+    try:
+        system_prompt = f"""Você é um revisor de traduções certificado especializado em {request.source_language} → {request.target_language}.
+
+TAREFA: Analise a tradução abaixo e verifique:
+1. Erros gramaticais no idioma alvo
+2. Inconsistências de terminologia
+3. Erros de pontuação
+4. Problemas de formatação
+5. Sugestões de melhoria
+
+RETORNE UM JSON com este formato exato:
+{{
+    "pontuacao_final": 85,
+    "classificacao": "APROVADO" | "APROVADO_COM_OBSERVACOES" | "REPROVADO",
+    "total_erros": 3,
+    "criticos": 0,
+    "altos": 1,
+    "medios": 2,
+    "baixos": 0,
+    "erros": [
+        {{
+            "tipo": "Gramática" | "Ortografia" | "Pontuação" | "Terminologia" | "Formatação",
+            "gravidade": "CRÍTICO" | "ALTO" | "MÉDIO" | "BAIXO",
+            "original": "texto com erro",
+            "sugestao": "texto corrigido",
+            "explicacao": "explicação do erro"
+        }}
+    ],
+    "observacoes": "Observações gerais sobre a qualidade da tradução",
+    "resumo": "Resumo em uma frase"
+}}
+
+CRITÉRIOS DE CLASSIFICAÇÃO:
+- APROVADO (85-100%): Sem erros críticos, máximo 2 erros menores
+- APROVADO_COM_OBSERVACOES (70-84%): Sem erros críticos, alguns erros menores
+- REPROVADO (<70%): Erros críticos ou muitos erros
+
+Responda APENAS com o JSON válido, sem texto adicional."""
+
+        user_message = f"""Analise esta tradução ({request.source_language} → {request.target_language}):
+
+{request.text[:15000]}
+
+Retorne o JSON com a análise completa."""
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": claude_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 4096,
+                    "system": system_prompt,
+                    "messages": [
+                        {"role": "user", "content": user_message}
+                    ]
+                }
+            )
+
+            if response.status_code != 200:
+                error_detail = response.text
+                logger.error(f"Claude API error in simple proofread: {response.status_code} - {error_detail}")
+                raise HTTPException(status_code=response.status_code, detail=f"AI analysis failed: {error_detail}")
+
+            result = response.json()
+            proofreading_result = result.get("content", [{}])[0].get("text", "")
+
+            # Try to parse as JSON
+            try:
+                clean_result = proofreading_result.strip()
+                if clean_result.startswith("```json"):
+                    clean_result = clean_result[7:]
+                if clean_result.startswith("```"):
+                    clean_result = clean_result[3:]
+                if clean_result.endswith("```"):
+                    clean_result = clean_result[:-3]
+                clean_result = clean_result.strip()
+
+                parsed_result = json.loads(clean_result)
+                return parsed_result
+
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return a default response
+                logger.warning(f"Failed to parse proofreading JSON: {proofreading_result[:200]}")
+                return {
+                    "pontuacao_final": 75,
+                    "classificacao": "APROVADO_COM_OBSERVACOES",
+                    "total_erros": 0,
+                    "criticos": 0,
+                    "altos": 0,
+                    "medios": 0,
+                    "baixos": 0,
+                    "erros": [],
+                    "observacoes": proofreading_result[:500],
+                    "resumo": "Análise concluída - verifique observações"
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Simple proofreading error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Proofreading failed: {str(e)}")
+
+
 @api_router.post("/admin/proofread")
 async def admin_proofread(request: ProofreadRequest, admin_key: str):
     """
