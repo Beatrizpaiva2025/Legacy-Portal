@@ -1811,6 +1811,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [sendingToProjects, setSendingToProjects] = useState(false);
+  const [sendDestination, setSendDestination] = useState('pm'); // 'pm' or 'admin'
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -7954,24 +7955,28 @@ tradução juramentada | certified translation`}
               {/* Send options after package generation */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Submit Translation</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => sendToProjects('pm')}
-                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className="px-4 py-3 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                <div className="flex gap-3 items-center">
+                  <select
+                    value={sendDestination}
+                    onChange={(e) => setSendDestination(e.target.value)}
+                    className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={sendingToProjects}
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                  </button>
+                    <option value="pm">📤 Send to PM</option>
+                    <option value="admin">📤 Send to Admin</option>
+                  </select>
                   <button
-                    onClick={() => sendToProjects('admin')}
+                    onClick={() => sendToProjects(sendDestination)}
                     disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className="px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                    className={`px-6 py-3 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 ${
+                      sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  Choose where to submit your completed translation
+                  Select destination and click Send
                 </p>
               </div>
             </>
@@ -8299,19 +8304,23 @@ tradução juramentada | certified translation`}
                       </button>
                     ) : (
                       <>
-                        <button
-                          onClick={() => sendToProjects('pm')}
-                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                          className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        <select
+                          value={sendDestination}
+                          onChange={(e) => setSendDestination(e.target.value)}
+                          className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          disabled={sendingToProjects}
                         >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                        </button>
+                          <option value="pm">Send to PM</option>
+                          <option value="admin">Send to Admin</option>
+                        </select>
                         <button
-                          onClick={() => sendToProjects('admin')}
+                          onClick={() => sendToProjects(sendDestination)}
                           disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                          className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                            sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
                         </button>
                       </>
                     )}
