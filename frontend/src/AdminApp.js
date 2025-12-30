@@ -2513,32 +2513,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Approve translation (PM/Admin) - marks as ready for delivery
-  const approveTranslation = async () => {
+  // Approve translation (PM/Admin) - sends to admin for final approval or marks as ready
+  const approveTranslation = async (sendDirectToReady = false) => {
     if (!selectedOrderId) {
       alert('No order selected');
       return;
     }
 
-    const confirmed = window.confirm(
-      '✅ Approve this translation?\n\n' +
-      'The translation will be marked as "Ready for Delivery" and will appear in the Admin\'s delivery queue.'
-    );
+    // PM sends to Admin for approval, Admin marks as ready
+    const isPMApproval = isPM && !isAdmin && !sendDirectToReady;
+    const newStatus = isPMApproval ? 'pending_admin_approval' : 'ready';
+    const message = isPMApproval
+      ? '✅ Approve and send to Admin?\n\nThe translation will be sent to Admin for final approval before delivery.'
+      : '✅ Approve this translation?\n\nThe translation will be marked as "Ready for Delivery".';
 
+    const confirmed = window.confirm(message);
     if (!confirmed) return;
 
     setSendingToProjects(true);
     try {
-      // Update order status to ready for delivery
       await axios.put(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`, {
-        translation_status: 'ready',
+        translation_status: newStatus,
         proofreading_status: 'approved',
         proofreading_score: proofreadingResult?.pontuacao_final || null,
         proofreading_by: user?.name || 'PM',
         proofreading_date: new Date().toISOString()
       });
 
-      setProcessingStatus('✅ Translation APPROVED! Ready for delivery by Admin.');
+      if (isPMApproval) {
+        setProcessingStatus('✅ Translation APPROVED and sent to Admin for final review!');
+      } else {
+        setProcessingStatus('✅ Translation APPROVED! Ready for delivery.');
+      }
 
       // Refresh lists
       fetchAvailableOrders();
@@ -7467,13 +7473,15 @@ tradução juramentada | certified translation`}
                       ❌ Reject
                     </button>
 
-                    {/* Approve Button */}
+                    {/* Approve Button - Different behavior for PM vs Admin */}
                     <button
-                      onClick={approveTranslation}
+                      onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
-                      className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:bg-gray-300 flex items-center gap-2"
+                      className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
+                        isPM && !isAdmin ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
-                      ✅ Approve
+                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -7488,9 +7496,19 @@ tradução juramentada | certified translation`}
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery" (Admin will send to client)
-                  <br/>
-                  ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                  {isPM && !isAdmin ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      <br/>
+                      ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                    </>
+                  ) : (
+                    <>
+                      ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery"
+                      <br/>
+                      ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                    </>
+                  )}
                 </p>
               </div>
             </>
@@ -9523,7 +9541,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
       o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
       o.document_type?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // Map similar statuses together for filtering
+    let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // "PM Review" filter should include both 'review' and 'pending_pm_review'
+    if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
+      matchStatus = true;
+    }
+    // "Ready" filter should include 'pending_admin_approval' (waiting for admin to send)
+    if (statusFilter === 'ready' && o.translation_status === 'pending_admin_approval') {
+      matchStatus = true;
+    }
     const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
     return matchSearch && matchStatus && matchDocType;
   });
@@ -10688,8 +10715,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
+                          {/* Admin only: Approve from PM (pending_admin_approval) */}
+                          {isAdmin && order.translation_status === 'pending_admin_approval' && (
+                            <>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
+                              >
+                                <CheckIcon className="w-4 h-4 text-green-500" />
+                                ✅ Approve (Ready for Delivery)
+                              </button>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-yellow-50 flex items-center gap-2"
+                              >
+                                <RefreshIcon className="w-4 h-4 text-yellow-500" />
+                                Return to PM Review
+                              </button>
+                            </>
+                          )}
+
                           {/* Admin only: Send to Client Review and Mark as Final */}
-                          {isAdmin && order.translation_status === 'review' && (
+                          {isAdmin && (order.translation_status === 'review' || order.translation_status === 'pending_pm_review') && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
@@ -10703,7 +10750,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
                               >
                                 <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                Mark as Final
+                                Mark as Ready
                               </button>
                             </>
                           )}
