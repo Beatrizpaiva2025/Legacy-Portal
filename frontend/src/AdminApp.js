@@ -3340,17 +3340,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         return;
       }
 
-      // Send to backend
+      // Send to backend with score for quality tracking
       await axios.post(`${API}/admin/translation-memory?admin_key=${adminKey}`, {
         sourceLang: sourceLanguage,
         targetLang: targetLanguage,
         field: documentType || 'General',
         documentType: documentType,
+        score: score,  // Include score so higher quality translations can replace lower ones
         entries: entries
       });
 
-      console.log(`✅ Saved ${entries.length} entries to Translation Memory`);
-      setProcessingStatus(`✅ Proofreading complete! ${entries.length} pairs saved to TM`);
+      console.log(`✅ Saved ${entries.length} entries to Translation Memory (score: ${score}%)`);
+      setProcessingStatus(`✅ Proofreading complete! ${entries.length} pairs saved to TM (${score}%)`);
     } catch (error) {
       console.error('Failed to save to Translation Memory:', error);
       // Don't show error to user - TM save is optional
@@ -8655,6 +8656,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <th className="px-3 py-2 text-left font-medium">Source Text</th>
                       <th className="px-3 py-2 text-left font-medium">Target Text</th>
                       <th className="px-3 py-2 text-left font-medium">Field</th>
+                      <th className="px-3 py-2 text-center font-medium">Score</th>
                       <th className="px-3 py-2 text-center font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -8670,6 +8672,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.target}>{tm.target}</td>
                         <td className="px-3 py-2">
                           <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{tm.field || 'General'}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                            (tm.score || 0) >= 95 ? 'bg-green-100 text-green-700' :
+                            (tm.score || 0) >= 85 ? 'bg-blue-100 text-blue-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {tm.score ? `${tm.score}%` : '-'}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
