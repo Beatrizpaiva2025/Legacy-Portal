@@ -8209,9 +8209,10 @@ class GlossaryCreate(BaseModel):
 # Translation Instructions CRUD
 @api_router.get("/admin/translation-instructions")
 async def get_translation_instructions(admin_key: str):
-    """Get all translation instructions"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Get all translation instructions - accessible by admin, pm, and translator"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
     instructions = await db.translation_instructions.find().sort("created_at", -1).to_list(100)
     for instr in instructions:
@@ -8225,14 +8226,21 @@ async def get_translation_instructions(admin_key: str):
 
 @api_router.post("/admin/translation-instructions")
 async def create_translation_instruction(data: TranslationInstructionCreate, admin_key: str):
-    """Create a new translation instruction"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Create a new translation instruction - only admin and PM"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin and PM can create instructions
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin and PM can create instructions")
 
     instruction = {
         "id": str(uuid.uuid4()),
         "sourceLang": data.sourceLang,
         "targetLang": data.targetLang,
+        "field": getattr(data, 'field', 'All Fields'),
+        "documentType": getattr(data, 'documentType', 'All Documents'),
         "title": data.title,
         "content": data.content,
         "created_at": datetime.utcnow()
@@ -8240,20 +8248,27 @@ async def create_translation_instruction(data: TranslationInstructionCreate, adm
 
     await db.translation_instructions.insert_one(instruction)
 
-    return {"status": "success", "instruction": instruction}
+    return {"status": "success", "instruction": instruction, "id": instruction["id"]}
 
 
 @api_router.put("/admin/translation-instructions/{instruction_id}")
 async def update_translation_instruction(instruction_id: str, data: TranslationInstructionCreate, admin_key: str):
-    """Update a translation instruction"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Update a translation instruction - only admin and PM"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin and PM can update instructions
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin and PM can update instructions")
 
     result = await db.translation_instructions.update_one(
         {"id": instruction_id},
         {"$set": {
             "sourceLang": data.sourceLang,
             "targetLang": data.targetLang,
+            "field": getattr(data, 'field', 'All Fields'),
+            "documentType": getattr(data, 'documentType', 'All Documents'),
             "title": data.title,
             "content": data.content
         }}
@@ -8267,9 +8282,14 @@ async def update_translation_instruction(instruction_id: str, data: TranslationI
 
 @api_router.delete("/admin/translation-instructions/{instruction_id}")
 async def delete_translation_instruction(instruction_id: str, admin_key: str):
-    """Delete a translation instruction"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Delete a translation instruction - only admin and PM"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only admin and PM can delete instructions
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin and PM can delete instructions")
 
     result = await db.translation_instructions.delete_one({"id": instruction_id})
 

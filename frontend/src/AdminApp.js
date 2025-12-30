@@ -1820,7 +1820,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [showGlossaryModal, setShowGlossaryModal] = useState(false);
   const [editingInstruction, setEditingInstruction] = useState(null);
   const [editingGlossary, setEditingGlossary] = useState(null);
-  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'Portuguese (Brazil)', targetLang: 'English', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
+  const [instructionForm, setInstructionForm] = useState({ sourceLang: 'All Languages', targetLang: 'All Languages', title: '', content: '', field: 'All Fields', documentType: 'All Documents' });
   const [glossaryForm, setGlossaryForm] = useState({
     name: '',
     sourceLang: 'Portuguese (Brazil)',
@@ -8320,26 +8320,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <span className="text-lg">📋</span>
               <div>
                 <h2 className="text-sm font-bold">Translation Instructions</h2>
-                <p className="text-xs text-gray-500">Manage custom instructions for specific document types and language pairs</p>
+                <p className="text-xs text-gray-500">
+                  {(isAdmin || isPM) ? 'Manage custom instructions for specific document types and language pairs' : 'View translation guidelines for document types and language pairs'}
+                </p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                setEditingInstruction(null);
-                setInstructionForm({
-                  title: '',
-                  sourceLang: 'Portuguese (Brazil)',
-                  targetLang: 'English',
-                  field: 'All Fields',
-                  documentType: 'All Documents',
-                  content: ''
-                });
-                setShowInstructionModal(true);
-              }}
-              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-            >
-              <span className="mr-1">+</span> Add Instruction
-            </button>
+            {(isAdmin || isPM) && (
+              <button
+                onClick={() => {
+                  setEditingInstruction(null);
+                  setInstructionForm({
+                    title: '',
+                    sourceLang: 'All Languages',
+                    targetLang: 'All Languages',
+                    field: 'All Fields',
+                    documentType: 'All Documents',
+                    content: ''
+                  });
+                  setShowInstructionModal(true);
+                }}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+              >
+                <span className="mr-1">+</span> Add Instruction
+              </button>
+            )}
           </div>
           <div className="p-4">
             {/* Filters */}
@@ -8400,40 +8404,42 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{instr.content}</p>
                       </div>
-                      <div className="flex space-x-1 ml-2">
-                        <button
-                          onClick={() => {
-                            setEditingInstruction(instr);
-                            setInstructionForm({
-                              title: instr.title,
-                              sourceLang: instr.sourceLang || 'Portuguese (Brazil)',
-                              targetLang: instr.targetLang || 'English',
-                              field: instr.field || 'All Fields',
-                              documentType: instr.documentType || 'All Documents',
-                              content: instr.content
-                            });
-                            setShowInstructionModal(true);
-                          }}
-                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (window.confirm(`Delete instruction "${instr.title}"?`)) {
-                              try {
-                                await axios.delete(`${API}/admin/translation-instructions/${instr.id}?admin_key=${adminKey}`);
-                                setInstructions(instructions.filter(i => i.id !== instr.id));
-                              } catch (err) {
-                                alert('Failed to delete instruction');
+                      {(isAdmin || isPM) && (
+                        <div className="flex space-x-1 ml-2">
+                          <button
+                            onClick={() => {
+                              setEditingInstruction(instr);
+                              setInstructionForm({
+                                title: instr.title,
+                                sourceLang: instr.sourceLang || 'Portuguese (Brazil)',
+                                targetLang: instr.targetLang || 'English',
+                                field: instr.field || 'All Fields',
+                                documentType: instr.documentType || 'All Documents',
+                                content: instr.content
+                              });
+                              setShowInstructionModal(true);
+                            }}
+                            className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (window.confirm(`Delete instruction "${instr.title}"?`)) {
+                                try {
+                                  await axios.delete(`${API}/admin/translation-instructions/${instr.id}?admin_key=${adminKey}`);
+                                  setInstructions(instructions.filter(i => i.id !== instr.id));
+                                } catch (err) {
+                                  alert('Failed to delete instruction: ' + (err.response?.data?.detail || err.message));
+                                }
                               }
-                            }
-                          }}
-                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                            }}
+                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -8442,7 +8448,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="text-center py-8 text-gray-500">
                 <div className="text-4xl mb-2">📋</div>
                 <p className="text-sm font-medium mb-1">No instructions yet</p>
-                <p className="text-xs">Click "Add Instruction" to create custom translation guidelines.</p>
+                <p className="text-xs">
+                  {(isAdmin || isPM) ? 'Click "Add Instruction" to create custom translation guidelines.' : 'No translation guidelines have been created yet.'}
+                </p>
                 <p className="text-xs text-gray-400 mt-2">Instructions help the AI follow specific rules for document types, terminology, and formatting.</p>
               </div>
             )}
@@ -8450,8 +8458,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* Instruction Modal - Outside all tabs so it's always available */}
-      {showInstructionModal && (
+      {/* Instruction Modal - Only for admin and PM */}
+      {showInstructionModal && (isAdmin || isPM) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b">
@@ -8479,6 +8487,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     onChange={(e) => setInstructionForm({ ...instructionForm, sourceLang: e.target.value })}
                     className="w-full px-3 py-2 text-sm border rounded-lg"
                   >
+                    <option value="All Languages">All Languages</option>
                     {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
@@ -8489,6 +8498,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     onChange={(e) => setInstructionForm({ ...instructionForm, targetLang: e.target.value })}
                     className="w-full px-3 py-2 text-sm border rounded-lg"
                   >
+                    <option value="All Languages">All Languages</option>
                     {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
                   </select>
                 </div>
