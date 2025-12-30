@@ -4223,7 +4223,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
-        .cover-page { page-break-after: always; }
+        .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
@@ -4690,6 +4690,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-center { text-align: center; padding: 0 15px; }
         .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
         .stamp-ata { font-size: 9px; color: #2563eb; }
+        .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .page-header { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
@@ -17900,7 +17901,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .stamp-center { text-align: center; margin: 5px 0; }
         .stamp-company { font-size: 9px; font-weight: bold; }
         .stamp-ata { font-size: 8px; }
-        .cover-page { page-break-after: always; }
+        .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
