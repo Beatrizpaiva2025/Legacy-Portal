@@ -1892,7 +1892,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const src = CURRENCIES[translatorNoteSettings.sourceCurrency];
     const tgt = CURRENCIES[translatorNoteSettings.targetCurrency];
     const rate = translatorNoteSettings.exchangeRate;
-    const date = new Date(translatorNoteSettings.rateDate).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    // Fix: Parse date directly to avoid timezone conversion issues
+    const dateParts = translatorNoteSettings.rateDate.split('-');
+    const date = `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`; // MM/DD/YYYY format
     const source = RATE_SOURCES.find(s => s.id === translatorNoteSettings.rateSource);
 
     // Format: NOK 10.19 ≈ US$1.00
