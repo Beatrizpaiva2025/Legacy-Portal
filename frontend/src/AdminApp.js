@@ -23,7 +23,8 @@ const STATUS_COLORS = {
   'pending_admin_approval': 'bg-blue-100 text-blue-700',
   'client_review': 'bg-orange-100 text-orange-700',
   'ready': 'bg-green-100 text-green-700',
-  'delivered': 'bg-teal-100 text-teal-700'
+  'delivered': 'bg-teal-100 text-teal-700',
+  'final': 'bg-purple-100 text-purple-700'
 };
 
 const PAYMENT_COLORS = {
@@ -1810,6 +1811,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [sendingToProjects, setSendingToProjects] = useState(false);
+  const [sendDestination, setSendDestination] = useState('pm'); // 'pm' or 'admin'
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -2511,32 +2513,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Approve translation (PM/Admin) - marks as ready for delivery
-  const approveTranslation = async () => {
+  // Approve translation (PM/Admin) - sends to admin for final approval or marks as ready
+  const approveTranslation = async (sendDirectToReady = false) => {
     if (!selectedOrderId) {
       alert('No order selected');
       return;
     }
 
-    const confirmed = window.confirm(
-      '✅ Approve this translation?\n\n' +
-      'The translation will be marked as "Ready for Delivery" and will appear in the Admin\'s delivery queue.'
-    );
+    // PM sends to Admin for approval, Admin marks as ready
+    const isPMApproval = isPM && !isAdmin && !sendDirectToReady;
+    const newStatus = isPMApproval ? 'pending_admin_approval' : 'ready';
+    const message = isPMApproval
+      ? '✅ Approve and send to Admin?\n\nThe translation will be sent to Admin for final approval before delivery.'
+      : '✅ Approve this translation?\n\nThe translation will be marked as "Ready for Delivery".';
 
+    const confirmed = window.confirm(message);
     if (!confirmed) return;
 
     setSendingToProjects(true);
     try {
-      // Update order status to ready for delivery
       await axios.put(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`, {
-        translation_status: 'ready',
+        translation_status: newStatus,
         proofreading_status: 'approved',
         proofreading_score: proofreadingResult?.pontuacao_final || null,
         proofreading_by: user?.name || 'PM',
         proofreading_date: new Date().toISOString()
       });
 
-      setProcessingStatus('✅ Translation APPROVED! Ready for delivery by Admin.');
+      if (isPMApproval) {
+        setProcessingStatus('✅ Translation APPROVED and sent to Admin for final review!');
+      } else {
+        setProcessingStatus('✅ Translation APPROVED! Ready for delivery.');
+      }
 
       // Refresh lists
       fetchAvailableOrders();
@@ -7465,13 +7473,15 @@ tradução juramentada | certified translation`}
                       ❌ Reject
                     </button>
 
-                    {/* Approve Button */}
+                    {/* Approve Button - Different behavior for PM vs Admin */}
                     <button
-                      onClick={approveTranslation}
+                      onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
-                      className="px-6 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 disabled:bg-gray-300 flex items-center gap-2"
+                      className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
+                        isPM && !isAdmin ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
+                      }`}
                     >
-                      ✅ Approve
+                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -7486,9 +7496,19 @@ tradução juramentada | certified translation`}
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery" (Admin will send to client)
-                  <br/>
-                  ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                  {isPM && !isAdmin ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      <br/>
+                      ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                    </>
+                  ) : (
+                    <>
+                      ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery"
+                      <br/>
+                      ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                    </>
+                  )}
                 </p>
               </div>
             </>
@@ -7953,24 +7973,28 @@ tradução juramentada | certified translation`}
               {/* Send options after package generation */}
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Submit Translation</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => sendToProjects('pm')}
-                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className="px-4 py-3 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                <div className="flex gap-3 items-center">
+                  <select
+                    value={sendDestination}
+                    onChange={(e) => setSendDestination(e.target.value)}
+                    className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={sendingToProjects}
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                  </button>
+                    <option value="pm">📤 Send to PM</option>
+                    <option value="admin">📤 Send to Admin</option>
+                  </select>
                   <button
-                    onClick={() => sendToProjects('admin')}
+                    onClick={() => sendToProjects(sendDestination)}
                     disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className="px-4 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 flex items-center justify-center gap-2"
+                    className={`px-6 py-3 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 ${
+                      sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  Choose where to submit your completed translation
+                  Select destination and click Send
                 </p>
               </div>
             </>
@@ -8070,6 +8094,15 @@ tradução juramentada | certified translation`}
                       className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
                     />
                     <span className="font-medium">Exclude Original Document</span>
+                  </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!includeAuthenticityStatement}
+                      onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
+                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
                   </label>
                 </div>
               </div>
@@ -8289,19 +8322,23 @@ tradução juramentada | certified translation`}
                       </button>
                     ) : (
                       <>
-                        <button
-                          onClick={() => sendToProjects('pm')}
-                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                          className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        <select
+                          value={sendDestination}
+                          onChange={(e) => setSendDestination(e.target.value)}
+                          className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          disabled={sendingToProjects}
                         >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to PM'}
-                        </button>
+                          <option value="pm">Send to PM</option>
+                          <option value="admin">Send to Admin</option>
+                        </select>
                         <button
-                          onClick={() => sendToProjects('admin')}
+                          onClick={() => sendToProjects(sendDestination)}
                           disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                          className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                            sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send to Admin'}
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
                         </button>
                       </>
                     )}
@@ -8447,6 +8484,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [assigningTranslator, setAssigningTranslator] = useState(null); // Order ID being assigned
   const [assigningPM, setAssigningPM] = useState(null); // Order ID being assigned PM
   const [openActionsDropdown, setOpenActionsDropdown] = useState(null); // Order ID with open actions dropdown
+
+  // Delivery Modal state
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryModalOrder, setDeliveryModalOrder] = useState(null);
+  const [deliveryTranslationHtml, setDeliveryTranslationHtml] = useState('');
+  const [deliverySending, setDeliverySending] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState('');
 
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
@@ -8606,6 +8650,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     if (isPM) fetchTranslatorStats();
   }, []);
 
+  // Re-fetch orders when status filter changes
+  useEffect(() => {
+    fetchOrders(1); // Reset to first page when filter changes
+  }, [statusFilter]);
+
   const fetchUsers = async () => {
     try {
       const [pmRes, transRes] = await Promise.all([
@@ -8729,6 +8778,50 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
+    }
+  };
+
+  // Open delivery modal with translation preview
+  const openDeliveryModal = async (order) => {
+    setDeliveryModalOrder(order);
+    setDeliveryStatus('');
+    setShowDeliveryModal(true);
+
+    // Fetch the translation HTML
+    try {
+      const response = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
+      const orderData = response.data.order || response.data;
+      setDeliveryTranslationHtml(orderData.translation_html || '');
+    } catch (err) {
+      console.error('Failed to fetch translation:', err);
+      setDeliveryTranslationHtml('<p style="color: red;">Erro ao carregar tradução</p>');
+    }
+  };
+
+  // Send translation by email
+  const sendDeliveryEmail = async () => {
+    if (!deliveryModalOrder) return;
+
+    setDeliverySending(true);
+    setDeliveryStatus('Enviando email...');
+
+    try {
+      await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`);
+      setDeliveryStatus('✅ Email enviado com sucesso!');
+      fetchOrders();
+
+      // Close modal after success
+      setTimeout(() => {
+        setShowDeliveryModal(false);
+        setDeliveryModalOrder(null);
+        setDeliveryTranslationHtml('');
+        setDeliveryStatus('');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to send email:', err);
+      setDeliveryStatus('❌ Erro ao enviar email: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setDeliverySending(false);
     }
   };
 
@@ -9499,7 +9592,16 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
       o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
       o.document_type?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // Map similar statuses together for filtering
+    let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // "PM Review" filter should include both 'review' and 'pending_pm_review'
+    if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
+      matchStatus = true;
+    }
+    // "Ready" filter should include 'pending_admin_approval' (waiting for admin to send)
+    if (statusFilter === 'ready' && o.translation_status === 'pending_admin_approval') {
+      matchStatus = true;
+    }
     const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
     return matchSearch && matchStatus && matchDocType;
   });
@@ -9517,7 +9619,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'pending_admin_approval': 'Pending Admin',
       'client_review': 'Client Review',
       'ready': 'Ready',
-      'delivered': 'Delivered'
+      'delivered': 'Delivered',
+      'final': 'Final'
     };
     return labels[status] || status;
   };
@@ -9951,7 +10054,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered'].map((s) => (
+            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -10663,8 +10766,28 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
+                          {/* Admin only: Approve from PM (pending_admin_approval) */}
+                          {isAdmin && order.translation_status === 'pending_admin_approval' && (
+                            <>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
+                              >
+                                <CheckIcon className="w-4 h-4 text-green-500" />
+                                ✅ Approve (Ready for Delivery)
+                              </button>
+                              <button
+                                onClick={() => { updateStatus(order.id, 'review'); setOpenActionsDropdown(null); }}
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-yellow-50 flex items-center gap-2"
+                              >
+                                <RefreshIcon className="w-4 h-4 text-yellow-500" />
+                                Return to PM Review
+                              </button>
+                            </>
+                          )}
+
                           {/* Admin only: Send to Client Review and Mark as Final */}
-                          {isAdmin && order.translation_status === 'review' && (
+                          {isAdmin && (order.translation_status === 'review' || order.translation_status === 'pending_pm_review') && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
@@ -10678,7 +10801,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50 flex items-center gap-2"
                               >
                                 <CheckIcon className="w-4 h-4 text-emerald-500" />
-                                Mark as Final
+                                Mark as Ready
                               </button>
                             </>
                           )}
@@ -10703,14 +10826,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </>
                           )}
 
-                          {/* Admin only: Deliver to Client */}
+                          {/* Admin only: Preview & Send Translation */}
+                          {isAdmin && ['ready', 'pending_admin_approval', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
+                            <button
+                              onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
+                            >
+                              <MailIcon className="w-4 h-4 text-blue-500" />
+                              📧 Preview & Send Email
+                            </button>
+                          )}
+
+                          {/* Admin only: Deliver to Client (quick) */}
                           {isAdmin && order.translation_status === 'ready' && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
                             >
                               <SendIcon className="w-4 h-4 text-teal-500" />
-                              Deliver to Client
+                              Deliver to Client (Quick)
+                            </button>
+                          )}
+
+                          {/* Admin only: Mark as Final (project completed) */}
+                          {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'ready') && (
+                            <button
+                              onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-purple-50 flex items-center gap-2"
+                            >
+                              <CheckIcon className="w-4 h-4 text-purple-500" />
+                              Mark as Final
                             </button>
                           )}
 
@@ -11628,6 +11773,92 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               >
                 {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend' : '📤 Send')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Preview Modal */}
+      {showDeliveryModal && deliveryModalOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold text-lg">📧 Preview & Send Translation</h3>
+                <p className="text-xs opacity-80">
+                  {deliveryModalOrder.order_number} - {deliveryModalOrder.client_name} ({deliveryModalOrder.client_email})
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); setDeliveryTranslationHtml(''); }}
+                className="text-white hover:text-gray-200 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Translation Preview */}
+            <div className="flex-1 overflow-auto p-4 bg-gray-50">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-700">📄 Translation Preview</h4>
+                <span className={`px-2 py-1 text-xs rounded ${STATUS_COLORS[deliveryModalOrder.translation_status] || 'bg-gray-100'}`}>
+                  {getStatusLabel(deliveryModalOrder.translation_status)}
+                </span>
+              </div>
+
+              {deliveryTranslationHtml ? (
+                <div
+                  className="bg-white border rounded-lg p-4 shadow-inner prose max-w-none"
+                  style={{ minHeight: '300px' }}
+                  dangerouslySetInnerHTML={{ __html: deliveryTranslationHtml }}
+                />
+              ) : (
+                <div className="bg-white border rounded-lg p-8 text-center text-gray-400">
+                  <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                  <p>Loading translation...</p>
+                </div>
+              )}
+            </div>
+
+            {/* Status Message */}
+            {deliveryStatus && (
+              <div className={`px-4 py-2 text-sm text-center ${
+                deliveryStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                deliveryStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                'bg-blue-100 text-blue-700'
+              }`}>
+                {deliveryStatus}
+              </div>
+            )}
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t bg-gray-100 rounded-b-lg flex justify-between items-center">
+              <div className="text-xs text-gray-500">
+                <strong>Client:</strong> {deliveryModalOrder.client_email}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); }}
+                  className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendDeliveryEmail}
+                  disabled={deliverySending || !deliveryTranslationHtml}
+                  className="px-6 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-300 text-sm font-medium flex items-center gap-2"
+                >
+                  {deliverySending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>📧 Send to Client</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
