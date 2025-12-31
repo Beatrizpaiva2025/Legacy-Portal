@@ -1811,7 +1811,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [availableOrders, setAvailableOrders] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [sendingToProjects, setSendingToProjects] = useState(false);
-  const [sendDestination, setSendDestination] = useState('pm'); // 'pm' or 'admin'
+  const [sendDestination, setSendDestination] = useState('client'); // 'client' or 'admin'
 
   // Resources state
   const [instructions, setInstructions] = useState([]);
@@ -2482,7 +2482,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         'save': 'Saved',
         'pm': 'PM Review',
         'ready': 'Ready for Delivery',
-        'deliver': 'Client'
+        'deliver': 'Client',
+        'client': 'Client (Review)'
       };
       const destinationLabel = destinationLabels[destination] || destination;
 
@@ -5004,9 +5005,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRADUÇÃO', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
+          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator'] }
@@ -6697,245 +6699,63 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* REVIEW TAB */}
+      {/* REVIEW TAB - For Translator to review and send to PM */}
       {activeSubTab === 'review' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-2">🔍 Proofreading & Review</h2>
+          <h2 className="text-sm font-bold mb-2">📋 Review Translation</h2>
 
-          {/* ========== UPLOAD & PROOFREADING - ALWAYS VISIBLE AT TOP ========== */}
+          {/* ========== UPLOAD TRANSLATION ========== */}
           <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
-            <div className="grid grid-cols-2 gap-4 mb-3">
+            <div className="mb-3">
               {/* Upload Translation */}
-              <div>
-                <label className="flex items-center justify-center px-4 py-2 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
-                  📄 Upload Translation (Word/HTML/TXT)
-                  <input
-                    type="file"
-                    accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
-                    multiple
-                    onChange={async (e) => {
-                      const files = Array.from(e.target.files);
-                      if (files.length === 0) return;
-                      setProcessingStatus('Processing uploaded translation...');
-                      for (const file of files) {
-                        const fileName = file.name.toLowerCase();
-                        try {
-                          if (fileName.endsWith('.docx')) {
-                            const html = await convertWordToHtml(file);
-                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                          } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
-                            const html = await readHtmlFile(file);
-                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                          } else if (fileName.endsWith('.txt')) {
-                            const text = await readTxtFile(file);
-                            const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
-                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                          } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
-                            const dataUrl = await new Promise((resolve) => {
-                              const reader = new FileReader();
-                              reader.onload = () => resolve(reader.result);
-                              reader.readAsDataURL(file);
-                            });
-                            const html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
-                            setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                          }
-                        } catch (err) {
-                          console.error('Upload error:', err);
-                          setProcessingStatus(`⚠️ Error: ${file.name}`);
+              <label className="flex items-center justify-center px-4 py-2 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
+                📄 Upload Translation (Word/HTML/TXT)
+                <input
+                  type="file"
+                  accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                  multiple
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files);
+                    if (files.length === 0) return;
+                    setProcessingStatus('Processing uploaded translation...');
+                    for (const file of files) {
+                      const fileName = file.name.toLowerCase();
+                      try {
+                        if (fileName.endsWith('.docx')) {
+                          const html = await convertWordToHtml(file);
+                          setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                        } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                          const html = await readHtmlFile(file);
+                          setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                        } else if (fileName.endsWith('.txt')) {
+                          const text = await readTxtFile(file);
+                          const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                          setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                        } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                          const dataUrl = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsDataURL(file);
+                          });
+                          const html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                          setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                         }
+                      } catch (err) {
+                        console.error('Upload error:', err);
+                        setProcessingStatus(`⚠️ Error: ${file.name}`);
                       }
-                      setProcessingStatus('✅ Translation uploaded!');
-                      setTimeout(() => setProcessingStatus(''), 3000);
-                      e.target.value = '';
-                    }}
-                    className="hidden"
-                  />
-                </label>
-                {translationResults.length > 0 && (
-                  <p className="text-xs text-green-600 mt-1 text-center">✓ Translation loaded</p>
-                )}
-              </div>
-              {/* Proofreading */}
-              <div>
-                <button
-                  onClick={async () => {
-                    if (!translationResults.length) {
-                      alert('Please upload or translate a document first');
-                      return;
                     }
-                    setIsProofreading(true);
-                    setProofreadingError('');
-                    try {
-                      const textToProofread = translationResults.map(r => r.translatedText).join('\n\n');
-                      const response = await axios.post(`${API}/ai/proofread?admin_key=${adminKey}`, {
-                        text: textToProofread,
-                        source_language: sourceLanguage,
-                        target_language: targetLanguage
-                      });
-                      setProofreadingResult(response.data);
-                    } catch (err) {
-                      setProofreadingError(err.response?.data?.detail || err.message);
-                    } finally {
-                      setIsProofreading(false);
-                    }
+                    setProcessingStatus('✅ Translation uploaded!');
+                    setTimeout(() => setProcessingStatus(''), 3000);
+                    e.target.value = '';
                   }}
-                  disabled={isProofreading || !translationResults.length}
-                  className="w-full px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 disabled:bg-gray-400"
-                >
-                  {isProofreading ? '⏳ Analyzing...' : '🔍 Run Proofreading'}
-                </button>
-              </div>
+                  className="hidden"
+                />
+              </label>
+              {translationResults.length > 0 && (
+                <p className="text-xs text-green-600 mt-1 text-center">✓ Translation loaded</p>
+              )}
             </div>
-            {/* Proofreading Results */}
-            {proofreadingError && (
-              <div className="p-2 bg-red-100 text-red-700 text-xs rounded mb-2">❌ {proofreadingError}</div>
-            )}
-            {proofreadingResult && (
-              <div className="p-3 bg-purple-50 rounded border border-purple-200">
-                {/* Score and Summary */}
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      proofreadingResult.classificacao === 'APROVADO'
-                        ? 'bg-green-500 text-white'
-                        : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-red-500 text-white'
-                    }`}>
-                      {proofreadingResult.classificacao === 'APROVADO' ? '✅ APROVADO' :
-                       proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ COM OBSERVAÇÕES' :
-                       '❌ REPROVADO'}
-                    </span>
-                    <span className="font-bold text-purple-700">Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%</span>
-                  </div>
-                  {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
-                    <button
-                      onClick={applyAllProofreadingCorrections}
-                      disabled={proofreadingResult.erros.every(e => e.applied)}
-                      className="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-1"
-                    >
-                      ✅ Aplicar Todas Correções
-                    </button>
-                  )}
-                </div>
-                {proofreadingResult.resumo && (
-                  <p className="text-xs text-gray-600 mb-2">📝 {proofreadingResult.resumo}</p>
-                )}
-
-                {/* Error Summary Counts */}
-                {proofreadingResult.total_erros > 0 && (
-                  <div className="flex gap-2 mb-3 flex-wrap">
-                    <span className="px-2 py-1 bg-gray-200 rounded text-xs">
-                      Total: <strong>{proofreadingResult.total_erros || 0}</strong>
-                    </span>
-                    {proofreadingResult.criticos > 0 && (
-                      <span className="px-2 py-1 bg-red-200 text-red-700 rounded text-xs">
-                        Críticos: <strong>{proofreadingResult.criticos}</strong>
-                      </span>
-                    )}
-                    {proofreadingResult.altos > 0 && (
-                      <span className="px-2 py-1 bg-orange-200 text-orange-700 rounded text-xs">
-                        Altos: <strong>{proofreadingResult.altos}</strong>
-                      </span>
-                    )}
-                    {proofreadingResult.medios > 0 && (
-                      <span className="px-2 py-1 bg-yellow-200 text-yellow-700 rounded text-xs">
-                        Médios: <strong>{proofreadingResult.medios}</strong>
-                      </span>
-                    )}
-                    {proofreadingResult.baixos > 0 && (
-                      <span className="px-2 py-1 bg-blue-200 text-blue-700 rounded text-xs">
-                        Baixos: <strong>{proofreadingResult.baixos}</strong>
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Suggestions Table */}
-                {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-100 sticky top-0">
-                        <tr>
-                          <th className="px-2 py-2 text-left font-medium text-gray-600">Severidade</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-600">Tipo</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-600">Encontrado</th>
-                          <th className="px-2 py-2 text-left font-medium text-gray-600">Sugestão</th>
-                          <th className="px-2 py-2 text-center font-medium text-gray-600">Ação</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {proofreadingResult.erros.map((erro, idx) => {
-                          const severity = erro.severidade || erro.gravidade || 'MÉDIO';
-                          const errorType = erro.tipo || 'Geral';
-                          const foundText = erro.encontrado || erro.original || erro.traducao_errada || '';
-                          const suggestionText = erro.sugestao || erro.correcao || '';
-                          const explanation = erro.explicacao || erro.descricao || '';
-
-                          return (
-                            <tr key={idx} className={`border-t ${
-                              erro.applied ? 'bg-green-50 opacity-60' :
-                              severity === 'CRÍTICO' ? 'bg-red-50' :
-                              severity === 'ALTO' ? 'bg-orange-50' :
-                              severity === 'MÉDIO' ? 'bg-yellow-50' :
-                              'bg-blue-50'
-                            }`}>
-                              <td className="px-2 py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
-                                  severity === 'ALTO' ? 'bg-orange-500 text-white' :
-                                  severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
-                                  'bg-blue-500 text-white'
-                                }`}>
-                                  {severity}
-                                </span>
-                              </td>
-                              <td className="px-2 py-2 text-gray-700">{errorType}</td>
-                              <td className="px-2 py-2 text-red-600 max-w-[150px] truncate" title={`${foundText}\n\n${explanation}`}>
-                                {erro.applied ? <s>{foundText}</s> : foundText || '-'}
-                              </td>
-                              <td className="px-2 py-2 text-green-600 max-w-[150px] truncate" title={suggestionText}>
-                                {suggestionText || '-'}
-                              </td>
-                              <td className="px-2 py-2 text-center">
-                                {erro.applied ? (
-                                  <span className="text-green-600 text-[10px] font-medium">✓ Aplicado</span>
-                                ) : foundText && suggestionText ? (
-                                  <button
-                                    onClick={() => applyProofreadingCorrection(erro, idx)}
-                                    className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
-                                  >
-                                    Aplicar
-                                  </button>
-                                ) : (
-                                  <span className="text-gray-400 text-[10px]">-</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* No Errors Message */}
-                {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && proofreadingResult.pontuacao_final >= 85 && (
-                  <div className="p-3 bg-green-100 border border-green-300 rounded text-center mt-2">
-                    <span className="text-green-700 text-xs font-medium">
-                      ✅ Nenhum erro encontrado na tradução!
-                    </span>
-                  </div>
-                )}
-
-                {/* Observations */}
-                {proofreadingResult.observacoes && typeof proofreadingResult.observacoes === 'string' && (
-                  <div className="p-2 bg-gray-100 border border-gray-200 rounded mt-2">
-                    <p className="text-xs text-gray-600">💡 {proofreadingResult.observacoes}</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Processing Status - Important for user feedback */}
@@ -7189,14 +7009,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     💾 Save Translation
                   </button>
 
-                  {/* Next: Deliver - for translators */}
+                  {/* Send to PM - for translators */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => setActiveSubTab('deliver')}
-                      disabled={translationResults.length === 0}
+                      onClick={() => {
+                        sendToProjects('pm');
+                        alert('Translation sent to PM for proofreading!');
+                      }}
+                      disabled={sendingToProjects || translationResults.length === 0}
                       className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
                     >
-                      Next: Deliver →
+                      📤 Send to PM
+                    </button>
+                  )}
+
+                  {/* Next: Proofreading - for admin/PM */}
+                  {(isAdmin || isPM) && (
+                    <button
+                      onClick={() => setActiveSubTab('proofreading')}
+                      disabled={translationResults.length === 0}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700 disabled:bg-gray-300 flex items-center gap-2"
+                    >
+                      Next: Proofreading →
                     </button>
                   )}
 
@@ -8005,7 +7839,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
               {/* Send options after package generation */}
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Submit Translation</h4>
+                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
                 <div className="flex gap-3 items-center">
                   <select
                     value={sendDestination}
@@ -8013,14 +7847,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     disabled={sendingToProjects}
                   >
-                    <option value="pm">📤 Send to PM</option>
-                    <option value="admin">📤 Send to Admin</option>
+                    <option value="client">📧 Send to Client (Review)</option>
+                    {isPM && <option value="admin">📤 Send to Admin</option>}
                   </select>
                   <button
                     onClick={() => sendToProjects(sendDestination)}
                     disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
                     className={`px-6 py-3 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 ${
-                      sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
+                      sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
                     }`}
                   >
                     {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
@@ -8344,37 +8178,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ))}
                   </select>
                   <div className="flex space-x-2">
-                    {/* Translator: Submit for Review button */}
-                    {user?.role === 'translator' ? (
-                      <button
-                        onClick={() => sendToProjects('review')}
-                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                        className="flex-1 px-4 py-2 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                      >
-                        {sendingToProjects ? '⏳ Sending...' : '📤 Submit for Review (Admin/PM)'}
-                      </button>
-                    ) : (
-                      <>
-                        <select
-                          value={sendDestination}
-                          onChange={(e) => setSendDestination(e.target.value)}
-                          className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                          disabled={sendingToProjects}
-                        >
-                          <option value="pm">Send to PM</option>
-                          <option value="admin">Send to Admin</option>
-                        </select>
-                        <button
-                          onClick={() => sendToProjects(sendDestination)}
-                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
-                          className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                            sendDestination === 'pm' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
-                          }`}
-                        >
-                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
-                        </button>
-                      </>
-                    )}
+                    {/* PM/Admin: Deliver options */}
+                    <select
+                      value={sendDestination}
+                      onChange={(e) => setSendDestination(e.target.value)}
+                      className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      disabled={sendingToProjects}
+                    >
+                      <option value="client">📧 Send to Client (Review)</option>
+                      {isPM && <option value="admin">📤 Send to Admin</option>}
+                    </select>
+                    <button
+                      onClick={() => sendToProjects(sendDestination)}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
+                      className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                        sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Deliver'}
+                    </button>
                   </div>
                 </div>
                 {availableOrders.length === 0 && (

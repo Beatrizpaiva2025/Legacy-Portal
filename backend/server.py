@@ -1696,8 +1696,88 @@ def get_estimated_delivery(urgency: str) -> str:
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text})"
 
-def extract_text_with_textract(content: bytes, file_extension: str) -> str:
-    """Extract text using AWS Textract (best quality OCR)"""
+def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120) -> str:
+    """
+    Reconstruct the original page layout from Textract blocks using geometry.
+    Uses bounding box coordinates to preserve spatial positioning.
+    """
+    # Extract LINE blocks with their geometry
+    lines = []
+    for block in blocks:
+        if block['BlockType'] == 'LINE' and 'Geometry' in block:
+            bbox = block['Geometry']['BoundingBox']
+            lines.append({
+                'text': block['Text'],
+                'left': bbox['Left'],
+                'top': bbox['Top'],
+                'width': bbox['Width'],
+                'height': bbox['Height']
+            })
+
+    if not lines:
+        return ""
+
+    # Sort lines by vertical position (top), then by horizontal position (left)
+    lines.sort(key=lambda x: (round(x['top'], 2), x['left']))
+
+    # Group lines that are on the same visual row (similar Y position)
+    # Lines with top values within 1.5% of page height are considered same row
+    row_threshold = 0.015
+    rows = []
+    current_row = []
+    current_top = None
+
+    for line in lines:
+        if current_top is None:
+            current_top = line['top']
+            current_row = [line]
+        elif abs(line['top'] - current_top) <= row_threshold:
+            current_row.append(line)
+        else:
+            if current_row:
+                rows.append(current_row)
+            current_row = [line]
+            current_top = line['top']
+
+    if current_row:
+        rows.append(current_row)
+
+    # Build the output with proper spacing
+    output_lines = []
+
+    for row in rows:
+        # Sort items in row by horizontal position
+        row.sort(key=lambda x: x['left'])
+
+        if len(row) == 1:
+            # Single item in row - add indentation based on left position
+            item = row[0]
+            indent = int(item['left'] * page_width_chars)
+            # Cap indent at reasonable value
+            indent = min(indent, 60)
+            output_lines.append(' ' * indent + item['text'])
+        else:
+            # Multiple items in row - space them according to position
+            line_chars = [' '] * page_width_chars
+
+            for item in row:
+                start_pos = int(item['left'] * page_width_chars)
+                text = item['text']
+
+                # Place text at calculated position
+                for i, char in enumerate(text):
+                    pos = start_pos + i
+                    if pos < page_width_chars:
+                        line_chars[pos] = char
+
+            # Convert to string and strip trailing spaces
+            output_lines.append(''.join(line_chars).rstrip())
+
+    return '\n'.join(output_lines)
+
+
+def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True) -> str:
+    """Extract text using AWS Textract (best quality OCR) with layout preservation"""
     if not textract_client:
         return None
 
@@ -1708,19 +1788,23 @@ def extract_text_with_textract(content: bytes, file_extension: str) -> str:
                 Document={'Bytes': content}
             )
 
-            # Extract text from response
-            text_parts = []
-            for block in response.get('Blocks', []):
-                if block['BlockType'] == 'LINE':
-                    text_parts.append(block['Text'])
+            # Extract text preserving layout
+            if preserve_layout:
+                text = reconstruct_layout_from_textract(response.get('Blocks', []))
+            else:
+                # Simple extraction (original behavior)
+                text_parts = []
+                for block in response.get('Blocks', []):
+                    if block['BlockType'] == 'LINE':
+                        text_parts.append(block['Text'])
+                text = '\n'.join(text_parts)
 
-            text = '\n'.join(text_parts)
-            logger.info(f"AWS Textract extracted {len(text)} characters from image")
+            logger.info(f"AWS Textract extracted {len(text)} characters from image (layout preserved: {preserve_layout})")
             return text
 
         # For PDFs, convert pages to images first
         elif file_extension == 'pdf':
-            text = ""
+            all_pages_text = []
             TEXTRACT_MAX_SIZE = 5 * 1024 * 1024  # 5MB max for Textract
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
@@ -1754,16 +1838,23 @@ def extract_text_with_textract(content: bytes, file_extension: str) -> str:
                         Document={'Bytes': img_data}
                     )
 
-                    # Extract text from response
-                    for block in response.get('Blocks', []):
-                        if block['BlockType'] == 'LINE':
-                            text += block['Text'] + '\n'
+                    # Extract text preserving layout
+                    if preserve_layout:
+                        page_text = reconstruct_layout_from_textract(response.get('Blocks', []))
+                    else:
+                        page_text = ""
+                        for block in response.get('Blocks', []):
+                            if block['BlockType'] == 'LINE':
+                                page_text += block['Text'] + '\n'
 
-                    text += '\n'  # Page separator
+                    if page_text.strip():
+                        all_pages_text.append(f"--- Page {page_num + 1} ---\n{page_text}")
 
                 num_pages = pdf_document.page_count
                 pdf_document.close()
-                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages)")
+
+                text = '\n\n'.join(all_pages_text)
+                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages, layout preserved: {preserve_layout})")
                 return text
 
             except Exception as e:
@@ -7313,7 +7404,7 @@ CRITICAL INSTRUCTIONS:
                 ocr_prompt += "\nExtract the complete text now, preserving the original layout:"
 
                 message = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=4096,
                     messages=[
                         {
@@ -7873,7 +7964,7 @@ CRITICAL INSTRUCTIONS:
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 8192,
                     "system": system_prompt,
                     "messages": [
@@ -7897,7 +7988,7 @@ CRITICAL INSTRUCTIONS:
                 "status": "success",
                 "translation": translation,
                 "action": request.action,
-                "model": "claude-sonnet-4-20250514"
+                "model": "claude-sonnet-4-5-20250929"
             }
 
     except httpx.TimeoutException:
@@ -8155,7 +8246,7 @@ Retorne o JSON com a análise completa."""
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 4096,
                     "system": system_prompt,
                     "messages": [
@@ -8247,7 +8338,7 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 8192,
                     "system": system_prompt,
                     "messages": [
@@ -11467,7 +11558,7 @@ Produce a complete HTML translation ready for professional use.
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,  # Increased for multi-page documents
                     system=system_prompt,
                     messages=[{"role": "user", "content": message_content}]
@@ -11667,7 +11758,7 @@ async def process_layout_chunk(chunk: str, chunk_num: int, total_chunks: int,
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -11922,7 +12013,7 @@ OUTPUT: Complete corrected HTML document."""
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{"role": "user", "content": message_content}]
@@ -12025,7 +12116,7 @@ async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: in
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -12173,7 +12264,7 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -12335,7 +12426,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                         file_data = file_data.split(",")[1]
 
                     response = client.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-5-20250929",
                         max_tokens=8000,
                         messages=[{
                             "role": "user",
