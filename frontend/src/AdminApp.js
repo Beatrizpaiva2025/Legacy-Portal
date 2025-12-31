@@ -574,17 +574,10 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => {
-              if (item.id === 'mia-bot') {
-                // Open MIA Bot admin control panel
-                window.open('https://mia-atendimento-1.onrender.com/admin/controle/', '_blank');
-              } else {
-                setActiveTab(item.id);
-              }
-            }}
+            onClick={() => setActiveTab(item.id)}
             className={`flex items-center px-3 py-1.5 rounded transition-colors ${
               activeTab === item.id
-                ? 'bg-teal-600 text-white'
+                ? item.id === 'mia-bot' ? 'bg-purple-600 text-white' : 'bg-teal-600 text-white'
                 : item.id === 'mia-bot'
                 ? 'text-purple-300 hover:bg-purple-700 bg-purple-900/50'
                 : 'text-slate-300 hover:bg-slate-700'
@@ -20589,6 +20582,40 @@ function AdminApp() {
       case 'settings':
         return userRole === 'admin'
           ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'mia-bot':
+        return userRole === 'admin'
+          ? (
+            <div className="h-full flex flex-col bg-gray-100">
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 shadow-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">🤖</span>
+                    <div>
+                      <h1 className="text-xl font-bold">MIA Bot - Assistente Virtual</h1>
+                      <p className="text-purple-200 text-sm">Painel de controle e chat integrado</p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://mia-atendimento-1.onrender.com/admin/controle/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
+                  >
+                    Abrir em nova aba ↗
+                  </a>
+                </div>
+              </div>
+              <div className="flex-1 p-4">
+                <iframe
+                  src="https://mia-atendimento-1.onrender.com/admin/controle/"
+                  className="w-full h-full min-h-[600px] rounded-lg shadow-lg border-0"
+                  title="MIA Bot Control Panel"
+                  allow="microphone; camera"
+                />
+              </div>
+            </div>
+          )
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       default:
         return userRole !== 'translator'
