@@ -7313,7 +7313,7 @@ CRITICAL INSTRUCTIONS:
                 ocr_prompt += "\nExtract the complete text now, preserving the original layout:"
 
                 message = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=4096,
                     messages=[
                         {
@@ -7873,7 +7873,7 @@ CRITICAL INSTRUCTIONS:
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 8192,
                     "system": system_prompt,
                     "messages": [
@@ -7897,7 +7897,7 @@ CRITICAL INSTRUCTIONS:
                 "status": "success",
                 "translation": translation,
                 "action": request.action,
-                "model": "claude-sonnet-4-20250514"
+                "model": "claude-sonnet-4-5-20250929"
             }
 
     except httpx.TimeoutException:
@@ -8155,7 +8155,7 @@ Retorne o JSON com a análise completa."""
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 4096,
                     "system": system_prompt,
                     "messages": [
@@ -8247,7 +8247,7 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                     "content-type": "application/json"
                 },
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 8192,
                     "system": system_prompt,
                     "messages": [
@@ -11467,7 +11467,7 @@ Produce a complete HTML translation ready for professional use.
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,  # Increased for multi-page documents
                     system=system_prompt,
                     messages=[{"role": "user", "content": message_content}]
@@ -11667,7 +11667,7 @@ async def process_layout_chunk(chunk: str, chunk_num: int, total_chunks: int,
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -11922,7 +11922,7 @@ OUTPUT: Complete corrected HTML document."""
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{"role": "user", "content": message_content}]
@@ -12025,7 +12025,7 @@ async def process_proofreader_chunk(chunk: str, chunk_num: int, total_chunks: in
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -12173,7 +12173,7 @@ async def run_ai_proofreader_stage(pipeline: dict, previous_translation: str, cl
         for attempt in range(max_retries):
             try:
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     max_tokens=16384,
                     system=system_prompt,
                     messages=[{
@@ -12335,7 +12335,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
                         file_data = file_data.split(",")[1]
 
                     response = client.messages.create(
-                        model="claude-sonnet-4-20250514",
+                        model="claude-sonnet-4-5-20250929",
                         max_tokens=8000,
                         messages=[{
                             "role": "user",
