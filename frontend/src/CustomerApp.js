@@ -824,6 +824,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [quote, setQuote] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [redirectingToPayment, setRedirectingToPayment] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [abandonedQuoteId, setAbandonedQuoteId] = useState(null);
@@ -843,6 +844,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [sendingSupport, setSendingSupport] = useState(false);
   const [supportSuccess, setSupportSuccess] = useState('');
   const [supportError, setSupportError] = useState('');
+  const [supportEmail, setSupportEmail] = useState(''); // Email for support form when guestEmail not set
   const supportFileInputRef = useRef(null);
 
 
@@ -1020,8 +1022,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     // beforeunload catches: tab close, browser close, refresh, navigation
     // Note: Modern browsers limit what can be shown, but we can trigger the native dialog
     const handleBeforeUnload = (e) => {
-      // Only warn if user has uploaded files and hasn't completed payment
-      if (uploadedFiles.length > 0 && !success) {
+      // Don't warn if redirecting to Stripe payment or payment completed
+      if (redirectingToPayment || success) {
+        return;
+      }
+      // Only warn if user has uploaded files
+      if (uploadedFiles.length > 0) {
         // This message may not be shown in modern browsers, but the dialog will appear
         const message = 'You have an incomplete order. Are you sure you want to leave?';
         e.preventDefault();
@@ -1037,7 +1043,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       document.removeEventListener('mouseleave', handleMouseLeave);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [quote, success, guestEmail, exitPopupShown, uploadedFiles.length]);
+  }, [quote, success, guestEmail, exitPopupShown, uploadedFiles.length, redirectingToPayment]);
 
   const autoSaveAbandonedQuote = async () => {
     try {
@@ -1282,7 +1288,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
       // Step 4: Redirect to Stripe checkout
       if (checkoutResponse.data.checkout_url) {
-        window.location.href = checkoutResponse.data.checkout_url;
+        // Set flag to prevent beforeunload warning
+        setRedirectingToPayment(true);
+        // Small delay to ensure state is updated before redirect
+        setTimeout(() => {
+          window.location.href = checkoutResponse.data.checkout_url;
+        }, 100);
       } else {
         throw new Error('No checkout URL received');
       }
@@ -1302,6 +1313,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
   // Handle support form submission
   const handleSupportSubmit = async () => {
+    const emailToUse = guestEmail || supportEmail;
+
+    // Validate required fields
+    if (!emailToUse || !emailToUse.trim()) {
+      setSupportError(t.pleaseEnterEmail);
+      return;
+    }
     if (!supportIssueType || !supportDescription.trim()) {
       setSupportError(t.supportError);
       return;
@@ -1315,7 +1333,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       await axios.post(`${API}/send-support-request`, {
         issue_type: supportIssueType,
         description: supportDescription,
-        customer_email: guestEmail || 'Not provided',
+        customer_email: emailToUse,
         customer_name: guestName || 'Not provided',
         files_count: supportFiles.length
       });
@@ -1325,6 +1343,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setSupportIssueType('');
       setSupportDescription('');
       setSupportFiles([]);
+      setSupportEmail('');
       // Close modal after 2 seconds
       setTimeout(() => {
         setShowContactModal(false);
@@ -1399,6 +1418,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </div>
             ) : (
               <div className="space-y-4 text-left">
+                {/* Email - required if not already provided */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">{t.yourEmail}</label>
+                  <input
+                    type="email"
+                    value={guestEmail || supportEmail}
+                    onChange={(e) => {
+                      if (!guestEmail) {
+                        setSupportEmail(e.target.value);
+                      } else {
+                        setGuestEmail(e.target.value);
+                      }
+                    }}
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">We'll respond to your request at this email</p>
+                </div>
+
                 {/* Issue Type Dropdown */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">{t.whatHelpWith}</label>
@@ -1471,6 +1509,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                       setSupportDescription('');
                       setSupportFiles([]);
                       setSupportError('');
+                      setSupportEmail('');
                     }}
                     className="px-6 py-2 text-gray-600 font-semibold hover:text-gray-800"
                   >
@@ -1479,7 +1518,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                   <button
                     type="button"
                     onClick={handleSupportSubmit}
-                    disabled={sendingSupport || !supportIssueType || !supportDescription.trim()}
+                    disabled={sendingSupport || !(guestEmail || supportEmail) || !supportIssueType || !supportDescription.trim()}
                     className="px-6 py-2 bg-amber-200 text-gray-800 rounded-md font-semibold hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
                   >
                     {sendingSupport ? '...' : t.sendRequest}
