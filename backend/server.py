@@ -1214,6 +1214,335 @@ async def send_to_make_webhook(order_data: dict, invoice_data: dict):
         logger.error(f"Error sending to Make webhook: {str(e)}")
         return False
 
+# ==================== MIA BOT QUOTE CALCULATION ====================
+# Pricing configuration for bot quotes (must match customer page prices!)
+BOT_PRICING = {
+    "certified": {"price_per_page": 24.99, "name": "Certified Translation", "description": "Official documents, legal, immigration"},
+    "standard": {"price_per_page": 19.99, "name": "Standard Translation", "description": "General use, no certification"},
+    "sworn": {"price_per_page": 55.00, "name": "Sworn Translation", "description": "For use outside USA - official sworn translator"},
+    "rmv": {"price_per_page": 24.99, "name": "RMV Certified Translation", "description": "Massachusetts Motor Vehicle - requires physical copy"},
+    # NOTE: Apostille is "Coming Soon" - not available yet
+}
+
+BOT_URGENCY = {
+    "standard": {"multiplier": 1.0, "name": "Standard (2-3 business days)"},
+    "priority": {"multiplier": 1.25, "name": "Priority (+25%, 24 hours)"},
+    "urgent": {"multiplier": 2.0, "name": "Urgent (+100%, 12 hours)"},
+}
+
+class BotQuoteRequest(BaseModel):
+    """Request model for bot quote calculation"""
+    client_name: str
+    client_phone: str
+    client_email: Optional[str] = None
+    service_type: str = "certified"  # certified, standard, sworn, rmv
+    source_language: str = "Portuguese"
+    target_language: str = "English"
+    urgency: str = "standard"  # standard, priority, urgent
+    document_type: Optional[str] = None  # birth_certificate, diploma, etc.
+    notes: Optional[str] = None
+    # Document can be sent as base64 or URL
+    document_base64: Optional[str] = None  # Base64 encoded PDF/image
+    document_url: Optional[str] = None  # URL to download document
+    page_count: Optional[int] = None  # Manual page count override
+
+class BotQuoteResponse(BaseModel):
+    """Response model for bot quote"""
+    success: bool
+    quote_id: str
+    page_count: int
+    price_per_page: float
+    subtotal: float
+    urgency_fee: float
+    total_price: float
+    service_name: str
+    urgency_name: str
+    message: str
+    quote_link: Optional[str] = None
+
+async def count_document_pages(document_base64: str = None, document_url: str = None) -> int:
+    """Count pages in a PDF or count images as 1 page each"""
+    try:
+        content = None
+
+        # Get content from base64 or URL
+        if document_base64:
+            # Remove data URI prefix if present
+            if ',' in document_base64:
+                document_base64 = document_base64.split(',')[1]
+            content = base64.b64decode(document_base64)
+        elif document_url:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(document_url, timeout=30)
+                content = response.content
+
+        if not content:
+            return 1
+
+        # Check if PDF
+        if content[:4] == b'%PDF':
+            try:
+                doc = fitz.open(stream=content, filetype="pdf")
+                page_count = doc.page_count
+                doc.close()
+                logger.info(f"Bot: PDF has {page_count} pages")
+                return max(1, page_count)
+            except Exception as e:
+                logger.error(f"Bot: Failed to read PDF pages: {e}")
+                return 1
+        else:
+            # Image = 1 page
+            logger.info("Bot: Document is image, counting as 1 page")
+            return 1
+
+    except Exception as e:
+        logger.error(f"Bot: Error counting pages: {e}")
+        return 1
+
+def calculate_bot_quote(page_count: int, service_type: str, urgency: str) -> dict:
+    """Calculate quote based on page count, service type and urgency"""
+    pricing = BOT_PRICING.get(service_type, BOT_PRICING["certified"])
+    urgency_config = BOT_URGENCY.get(urgency, BOT_URGENCY["standard"])
+
+    price_per_page = pricing["price_per_page"]
+    subtotal = page_count * price_per_page
+    urgency_fee = subtotal * (urgency_config["multiplier"] - 1)
+    total_price = subtotal + urgency_fee
+
+    return {
+        "page_count": page_count,
+        "price_per_page": price_per_page,
+        "subtotal": round(subtotal, 2),
+        "urgency_fee": round(urgency_fee, 2),
+        "total_price": round(total_price, 2),
+        "service_name": pricing["name"],
+        "urgency_name": urgency_config["name"]
+    }
+
+@api_router.post("/bot/calculate-quote", response_model=BotQuoteResponse)
+async def bot_calculate_quote(request: BotQuoteRequest):
+    """
+    Calculate quote for MIA WhatsApp bot.
+    Receives document, counts pages, calculates price, and creates lead in admin.
+    """
+    try:
+        # Count pages from document
+        if request.page_count and request.page_count > 0:
+            page_count = request.page_count
+        else:
+            page_count = await count_document_pages(
+                document_base64=request.document_base64,
+                document_url=request.document_url
+            )
+
+        # Calculate quote
+        quote = calculate_bot_quote(page_count, request.service_type, request.urgency)
+
+        # Generate order number for Projects list
+        count = await db.translation_orders.count_documents({})
+        order_number = f"P{count + 6001}"
+        order_id = str(uuid.uuid4())
+
+        # Create order directly in translation_orders (appears in Projects with Quote status)
+        order_data = {
+            "id": order_id,
+            "order_number": order_number,
+            "partner_id": "whatsapp_bot",
+            "client_name": request.client_name,
+            "client_email": request.client_email or "",
+            "client_phone": request.client_phone,
+            "document_type": request.document_type or "Document",
+            "service_type": request.service_type,
+            "translate_from": request.source_language,
+            "translate_to": request.target_language,
+            "page_count": page_count,
+            "word_count": page_count * 250,  # Estimate
+            "urgency": request.urgency,
+            "total_price": quote["total_price"],
+            "base_price": quote["subtotal"],
+            "urgency_fee": quote["urgency_fee"],
+            "translation_status": "Quote",  # This makes it appear in Quote filter!
+            "payment_status": "pending",
+            "source": "whatsapp_bot",
+            "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
+            "created_at": datetime.utcnow(),
+            "has_document": bool(request.document_base64 or request.document_url)
+        }
+
+        # Store document if provided
+        if request.document_base64:
+            order_data["bot_document_data"] = request.document_base64
+
+        # Save to translation_orders (main Projects collection)
+        await db.translation_orders.insert_one(order_data)
+        logger.info(f"Bot quote created as order {order_number} for {request.client_name} - ${quote['total_price']}")
+
+        # Create notification for admin
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "bot_quote",
+            "title": f"📱 New WhatsApp Quote - {order_number}",
+            "message": f"Client: {request.client_name}\nPhone: {request.client_phone}\nService: {quote['service_name']}\nPages: {page_count}\nTotal: ${quote['total_price']:.2f}",
+            "order_number": order_number,
+            "order_id": order_id,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        # Format response message for bot
+        message = f"""✅ *Orçamento #{order_number}*
+
+📄 *Serviço:* {quote['service_name']}
+📑 *Páginas:* {page_count}
+💵 *Preço por página:* ${quote['price_per_page']:.2f}
+📊 *Subtotal:* ${quote['subtotal']:.2f}"""
+
+        if quote['urgency_fee'] > 0:
+            message += f"\n⚡ *Taxa de urgência:* ${quote['urgency_fee']:.2f}"
+
+        message += f"""
+━━━━━━━━━━━━━━━━
+💰 *TOTAL: ${quote['total_price']:.2f}*
+
+Este orçamento é válido por 7 dias.
+Para prosseguir, responda SIM ou entre em contato conosco!"""
+
+        return BotQuoteResponse(
+            success=True,
+            quote_id=order_number,
+            page_count=page_count,
+            price_per_page=quote["price_per_page"],
+            subtotal=quote["subtotal"],
+            urgency_fee=quote["urgency_fee"],
+            total_price=quote["total_price"],
+            service_name=quote["service_name"],
+            urgency_name=quote["urgency_name"],
+            message=message,
+            quote_link=f"https://portal.legacytranslations.com/#/admin"
+        )
+
+    except Exception as e:
+        logger.error(f"Bot quote calculation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return BotQuoteResponse(
+            success=False,
+            quote_id="",
+            page_count=0,
+            price_per_page=0,
+            subtotal=0,
+            urgency_fee=0,
+            total_price=0,
+            service_name="",
+            urgency_name="",
+            message=f"Erro ao calcular orçamento: {str(e)}"
+        )
+
+@api_router.get("/bot/quotes")
+async def get_bot_quotes(admin_key: str, status: str = None, limit: int = 50):
+    """Get all quotes generated by the bot (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    query = {}
+    if status:
+        query["status"] = status
+
+    quotes = await db.bot_quotes.find(query).sort("created_at", -1).limit(limit).to_list(limit)
+
+    # Convert ObjectId to string
+    for q in quotes:
+        q["_id"] = str(q["_id"])
+        if q.get("document_data"):
+            q["has_document"] = True
+            del q["document_data"]  # Don't send full document data in list
+
+    return {"quotes": quotes, "total": len(quotes)}
+
+@api_router.put("/bot/quotes/{quote_id}/status")
+async def update_bot_quote_status(quote_id: str, admin_key: str, status: str = Body(...)):
+    """Update bot quote status (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.bot_quotes.update_one(
+        {"quote_id": quote_id},
+        {"$set": {"status": status, "updated_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Quote not found")
+
+    return {"success": True, "quote_id": quote_id, "status": status}
+
+@api_router.post("/bot/quotes/{quote_id}/convert")
+async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
+    """Convert a bot quote to a translation order (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get the quote
+    quote = await db.bot_quotes.find_one({"quote_id": quote_id})
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+
+    # Generate order number
+    count = await db.translation_orders.count_documents({})
+    order_number = f"P{count + 6001}"
+
+    # Create order
+    order_data = {
+        "id": str(uuid.uuid4()),
+        "order_number": order_number,
+        "partner_id": "direct_client",
+        "client_name": quote["client_name"],
+        "client_email": quote.get("client_email", ""),
+        "client_phone": quote["client_phone"],
+        "document_type": quote.get("document_type", "General Document"),
+        "service_type": quote["service_type"],
+        "translate_from": quote["source_language"],
+        "translate_to": quote["target_language"],
+        "page_count": quote["page_count"],
+        "urgency": quote["urgency"],
+        "total_price": quote["total_price"],
+        "base_price": quote["subtotal"],
+        "urgency_fee": quote["urgency_fee"],
+        "translation_status": "pending",
+        "payment_status": "pending",
+        "source": "whatsapp_bot",
+        "bot_quote_id": quote_id,
+        "created_at": datetime.utcnow(),
+        "notes": quote.get("notes", "")
+    }
+
+    await db.translation_orders.insert_one(order_data)
+
+    # Update quote status
+    await db.bot_quotes.update_one(
+        {"quote_id": quote_id},
+        {"$set": {"status": "converted", "order_number": order_number, "updated_at": datetime.utcnow()}}
+    )
+
+    logger.info(f"Bot quote {quote_id} converted to order {order_number}")
+
+    return {
+        "success": True,
+        "quote_id": quote_id,
+        "order_number": order_number,
+        "order_id": order_data["id"]
+    }
+
 # Notification Model
 class Notification(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
