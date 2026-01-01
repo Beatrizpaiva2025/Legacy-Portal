@@ -1006,8 +1006,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   }, [quote, guestEmail]);
 
   // Exit intent detection - only show once per session
+  // Uses both mouse leave (for exit intent) and beforeunload (for actual leaving)
   useEffect(() => {
     const handleMouseLeave = (e) => {
+      // Detect mouse leaving at top of window (browser UI direction)
       if (e.clientY <= 0 && quote && !success && guestEmail && !exitPopupShown) {
         setShowExitPopup(true);
         setExitPopupShown(true);
@@ -1015,9 +1017,27 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       }
     };
 
+    // beforeunload catches: tab close, browser close, refresh, navigation
+    // Note: Modern browsers limit what can be shown, but we can trigger the native dialog
+    const handleBeforeUnload = (e) => {
+      // Only warn if user has uploaded files and hasn't completed payment
+      if (uploadedFiles.length > 0 && !success) {
+        // This message may not be shown in modern browsers, but the dialog will appear
+        const message = 'You have an incomplete order. Are you sure you want to leave?';
+        e.preventDefault();
+        e.returnValue = message; // Required for Chrome
+        return message; // Required for older browsers
+      }
+    };
+
     document.addEventListener('mouseleave', handleMouseLeave);
-    return () => document.removeEventListener('mouseleave', handleMouseLeave);
-  }, [quote, success, guestEmail, exitPopupShown]);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [quote, success, guestEmail, exitPopupShown, uploadedFiles.length]);
 
   const autoSaveAbandonedQuote = async () => {
     try {
@@ -1086,14 +1106,15 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
           timeout: 120000
         });
 
-        if (response.data?.word_count) {
-          newWords += response.data.word_count;
-          newFiles.push({
-            fileName: file.name,
-            wordCount: response.data.word_count,
-            documentId: response.data.document_id
-          });
-        }
+        // Always add file if upload succeeded, even if word_count is 0 (OCR might have failed)
+        // Use word_count of 0 if not provided - the file was still uploaded successfully
+        const fileWordCount = response.data?.word_count ?? 0;
+        newWords += fileWordCount;
+        newFiles.push({
+          fileName: file.name,
+          wordCount: fileWordCount,
+          documentId: response.data.document_id
+        });
       }
 
       setUploadedFiles(prev => [...prev, ...newFiles]);
@@ -1654,12 +1675,18 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                 <div className="mt-4 space-y-2">
                   {uploadedFiles.map((item, i) => {
                     const pages = Math.max(1, Math.ceil(item.wordCount / 250));
+                    const hasNoWords = item.wordCount === 0;
                     return (
-                      <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
-                        <div className="flex items-center">
-                          <span className="text-green-600 mr-2">✓</span>
+                      <div key={i} className={`p-3 rounded-md flex justify-between items-center ${hasNoWords ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
+                        <div className="flex items-center flex-wrap">
+                          <span className={`mr-2 ${hasNoWords ? 'text-yellow-600' : 'text-green-600'}`}>{hasNoWords ? '⚠️' : '✓'}</span>
                           <span>{item.fileName}</span>
                           <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? t.page : t.pages})</span>
+                          {hasNoWords && (
+                            <span className="text-yellow-600 text-xs ml-2 block w-full mt-1">
+                              Could not extract text - counted as 1 page
+                            </span>
+                          )}
                         </div>
                         <button
                           type="button"
