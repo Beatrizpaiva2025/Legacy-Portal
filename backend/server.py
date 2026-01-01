@@ -1215,18 +1215,18 @@ async def send_to_make_webhook(order_data: dict, invoice_data: dict):
         return False
 
 # ==================== MIA BOT QUOTE CALCULATION ====================
-# Pricing configuration for bot quotes
+# Pricing configuration for bot quotes (must match partner page prices!)
 BOT_PRICING = {
     "certified": {"price_per_page": 24.99, "name": "Certified Translation"},
-    "sworn": {"price_per_page": 34.99, "name": "Sworn Translation"},
-    "apostille": {"price_per_page": 85.00, "name": "Apostille Service"},
-    "standard": {"price_per_page": 19.50, "name": "Standard Translation"},
+    "sworn": {"price_per_page": 34.99, "name": "Sworn Translation (Tradução Juramentada)"},
+    "standard": {"price_per_page": 19.99, "name": "Standard Translation"},
+    # NOTE: Apostille is "Coming Soon" - not available yet
 }
 
 BOT_URGENCY = {
-    "standard": {"multiplier": 1.0, "name": "Standard (3-5 days)"},
-    "priority": {"multiplier": 1.25, "name": "Priority (24 hours)"},
-    "urgent": {"multiplier": 2.0, "name": "Urgent (12 hours)"},
+    "standard": {"multiplier": 1.0, "name": "Standard (3-5 business days)"},
+    "priority": {"multiplier": 1.25, "name": "Priority (+25%, 24 hours)"},
+    "urgent": {"multiplier": 2.0, "name": "Urgent (+100%, 12 hours)"},
 }
 
 class BotQuoteRequest(BaseModel):
@@ -1234,7 +1234,7 @@ class BotQuoteRequest(BaseModel):
     client_name: str
     client_phone: str
     client_email: Optional[str] = None
-    service_type: str = "certified"  # certified, sworn, apostille, standard
+    service_type: str = "certified"  # certified, sworn, standard (apostille coming soon)
     source_language: str = "Portuguese"
     target_language: str = "English"
     urgency: str = "standard"  # standard, priority, urgent
