@@ -1412,21 +1412,25 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <h2 className="text-xl font-bold text-gray-800 mb-1">{t.getSupport}</h2>
             <p className="text-gray-600 text-sm mb-4">{t.supportDescription}</p>
 
-            {/* Chat with MIA Option */}
-            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+            {/* Live Chat Option */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <span className="text-3xl">🤖</span>
+                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-purple-800">Chat with MIA</h3>
-                    <p className="text-xs text-purple-600">Get instant answers 24/7</p>
+                    <h3 className="font-semibold text-teal-800">Live Chat</h3>
+                    <p className="text-xs text-teal-600">Instant support available</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     setShowContactModal(false);
-                    // Try to open MIA widget if available
+                    // Try to open chat widget if available
                     if (window.MiaWidget?.open) {
                       window.MiaWidget.open();
                     } else if (window.MiaBot?.open) {
@@ -1439,9 +1443,9 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                       if (chatButton) chatButton.click();
                     }
                   }}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors text-sm"
+                  className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors text-sm"
                 >
-                  Start Chat →
+                  Start Chat
                 </button>
               </div>
             </div>
@@ -1451,7 +1455,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-white text-gray-500">or send us a message</span>
+                <span className="px-3 bg-white text-gray-500">or submit a request</span>
               </div>
             </div>
 
