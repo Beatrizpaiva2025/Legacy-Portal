@@ -1338,55 +1338,60 @@ async def bot_calculate_quote(request: BotQuoteRequest):
         # Calculate quote
         quote = calculate_bot_quote(page_count, request.service_type, request.urgency)
 
-        # Generate quote ID
-        quote_id = f"BOT-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{str(uuid.uuid4())[:4].upper()}"
+        # Generate order number for Projects list
+        count = await db.translation_orders.count_documents({})
+        order_number = f"P{count + 6001}"
+        order_id = str(uuid.uuid4())
 
-        # Create lead/quote in database
-        lead_data = {
-            "id": str(uuid.uuid4()),
-            "quote_id": quote_id,
-            "source": "whatsapp_bot",
+        # Create order directly in translation_orders (appears in Projects with Quote status)
+        order_data = {
+            "id": order_id,
+            "order_number": order_number,
+            "partner_id": "whatsapp_bot",
             "client_name": request.client_name,
+            "client_email": request.client_email or "",
             "client_phone": request.client_phone,
-            "client_email": request.client_email,
+            "document_type": request.document_type or "Document",
             "service_type": request.service_type,
-            "source_language": request.source_language,
-            "target_language": request.target_language,
-            "urgency": request.urgency,
-            "document_type": request.document_type,
+            "translate_from": request.source_language,
+            "translate_to": request.target_language,
             "page_count": page_count,
-            "price_per_page": quote["price_per_page"],
-            "subtotal": quote["subtotal"],
-            "urgency_fee": quote["urgency_fee"],
+            "word_count": page_count * 250,  # Estimate
+            "urgency": request.urgency,
             "total_price": quote["total_price"],
-            "notes": request.notes,
-            "status": "pending",  # pending, contacted, converted, lost
+            "base_price": quote["subtotal"],
+            "urgency_fee": quote["urgency_fee"],
+            "translation_status": "Quote",  # This makes it appear in Quote filter!
+            "payment_status": "pending",
+            "source": "whatsapp_bot",
+            "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
             "has_document": bool(request.document_base64 or request.document_url)
         }
 
         # Store document if provided
         if request.document_base64:
-            lead_data["document_data"] = request.document_base64
+            order_data["bot_document_data"] = request.document_base64
 
-        # Save to database
-        await db.bot_quotes.insert_one(lead_data)
-        logger.info(f"Bot quote created: {quote_id} for {request.client_name} - ${quote['total_price']}")
+        # Save to translation_orders (main Projects collection)
+        await db.translation_orders.insert_one(order_data)
+        logger.info(f"Bot quote created as order {order_number} for {request.client_name} - ${quote['total_price']}")
 
         # Create notification for admin
         admin_notification = {
             "id": str(uuid.uuid4()),
             "type": "bot_quote",
-            "title": f"📱 New WhatsApp Quote - {quote_id}",
+            "title": f"📱 New WhatsApp Quote - {order_number}",
             "message": f"Client: {request.client_name}\nPhone: {request.client_phone}\nService: {quote['service_name']}\nPages: {page_count}\nTotal: ${quote['total_price']:.2f}",
-            "quote_id": quote_id,
+            "order_number": order_number,
+            "order_id": order_id,
             "is_read": False,
             "created_at": datetime.utcnow()
         }
         await db.admin_notifications.insert_one(admin_notification)
 
         # Format response message for bot
-        message = f"""✅ *Orçamento #{quote_id}*
+        message = f"""✅ *Orçamento #{order_number}*
 
 📄 *Serviço:* {quote['service_name']}
 📑 *Páginas:* {page_count}
@@ -1405,7 +1410,7 @@ Para prosseguir, responda SIM ou entre em contato conosco!"""
 
         return BotQuoteResponse(
             success=True,
-            quote_id=quote_id,
+            quote_id=order_number,
             page_count=page_count,
             price_per_page=quote["price_per_page"],
             subtotal=quote["subtotal"],
@@ -1414,7 +1419,7 @@ Para prosseguir, responda SIM ou entre em contato conosco!"""
             service_name=quote["service_name"],
             urgency_name=quote["urgency_name"],
             message=message,
-            quote_link=f"https://legacy-admin.onrender.com/admin?quote={quote_id}"
+            quote_link=f"https://portal.legacytranslations.com/#/admin"
         )
 
     except Exception as e:
