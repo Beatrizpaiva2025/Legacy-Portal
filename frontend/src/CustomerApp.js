@@ -1837,12 +1837,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               <div className="mt-3 text-center">
                 <p className="text-xs text-gray-400">
                   {t.uploadTrouble}{' '}
-                  <a
-                    href="mailto:info@legacytranslations.com?subject=Document Upload Issue"
+                  <button
+                    type="button"
+                    onClick={() => setShowContactModal(true)}
                     className="text-teal-600 hover:underline"
                   >
                     {t.contactEmail}
-                  </a>
+                  </button>
                 </p>
               </div>
             </div>
