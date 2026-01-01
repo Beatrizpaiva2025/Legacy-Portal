@@ -1090,35 +1090,82 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     setFieldErrors(prev => ({...prev, files: null}));
     setProcessingStatus('Connecting to server...');
 
+    // Helper function to upload a single file with retry logic
+    const uploadWithRetry = async (file, maxRetries = 2) => {
+      let lastError = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            setProcessingStatus(`Retrying ${file.name} (attempt ${attempt + 1})...`);
+            // Wait before retry: 1s, then 2s
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          }
+
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
+
+          const response = await axios.post(`${API}/upload-document`, formDataUpload, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 120000
+          });
+
+          return response;
+        } catch (err) {
+          lastError = err;
+          console.log(`Upload attempt ${attempt + 1} failed for ${file.name}:`, err.message);
+
+          // Don't retry on timeout errors - file is likely too large
+          if (err.code === 'ECONNABORTED') {
+            throw err;
+          }
+        }
+      }
+
+      throw lastError;
+    };
+
     try {
       let newWords = 0;
       const newFiles = [];
+      const failedFiles = [];
 
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i];
         setProcessingStatus(`Processing ${file.name} (${i + 1}/${acceptedFiles.length})...`);
 
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', file);
+        try {
+          const response = await uploadWithRetry(file);
 
-        const response = await axios.post(`${API}/upload-document`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 120000
-        });
-
-        // Always add file if upload succeeded, even if word_count is 0 (OCR might have failed)
-        // Use word_count of 0 if not provided - the file was still uploaded successfully
-        const fileWordCount = response.data?.word_count ?? 0;
-        newWords += fileWordCount;
-        newFiles.push({
-          fileName: file.name,
-          wordCount: fileWordCount,
-          documentId: response.data.document_id
-        });
+          // Always add file if upload succeeded, even if word_count is 0 (OCR might have failed)
+          const fileWordCount = response.data?.word_count ?? 0;
+          newWords += fileWordCount;
+          newFiles.push({
+            fileName: file.name,
+            wordCount: fileWordCount,
+            documentId: response.data.document_id
+          });
+        } catch (fileErr) {
+          console.error(`Failed to upload ${file.name}:`, fileErr);
+          failedFiles.push(file.name);
+        }
       }
 
-      setUploadedFiles(prev => [...prev, ...newFiles]);
-      setWordCount(prev => prev + newWords);
+      // Update state with successfully uploaded files
+      if (newFiles.length > 0) {
+        setUploadedFiles(prev => [...prev, ...newFiles]);
+        setWordCount(prev => prev + newWords);
+      }
+
+      // Show error for failed files
+      if (failedFiles.length > 0) {
+        if (failedFiles.length === acceptedFiles.length) {
+          setError(`Failed to process ${failedFiles.length === 1 ? 'file' : 'files'}. Please try again.`);
+        } else {
+          setError(`Some files failed to upload: ${failedFiles.join(', ')}. Please try uploading them again.`);
+        }
+      }
+
       setProcessingStatus('');
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
