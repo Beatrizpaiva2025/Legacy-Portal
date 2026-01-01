@@ -1401,8 +1401,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
       {/* Contact Options Modal */}
       {showContactModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center relative">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowContactModal(false)}
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
@@ -1413,7 +1413,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <p className="text-gray-600 text-sm mb-4">{t.supportDescription}</p>
 
             {/* Live Chat Option */}
-            <div className="mb-6 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200">
+            <a
+              href="https://mia-atendimento-1.onrender.com/webchat/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mb-6 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200 hover:from-teal-100 hover:to-teal-150 transition-colors"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
@@ -1426,29 +1431,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                     <p className="text-xs text-teal-600">Instant support available</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowContactModal(false);
-                    // Try to open chat widget if available
-                    if (window.MiaWidget?.open) {
-                      window.MiaWidget.open();
-                    } else if (window.MiaBot?.open) {
-                      window.MiaBot.open();
-                    } else {
-                      // Look for the chat widget button and click it
-                      const chatButton = document.querySelector('[data-mia-widget]') ||
-                                        document.querySelector('.mia-chat-button') ||
-                                        document.querySelector('[class*="mia"]');
-                      if (chatButton) chatButton.click();
-                    }
-                  }}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors text-sm"
-                >
+                <span className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold text-sm">
                   Start Chat
-                </button>
+                </span>
               </div>
-            </div>
+            </a>
 
             <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
