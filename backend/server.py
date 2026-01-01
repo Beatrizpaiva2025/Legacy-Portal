@@ -1215,11 +1215,12 @@ async def send_to_make_webhook(order_data: dict, invoice_data: dict):
         return False
 
 # ==================== MIA BOT QUOTE CALCULATION ====================
-# Pricing configuration for bot quotes (must match partner page prices!)
+# Pricing configuration for bot quotes (must match customer page prices!)
 BOT_PRICING = {
-    "certified": {"price_per_page": 24.99, "name": "Certified Translation"},
-    "sworn": {"price_per_page": 34.99, "name": "Sworn Translation (Tradução Juramentada)"},
-    "standard": {"price_per_page": 19.99, "name": "Standard Translation"},
+    "certified": {"price_per_page": 24.99, "name": "Certified Translation", "description": "Official documents, legal, immigration"},
+    "standard": {"price_per_page": 19.99, "name": "Standard Translation", "description": "General use, no certification"},
+    "sworn": {"price_per_page": 55.00, "name": "Sworn Translation", "description": "For use outside USA - official sworn translator"},
+    "rmv": {"price_per_page": 24.99, "name": "RMV Certified Translation", "description": "Massachusetts Motor Vehicle - requires physical copy"},
     # NOTE: Apostille is "Coming Soon" - not available yet
 }
 
@@ -1234,7 +1235,7 @@ class BotQuoteRequest(BaseModel):
     client_name: str
     client_phone: str
     client_email: Optional[str] = None
-    service_type: str = "certified"  # certified, sworn, standard (apostille coming soon)
+    service_type: str = "certified"  # certified, standard, sworn, rmv
     source_language: str = "Portuguese"
     target_language: str = "English"
     urgency: str = "standard"  # standard, priority, urgent
