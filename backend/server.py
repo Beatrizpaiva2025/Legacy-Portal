@@ -1224,7 +1224,7 @@ BOT_PRICING = {
 }
 
 BOT_URGENCY = {
-    "standard": {"multiplier": 1.0, "name": "Standard (3-5 business days)"},
+    "standard": {"multiplier": 1.0, "name": "Standard (2-3 business days)"},
     "priority": {"multiplier": 1.25, "name": "Priority (+25%, 24 hours)"},
     "urgent": {"multiplier": 2.0, "name": "Urgent (+100%, 12 hours)"},
 }
