@@ -1410,7 +1410,50 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               &times;
             </button>
             <h2 className="text-xl font-bold text-gray-800 mb-1">{t.getSupport}</h2>
-            <p className="text-gray-600 text-sm mb-6">{t.supportDescription}</p>
+            <p className="text-gray-600 text-sm mb-4">{t.supportDescription}</p>
+
+            {/* Chat with MIA Option */}
+            <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-3xl">🤖</span>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-purple-800">Chat with MIA</h3>
+                    <p className="text-xs text-purple-600">Get instant answers 24/7</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowContactModal(false);
+                    // Try to open MIA widget if available
+                    if (window.MiaWidget?.open) {
+                      window.MiaWidget.open();
+                    } else if (window.MiaBot?.open) {
+                      window.MiaBot.open();
+                    } else {
+                      // Look for the chat widget button and click it
+                      const chatButton = document.querySelector('[data-mia-widget]') ||
+                                        document.querySelector('.mia-chat-button') ||
+                                        document.querySelector('[class*="mia"]');
+                      if (chatButton) chatButton.click();
+                    }
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors text-sm"
+                >
+                  Start Chat →
+                </button>
+              </div>
+            </div>
+
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-3 bg-white text-gray-500">or send us a message</span>
+              </div>
+            </div>
 
             {supportSuccess ? (
               <div className="p-4 bg-green-100 text-green-700 rounded-md">
