@@ -781,8 +781,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </h1>
 
           <p style="text-align: justify; margin-bottom: 50px; line-height: 2;">
-            I hereby certify that this is a true and complete original translation from <strong>Portuguese</strong> into English of a
-            <strong>Birth Certificate</strong> that I have translated. I further certify that I speak the language of the original
+            I hereby certify that this is a true and complete original translation from <input type="text" id="rmv-source-language" value="Portuguese" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 100px; text-align: center;" /> into English of a
+            <input type="text" id="rmv-document-type" value="Birth Certificate" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 140px; text-align: center;" /> that I have translated. I further certify that I speak the language of the original
             document fluently and I am a translator and sole proprietor of Legacy Translations (ATA member
             under # 275993). I understand that the original document and this certified translation may be
             presented to the Massachusetts Registry of Motor Vehicles (RMV) in support of an application for a
