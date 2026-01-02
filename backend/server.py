@@ -8633,10 +8633,16 @@ Retorne o JSON com a análise completa."""
 async def admin_proofread(request: ProofreadRequest, admin_key: str):
     """
     Proofread a translation - Returns JSON with detailed errors
-    Admin only endpoint for detailed proofreading
+    Admin and PM endpoint for detailed proofreading
     """
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+    # Validate admin key or user token (admin and PM can use proofreading)
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Only admin and PM can run proofreading
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin and PM can run proofreading")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
