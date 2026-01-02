@@ -6381,17 +6381,29 @@ async def admin_delete_order(order_id: str, admin_key: str):
 
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):
-    """Mark order as paid (admin only)"""
+    """Mark order as paid (admin only). Also changes status from 'quote' to 'in_translation'."""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
+    # First, fetch the order to check its current status
+    order = await db.translation_orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Build the update fields
+    update_fields = {"payment_status": "paid", "payment_date": datetime.utcnow()}
+
+    # If the order status is 'quote', change it to 'in_translation' (In Progress)
+    if order.get("translation_status") == "quote":
+        update_fields["translation_status"] = "in_translation"
+
     result = await db.translation_orders.update_one(
         {"id": order_id},
-        {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        {"$set": update_fields}
     )
 
     if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(status_code=404, detail="Order not updated")
 
     return {"status": "success", "message": "Order marked as paid"}
 
