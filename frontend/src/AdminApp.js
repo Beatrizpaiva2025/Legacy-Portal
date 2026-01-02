@@ -773,13 +773,53 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       name: 'RMV Massachusetts',
       description: 'MA Registry',
       category: 'certificates',
-      bodyParagraphs: [
-        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, hereby certify that the attached English translation of the {{sourceLanguage}} <strong>Driver\'s License / Identification Document</strong> was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
-        'This translation is being provided for use with the <strong>Massachusetts Registry of Motor Vehicles (RMV)</strong> for the purpose of driver\'s license application, identification verification, or other official purposes as required by the Commonwealth of Massachusetts.',
-        'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used.',
-        'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
-        'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
-      ]
+      isForm: true,
+      formHTML: `
+        <div style="font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 60px; background: white;">
+          <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 40px; letter-spacing: 0.5px;">
+            CERTIFICATION OF TRANSLATION ACCURACY AND COMPLETION
+          </h1>
+
+          <p style="text-align: justify; margin-bottom: 50px; line-height: 2;">
+            I hereby certify that this is a true and complete original translation from <input type="text" id="rmv-source-language" value="Portuguese" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 100px; text-align: center;" /> into English of a
+            <input type="text" id="rmv-document-type" value="Birth Certificate" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 140px; text-align: center;" /> that I have translated. I further certify that I speak the language of the original
+            document fluently and I am a translator and sole proprietor of Legacy Translations (ATA member
+            under # 275993). I understand that the original document and this certified translation may be
+            presented to the Massachusetts Registry of Motor Vehicles (RMV) in support of an application for a
+            permit, license, or Identification Card, and I further understand that false statements to the RMV
+            may be punished by fine, imprisonment, or both (M.G.L. Chapter 90, Section 24).
+          </p>
+
+          <div style="margin-top: 40px;">
+            <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Applicant's Name:</label>
+              <input type="text" id="rmv-applicant-name" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" placeholder="Enter applicant name" />
+            </div>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Full Address:</label>
+              <input type="text" id="rmv-translator-address" value="15 South Point Dr. Apt 606, Boston/MA" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
+            </div>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Telephone Number:</label>
+              <input type="text" id="rmv-translator-phone" value="(857)316-7770" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
+            </div>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Name:</label>
+              <input type="text" id="rmv-translator-name" value="Beatriz Paiva" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
+            </div>
+          </div>
+
+          <div style="margin-top: 60px; text-align: right;">
+            <div style="display: inline-block; text-align: center;">
+              <div style="border-bottom: 1px solid #000; width: 250px; margin-bottom: 5px; height: 40px;"></div>
+              <div style="font-size: 12px; color: #666;">Digitally signed by Beatriz Paiva</div>
+            </div>
+          </div>
+        </div>
+      `
     },
     'dmv-fl': {
       name: 'DMV Florida',
