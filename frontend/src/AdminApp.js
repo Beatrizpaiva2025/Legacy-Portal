@@ -833,7 +833,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </div>
 
           <!-- Signature Section -->
-          <div style="margin-top: 60px;">
+          <div style="margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div style="display: inline-block;">
               <!-- Empty signature line for manual signing -->
               <div style="border-bottom: 1px solid #000; width: 200px; height: 40px; margin-bottom: 4px;"></div>
@@ -843,6 +843,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div style="font-size: 12px; margin-top: 12px;">
                 Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US')}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
               </div>
+            </div>
+            <div style="text-align: center;">
+              {{LOGO_STAMP}}
             </div>
           </div>
         </div>
