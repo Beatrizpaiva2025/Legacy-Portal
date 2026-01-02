@@ -780,7 +780,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <!-- Header with logos -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px;">
             <div style="width: 128px;">
-              <div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>
+              {{LOGO_LEFT}}
             </div>
             <div style="text-align: center; flex: 1; padding: 0 16px;">
               <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
@@ -788,7 +788,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
             </div>
             <div style="width: 80px; text-align: right;">
-              <div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>
+              {{LOGO_RIGHT}}
             </div>
           </div>
 
@@ -833,7 +833,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           </div>
 
           <!-- Signature Section -->
-          <div style="margin-top: 60px;">
+          <div style="margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end;">
             <div style="display: inline-block;">
               <!-- Empty signature line for manual signing -->
               <div style="border-bottom: 1px solid #000; width: 200px; height: 40px; margin-bottom: 4px;"></div>
@@ -843,6 +843,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div style="font-size: 12px; margin-top: 12px;">
                 Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US')}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
               </div>
+            </div>
+            <div style="text-align: center;">
+              {{LOGO_STAMP}}
             </div>
           </div>
         </div>
@@ -5439,7 +5442,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div
                 className="border rounded bg-white overflow-auto"
                 style={{maxHeight: '800px'}}
-                dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML }}
+                dangerouslySetInnerHTML={{ __html: CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
+                  .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
+                  .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+                  .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
+                  .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
+                  .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))
+                }}
               />
             ) : (
               /* Render Standard Certificate Template */
