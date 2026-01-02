@@ -7202,16 +7202,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* Translation Preview */}
-              <div className="mb-4 border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-gray-100 border-b">
-                  <span className="text-xs font-bold text-gray-700">📄 Translation to Review</span>
+              {/* Original and Translation Side by Side */}
+              <div className="mb-4 grid grid-cols-2 gap-4">
+                {/* Original Document */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-blue-100 border-b">
+                    <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
+                  </div>
+                  <div className="p-4 bg-white max-h-64 overflow-y-auto">
+                    <div className="text-xs whitespace-pre-wrap">
+                      {ocrResults[selectedResultIndex]?.text ||
+                       translationResults[selectedResultIndex]?.originalText ||
+                       'Original text not available'}
+                    </div>
+                  </div>
                 </div>
-                <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                  <div
-                    className="text-xs"
-                    dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
-                  />
+
+                {/* Translation Preview */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-green-100 border-b">
+                    <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
+                  </div>
+                  <div className="p-4 bg-white max-h-64 overflow-y-auto">
+                    <div
+                      className="text-xs"
+                      dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
+                    />
+                  </div>
                 </div>
               </div>
 
