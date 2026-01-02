@@ -2420,12 +2420,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const orderData = response.data.order || response.data;
 
         if (orderData.translation_html) {
-          // Set translation results
+          // Set translation results with original text for proofreading
           setTranslationResults([{
             translatedText: orderData.translation_html,
             filename: orderData.translation_document_type || 'Translation',
-            originalText: ''
+            originalText: orderData.translation_original_text || ''
           }]);
+
+          // Also set OCR results if original text is available
+          if (orderData.translation_original_text) {
+            setOcrResults([{
+              filename: orderData.translation_document_type || 'Original',
+              text: orderData.translation_original_text
+            }]);
+          }
 
           // Set original images if available
           if (orderData.translation_original_images && orderData.translation_original_images.length > 0) {
@@ -2531,9 +2539,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Build translation HTML (simplified for storage)
       const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
 
+      // Build original text for proofreading
+      const originalText = translationResults.map(r => r.originalText).join('\n\n---\n\n') ||
+                          ocrResults.map(r => r.text).join('\n\n---\n\n') || '';
+
       // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
         translation_html: translationHTML,
+        translation_original_text: originalText,
         source_language: sourceLanguage,
         target_language: targetLanguage,
         document_type: documentType || 'Document',

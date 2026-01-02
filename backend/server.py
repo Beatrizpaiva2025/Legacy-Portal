@@ -6690,6 +6690,7 @@ async def review_payment_proof(
 
 class TranslationData(BaseModel):
     translation_html: str
+    translation_original_text: Optional[str] = None  # Original text for proofreading
     source_language: str
     target_language: str
     document_type: str
@@ -6755,6 +6756,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
         {"id": order_id},
         {"$set": {
             "translation_html": data.translation_html,
+            "translation_original_text": data.translation_original_text or "",
             "translation_source_language": data.source_language,
             "translation_target_language": data.target_language,
             "translation_document_type": data.document_type,
