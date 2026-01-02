@@ -808,8 +808,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           <p style="text-align: justify; margin-bottom: 50px; line-height: 2; font-size: 14px;">
             I hereby certify that this is a true and complete original translation from <input type="text" id="rmv-source-language" value="Portuguese" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 100px; text-align: center;" /> into English of a
-            <input type="text" id="rmv-document-type" value="Birth Certificate" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 140px; text-align: center;" /> that I have translated. I further certify that I speak the language of the original
-            document fluently and I am a translator and sole proprietor of Legacy Translations (ATA member
+            <input type="text" id="rmv-document-type" value="Birth Certificate" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 140px; text-align: center;" />. This translation was performed by a qualified professional translator fluent in the source language, authorized by Legacy Translations (ATA member
             under # 275993). I understand that the original document and this certified translation may be
             presented to the Massachusetts Registry of Motor Vehicles (RMV) in support of an application for a
             permit, license, or Identification Card, and I further understand that false statements to the RMV
@@ -823,18 +822,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
 
             <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
-              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Full Address:</label>
-              <input type="text" id="rmv-translator-address" value="15 South Point Dr. Apt 606, Boston/MA" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Address:</label>
+              <input type="text" id="rmv-address" value="867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
             </div>
 
             <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
-              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Telephone Number:</label>
-              <input type="text" id="rmv-translator-phone" value="(857)316-7770" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
-            </div>
-
-            <div style="margin-bottom: 20px; display: flex; align-items: baseline;">
-              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Translator's Name:</label>
-              <input type="text" id="rmv-translator-name" value="Beatriz Paiva" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
+              <label style="font-weight: bold; font-style: italic; min-width: 280px;">Phone:</label>
+              <input type="text" id="rmv-phone" value="(857) 316-7770" style="flex: 1; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent;" />
             </div>
           </div>
 
