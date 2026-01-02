@@ -775,12 +775,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       category: 'certificates',
       isForm: true,
       formHTML: `
-        <div style="font-family: 'Times New Roman', Times, serif; font-size: 14px; line-height: 1.8; max-width: 800px; margin: 0 auto; padding: 40px 60px; background: white;">
-          <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 40px; letter-spacing: 0.5px;">
+        <div style="font-family: 'Georgia', 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 32px; background: white;">
+
+          <!-- Header with logos -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px;">
+            <div style="width: 128px;">
+              <div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>
+            </div>
+            <div style="text-align: center; flex: 1; padding: 0 16px;">
+              <div style="font-weight: bold; color: #2563eb; font-size: 14px; font-style: italic;">Legacy Translations</div>
+              <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+              <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+            </div>
+            <div style="width: 80px; text-align: right;">
+              <div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>
+            </div>
+          </div>
+
+          <!-- Blue line -->
+          <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+
+          <!-- Order Number -->
+          <div style="text-align: right; margin-bottom: 24px; font-size: 14px;">
+            <span>Order # </span>
+            <input type="text" id="rmv-order-number" value="P6287" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 80px; text-align: center; font-size: 14px; font-family: Georgia, serif;" />
+          </div>
+
+          <!-- Main Title -->
+          <h1 style="text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 40px; letter-spacing: 0.5px; color: #1a365d;">
             CERTIFICATION OF TRANSLATION ACCURACY AND COMPLETION
           </h1>
 
-          <p style="text-align: justify; margin-bottom: 50px; line-height: 2;">
+          <p style="text-align: justify; margin-bottom: 50px; line-height: 2; font-size: 14px;">
             I hereby certify that this is a true and complete original translation from <input type="text" id="rmv-source-language" value="Portuguese" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 100px; text-align: center;" /> into English of a
             <input type="text" id="rmv-document-type" value="Birth Certificate" style="font-weight: bold; border: none; border-bottom: 1px solid #000; font-size: 14px; font-family: 'Times New Roman', Times, serif; padding: 2px 5px; background: transparent; width: 140px; text-align: center;" /> that I have translated. I further certify that I speak the language of the original
             document fluently and I am a translator and sole proprietor of Legacy Translations (ATA member
@@ -812,10 +838,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           </div>
 
-          <div style="margin-top: 60px; text-align: right;">
-            <div style="display: inline-block; text-align: center;">
-              <div style="border-bottom: 1px solid #000; width: 250px; margin-bottom: 5px; height: 40px;"></div>
-              <div style="font-size: 12px; color: #666;">Digitally signed by Beatriz Paiva</div>
+          <!-- Signature Section -->
+          <div style="margin-top: 60px;">
+            <div style="display: inline-block;">
+              <!-- Empty signature line for manual signing -->
+              <div style="border-bottom: 1px solid #000; width: 200px; height: 40px; margin-bottom: 4px;"></div>
+              <div style="font-style: italic; font-size: 13px; color: #1a365d;">Beatriz Paiva</div>
+              <div style="font-size: 12px; margin-top: 8px;">Authorized Representative</div>
+              <div style="font-size: 12px;">Legacy Translations Inc.</div>
+              <div style="font-size: 12px; margin-top: 12px;">
+                Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US')}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
+              </div>
             </div>
           </div>
         </div>
