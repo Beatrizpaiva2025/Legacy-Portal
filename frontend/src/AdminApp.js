@@ -5110,7 +5110,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </div>
                       {order.deadline && (
                         <div className="text-[10px] text-orange-600 mt-1">
-                          ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('pt-BR')}
+                          ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('en-US')}
                         </div>
                       )}
                       {selectedOrderId === order.id && (
@@ -10802,7 +10802,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <div key={idx} className="flex justify-between items-center text-[10px] py-0.5">
                               <span className="text-blue-600 font-mono">{proj.code}</span>
                               <span className="text-gray-500">
-                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US') : 'No deadline'}
                               </span>
                             </div>
                           ))}
@@ -11253,8 +11253,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Order Date */}
                   <td className="px-3 py-3 text-gray-600">
-                    {created.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                    <span className="text-xs text-gray-400 block">{created.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    {created.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                    <span className="text-xs text-gray-400 block">{created.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                   </td>
                   {/* Client with email and send buttons */}
                   <td className="px-3 py-3">
@@ -11407,8 +11407,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
                         title={isAdmin ? "Click to edit deadline" : ""}
                       >
-                        {orderDeadline.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {orderDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                         {daysUntil > 0 && order.translation_status !== 'delivered' && (
                           <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
                         )}
@@ -11460,7 +11460,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </span>
                         {order.translation_ready_at && (
                           <span className="text-xs text-gray-500">
-                            {new Date(order.translation_ready_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {new Date(order.translation_ready_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
                           </span>
                         )}
                       </div>
@@ -15515,7 +15515,7 @@ const UsersPage = ({ adminKey, user }) => {
                             <div>
                               <span className="text-gray-500 text-xs">Data de Cadastro:</span>
                               <div className="font-medium">
-                                {u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-'}
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US') : '-'}
                               </div>
                             </div>
                           </div>
@@ -15579,7 +15579,7 @@ const UsersPage = ({ adminKey, user }) => {
                                       <div className="font-medium">{doc.filename}</div>
                                       <div className="text-gray-400">
                                         {TRANSLATOR_DOC_TYPES.find(dt => dt.value === doc.document_type)?.label || doc.document_type}
-                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('pt-BR')}`}
+                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US')}`}
                                       </div>
                                     </div>
                                   </div>
@@ -15741,7 +15741,7 @@ const ProductionPage = ({ adminKey }) => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('pt-BR');
+    return new Date(dateStr).toLocaleDateString('en-US');
   };
 
   const formatCurrency = (amount) => {
@@ -16358,7 +16358,7 @@ const FinancesPage = ({ adminKey }) => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('pt-BR');
+    return new Date(dateStr).toLocaleDateString('en-US');
   };
 
   // Simple Donut Chart Component
@@ -16802,9 +16802,9 @@ const FinancesPage = ({ adminKey }) => {
                   paymentProofs.map((proof) => (
                     <tr key={proof.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        {new Date(proof.created_at).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
+                        {new Date(proof.created_at).toLocaleDateString('en-US', {
                           month: '2-digit',
+                          day: '2-digit',
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
@@ -17067,7 +17067,7 @@ const FinancesPage = ({ adminKey }) => {
                         <div className="flex justify-between items-center">
                           <span className="font-medium text-green-600">${payment.amount.toFixed(2)}</span>
                           <span className="text-xs text-gray-500">
-                            {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                            {new Date(payment.paid_at).toLocaleDateString('en-US')}
                           </span>
                         </div>
                         {payment.note && (
@@ -19203,7 +19203,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </span>
                       </td>
                       <td className="py-2 px-2">
-                        {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                        {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : '-'}
                       </td>
                     </tr>
                   ))}
@@ -20125,7 +20125,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div key={idx} className="flex justify-between text-[10px] py-0.5">
                             <span className="text-blue-600 font-mono">{order.order_number}</span>
                             <span className="text-gray-500">
-                              {order.deadline ? new Date(order.deadline).toLocaleDateString('pt-BR') : '-'}
+                              {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : '-'}
                             </span>
                           </div>
                         ))}
@@ -20184,7 +20184,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       }
                     </div>
                     <div className="text-xs text-gray-500">
-                      {order.deadlineDate.toLocaleDateString('pt-BR')}
+                      {order.deadlineDate.toLocaleDateString('en-US')}
                     </div>
                     <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
                       {order.translation_status}
