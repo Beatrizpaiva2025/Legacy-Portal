@@ -3972,16 +3972,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
           setQuickTranslationType('html');
         }
-        // PDF - store directly
+        // PDF - convert to images first
         else if (fileName.endsWith('.pdf')) {
-          setQuickPackageProgress(`Loading PDF: ${file.name}`);
-          const base64 = await fileToBase64(file);
-          setQuickTranslationFiles(prev => [...prev, {
-            filename: file.name,
-            data: base64,
-            type: 'application/pdf'
-          }]);
-          if (!quickTranslationHtml) setQuickTranslationType('files');
+          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          try {
+            const images = await convertPdfToImages(file, (page, total) => {
+              setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+            });
+            // Add each page as a separate image
+            images.forEach((img, pageIdx) => {
+              setQuickTranslationFiles(prev => [...prev, {
+                filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
+                data: img.data.includes(',') ? img.data.split(',')[1] : img.data,
+                type: 'image/png'
+              }]);
+            });
+            if (!quickTranslationHtml) setQuickTranslationType('images');
+          } catch (pdfErr) {
+            console.error('PDF conversion failed:', pdfErr);
+            setQuickPackageProgress(`⚠️ PDF conversion failed for ${file.name}`);
+          }
         }
         // Images (JPG, PNG, etc.)
         else if (file.type.startsWith('image/')) {
@@ -4021,15 +4031,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress(`Processing original ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        // PDF - store directly
+        // PDF - convert to images first
         if (fileName.endsWith('.pdf')) {
-          setQuickPackageProgress(`Loading PDF: ${file.name}`);
-          const base64 = await fileToBase64(file);
-          processedFiles.push({
-            filename: file.name,
-            data: base64,
-            type: 'application/pdf'
-          });
+          setQuickPackageProgress(`Converting PDF to images: ${file.name}`);
+          try {
+            const images = await convertPdfToImages(file, (page, total) => {
+              setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
+            });
+            // Add each page as a separate image
+            images.forEach((img, pageIdx) => {
+              processedFiles.push({
+                filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
+                data: img.data.includes(',') ? img.data.split(',')[1] : img.data,
+                type: 'image/png'
+              });
+            });
+          } catch (pdfErr) {
+            console.error('PDF conversion failed:', pdfErr);
+            setQuickPackageProgress(`⚠️ PDF conversion failed for ${file.name}`);
+          }
         }
         // Images
         else if (file.type.startsWith('image/')) {
@@ -7233,12 +7253,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             if (!file) return;
                             setProcessingStatus('🔄 Extracting text from original...');
                             try {
-                              const formData = new FormData();
-                              formData.append('file', file);
+                              // Convert file to base64 first
+                              const fileBase64 = await fileToBase64(file);
                               const response = await axios.post(
-                                `${API}/admin/ocr?admin_key=${adminKey}&use_claude=${claudeApiKey ? 'true' : 'false'}`,
-                                formData,
-                                { headers: { 'Content-Type': 'multipart/form-data' } }
+                                `${API}/admin/ocr?admin_key=${adminKey}`,
+                                {
+                                  file_base64: fileBase64,
+                                  file_type: file.type,
+                                  filename: file.name,
+                                  use_claude: claudeApiKey ? true : false,
+                                  claude_api_key: claudeApiKey || null,
+                                  preserve_layout: true
+                                }
                               );
                               if (response.data.text) {
                                 setOcrResults([{ filename: file.name, text: response.data.text }]);
@@ -7248,7 +7274,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 setProcessingStatus('✅ Original text extracted!');
                               }
                             } catch (err) {
-                              setProcessingStatus('❌ Failed to extract text: ' + err.message);
+                              setProcessingStatus('❌ Failed to extract text: ' + (err.response?.data?.detail || err.message));
                             }
                             e.target.value = '';
                           }}
