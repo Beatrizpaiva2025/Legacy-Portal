@@ -37,7 +37,7 @@ const FLAGS = {
   'english': '🇺🇸', 'spanish': '🇪🇸', 'french': '🇫🇷', 'german': '🇩🇪',
   'portuguese': '🇧🇷', 'italian': '🇮🇹', 'chinese': '🇨🇳', 'japanese': '🇯🇵',
   'korean': '🇰🇷', 'arabic': '🇸🇦', 'russian': '🇷🇺', 'dutch': '🇳🇱',
-  'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
+  'Portuguese': '🇧🇷', 'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
   'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
 };
 
@@ -2525,7 +2525,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    if (translationResults.length === 0) {
+    // Check for translation content - in Quick Package mode check those variables
+    const hasTranslation = quickPackageMode
+      ? (quickTranslationFiles.length > 0 || quickTranslationHtml)
+      : translationResults.length > 0;
+
+    if (!hasTranslation) {
       alert('No translation to save. Please translate the document first.');
       return;
     }
@@ -2536,12 +2541,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
 
-      // Build translation HTML (simplified for storage)
-      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      // Build translation HTML - use Quick Package data if in that mode
+      let translationHTML = '';
+      if (quickPackageMode && (quickTranslationHtml || quickTranslationFiles.length > 0)) {
+        if (quickTranslationHtml) {
+          translationHTML = quickTranslationHtml;
+        } else {
+          // Convert image files to HTML
+          translationHTML = quickTranslationFiles.map((file, idx) =>
+            `<div style="text-align:center; page-break-after: always;"><img src="data:${file.type || 'image/png'};base64,${file.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`
+          ).join('\n');
+        }
+      } else {
+        translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      }
 
       // Build original text for proofreading
       const originalText = translationResults.map(r => r.originalText).join('\n\n---\n\n') ||
                           ocrResults.map(r => r.text).join('\n\n---\n\n') || '';
+
+      // Get original images - use Quick Package data if in that mode
+      let origImages = [];
+      if (quickPackageMode && quickOriginalFiles.length > 0) {
+        origImages = quickOriginalFiles.map(img => ({ filename: img.filename, data: img.data }));
+      } else if (originalImages.length > 0) {
+        origImages = originalImages.map(img => ({ filename: img.filename, data: img.data }));
+      }
 
       // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
@@ -2555,7 +2580,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         include_cover: includeCover,
         page_format: pageFormat,
         translation_type: translationType,
-        original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
+        original_images: origImages,
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
