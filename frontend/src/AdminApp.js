@@ -37,7 +37,7 @@ const FLAGS = {
   'english': '🇺🇸', 'spanish': '🇪🇸', 'french': '🇫🇷', 'german': '🇩🇪',
   'portuguese': '🇧🇷', 'italian': '🇮🇹', 'chinese': '🇨🇳', 'japanese': '🇯🇵',
   'korean': '🇰🇷', 'arabic': '🇸🇦', 'russian': '🇷🇺', 'dutch': '🇳🇱',
-  'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
+  'Portuguese': '🇧🇷', 'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
   'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
 };
 
@@ -2525,7 +2525,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    if (translationResults.length === 0) {
+    // Check for translation content - in Quick Package mode check those variables
+    const hasTranslation = quickPackageMode
+      ? (quickTranslationFiles.length > 0 || quickTranslationHtml)
+      : translationResults.length > 0;
+
+    if (!hasTranslation) {
       alert('No translation to save. Please translate the document first.');
       return;
     }
@@ -2536,12 +2541,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Generate the HTML content
       const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
 
-      // Build translation HTML (simplified for storage)
-      const translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      // Build translation HTML - use Quick Package data if in that mode
+      let translationHTML = '';
+      if (quickPackageMode && (quickTranslationHtml || quickTranslationFiles.length > 0)) {
+        if (quickTranslationHtml) {
+          translationHTML = quickTranslationHtml;
+        } else {
+          // Convert image files to HTML
+          translationHTML = quickTranslationFiles.map((file, idx) =>
+            `<div style="text-align:center; page-break-after: always;"><img src="data:${file.type || 'image/png'};base64,${file.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`
+          ).join('\n');
+        }
+      } else {
+        translationHTML = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      }
 
       // Build original text for proofreading
       const originalText = translationResults.map(r => r.originalText).join('\n\n---\n\n') ||
                           ocrResults.map(r => r.text).join('\n\n---\n\n') || '';
+
+      // Get original images - use Quick Package data if in that mode
+      let origImages = [];
+      if (quickPackageMode && quickOriginalFiles.length > 0) {
+        origImages = quickOriginalFiles.map(img => ({ filename: img.filename, data: img.data }));
+      } else if (originalImages.length > 0) {
+        origImages = originalImages.map(img => ({ filename: img.filename, data: img.data }));
+      }
 
       // Send to backend with destination info
       const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
@@ -2555,7 +2580,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         include_cover: includeCover,
         page_format: pageFormat,
         translation_type: translationType,
-        original_images: originalImages.map(img => ({ filename: img.filename, data: img.data })),
+        original_images: origImages,
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
@@ -3923,6 +3948,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           selection.addRange(newRange);
         } catch (e) {
           console.error('Error applying format:', e);
+        }
+      }
+    }
+    // Handle line spacing
+    else if (command === 'increaseLineHeight' || command === 'decreaseLineHeight') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        // Get the editable container
+        const container = editableRef.current;
+        if (container) {
+          // Get current line height
+          const computedStyle = window.getComputedStyle(container);
+          let currentLineHeight = parseFloat(computedStyle.lineHeight);
+          if (isNaN(currentLineHeight)) currentLineHeight = 1.5;
+          else currentLineHeight = currentLineHeight / parseFloat(computedStyle.fontSize);
+
+          // Increase or decrease by 0.2
+          const newLineHeight = command === 'increaseLineHeight'
+            ? Math.min(currentLineHeight + 0.2, 3.0)
+            : Math.max(currentLineHeight - 0.2, 1.0);
+
+          container.style.lineHeight = newLineHeight.toFixed(1);
         }
       }
     } else {
@@ -6908,28 +6955,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* View Mode Toggle + Edit Toolbar */}
+              {/* View Mode Toggle + Download + Edit Toolbar */}
               <div className="flex justify-between items-center mb-2">
-                <div className="inline-flex rounded-md shadow-sm" role="group">
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md shadow-sm" role="group">
+                    <button
+                      onClick={() => setReviewViewMode('preview')}
+                      className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                        reviewViewMode === 'preview'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      👁️ Preview
+                    </button>
+                    <button
+                      onClick={() => setReviewViewMode('edit')}
+                      className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                        reviewViewMode === 'edit'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      ✏️ Edit
+                    </button>
+                  </div>
+                  {/* Download Translation Button */}
                   <button
-                    onClick={() => setReviewViewMode('preview')}
-                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
-                      reviewViewMode === 'preview'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
+                    onClick={() => {
+                      const content = translationResults[selectedResultIndex]?.translatedText || '';
+                      const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `translation_${orderNumber || 'document'}.html`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                    title="Download Translation"
                   >
-                    👁️ Preview
-                  </button>
-                  <button
-                    onClick={() => setReviewViewMode('edit')}
-                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
-                      reviewViewMode === 'edit'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    ✏️ Edit
+                    ⬇️ Download
                   </button>
                 </div>
 
@@ -6942,6 +7008,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
@@ -7215,7 +7284,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* PROOFREADING TAB - Admin and PM Only */}
       {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">🔍 Proofreading & Quality Assurance</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
+            {translationResults.length > 0 && (
+              <button
+                onClick={() => {
+                  const content = translationResults[selectedResultIndex]?.translatedText || '';
+                  const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `translation_${orderNumber || 'document'}.html`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                title="Download Translation"
+              >
+                ⬇️ Download
+              </button>
+            )}
+          </div>
 
           {translationResults.length > 0 ? (
             <>
@@ -7241,7 +7330,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="border rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-blue-100 border-b flex justify-between items-center">
                     <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
-                    {!(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
+                    {!(originalImages[selectedResultIndex] || ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
                       <label className="text-[10px] text-blue-600 cursor-pointer hover:text-blue-800 flex items-center gap-1">
                         📤 Upload Original
                         <input
@@ -7282,12 +7371,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </label>
                     )}
                   </div>
-                  <div className="p-2 bg-white">
-                    {(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
-                      <div className="text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                  <div className="p-2 bg-white max-h-64 overflow-y-auto">
+                    {/* Priority 1: Show original images if available */}
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '250px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : /* Priority 2: Show original text if available */
+                    (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <div className="text-xs whitespace-pre-wrap">
                         {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
                       </div>
                     ) : (
+                      /* Priority 3: Show textarea to paste/upload */
                       <textarea
                         className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Cole o texto original aqui para fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima para extrair texto de PDF/imagem"
