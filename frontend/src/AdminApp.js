@@ -7266,7 +7266,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="border rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-blue-100 border-b flex justify-between items-center">
                     <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
-                    {!(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
+                    {!(originalImages[selectedResultIndex] || ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
                       <label className="text-[10px] text-blue-600 cursor-pointer hover:text-blue-800 flex items-center gap-1">
                         📤 Upload Original
                         <input
@@ -7307,12 +7307,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </label>
                     )}
                   </div>
-                  <div className="p-2 bg-white">
-                    {(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
-                      <div className="text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                  <div className="p-2 bg-white max-h-64 overflow-y-auto">
+                    {/* Priority 1: Show original images if available */}
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '250px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : /* Priority 2: Show original text if available */
+                    (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <div className="text-xs whitespace-pre-wrap">
                         {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
                       </div>
                     ) : (
+                      /* Priority 3: Show textarea to paste/upload */
                       <textarea
                         className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Cole o texto original aqui para fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima para extrair texto de PDF/imagem"
