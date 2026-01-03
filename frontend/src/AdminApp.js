@@ -99,16 +99,16 @@ const DOCUMENT_TYPES = [
 // Document Categories for uploaded files
 const DOCUMENT_CATEGORIES = [
   { value: '', label: '-- Select Category --' },
-  { value: 'financial', label: 'Financial / Financeiro' },
-  { value: 'educational', label: 'Educational / Educacional' },
-  { value: 'personal', label: 'Personal Documents / Documentos Pessoais' },
-  { value: 'bank_statement', label: 'Bank Statement / Extrato Bancário' },
-  { value: 'legal', label: 'Legal / Jurídico' },
-  { value: 'medical', label: 'Medical / Médico' },
-  { value: 'immigration', label: 'Immigration / Imigração' },
-  { value: 'business', label: 'Business / Empresarial' },
-  { value: 'government', label: 'Government / Governamental' },
-  { value: 'other', label: 'Other / Outros' }
+  { value: 'financial', label: 'Financial' },
+  { value: 'educational', label: 'Educational' },
+  { value: 'personal', label: 'Personal Documents' },
+  { value: 'bank_statement', label: 'Bank Statement' },
+  { value: 'legal', label: 'Legal' },
+  { value: 'medical', label: 'Medical' },
+  { value: 'immigration', label: 'Immigration' },
+  { value: 'business', label: 'Business' },
+  { value: 'government', label: 'Government' },
+  { value: 'other', label: 'Other' }
 ];
 
 // ==================== SVG ICONS (Professional/Minimal) ====================

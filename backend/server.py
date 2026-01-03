@@ -4769,9 +4769,102 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
 
+        # Create QuickBooks invoice automatically
+        quickbooks_invoice_id = None
+        quickbooks_invoice_number = None
+        try:
+            settings = await db.settings.find_one({"key": "quickbooks"})
+            if settings and settings.get("quickbooks_connected"):
+                qb_client = get_quickbooks_client(settings)
+
+                # Use partner info as customer (B2B portal)
+                customer_name = partner.get("company_name", partner.get("name", "Partner"))
+                customer_email = partner.get("email")
+
+                # Find or create customer in QuickBooks
+                qb_customer_id = None
+                if customer_email:
+                    existing = qb_client.find_customer_by_email(customer_email)
+                    if existing.get("success"):
+                        customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                        if customers:
+                            qb_customer_id = customers[0].get("Id")
+
+                if not qb_customer_id:
+                    cust_result = qb_client.create_customer(
+                        display_name=customer_name,
+                        email=customer_email
+                    )
+                    if cust_result.get("success"):
+                        qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+
+                if qb_customer_id:
+                    # Create line items
+                    service_desc = f"Translation Service - {order.service_type.capitalize()}"
+                    if order.translate_from and order.translate_to:
+                        service_desc += f" ({order.translate_from} to {order.translate_to})"
+
+                    line_items = [{
+                        "description": service_desc,
+                        "amount": order.total_price,
+                        "quantity": 1
+                    }]
+
+                    # Add urgency fee as separate line if applicable
+                    if order.urgency_fee and order.urgency_fee > 0:
+                        line_items.append({
+                            "description": f"Urgency Fee ({order.urgency.capitalize()})",
+                            "amount": order.urgency_fee,
+                            "quantity": 1
+                        })
+                        # Adjust the main line item to be base price only
+                        line_items[0]["amount"] = order.base_price
+
+                    # Create invoice
+                    invoice_result = qb_client.create_invoice(
+                        customer_id=qb_customer_id,
+                        line_items=line_items,
+                        memo=f"Order #{order.order_number} - {order.client_name}"
+                    )
+
+                    if invoice_result.get("success"):
+                        invoice = invoice_result.get("data", {}).get("Invoice", {})
+                        quickbooks_invoice_id = invoice.get("Id")
+                        quickbooks_invoice_number = invoice.get("DocNumber")
+
+                        # Update order with QuickBooks info
+                        await db.translation_orders.update_one(
+                            {"id": order.id},
+                            {"$set": {
+                                "quickbooks_invoice_id": quickbooks_invoice_id,
+                                "quickbooks_invoice_number": quickbooks_invoice_number,
+                                "quickbooks_synced_at": datetime.utcnow()
+                            }}
+                        )
+
+                        # Send invoice email
+                        try:
+                            qb_client.send_invoice(quickbooks_invoice_id, customer_email)
+                        except Exception as send_err:
+                            logger.warning(f"Failed to send QuickBooks invoice email: {str(send_err)}")
+
+                        logger.info(f"Created QuickBooks invoice {quickbooks_invoice_number} for order {order.order_number}")
+                    else:
+                        logger.warning(f"Failed to create QuickBooks invoice: {invoice_result.get('error')}")
+                else:
+                    logger.warning("Could not find or create QuickBooks customer")
+        except Exception as e:
+            logger.error(f"Failed to create QuickBooks invoice: {str(e)}")
+
+        # Update the order object with QuickBooks info for the response
+        order_dict = order.dict()
+        if quickbooks_invoice_id:
+            order_dict["quickbooks_invoice_id"] = quickbooks_invoice_id
+            order_dict["quickbooks_invoice_number"] = quickbooks_invoice_number
+
         return {
             "status": "success",
-            "order": order.dict(),
+            "order": order_dict,
             "message": "Order created successfully"
         }
 
