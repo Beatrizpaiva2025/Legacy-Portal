@@ -7219,15 +7219,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="mb-4 grid grid-cols-2 gap-4">
                 {/* Original Document */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-blue-100 border-b">
+                  <div className="px-3 py-2 bg-blue-100 border-b flex justify-between items-center">
                     <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
+                    {!(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
+                      <span className="text-[10px] text-orange-600">⚠️ Paste original below</span>
+                    )}
                   </div>
-                  <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div className="text-xs whitespace-pre-wrap">
-                      {ocrResults[selectedResultIndex]?.text ||
-                       translationResults[selectedResultIndex]?.originalText ||
-                       'Original text not available'}
-                    </div>
+                  <div className="p-2 bg-white">
+                    {(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <div className="text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
+                      </div>
+                    ) : (
+                      <textarea
+                        className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Cole o texto original aqui para fazer o proofreading...&#10;&#10;Paste the original text here for proofreading..."
+                        onChange={(e) => {
+                          const text = e.target.value;
+                          if (text.trim()) {
+                            setOcrResults([{ filename: 'Original', text: text }]);
+                            // Also update translationResults
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === selectedResultIndex ? { ...r, originalText: text } : r
+                            ));
+                          }
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
 
