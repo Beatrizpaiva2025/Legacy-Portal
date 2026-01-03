@@ -1,0 +1,48 @@
+{
+  "name": "Legacy Translations Portal",
+  "short_name": "Legacy Portal",
+  "description": "Portal de serviços de tradução Legacy Translations",
+  "start_url": "/#/partner",
+  "display": "standalone",
+  "theme_color": "#1e40af",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Partner Login",
+      "short_name": "Partner",
+      "description": "Acessar portal de parceiros",
+      "url": "/#/partner",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Customer Login",
+      "short_name": "Customer",
+      "description": "Acessar portal de clientes",
+      "url": "/#/customer",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Admin Login",
+      "short_name": "Admin",
+      "description": "Acessar portal administrativo",
+      "url": "/#/admin",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    }
+  ],
+  "categories": ["business", "productivity"]
+}
