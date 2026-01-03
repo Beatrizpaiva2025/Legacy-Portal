@@ -3950,6 +3950,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           console.error('Error applying format:', e);
         }
       }
+    }
+    // Handle line spacing
+    else if (command === 'increaseLineHeight' || command === 'decreaseLineHeight') {
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        // Get the editable container
+        const container = editableRef.current;
+        if (container) {
+          // Get current line height
+          const computedStyle = window.getComputedStyle(container);
+          let currentLineHeight = parseFloat(computedStyle.lineHeight);
+          if (isNaN(currentLineHeight)) currentLineHeight = 1.5;
+          else currentLineHeight = currentLineHeight / parseFloat(computedStyle.fontSize);
+
+          // Increase or decrease by 0.2
+          const newLineHeight = command === 'increaseLineHeight'
+            ? Math.min(currentLineHeight + 0.2, 3.0)
+            : Math.max(currentLineHeight - 0.2, 1.0);
+
+          container.style.lineHeight = newLineHeight.toFixed(1);
+        }
+      }
     } else {
       document.execCommand(command, false, value);
     }
@@ -6933,28 +6955,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* View Mode Toggle + Edit Toolbar */}
+              {/* View Mode Toggle + Download + Edit Toolbar */}
               <div className="flex justify-between items-center mb-2">
-                <div className="inline-flex rounded-md shadow-sm" role="group">
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md shadow-sm" role="group">
+                    <button
+                      onClick={() => setReviewViewMode('preview')}
+                      className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                        reviewViewMode === 'preview'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      👁️ Preview
+                    </button>
+                    <button
+                      onClick={() => setReviewViewMode('edit')}
+                      className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                        reviewViewMode === 'edit'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      ✏️ Edit
+                    </button>
+                  </div>
+                  {/* Download Translation Button */}
                   <button
-                    onClick={() => setReviewViewMode('preview')}
-                    className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
-                      reviewViewMode === 'preview'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
+                    onClick={() => {
+                      const content = translationResults[selectedResultIndex]?.translatedText || '';
+                      const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `translation_${orderNumber || 'document'}.html`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                    title="Download Translation"
                   >
-                    👁️ Preview
-                  </button>
-                  <button
-                    onClick={() => setReviewViewMode('edit')}
-                    className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
-                      reviewViewMode === 'edit'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    ✏️ Edit
+                    ⬇️ Download
                   </button>
                 </div>
 
@@ -6967,6 +7008,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
@@ -7240,7 +7284,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* PROOFREADING TAB - Admin and PM Only */}
       {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">🔍 Proofreading & Quality Assurance</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
+            {translationResults.length > 0 && (
+              <button
+                onClick={() => {
+                  const content = translationResults[selectedResultIndex]?.translatedText || '';
+                  const blob = new Blob([`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Translation</title></head><body>${content}</body></html>`], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `translation_${orderNumber || 'document'}.html`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+                title="Download Translation"
+              >
+                ⬇️ Download
+              </button>
+            )}
+          </div>
 
           {translationResults.length > 0 ? (
             <>
