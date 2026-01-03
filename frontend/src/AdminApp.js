@@ -7219,15 +7219,63 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="mb-4 grid grid-cols-2 gap-4">
                 {/* Original Document */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-blue-100 border-b">
+                  <div className="px-3 py-2 bg-blue-100 border-b flex justify-between items-center">
                     <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
+                    {!(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
+                      <label className="text-[10px] text-blue-600 cursor-pointer hover:text-blue-800 flex items-center gap-1">
+                        📤 Upload Original
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            setProcessingStatus('🔄 Extracting text from original...');
+                            try {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              const response = await axios.post(
+                                `${API}/admin/ocr?admin_key=${adminKey}&use_claude=${claudeApiKey ? 'true' : 'false'}`,
+                                formData,
+                                { headers: { 'Content-Type': 'multipart/form-data' } }
+                              );
+                              if (response.data.text) {
+                                setOcrResults([{ filename: file.name, text: response.data.text }]);
+                                setTranslationResults(prev => prev.map((r, idx) =>
+                                  idx === selectedResultIndex ? { ...r, originalText: response.data.text } : r
+                                ));
+                                setProcessingStatus('✅ Original text extracted!');
+                              }
+                            } catch (err) {
+                              setProcessingStatus('❌ Failed to extract text: ' + err.message);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
                   </div>
-                  <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div className="text-xs whitespace-pre-wrap">
-                      {ocrResults[selectedResultIndex]?.text ||
-                       translationResults[selectedResultIndex]?.originalText ||
-                       'Original text not available'}
-                    </div>
+                  <div className="p-2 bg-white">
+                    {(ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <div className="text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                        {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
+                      </div>
+                    ) : (
+                      <textarea
+                        className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Cole o texto original aqui para fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima para extrair texto de PDF/imagem"
+                        onChange={(e) => {
+                          const text = e.target.value;
+                          if (text.trim()) {
+                            setOcrResults([{ filename: 'Original', text: text }]);
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === selectedResultIndex ? { ...r, originalText: text } : r
+                            ));
+                          }
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
 
