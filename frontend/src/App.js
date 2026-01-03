@@ -1546,6 +1546,11 @@ const OrdersPage = ({ token }) => {
                         <span className="font-bold text-teal-600">#{order.order_number}</span>
                         {getTranslationBadge(order.translation_status)}
                         {getStatusBadge(order.payment_status)}
+                        {order.quickbooks_invoice_number && (
+                          <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                            Invoice #{order.quickbooks_invoice_number}
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
                         Client: {order.client_name} ({order.client_email})
@@ -1594,6 +1599,28 @@ const OrdersPage = ({ token }) => {
                     <div className="mt-4">
                       <div className="text-sm text-gray-500">Reference</div>
                       <div className="font-medium">{order.reference}</div>
+                    </div>
+                  )}
+                  {order.quickbooks_invoice_number && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm text-gray-500">QuickBooks Invoice</div>
+                          <div className="font-medium text-green-700">
+                            Invoice #{order.quickbooks_invoice_number}
+                          </div>
+                          {order.quickbooks_synced_at && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              Created: {new Date(order.quickbooks_synced_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-green-600">
+                          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
