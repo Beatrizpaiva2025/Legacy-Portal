@@ -16337,6 +16337,8 @@ const FinancesPage = ({ adminKey }) => {
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
   const [paidOrders, setPaidOrders] = useState([]);
+  // Partner statistics state
+  const [partnerStats, setPartnerStats] = useState({ partners: [], summary: {} });
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -16496,6 +16498,15 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const fetchPartnerStats = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/finances/partners?admin_key=${adminKey}`);
+      setPartnerStats(response.data);
+    } catch (err) {
+      console.error('Failed to fetch partner statistics:', err);
+    }
+  };
+
   const syncOrderToQuickBooks = async (order) => {
     setQbSyncing(prev => ({ ...prev, [order.id]: true }));
     try {
@@ -16549,6 +16560,9 @@ const FinancesPage = ({ adminKey }) => {
   useEffect(() => {
     if (activeView === 'quickbooks') {
       fetchPaidOrders();
+    }
+    if (activeView === 'partners') {
+      fetchPartnerStats();
     }
   }, [activeView]);
 
@@ -16710,6 +16724,12 @@ const FinancesPage = ({ adminKey }) => {
             >
               📊 QuickBooks
               {qbConnected && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
+            </button>
+            <button
+              onClick={() => setActiveView('partners')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'partners' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              🤝 Partners
             </button>
           </div>
         </div>
@@ -17455,6 +17475,85 @@ const FinancesPage = ({ adminKey }) => {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Partners View */}
+      {activeView === 'partners' && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Partners</div>
+              <div className="text-2xl font-bold text-gray-800">{partnerStats.summary?.total_partners || 0}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Received</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(partnerStats.summary?.total_received || 0)}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Pending</div>
+              <div className="text-2xl font-bold text-yellow-600">{formatCurrency(partnerStats.summary?.total_pending || 0)}</div>
+            </div>
+          </div>
+
+          {/* Partners Table */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b bg-gray-50">
+              <h2 className="text-sm font-bold text-gray-700">🤝 Partner Companies</h2>
+              <p className="text-xs text-gray-500 mt-1">Revenue from Partner Portal orders</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {partnerStats.partners?.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                        No partner orders found
+                      </td>
+                    </tr>
+                  ) : (
+                    partnerStats.partners?.map((partner) => (
+                      <tr key={partner.partner_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-800">{partner.company_name}</div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                            {partner.orders_paid}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                            {partner.orders_pending}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-green-600">
+                          {formatCurrency(partner.total_received)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-yellow-600">
+                          {formatCurrency(partner.total_pending)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-gray-800">
+                          {formatCurrency(partner.total_received + partner.total_pending)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
     </div>

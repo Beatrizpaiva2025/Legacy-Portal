@@ -741,6 +741,16 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const fileUploadRef = useRef(null);
   const shippingRef = useRef(null);
 
+  // Contact/Support form states
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [supportIssueType, setSupportIssueType] = useState('');
+  const [supportDescription, setSupportDescription] = useState('');
+  const [supportFiles, setSupportFiles] = useState([]);
+  const [supportError, setSupportError] = useState('');
+  const [supportSuccess, setSupportSuccess] = useState('');
+  const [sendingSupport, setSendingSupport] = useState(false);
+  const supportFileInputRef = useRef(null);
+
   // Format price with currency conversion
   const formatPrice = (usdPrice) => {
     const converted = usdPrice * currency.rate;
@@ -910,6 +920,51 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     },
     multiple: true
   });
+
+  // Support file change handler
+  const handleSupportFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(f => f.size <= 10 * 1024 * 1024).slice(0, 5);
+    setSupportFiles(validFiles);
+  };
+
+  // Handle support form submission
+  const handleSupportSubmit = async () => {
+    if (!partner?.email) {
+      setSupportError('Email is required');
+      return;
+    }
+    if (!supportIssueType) {
+      setSupportError('Please select an issue type');
+      return;
+    }
+
+    setSendingSupport(true);
+    setSupportError('');
+
+    try {
+      await axios.post(`${API}/send-support-request`, {
+        issue_type: supportIssueType,
+        description: supportDescription,
+        customer_email: partner.email,
+        customer_name: partner.company_name || partner.name || 'Partner',
+        files_count: supportFiles.length
+      });
+
+      setSupportSuccess('Request sent successfully! We will respond to your email shortly.');
+      setSupportIssueType('');
+      setSupportDescription('');
+      setSupportFiles([]);
+      setTimeout(() => {
+        setShowContactModal(false);
+        setSupportSuccess('');
+      }, 2000);
+    } catch (err) {
+      setSupportError('Failed to send request. Please try again.');
+    } finally {
+      setSendingSupport(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1282,6 +1337,18 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   </div>
                 </div>
               )}
+
+              {/* Having trouble link */}
+              <div className="mt-3 text-center text-sm text-gray-500">
+                Having trouble uploading?{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowContactModal(true)}
+                  className="text-teal-600 hover:text-teal-700 underline"
+                >
+                  Contact us via email
+                </button>
+              </div>
             </div>
 
             {/* Urgency */}
@@ -1483,6 +1550,163 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
           </div>
         </div>
       </div>
+
+      {/* Contact Options Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md text-center relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowContactModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Get Support</h2>
+            <p className="text-gray-600 text-sm mb-4">Share details about your issue and our team will respond via email.</p>
+
+            {/* Live Chat Option */}
+            <a
+              href="https://mia-atendimento-1.onrender.com/webchat/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mb-6 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200 hover:from-teal-100 hover:to-teal-150 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-teal-800">Live Chat</h3>
+                    <p className="text-xs text-teal-600">Instant support available</p>
+                  </div>
+                </div>
+                <span className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold text-sm">
+                  Start Chat
+                </span>
+              </div>
+            </a>
+
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-3 bg-white text-gray-500">or submit a request</span>
+              </div>
+            </div>
+
+            {supportSuccess ? (
+              <div className="p-4 bg-green-100 text-green-700 rounded-md">
+                {supportSuccess}
+              </div>
+            ) : (
+              <div className="space-y-4 text-left">
+                {/* Email - show partner email */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Your Email *</label>
+                  <input
+                    type="email"
+                    value={partner?.email || ''}
+                    disabled
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-gray-600"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">We'll respond to your request at this email</p>
+                </div>
+
+                {/* Issue Type Dropdown */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">What do you need help with? *</label>
+                  <select
+                    value={supportIssueType}
+                    onChange={(e) => setSupportIssueType(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  >
+                    <option value="">-- Select issue type --</option>
+                    <option value="upload">Problems with upload</option>
+                    <option value="translation_type">Not sure what translation type I need</option>
+                    <option value="other">Other issue</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Describe the issue</label>
+                  <textarea
+                    value={supportDescription}
+                    onChange={(e) => setSupportDescription(e.target.value.slice(0, 2000))}
+                    placeholder="Provide details about your issue..."
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md h-32 resize-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Provide as much detail as possible.</span>
+                    <span>{supportDescription.length}/2000</span>
+                  </div>
+                </div>
+
+                {/* File Attachments */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Attachments (optional)</label>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => supportFileInputRef.current?.click()}
+                      className="px-4 py-2 border-2 border-teal-600 text-teal-600 rounded-md font-semibold hover:bg-teal-50 transition-colors"
+                    >
+                      CHOOSE FILES
+                    </button>
+                    <span className="text-gray-500 text-sm">
+                      {supportFiles.length > 0 ? `${supportFiles.length} file(s) selected` : 'No file selected'}
+                    </span>
+                    <input
+                      ref={supportFileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={handleSupportFileChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Attach screenshots or PDFs (max 5 files, 10 MB each).</p>
+                </div>
+
+                {supportError && (
+                  <div className="p-3 bg-red-100 text-red-700 rounded-md text-sm">
+                    {supportError}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactModal(false);
+                      setSupportIssueType('');
+                      setSupportDescription('');
+                      setSupportFiles([]);
+                      setSupportError('');
+                    }}
+                    className="px-6 py-2 text-gray-600 font-semibold hover:text-gray-800"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSupportSubmit}
+                    disabled={sendingSupport || !supportIssueType}
+                    className="px-6 py-2 bg-amber-200 text-gray-800 rounded-md font-semibold hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
+                  >
+                    {sendingSupport ? '...' : 'SEND REQUEST'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
