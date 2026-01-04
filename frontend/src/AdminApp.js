@@ -10007,14 +10007,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // View order documents
   const viewOrderDocuments = async (order) => {
+    console.log('Opening project details for:', order);
+    if (!order) {
+      console.error('viewOrderDocuments called with null order');
+      return;
+    }
+    setProjectModalTab('details'); // Reset to details tab
+    setEditingProject(false); // Reset edit mode
     setViewingOrder(order);
     setLoadingDocuments(true);
     setOrderDocuments([]);
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+      console.log('Documents loaded:', response.data);
       setOrderDocuments(response.data.documents || []);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
+      setOrderDocuments([]);
     } finally {
       setLoadingDocuments(false);
     }
@@ -10257,7 +10266,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   }, [adminKey, user]);
 
   // Open translator assignment modal
-  const openAssignTranslatorModal = (order) => {
+  const openAssignTranslatorModal = async (order) => {
     setAssigningTranslatorModal(order);
     setAssignmentDetails({
       translator_id: '',
@@ -10266,6 +10275,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       project_notes: order.internal_notes || '',
       language_pair: `${order.translate_from} → ${order.translate_to}`
     });
+    // Refresh translator list when opening modal to ensure we have latest data
+    try {
+      const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+      console.log('Translators loaded:', response.data);
+      setTranslatorList(response.data || []);
+    } catch (err) {
+      console.error('Failed to load translators:', err);
+    }
   };
 
   // Quick Add Translator (PM can add new translators from assignment modal)
@@ -10755,14 +10772,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
                   <option value="">-- Choose Translator --</option>
-                  {translatorList.filter(t => t.role === 'translator' && t.is_active !== false).map(t => (
+                  {translatorList.filter(t => t.is_active !== false).map(t => (
                     <option key={t.id} value={t.id}>
-                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
+                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
                     </option>
                   ))}
                 </select>
-                {translatorList.filter(t => t.role === 'translator').length === 0 && (
-                  <p className="text-[10px] text-orange-600 mt-1">No translators found. Register translators in the Translators tab first.</p>
+                {translatorList.length === 0 && (
+                  <p className="text-[10px] text-orange-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                )}
+                {translatorList.length > 0 && translatorList.filter(t => t.is_active !== false).length === 0 && (
+                  <p className="text-[10px] text-orange-600 mt-1">All translators are inactive. They need to accept their invitation first.</p>
                 )}
               </div>
 
