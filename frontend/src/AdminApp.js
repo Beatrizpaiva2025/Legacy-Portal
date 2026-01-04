@@ -17891,6 +17891,9 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       }
 
       await axios.post(`${API}/admin/auth/accept-invitation`, data);
+      // Clear any existing session to force fresh login with new credentials
+      localStorage.removeItem('admin_key');
+      localStorage.removeItem('admin_user');
       setSuccess('Account set up successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
