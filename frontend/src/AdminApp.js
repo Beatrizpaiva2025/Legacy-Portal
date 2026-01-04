@@ -9751,6 +9751,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Confirm payment for WhatsApp/MIA quotes - marks as paid and changes status to "received"
+  const confirmQuotePayment = async (orderId) => {
+    if (!window.confirm('Confirm payment received? This will convert the Quote to an active Order.')) return;
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        payment_status: 'paid',
+        translation_status: 'received'
+      });
+      alert('✅ Payment confirmed! Order is now active.');
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to confirm payment:', err);
+      alert('Error confirming payment');
+    }
+  };
+
   const deliverOrder = async (orderId) => {
     try {
       await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`);
@@ -10640,6 +10656,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // "Quote" filter should include both 'received' and 'Quote' (from MIA bot)
+    if (statusFilter === 'received' && o.translation_status === 'Quote') {
+      matchStatus = true;
+    }
     // "In Progress" filter should include orders being translated or pending translation
     if (statusFilter === 'in_translation') {
       matchStatus = o.translation_status === 'in_translation' ||
@@ -10665,6 +10685,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const getStatusLabel = (status) => {
     const labels = {
       'received': 'Quote',
+      'Quote': 'Quote',
       'in_translation': 'In Progress',
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
@@ -11804,6 +11825,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             >
                               <SearchIcon className="w-4 h-4 text-emerald-500" />
                               Review Side-by-Side
+                            </button>
+                          )}
+
+                          {/* Confirm Payment - for WhatsApp/MIA quotes */}
+                          {isAdmin && (order.translation_status === 'Quote' || (order.translation_status === 'received' && order.payment_status === 'pending')) && (
+                            <button
+                              onClick={() => { confirmQuotePayment(order.id); setOpenActionsDropdown(null); }}
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-green-50 flex items-center gap-2"
+                            >
+                              <CheckIcon className="w-4 h-4 text-green-500" />
+                              💰 Confirm Payment
                             </button>
                           )}
 
