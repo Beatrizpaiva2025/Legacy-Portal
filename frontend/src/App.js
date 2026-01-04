@@ -879,7 +879,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/bmp': ['.bmp'],
+      'image/tiff': ['.tiff', '.tif'],
+      'image/webp': ['.webp'],
+      'image/gif': ['.gif'],
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'text/plain': ['.txt']
