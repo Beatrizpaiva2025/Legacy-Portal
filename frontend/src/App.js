@@ -834,34 +834,53 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     try {
       let newWords = 0;
       const newFiles = [];
+      const failedFiles = [];
 
       for (let i = 0; i < acceptedFiles.length; i++) {
         const file = acceptedFiles[i];
         setProcessingStatus(`Processing ${file.name} (${i + 1}/${acceptedFiles.length})...`);
 
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', file);
+        try {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
 
-        const response = await axios.post(`${API}/upload-document?token=${token}`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 120000 // 2 minute timeout for OCR processing
-        });
+          const response = await axios.post(`${API}/upload-document?token=${token}`, formDataUpload, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 120000 // 2 minute timeout for OCR processing
+          });
 
-        if (response.data?.word_count) {
-          newWords += response.data.word_count;
+          // Always add file if upload succeeded, even if word_count is 0 (OCR might have failed)
+          const fileWordCount = response.data?.word_count ?? 0;
+          newWords += fileWordCount;
           newFiles.push({
             fileName: file.name,
-            wordCount: response.data.word_count,
-            documentId: response.data.document_id
+            wordCount: fileWordCount,
+            documentId: response.data.document_id,
+            ocrFailed: fileWordCount === 0
           });
+        } catch (fileErr) {
+          console.error(`Failed to upload ${file.name}:`, fileErr);
+          failedFiles.push(file.name);
         }
       }
 
       // Add new files to existing files (accumulate) - store with word counts and document IDs
-      setUploadedFiles(prev => [...prev, ...newFiles]);
-      setWordCount(prev => prev + newWords);
-      // Clear file upload error when files are added
-      if (fieldErrors.file_upload) setFieldErrors(prev => ({...prev, file_upload: false}));
+      if (newFiles.length > 0) {
+        setUploadedFiles(prev => [...prev, ...newFiles]);
+        setWordCount(prev => prev + newWords);
+        // Clear file upload error when files are added
+        if (fieldErrors.file_upload) setFieldErrors(prev => ({...prev, file_upload: false}));
+      }
+
+      // Show error for failed files
+      if (failedFiles.length > 0) {
+        if (failedFiles.length === acceptedFiles.length) {
+          setError(`Failed to process ${failedFiles.length === 1 ? 'file' : 'files'}. Please try again.`);
+        } else {
+          setError(`Some files failed to upload: ${failedFiles.join(', ')}. Please try uploading them again.`);
+        }
+      }
+
       setProcessingStatus('');
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
@@ -879,7 +898,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.jpg', '.jpeg', '.png', '.bmp', '.tiff'],
+      'image/jpeg': ['.jpg', '.jpeg'],
+      'image/png': ['.png'],
+      'image/bmp': ['.bmp'],
+      'image/tiff': ['.tiff', '.tif'],
+      'image/webp': ['.webp'],
+      'image/gif': ['.gif'],
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
       'text/plain': ['.txt']
@@ -1219,11 +1243,20 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   {uploadedFiles.map((item, i) => {
                     const pages = Math.max(1, Math.ceil(item.wordCount / 250));
                     return (
-                      <div key={i} className="p-3 bg-gray-50 rounded-md flex justify-between items-center">
-                        <div className="flex items-center">
-                          <span className="text-green-600 mr-2">✓</span>
-                          <span>{item.fileName}</span>
-                          <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
+                      <div key={i} className={`p-3 rounded-md flex justify-between items-center ${item.ocrFailed ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'}`}>
+                        <div className="flex-1">
+                          <div className="flex items-center">
+                            <span className={item.ocrFailed ? "text-yellow-600 mr-2" : "text-green-600 mr-2"}>
+                              {item.ocrFailed ? "⚠️" : "✓"}
+                            </span>
+                            <span>{item.fileName}</span>
+                            <span className="text-gray-400 text-sm ml-2">({pages} {pages === 1 ? 'page' : 'pages'})</span>
+                          </div>
+                          {item.ocrFailed && (
+                            <div className="text-yellow-600 text-xs ml-6 mt-1">
+                              Could not extract text - counted as 1 page
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
