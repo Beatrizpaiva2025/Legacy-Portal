@@ -2285,7 +2285,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const loaded = await loadSavedTranslation(selectedOrder);
           if (loaded) {
             setActiveSubTab('review');
-            setProcessingStatus(`✅ Tradução do project ${selectedOrder.order_number} carregada to review!`);
+            setProcessingStatus(`✅ Translation for project ${selectedOrder.order_number} loaded for review!`);
           } else {
             // If loadSavedTranslation failed, try to fetch directly
             try {
@@ -2298,11 +2298,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   originalText: ''
                 }]);
                 setActiveSubTab('review');
-                setProcessingStatus(`✅ Tradução carregada!`);
+                setProcessingStatus(`✅ Translation loaded!`);
               }
             } catch (err) {
               console.error('Failed to load translation:', err);
-              setProcessingStatus(`⚠️ Não foi possível load a translation`);
+              setProcessingStatus(`⚠️ Could not load the translation`);
             }
           }
         }
@@ -2459,7 +2459,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           if (orderData.translation_page_format) setPageFormat(orderData.translation_page_format);
           if (orderData.translation_include_cover !== undefined) setIncludeCover(orderData.translation_include_cover);
 
-          setProcessingStatus(`✅ Tradução carregada: ${orderData.translation_document_type || 'Documento'}`);
+          setProcessingStatus(`✅ Translation loaded: ${orderData.translation_document_type || 'Document'}`);
           return true;
         }
       } catch (err) {
@@ -5082,8 +5082,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     >
                       <span className="text-lg">📂</span>
                       <div className="text-left">
-                        <div className="font-medium">Abrir Documentos</div>
-                        <div className="text-[10px] text-gray-500">Ver files do project</div>
+                        <div className="font-medium">Open Documents</div>
+                        <div className="text-[10px] text-gray-500">View project files</div>
                       </div>
                     </button>
 
@@ -5097,8 +5097,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     >
                       <span className="text-lg">📄</span>
                       <div className="text-left">
-                        <div className="font-medium">Traduzir Documento</div>
-                        <div className="text-[10px] text-gray-500">OCR e translation manual</div>
+                        <div className="font-medium">Translate Document</div>
+                        <div className="text-[10px] text-gray-500">OCR and manual translation</div>
                       </div>
                     </button>
 
@@ -5120,10 +5120,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">🔍</span>
                       <div className="text-left">
                         <div className="font-medium">
-                          {selectedOrder.translation_ready ? '✅ Revisar Tradução' : 'Review'}
+                          {selectedOrder.translation_ready ? '✅ Review Translation' : 'Review'}
                         </div>
                         <div className="text-[10px] text-gray-500">
-                          {selectedOrder.translation_ready ? 'Tradução pronta to review' : 'Revisar e aprovar'}
+                          {selectedOrder.translation_ready ? 'Translation ready for review' : 'Review and approve'}
                         </div>
                       </div>
                     </button>
@@ -5174,7 +5174,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator'] }
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
         ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
           <button
             key={tab.id}
@@ -6117,7 +6117,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                       {originalImages.length > 0 && (
                         <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-700">
-                          ✅ Documento carregado: {originalImages[0]?.filename || 'Ready'} ({originalImages.length} página{originalImages.length > 1 ? 's' : ''})
+                          ✅ Document loaded: {originalImages[0]?.filename || 'Ready'} ({originalImages.length} page{originalImages.length > 1 ? 's' : ''})
                         </div>
                       )}
                     </>
@@ -7234,8 +7234,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="py-4">
               {/* Show orders with saved translations */}
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-bold text-blue-800 mb-3">📋 Projetos com Tradução to Revisar</h3>
-                <p className="text-xs text-gray-600 mb-3">Select um project to load a translation saved:</p>
+                <h3 className="text-sm font-bold text-blue-800 mb-3">📋 Projects with Translation to Review</h3>
+                <p className="text-xs text-gray-600 mb-3">Select a project to load a saved translation:</p>
 
                 {assignedOrders.filter(o => o.translation_ready || o.translation_html).length > 0 ? (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -7247,7 +7247,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setOrderNumber(order.order_number);
                           const loaded = await loadSavedTranslation(order);
                           if (loaded) {
-                            setProcessingStatus(`✅ Tradução do project ${order.order_number} carregada!`);
+                            setProcessingStatus(`✅ Translation for project ${order.order_number} loaded!`);
                           }
                         }}
                         className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all"
@@ -7265,8 +7265,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             order.translation_status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' :
                             'bg-green-100 text-green-700'
                           }`}>
-                            {order.translation_status === 'review' ? 'Aguardando Review' :
-                             order.translation_status === 'pending_review' ? 'Para Revisar' : 'Tradução Pronta'}
+                            {order.translation_status === 'review' ? 'Awaiting Review' :
+                             order.translation_status === 'pending_review' ? 'Pending Review' : 'Translation Ready'}
                           </span>
                           <span className="text-green-600">→</span>
                         </div>
@@ -7274,18 +7274,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 text-center py-4">No project com translation saved found.</p>
+                  <p className="text-xs text-gray-500 text-center py-4">No project with saved translation found.</p>
                 )}
               </div>
 
               {/* Alternative: go to translate */}
               <div className="text-center py-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-3">Ou comece a nova translation:</p>
+                <p className="text-xs text-gray-500 mb-3">Or start a new translation:</p>
                 <button
                   onClick={() => setActiveSubTab('translate')}
                   className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                 >
-                  Ir to Documento
+                  Go to Document
                 </button>
               </div>
             </div>
