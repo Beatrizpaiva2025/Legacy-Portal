@@ -213,7 +213,7 @@ const WriteIcon = ({ className = "w-3 h-3" }) => (
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
@@ -223,7 +223,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrorr('');
     setSuccess('');
     setLoading(true);
 
@@ -249,7 +249,7 @@ const AdminLogin = ({ onLogin }) => {
         }
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid credentials');
+      setErrorr(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -257,7 +257,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrorr('');
     setSuccess('');
     setLoading(true);
 
@@ -266,7 +266,7 @@ const AdminLogin = ({ onLogin }) => {
       setSuccess('If an account exists with this email, a password reset link has been sent.');
       setForgotEmail('');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Error sending reset email');
+      setErrorr(err.response?.data?.detail || 'Errorr sending reset email');
     } finally {
       setLoading(false);
     }
@@ -321,7 +321,7 @@ const AdminLogin = ({ onLogin }) => {
 
           <div className="mt-4 text-center">
             <button
-              onClick={() => { setShowForgotPassword(false); setError(''); setSuccess(''); }}
+              onClick={() => { setShowForgotPassword(false); setErrorr(''); setSuccess(''); }}
               className="text-teal-600 hover:underline text-xs"
             >
               ← Back to Login
@@ -748,7 +748,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Predefined certificate templates with body text only (header, logos, signature are separate)
+  // Predefined certificate templates with body text only (header, logos, signature are setote)
   // Template Categories for organization
   const TEMPLATE_CATEGORIES = {
     'certificates': { name: 'Certificates', icon: '📜', description: 'Standard translation certificates' },
@@ -1552,7 +1552,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px;">
             <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">OBSERVAÇÕES / OBSERVATIONS:</div>
             <div style="min-height: 40px; border: 1px dashed #ccc; padding: 5px; font-size: 9px;" contenteditable="true">
-              Escala de notas: 0 a 10 (Média para aprovação: 5,0) / Grading scale: 0 to 10 (Passing grade: 5.0)
+              Escala de notas: 0 a 10 (Média to aprovação: 5,0) / Grading scale: 0 to 10 (Passing grade: 5.0)
             </div>
           </div>
 
@@ -1580,7 +1580,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           <!-- Footer -->
           <div style="margin-top: 15px; padding-top: 8px; border-top: 1px solid #000; font-size: 8px; text-align: center; color: #666;">
-            <div>Este documento não contém emendas ou rasuras / This document contains no amendments or erasures</div>
+            <div>Este document não contém emendas ou rasuras / This document contains no amendments or erasures</div>
             <div style="margin-top: 3px;">Documento válido em todo território nacional conforme Lei nº 9.394/96 (LDB)</div>
             <div>Valid document throughout national territory according to Law No. 9,394/96 (LDB)</div>
           </div>
@@ -1812,7 +1812,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
             <div style="flex: 1; font-size: 9px; line-height: 1.5;">
               <p>Documento assinado com certificado digital em conformidade com a Medida Provisória nº 2200-2/2001. Sua validade poderá ser confirmada por meio do programa Assinador Serpro.</p>
-              <p style="margin-top: 10px;">As orientações para instalar o Assinador Serpro e realizar a validação do documento digital estão disponíveis em:<br/>
+              <p style="margin-top: 10px;">As orientações to instalar o Assinador Serpro e realizar a validação do document digital estão disponíveis em:<br/>
               <strong>https://www.serpro.gov.br/assinador-digital</strong></p>
               <div style="margin-top: 15px; text-align: right;">
                 <span style="font-weight: bold; color: #006847;">SERPRO</span> / <span style="font-weight: bold;">SENATRAN</span>
@@ -1822,7 +1822,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           <!-- Legend -->
           <div style="margin: 10px; padding: 10px; background: #f5f5f5; font-size: 7px; line-height: 1.6; border: 1px solid #ddd;">
-            <div><strong>2+9.</strong> Nome e Sobrenome / Name and Surname / Nombre y Apellidos - <strong>1ª Habilitação</strong> - Primeira Habilitação / First Driver License / Primera Licencia de Conducir - <strong>3.</strong> Data e Local de Nascimento / Date and Place of Birth (DD/MM/YYYY) / Fecha y Lugar de Nacimiento - <strong>4a.</strong> Data de Emissão / Issuing Date (DD/MM/YYYY) / Fecha de Emisión - <strong>4b.</strong> Data de Validade / Expiration Date (DD/MM/YYYY) / Válido Hasta - <strong>ACC</strong> - Autorização para Conduzir Ciclomotor / Moped Authorization / Autorización Ciclomotor - <strong>4c.</strong> Documento de Identificação / Identity Document / Documento de Identificación - Órgão emissor / Issuing Authority / Autoridad Emisora - <strong>4d.</strong> CPF - <strong>5.</strong> Número de registro da CNH / Driver License Number / Número de Permiso de Conducir - <strong>9.</strong> Categoria de Veículos de Carteira de Habilitação / Driver license Class / Categoría de Permiso de Conducir - Nacionalidade / Nationality / Nacionalidad - <strong>8.</strong> Filiação / Filiation / Filiación - <strong>12.</strong> Observações / Observations / Observaciones - Local / Place / Lugar</div>
+            <div><strong>2+9.</strong> Nome e Sobrenome / Name and Surname / Nombre y Apellidos - <strong>1ª Habilitação</strong> - Primeira Habilitação / First Driver License / Primera Licencia de Conducir - <strong>3.</strong> Data e Local de Nascimento / Date and Place of Birth (DD/MM/YYYY) / Fecha y Lugar de Nacimiento - <strong>4a.</strong> Data de Emissão / Issuing Date (DD/MM/YYYY) / Fecha de Emisión - <strong>4b.</strong> Data de Validade / Expiration Date (DD/MM/YYYY) / Golido Hasta - <strong>ACC</strong> - Autorização to Conduzir Ciclomotor / Moped Authorization / Autorización Ciclomotor - <strong>4c.</strong> Documento de Identificação / Identity Document / Documento de Identificación - Órgão emissor / Issuing Authority / Autoridad Emisora - <strong>4d.</strong> CPF - <strong>5.</strong> Número de registro da CNH / Driver License Number / Número de Permiso de Conducir - <strong>9.</strong> Categoria de Veículos de Carteira de Habilitação / Driver license Class / Categoría de Permiso de Conducir - Nacionalidade / Nationality / Nacionalidad - <strong>8.</strong> Filiação / Filiation / Filiación - <strong>12.</strong> Observações / Observations / Observaciones - Local / Place / Lugar</div>
           </div>
 
           <!-- MRZ Code -->
@@ -1847,7 +1847,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Proofreading state (admin only)
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
-  const [proofreadingError, setProofreadingError] = useState('');
+  const [proofreadingErrorr, setProofreadingErrorr] = useState('');
 
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
@@ -1939,7 +1939,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           rateDate: data.date || new Date().toISOString().split('T')[0]
         }));
       } else {
-        throw new Error('Rate not found');
+        throw new Errorr('Rate not found');
       }
     } catch (error) {
       // Fallback to Frankfurter API (ECB rates)
@@ -1956,7 +1956,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }));
         }
       } catch (err) {
-        console.error('Error fetching exchange rate:', err);
+        console.error('Errorr fetching exchange rate:', err);
         alert('Could not fetch exchange rate. Please enter manually.');
       }
     } finally {
@@ -2135,8 +2135,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
       return true;
     } catch (error) {
-      console.error('Error saving asset:', error);
-      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
+      console.error('Errorr saving asset:', error);
+      setProcessingStatus(`❌ Falha ao savedr ${assetType}`);
       return false;
     }
   };
@@ -2275,7 +2275,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           const loaded = await loadSavedTranslation(selectedOrder);
           if (loaded) {
             setActiveSubTab('review');
-            setProcessingStatus(`✅ Tradução do projeto ${selectedOrder.order_number} carregada para revisão!`);
+            setProcessingStatus(`✅ Tradução do project ${selectedOrder.order_number} carregada to review!`);
           } else {
             // If loadSavedTranslation failed, try to fetch directly
             try {
@@ -2292,7 +2292,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               }
             } catch (err) {
               console.error('Failed to load translation:', err);
-              setProcessingStatus(`⚠️ Não foi possível carregar a tradução`);
+              setProcessingStatus(`⚠️ Não foi possível load a translation`);
             }
           }
         }
@@ -2318,9 +2318,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setSelectedProjectFiles(docs);
 
       if (docs.length === 0) {
-        setProcessingStatus(`⚠️ Nenhum documento encontrado para ${order.order_number}`);
+        setProcessingStatus(`⚠️ No document found to ${order.order_number}`);
       } else {
-        setProcessingStatus(`📋 ${docs.length} arquivo(s) encontrado(s). Clique em um arquivo para carregar.`);
+        setProcessingStatus(`📋 ${docs.length} file(s) found(s). Click em um file to load.`);
       }
 
       // Update order status to "in_translation" if it was "received"
@@ -2338,7 +2338,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       console.error('Failed to fetch documents:', err);
-      setProcessingStatus(`❌ Erro ao buscar documentos: ${err.message}`);
+      setProcessingStatus(`❌ Error ao buscar documents: ${err.message}`);
     } finally {
       setLoadingProjectFiles(false);
     }
@@ -2399,7 +2399,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       console.error('Failed to load file:', err);
-      setProcessingStatus(`❌ Erro ao carregar arquivo: ${err.message}`);
+      setProcessingStatus(`❌ Error ao load file: ${err.message}`);
     }
   };
 
@@ -2633,10 +2633,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         fetchAvailableOrders();
         fetchAssignedOrders();
       } else {
-        throw new Error(response.data.error || response.data.detail || 'Failed to send');
+        throw new Errorr(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
-      console.error('Error sending to projects:', error);
+      console.error('Errorr sending to projects:', error);
       setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -2688,7 +2688,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setActiveSubTab('deliver');
       }
     } catch (error) {
-      console.error('Error approving translation:', error);
+      console.error('Errorr approving translation:', error);
       setProcessingStatus(`❌ Failed to approve: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -2735,7 +2735,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setTimeout(() => onBack(), 1500);
       }
     } catch (error) {
-      console.error('Error rejecting translation:', error);
+      console.error('Errorr rejecting translation:', error);
       setProcessingStatus(`❌ Failed to reject: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -2898,8 +2898,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const errorMsg = err.code === 'ECONNABORTED'
         ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Error'
-          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+        : err.message === 'Network Errorr'
+          ? 'Network Errorr - Server may be restarting. Saved locally as backup.'
           : (err.response?.data?.detail || err.message);
 
       alert('Failed to save instruction: ' + errorMsg);
@@ -2966,8 +2966,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const errorMsg = err.code === 'ECONNABORTED'
         ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Error'
-          ? 'Network Error - Server may be restarting. Saved locally as backup.'
+        : err.message === 'Network Errorr'
+          ? 'Network Errorr - Server may be restarting. Saved locally as backup.'
           : (err.response?.data?.detail || err.message);
 
       alert('Failed to save glossary: ' + errorMsg);
@@ -3172,8 +3172,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setProcessingStatus(`✅ Image uploaded`);
         }
       } catch (err) {
-        console.error(`Error processing ${file.name}:`, err);
-        setProcessingStatus(`⚠️ Error processing ${file.name}`);
+        console.error(`Errorr processing ${file.name}:`, err);
+        setProcessingStatus(`⚠️ Errorr processing ${file.name}`);
       }
     }
 
@@ -3292,7 +3292,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         'Original text not available';
 
     setIsProofreading(true);
-    setProofreadingError('');
+    setProofreadingErrorr('');
     setProofreadingResult(null);
 
     try {
@@ -3312,7 +3312,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Proofreading failed');
+        throw new Errorr(data.detail || 'Proofreading failed');
       }
 
       if (data.proofreading_result) {
@@ -3326,11 +3326,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       } else if (data.raw_response) {
         // Show raw response if JSON parsing failed
-        setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response}`);
+        setProofreadingErrorr(`JSON parsing failed. Raw response:\n${data.raw_response}`);
       }
     } catch (error) {
       console.error('Proofreading error:', error);
-      setProofreadingError(error.message);
+      setProofreadingErrorr(error.message);
     } finally {
       setIsProofreading(false);
     }
@@ -3338,8 +3338,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
-    // Handle both field name conventions (encontrado/original and sugestao/correcao)
-    const foundText = erro.encontrado || erro.original || erro.traducao_errada;
+    // Handle both field name conventions (found/original and sugestao/correcao)
+    const foundText = erro.found || erro.original || erro.traducao_errada;
     const suggestionText = erro.sugestao || erro.correcao;
 
     if (!foundText || !suggestionText) {
@@ -3366,11 +3366,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     // Mark this error as applied in proofreading result
     if (proofreadingResult?.erros) {
-      const updatedErros = [...proofreadingResult.erros];
-      updatedErros[index] = { ...updatedErros[index], applied: true };
+      const updatedErrors = [...proofreadingResult.erros];
+      updatedErrors[index] = { ...updatedErrors[index], applied: true };
       setProofreadingResult({
         ...proofreadingResult,
-        erros: updatedErros
+        erros: updatedErrors
       });
     }
   };
@@ -3383,9 +3383,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!currentResult?.translatedText) return;
 
     let updatedHtml = currentResult.translatedText;
-    const updatedErros = proofreadingResult.erros.map(erro => {
+    const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions
-      const foundText = erro.encontrado || erro.original || erro.traducao_errada;
+      const foundText = erro.found || erro.original || erro.traducao_errada;
       const suggestionText = erro.sugestao || erro.correcao;
 
       if (foundText && suggestionText && !erro.applied) {
@@ -3409,7 +3409,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Update proofreading result
     setProofreadingResult({
       ...proofreadingResult,
-      erros: updatedErros
+      erros: updatedErrors
     });
   };
 
@@ -3603,7 +3603,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             text: response.data.text
           }]);
         } else {
-          throw new Error(response.data.error || response.data.detail || 'OCR failed');
+          throw new Errorr(response.data.error || response.data.detail || 'OCR failed');
         }
       }
       setProcessingStatus('✅ OCR completed!');
@@ -3698,7 +3698,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             translatedText: finalTranslation
           }]);
         } else {
-          throw new Error(response.data.error || response.data.detail || 'Translation failed');
+          throw new Errorr(response.data.error || response.data.detail || 'Translation failed');
         }
       }
       setProcessingStatus('✅ Translation completed!');
@@ -3738,7 +3738,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         // Add page context to help Claude understand this is part of a multi-page document
         const pageContext = totalPages > 1
-          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated separately.`
+          ? `IMPORTANT: This is PAGE ${pageNumber} of ${totalPages} of a multi-page document. Translate ONLY the content visible in THIS image completely. Do NOT ask for other pages - they will be translated setotely.`
           : '';
 
         const response = await axios.post(`${API}/admin/translate?admin_key=${adminKey}`, {
@@ -3761,7 +3761,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             translatedText: response.data.translation
           }]);
         } else {
-          throw new Error(response.data.error || response.data.detail || 'Translation failed');
+          throw new Errorr(response.data.error || response.data.detail || 'Translation failed');
         }
       }
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
@@ -3840,7 +3840,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         };
         setTranslationResults(updatedResults);
 
-        // Save notes separately
+        // Save notes setotely
         if (notesText) {
           setClaudeNotes(prev => prev ? prev + '\n\n---\n\n' + notesText : notesText);
         }
@@ -3848,11 +3848,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setCorrectionCommand('');
         setProcessingStatus('✅ Correction applied!');
       } else {
-        throw new Error(response.data.error || response.data.detail || 'Correction failed');
+        throw new Errorr(response.data.error || response.data.detail || 'Correction failed');
       }
     } catch (error) {
       console.error('Correction error:', error);
-      alert('Error applying correction: ' + error.message);
+      alert('Errorr applying correction: ' + error.message);
     } finally {
       setApplyingCorrection(false);
     }
@@ -3919,7 +3919,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
-          console.error('Error applying font size:', e);
+          console.error('Errorr applying font size:', e);
         }
       }
     }
@@ -3947,7 +3947,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
-          console.error('Error applying format:', e);
+          console.error('Errorr applying format:', e);
         }
       }
     }
@@ -4026,7 +4026,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             const images = await convertPdfToImages(file, (page, total) => {
               setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
             });
-            // Add each page as a separate image
+            // Add each page as a setote image
             images.forEach((img, pageIdx) => {
               setQuickTranslationFiles(prev => [...prev, {
                 filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
@@ -4054,8 +4054,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           console.warn(`Unsupported file type: ${file.name}`);
         }
       } catch (err) {
-        console.error(`Error processing ${file.name}:`, err);
-        setQuickPackageProgress(`⚠️ Error processing ${file.name}`);
+        console.error(`Errorr processing ${file.name}:`, err);
+        setQuickPackageProgress(`⚠️ Errorr processing ${file.name}`);
       }
     }
 
@@ -4085,7 +4085,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             const images = await convertPdfToImages(file, (page, total) => {
               setQuickPackageProgress(`Converting PDF page ${page}/${total}: ${file.name}`);
             });
-            // Add each page as a separate image
+            // Add each page as a setote image
             images.forEach((img, pageIdx) => {
               processedFiles.push({
                 filename: `${file.name.replace('.pdf', '')}_page_${pageIdx + 1}.png`,
@@ -4111,7 +4111,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           console.warn(`Unsupported file type for original: ${file.name}`);
         }
       } catch (err) {
-        console.error(`Error processing ${file.name}:`, err);
+        console.error(`Errorr processing ${file.name}:`, err);
       }
     }
 
@@ -4283,7 +4283,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
 
         ${(() => {
-          // Get the template paragraphs for download
+          // Get the template tographs for download
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
             const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
@@ -4293,8 +4293,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
 
           // Replace placeholders and generate HTML
-          return templateParagraphs.map(paragraph => {
-            const processedParagraph = paragraph
+          return templateParagraphs.map(tograph => {
+            const processedParagraph = tograph
               .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
               .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
             return `<p class="body-text">${processedParagraph}</p>`;
@@ -4578,8 +4578,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       }, 10000);
     } catch (err) {
-      console.error('Error generating package:', err);
-      alert('Error generating package. Please try with fewer files.');
+      console.error('Errorr generating package:', err);
+      alert('Errorr generating package. Please try with fewer files.');
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
@@ -4727,7 +4727,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
 
         ${(() => {
-          // Get the template paragraphs for download
+          // Get the template tographs for download
           let templateParagraphs;
           if (selectedCertificateTemplate.startsWith('custom-')) {
             const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
@@ -4737,8 +4737,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }
 
           // Replace placeholders and generate HTML
-          return templateParagraphs.map(paragraph => {
-            const processedParagraph = paragraph
+          return templateParagraphs.map(tograph => {
+            const processedParagraph = tograph
               .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
               .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
             return `<p class="body-text">${processedParagraph}</p>`;
@@ -4848,7 +4848,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     ` : '';
 
-    // Original documents pages HTML (each image on separate page, title only on first)
+    // Original documents pages HTML (each image on setote page, title only on first)
     const originalPagesHTML = (includeOriginal && originalImages.length > 0) ? originalImages.map((img, index) => `
     <div class="original-documents-page">
         ${includeLetterhead ? letterheadHTML : ''}
@@ -5073,7 +5073,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">📂</span>
                       <div className="text-left">
                         <div className="font-medium">Abrir Documentos</div>
-                        <div className="text-[10px] text-gray-500">Ver arquivos do projeto</div>
+                        <div className="text-[10px] text-gray-500">Ver files do project</div>
                       </div>
                     </button>
 
@@ -5088,7 +5088,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">📄</span>
                       <div className="text-left">
                         <div className="font-medium">Traduzir Documento</div>
-                        <div className="text-[10px] text-gray-500">OCR e tradução manual</div>
+                        <div className="text-[10px] text-gray-500">OCR e translation manual</div>
                       </div>
                     </button>
 
@@ -5113,7 +5113,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           {selectedOrder.translation_ready ? '✅ Revisar Tradução' : 'Review'}
                         </div>
                         <div className="text-[10px] text-gray-500">
-                          {selectedOrder.translation_ready ? 'Tradução pronta para revisão' : 'Revisar e aprovar'}
+                          {selectedOrder.translation_ready ? 'Tradução pronta to review' : 'Revisar e aprovar'}
                         </div>
                       </div>
                     </button>
@@ -5188,7 +5188,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg p-4">
               <h3 className="text-sm font-bold text-teal-800 mb-3">📋 Meus Projetos Atribuídos</h3>
               {loadingAssigned ? (
-                <div className="text-center py-4 text-gray-500 text-sm">Carregando projetos...</div>
+                <div className="text-center py-4 text-gray-500 text-sm">Carregando projects...</div>
               ) : assignedOrders.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {assignedOrders.map(order => (
@@ -5232,8 +5232,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               ) : (
                 <div className="text-center py-6 text-gray-500">
                   <div className="text-3xl mb-2">📭</div>
-                  <p className="text-sm">Nenhum projeto atribuído ainda</p>
-                  <p className="text-xs mt-1">Aguarde a atribuição de projetos pelo PM</p>
+                  <p className="text-sm">No project assigned yet</p>
+                  <p className="text-xs mt-1">Aguarde a atribuição de projects pelo PM</p>
                 </div>
               )}
             </div>
@@ -5574,9 +5574,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </select>
                 </p>
 
-                {/* Body paragraphs - Dynamic based on selected template */}
+                {/* Body tographs - Dynamic based on selected template */}
                 {(() => {
-                  // Get the template paragraphs
+                  // Get the template tographs
                   let templateParagraphs;
                   if (selectedCertificateTemplate.startsWith('custom-')) {
                     const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
@@ -5586,8 +5586,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   }
 
                   // Replace placeholders with actual values
-                  return templateParagraphs.map((paragraph, index) => {
-                    const processedParagraph = paragraph
+                  return templateParagraphs.map((tograph, index) => {
+                    const processedParagraph = tograph
                       .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
                       .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
 
@@ -5781,11 +5781,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 onClick={() => {
                   const name = prompt('Template name:');
                   if (name) {
-                    const templateText = prompt('Certificate paragraphs (use {{sourceLanguage}}, {{targetLanguage}}). Separate with ||:');
+                    const templateText = prompt('Certificate tographs (use {{sourceLanguage}}, {{targetLanguage}}). Setote with ||:');
                     if (templateText) {
-                      const paragraphs = templateText.split('||').map(p => p.trim()).filter(p => p);
-                      if (paragraphs.length > 0) {
-                        const newTemplate = { id: Date.now(), name, description: 'Custom', bodyParagraphs: paragraphs };
+                      const tographs = templateText.split('||').map(p => p.trim()).filter(p => p);
+                      if (tographs.length > 0) {
+                        const newTemplate = { id: Date.now(), name, description: 'Custom', bodyParagraphs: tographs };
                         const updated = [...customCertificateTemplates, newTemplate];
                         setCustomCertificateTemplates(updated);
                         localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
@@ -5979,10 +5979,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className="flex justify-between items-start gap-4">
                 {/* Left side - Files */}
                 <div className="flex-1">
-                  <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Documentos do Projeto - Clique para Carregar</h3>
+                  <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Project Documents - Click to Load</h3>
 
                   {loadingProjectFiles ? (
-                    <div className="text-sm text-gray-500 text-center py-4">Carregando arquivos...</div>
+                    <div className="text-sm text-gray-500 text-center py-4">Carregando files...</div>
                   ) : selectedProjectFiles.length > 0 ? (
                     <>
                       <div className="space-y-2">
@@ -6013,7 +6013,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     {doc.filename || `Arquivo ${idx + 1}`}
                                   </div>
                                   <div className="text-xs text-gray-400">
-                                    {selectedFileId === doc.id ? '✓ Carregado - Pronto para traduzir' : 'Clique para carregar'}
+                                    {selectedFileId === doc.id ? '✓ Loaded - Ready to translate' : 'Click to load'}
                                   </div>
                                 </div>
                                 {selectedFileId === doc.id && (
@@ -6038,7 +6038,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                         link.click();
                                       }
                                     } catch (err) {
-                                      alert('Erro ao baixar arquivo');
+                                      alert('Error ao baixar file');
                                     }
                                   }}
                                   className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
@@ -6050,7 +6050,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 {/* Replace Button - File input */}
                                 <label
                                   className="px-2 py-1.5 bg-orange-100 text-orange-600 rounded text-xs hover:bg-orange-200 transition-colors cursor-pointer"
-                                  title="Substituir arquivo"
+                                  title="Substituir file"
                                 >
                                   🔄
                                   <input
@@ -6076,7 +6076,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                         };
                                         reader.readAsDataURL(file);
                                       } catch (err) {
-                                        alert('Erro ao substituir arquivo');
+                                        alert('Error ao substituir file');
                                       }
                                     }}
                                   />
@@ -6093,7 +6093,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     setProcessingStatus(`✅ Document type set to: "${nameWithoutExt}"`);
                                   }}
                                   className="px-2 py-1.5 bg-purple-100 text-purple-600 rounded text-xs hover:bg-purple-200 transition-colors"
-                                  title="Usar nome do arquivo na Capa"
+                                  title="Usar nome do file na Capa"
                                 >
                                   📋
                                 </button>
@@ -6105,18 +6105,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                       {originalImages.length > 0 && (
                         <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-sm text-green-700">
-                          ✅ Documento carregado: {originalImages[0]?.filename || 'Pronto'} ({originalImages.length} página{originalImages.length > 1 ? 's' : ''})
+                          ✅ Documento carregado: {originalImages[0]?.filename || 'Ready'} ({originalImages.length} página{originalImages.length > 1 ? 's' : ''})
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-sm text-gray-500 mb-3">Nenhum documento encontrado neste projeto</p>
+                      <p className="text-sm text-gray-500 mb-3">No document found in this project</p>
                       <button
                         onClick={() => setActiveSubTab('start')}
                         className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                       >
-                        Fazer Upload na aba START
+                        Fazer Upload na tab START
                       </button>
                     </div>
                   )}
@@ -6145,13 +6145,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {!selectedOrderId && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-center">
               <div className="text-3xl mb-2">📋</div>
-              <p className="text-sm text-yellow-800 font-medium">Selecione um projeto primeiro</p>
-              <p className="text-xs text-yellow-600 mt-1">Vá para a aba START e selecione um projeto para carregar os documentos</p>
+              <p className="text-sm text-yellow-800 font-medium">Select um project first</p>
+              <p className="text-xs text-yellow-600 mt-1">Go to a tab START e selecione um project to load os documents</p>
               <button
                 onClick={() => setActiveSubTab('start')}
                 className="mt-3 px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
               >
-                Ir para START
+                Ir to START
               </button>
             </div>
           )}
@@ -6901,7 +6901,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         }
                       } catch (err) {
                         console.error('Upload error:', err);
-                        setProcessingStatus(`⚠️ Error: ${file.name}`);
+                        setProcessingStatus(`⚠️ Errorr: ${file.name}`);
                       }
                     }
                     setProcessingStatus('✅ Translation uploaded!');
@@ -6922,7 +6922,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className={`mb-3 p-3 rounded text-sm font-medium ${
               processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
               processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
-              processingStatus.includes('Error') ? 'bg-red-100 text-red-700 border border-red-300' :
+              processingStatus.includes('Errorr') ? 'bg-red-100 text-red-700 border border-red-300' :
               'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
             }`}>
               {processingStatus}
@@ -7101,7 +7101,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               </div>
 
-              {/* Claude Notes/Changes - Separate Field */}
+              {/* Claude Notes/Changes - Setote Field */}
               {claudeNotes && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
                   <div className="flex justify-between items-center mb-2">
@@ -7222,8 +7222,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div className="py-4">
               {/* Show orders with saved translations */}
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-bold text-blue-800 mb-3">📋 Projetos com Tradução para Revisar</h3>
-                <p className="text-xs text-gray-600 mb-3">Selecione um projeto para carregar a tradução salva:</p>
+                <h3 className="text-sm font-bold text-blue-800 mb-3">📋 Projetos com Tradução to Revisar</h3>
+                <p className="text-xs text-gray-600 mb-3">Select um project to load a translation saved:</p>
 
                 {assignedOrders.filter(o => o.translation_ready || o.translation_html).length > 0 ? (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -7235,7 +7235,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setOrderNumber(order.order_number);
                           const loaded = await loadSavedTranslation(order);
                           if (loaded) {
-                            setProcessingStatus(`✅ Tradução do projeto ${order.order_number} carregada!`);
+                            setProcessingStatus(`✅ Tradução do project ${order.order_number} carregada!`);
                           }
                         }}
                         className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all"
@@ -7262,18 +7262,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 text-center py-4">Nenhum projeto com tradução salva encontrado.</p>
+                  <p className="text-xs text-gray-500 text-center py-4">No project com translation saved found.</p>
                 )}
               </div>
 
               {/* Alternative: go to translate */}
               <div className="text-center py-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-3">Ou comece uma nova tradução:</p>
+                <p className="text-xs text-gray-500 mb-3">Ou comece a nova translation:</p>
                 <button
                   onClick={() => setActiveSubTab('translate')}
                   className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                 >
-                  Ir para Documento
+                  Ir to Documento
                 </button>
               </div>
             </div>
@@ -7388,7 +7388,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       /* Priority 3: Show textarea to paste/upload */
                       <textarea
                         className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Cole o texto original aqui para fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima para extrair texto de PDF/imagem"
+                        placeholder="Cole o texto original aqui to fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima to extrair texto de PDF/imagem"
                         onChange={(e) => {
                           const text = e.target.value;
                           if (text.trim()) {
@@ -7441,10 +7441,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </button>
                 </div>
 
-                {/* Error Display */}
-                {proofreadingError && (
+                {/* Errorr Display */}
+                {proofreadingErrorr && (
                   <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
-                    ❌ {proofreadingError}
+                    ❌ {proofreadingErrorr}
                   </div>
                 )}
 
@@ -7488,7 +7488,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </span>
                     </div>
 
-                    {/* Errors Table */}
+                    {/* Errorrs Table */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                       <div>
                         {/* Apply All Button */}
@@ -7519,7 +7519,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const severity = erro.severidade || erro.gravidade || 'MÉDIO';
                                 const errorType = erro.tipo || 'Geral';
                                 const originalText = erro.original || erro.traducao_errada || '';
-                                const foundText = erro.encontrado || erro.original || erro.traducao_errada || '';
+                                const foundText = erro.found || erro.original || erro.traducao_errada || '';
                                 const suggestionText = erro.sugestao || erro.correcao || '';
                                 const explanation = erro.explicacao || erro.descricao || '';
 
@@ -7574,11 +7574,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </div>
                     )}
 
-                    {/* No Errors Message */}
+                    {/* No Errorrs Message */}
                     {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && (
                       <div className="p-4 bg-green-100 border border-green-300 rounded text-center">
                         <span className="text-green-700 text-sm font-medium">
-                          ✅ Nenhum erro encontrado na tradução!
+                          ✅ No erro found na translation!
                         </span>
                       </div>
                     )}
@@ -7594,9 +7594,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
 
                 {/* Instructions when no result */}
-                {!proofreadingResult && !isProofreading && !proofreadingError && (
+                {!proofreadingResult && !isProofreading && !proofreadingErrorr && (
                   <p className="text-xs text-gray-500">
-                    Clique em "Run Proofreading" para analisar a tradução e identificar erros.
+                    Click em "Run Proofreading" to analyze a translation e identificar erros.
                   </p>
                 )}
               </div>
@@ -7663,12 +7663,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           ) : (
             <div className="text-center py-8 text-gray-500">
               <div className="text-4xl mb-2">🔍</div>
-              <p className="text-xs mb-4">Nenhuma tradução para revisar. Vá para a aba REVIEW para carregar uma tradução.</p>
+              <p className="text-xs mb-4">Noa translation to review. Go to a tab REVIEW to load a translation.</p>
               <button
                 onClick={() => setActiveSubTab('review')}
                 className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
               >
-                Ir para Review
+                Ir to Review
               </button>
             </div>
           )}
@@ -9236,7 +9236,7 @@ certidão de casamento | marriage certificate
 certidão de óbito | death certificate
 reconhecimento de firma | notarized signature
 autenticação | authentication
-tradução juramentada | certified translation`}
+translation juramentada | certified translation`}
                   className="w-full px-2 py-1.5 text-xs border rounded h-40 font-mono resize-y"
                 />
                 <div className="flex items-center justify-between mt-2">
@@ -9675,8 +9675,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const fetchOrders = async (page = currentPage) => {
     setLoading(true);
     try {
-      // Build query params for pagination
-      const params = new URLSearchParams({
+      // Build query toms for pagination
+      const toms = new URLSearchParams({
         admin_key: adminKey,
         page: page.toString(),
         limit: pageSize.toString()
@@ -9684,10 +9684,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       // Add filters if active
       if (statusFilter && statusFilter !== 'all') {
-        params.append('status', statusFilter);
+        toms.append('status', statusFilter);
       }
 
-      const response = await axios.get(`${API}/admin/orders?${params.toString()}`);
+      const response = await axios.get(`${API}/admin/orders?${toms.toString()}`);
       let allOrders = response.data.orders || [];
 
       // Update pagination state
@@ -9761,7 +9761,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setDeliveryTranslationHtml(orderData.translation_html || '');
     } catch (err) {
       console.error('Failed to fetch translation:', err);
-      setDeliveryTranslationHtml('<p style="color: red;">Erro ao carregar tradução</p>');
+      setDeliveryTranslationHtml('<p style="color: red;">Error ao load translation</p>');
     }
   };
 
@@ -9774,7 +9774,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
     try {
       await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`);
-      setDeliveryStatus('✅ Email enviado com sucesso!');
+      setDeliveryStatus('✅ Email sent successfully!');
       fetchOrders();
 
       // Close modal after success
@@ -9786,7 +9786,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }, 2000);
     } catch (err) {
       console.error('Failed to send email:', err);
-      setDeliveryStatus('❌ Erro ao enviar email: ' + (err.response?.data?.detail || err.message));
+      setDeliveryStatus('❌ Error ao enviar email: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeliverySending(false);
     }
@@ -9799,7 +9799,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to delete:', err);
-      alert('Erro ao deletar pedido');
+      alert('Error ao deletar pedido');
     }
   };
 
@@ -9901,7 +9901,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download translation:', err);
-      alert('Error downloading translation');
+      alert('Errorr downloading translation');
     }
   };
 
@@ -9931,10 +9931,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Refresh doc info
       const response = await axios.get(`${API}/admin/orders/${orderId}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
-      alert(`${fileList.length} arquivo(s) enviado(s) com sucesso!`);
+      alert(`${fileList.length} file(s) sent(s) successfully!`);
     } catch (err) {
       console.error('Failed to upload translation:', err);
-      alert('Erro ao enviar arquivo');
+      alert('Error ao enviar file');
     } finally {
       setUploadingFile(false);
     }
@@ -9956,17 +9956,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         attachments: attachmentsToSend
       });
 
-      let message = '✅ Email enviado para o cliente!\n\n';
+      let message = '✅ Email sent to o cliente!\n\n';
 
       if (response.data.attachments_sent > 0) {
-        message += `📎 ${response.data.attachments_sent} anexo(s) enviado(s)\n`;
+        message += `📎 ${response.data.attachments_sent} attachment(s) sent(s)\n`;
         if (response.data.attachment_filenames) {
           message += `   Arquivos: ${response.data.attachment_filenames.join(', ')}\n`;
         }
       } else if (response.data.attachment_sent) {
         message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
       } else {
-        message += '⚠️ Sem anexo (nenhum arquivo de tradução encontrado)\n';
+        message += '⚠️ Without attachment (nenhum file de translation found)\n';
         if (response.data.debug) {
           message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
         }
@@ -9987,7 +9987,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Erro ao enviar: ' + (err.response?.data?.detail || err.message));
+      alert('Error ao enviar: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingToClient(false);
     }
@@ -10022,7 +10022,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Error downloading document');
+      alert('Errorr downloading document');
     }
   };
 
@@ -10053,7 +10053,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload document:', err);
-      alert('Error uploading document');
+      alert('Errorr uploading document');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -10140,7 +10140,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload documents:', err);
-      alert('Error uploading documents');
+      alert('Errorr uploading documents');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -10159,7 +10159,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update notes:', err);
-      alert('Error updating notes');
+      alert('Errorr updating notes');
     }
   };
 
@@ -10184,10 +10184,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       // Also refresh from server to ensure consistency
       fetchOrders();
 
-      alert('✅ Projeto salvo com sucesso!');
+      alert('✅ Projeto salvo successfully!');
     } catch (err) {
       console.error('Failed to save project:', err);
-      alert('Error saving project: ' + (err.response?.data?.detail || err.message));
+      alert('Errorr saving project: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSavingProject(false);
     }
@@ -10290,7 +10290,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to add translator:', err);
-      alert(err.response?.data?.detail || 'Error creating translator');
+      alert(err.response?.data?.detail || 'Errorr creating translator');
     } finally {
       setAddingTranslator(false);
     }
@@ -10352,7 +10352,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to load review documents:', err);
-      alert('Error loading documents for review');
+      alert('Errorr loading documents for review');
     } finally {
       setLoadingReview(false);
     }
@@ -10374,7 +10374,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('Error approving translation');
+      alert('Errorr approving translation');
     } finally {
       setSubmittingReview(false);
     }
@@ -10400,7 +10400,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('Error requesting correction');
+      alert('Errorr requesting correction');
     } finally {
       setSubmittingReview(false);
     }
@@ -10437,7 +10437,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchNotifications();
     } catch (err) {
       console.error('Failed to assign translator:', err);
-      alert('Error sending assignment');
+      alert('Errorr sending assignment');
     } finally {
       setSendingAssignment(false);
     }
@@ -10595,8 +10595,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setDocumentFiles([]);
       fetchOrders();
     } catch (err) {
-      console.error('Error creating project:', err.response?.data || err);
-      const errorMsg = err.response?.data?.detail || 'Error creating project';
+      console.error('Errorr creating project:', err.response?.data || err);
+      const errorMsg = err.response?.data?.detail || 'Errorr creating project';
       alert(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
     } finally {
       setCreatingProject(false);
@@ -11047,7 +11047,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </div>
                       )}
                       {translator.status === 'available' && (
-                        <div className="mt-2 text-[10px] text-green-600">✓ Pronto para novos projetos</div>
+                        <div className="mt-2 text-[10px] text-green-600">✓ Ready to novos projects</div>
                       )}
                     </div>
                   ))}
@@ -11484,7 +11484,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     <button
                       onClick={() => viewOrderDocuments(order)}
                       className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-semibold"
-                      title="Ver documento original"
+                      title="Ver document original"
                     >
                       {order.order_number}
                     </button>
@@ -11536,7 +11536,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           onBlur={() => setAssigningPM(null)}
                         >
                           <option value="">Select...</option>
-                          {/* Use registered PMs from database, fallback to static list */}
+                          {/* Use registered PMs from dattabse, fallback to static list */}
                           {(pmList.length > 0 ? pmList : PROJECT_MANAGERS).map(pm => (
                             <option key={pm.id || pm.name} value={pm.name}>{pm.name}</option>
                           ))}
@@ -11571,7 +11571,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         onBlur={() => setAssigningTranslator(null)}
                       >
                         <option value="">Select...</option>
-                        {/* Use registered translators from database, fallback to static list */}
+                        {/* Use registered translators from dattabse, fallback to static list */}
                         {(translatorList.length > 0 ? translatorList : TRANSLATORS).map(t => (
                           <option key={t.id || t.name} value={t.name}>{t.name}</option>
                         ))}
@@ -12706,7 +12706,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Translated Document Status */}
               <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Tradução para Anexar:</div>
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Tradução to Anexar:</div>
                 {!translatedDocInfo ? (
                   <div className="text-center py-2 text-gray-500 text-[10px]">Carregando...</div>
                 ) : (
@@ -12788,9 +12788,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     {/* No attachments warning */}
                     {!translatedDocInfo.has_html_translation && additionalAttachments.length === 0 && (
                       <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <div className="text-[10px] text-yellow-800">⚠️ Nenhuma tradução anexada</div>
+                        <div className="text-[10px] text-yellow-800">⚠️ Noa translation anexada</div>
                         <div className="text-[9px] text-yellow-600 mt-1">
-                          Faça upload de arquivos abaixo ou complete a tradução no Workspace
+                          Faça upload de files tabixo ou complete a translation no Workspace
                         </div>
                       </div>
                     )}
@@ -12798,7 +12798,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     {/* Selection summary */}
                     {(translatedDocInfo.has_html_translation || additionalAttachments.length > 0) && (
                       <div className="p-1.5 bg-gray-100 rounded text-[9px] text-gray-600">
-                        📋 {(selectedAttachments.workspace && translatedDocInfo.has_html_translation ? 1 : 0) + selectedAttachments.uploaded.length} arquivo(s) selecionado(s) para envio
+                        📋 {(selectedAttachments.workspace && translatedDocInfo.has_html_translation ? 1 : 0) + selectedAttachments.uploaded.length} file(s) selecionado(s) to envio
                       </div>
                     )}
                   </div>
@@ -12824,7 +12824,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   htmlFor="translationFile"
                   className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
                 >
-                  {uploadingFile ? 'Enviando...' : '📁 Selecionar arquivo(s) (PDF, DOC, HTML)'}
+                  {uploadingFile ? 'Enviando...' : '📁 Selecionar file(s) (PDF, DOC, HTML)'}
                 </label>
                 <div className="text-[9px] text-gray-400 mt-1 text-center">
                   Para traduções feitas fora do sistema
@@ -12998,7 +12998,7 @@ const NewQuotePage = ({ adminKey, user }) => {
   const [sending, setSending] = useState(false);
   const [quote, setQuote] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
 
   const LANGUAGES = ['Portuguese', 'Spanish', 'English', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Russian'];
 
@@ -13064,12 +13064,12 @@ const NewQuotePage = ({ adminKey, user }) => {
   // Calculate quote
   const calculateQuote = () => {
     if (uploadedFiles.length === 0) {
-      setError('Please upload at least one document');
+      setErrorr('Please upload at least one document');
       return;
     }
 
     setCalculating(true);
-    setError('');
+    setErrorr('');
 
     // Calculate total pages (simplified - 1 page per file for now)
     const totalPages = uploadedFiles.length || 1;
@@ -13105,17 +13105,17 @@ const NewQuotePage = ({ adminKey, user }) => {
   // Send quote to client
   const sendQuote = async () => {
     if (!quote) {
-      setError('Please calculate the quote first');
+      setErrorr('Please calculate the quote first');
       return;
     }
 
     if (!formData.client_email || !formData.client_name) {
-      setError('Please fill in client name and email');
+      setErrorr('Please fill in client name and email');
       return;
     }
 
     setSending(true);
-    setError('');
+    setErrorr('');
 
     try {
       // Create order in backend
@@ -13153,11 +13153,11 @@ const NewQuotePage = ({ adminKey, user }) => {
         setUploadedFiles([]);
         setQuote(null);
       } else {
-        throw new Error(response.data.error || 'Failed to create quote');
+        throw new Errorr(response.data.error || 'Failed to create quote');
       }
     } catch (err) {
       console.error('Failed to send quote:', err);
-      setError(err.response?.data?.detail || err.message || 'Failed to send quote');
+      setErrorr(err.response?.data?.detail || err.message || 'Failed to send quote');
     } finally {
       setSending(false);
     }
@@ -13569,7 +13569,7 @@ const FollowupsPage = ({ adminKey }) => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [followupData, setFollowupData] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
 
   const fetchFollowupStatus = async () => {
     setLoading(true);
@@ -13577,7 +13577,7 @@ const FollowupsPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/quotes/followup-status?admin_key=${adminKey}`);
       setFollowupData(response.data);
     } catch (err) {
-      setError('Failed to load follow-up data');
+      setErrorr('Failed to load follow-up data');
       console.error(err);
     } finally {
       setLoading(false);
@@ -13589,7 +13589,7 @@ const FollowupsPage = ({ adminKey }) => {
     try {
       const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
       const result = response.data;
-      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrors: ${result.errors.length}` : ''}`);
+      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrorrs: ${result.errors.length}` : ''}`);
       fetchFollowupStatus();
     } catch (err) {
       alert('Failed to process follow-ups. Check console for details.');
@@ -13739,10 +13739,10 @@ const FollowupsPage = ({ adminKey }) => {
         )}
 
         {/* Abandoned Quotes Table */}
-        {followupData?.abandoned_quotes?.length > 0 && (
+        {followupData?.tabndoned_quotes?.length > 0 && (
           <div className="bg-white rounded-lg shadow">
             <div className="px-4 py-3 border-b bg-gray-50">
-              <h3 className="font-semibold text-gray-800">Abandoned Quotes ({followupData.abandoned_quotes.length})</h3>
+              <h3 className="font-semibold text-gray-800">Abandoned Quotes ({followupData.tabndoned_quotes.length})</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -13758,7 +13758,7 @@ const FollowupsPage = ({ adminKey }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {followupData.abandoned_quotes.map((quote, idx) => (
+                  {followupData.tabndoned_quotes.map((quote, idx) => (
                     <tr key={idx} className="border-t hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium">{quote.name}</td>
                       <td className="px-4 py-2 text-gray-600">{quote.email}</td>
@@ -13771,7 +13771,7 @@ const FollowupsPage = ({ adminKey }) => {
                           quote.status === 'recovered' ? 'bg-green-100 text-green-700' :
                           'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {quote.status || 'abandoned'}
+                          {quote.status || 'tabndoned'}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-600">{quote.next_action}</td>
@@ -13783,7 +13783,7 @@ const FollowupsPage = ({ adminKey }) => {
           </div>
         )}
 
-        {(!followupData?.quote_orders?.length && !followupData?.abandoned_quotes?.length) && (
+        {(!followupData?.quote_orders?.length && !followupData?.tabndoned_quotes?.length) && (
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <div className="text-6xl mb-4">✅</div>
             <h3 className="text-lg font-semibold text-gray-700">All caught up!</h3>
@@ -13921,7 +13921,7 @@ const SettingsPage = ({ adminKey }) => {
       else exportToJSON(exportData, 'projects');
       setExportProgress('✅ Projects exported!');
     } catch (err) {
-      setExportProgress('❌ Error exporting projects');
+      setExportProgress('❌ Errorr exporting projects');
       console.error(err);
     } finally {
       setExporting(false);
@@ -13958,7 +13958,7 @@ const SettingsPage = ({ adminKey }) => {
       else exportToJSON(clients, 'clients');
       setExportProgress('✅ Clients exported!');
     } catch (err) {
-      setExportProgress('❌ Error exporting clients');
+      setExportProgress('❌ Errorr exporting clients');
       console.error(err);
     } finally {
       setExporting(false);
@@ -13984,7 +13984,7 @@ const SettingsPage = ({ adminKey }) => {
       else exportToJSON(exportData, 'translators');
       setExportProgress('✅ Translators exported!');
     } catch (err) {
-      setExportProgress('❌ Error exporting translators');
+      setExportProgress('❌ Errorr exporting translators');
       console.error(err);
     } finally {
       setExporting(false);
@@ -14014,7 +14014,7 @@ const SettingsPage = ({ adminKey }) => {
       else exportToJSON(reportData, 'financial_report');
       setExportProgress('✅ Financial report exported!');
     } catch (err) {
-      setExportProgress('❌ Error exporting report');
+      setExportProgress('❌ Errorr exporting report');
       console.error(err);
     } finally {
       setExporting(false);
@@ -14054,7 +14054,7 @@ const SettingsPage = ({ adminKey }) => {
       exportToJSON(backupData, 'full_backup');
       setExportProgress('✅ Full backup created!');
     } catch (err) {
-      setExportProgress('❌ Error creating backup');
+      setExportProgress('❌ Errorr creating backup');
       console.error(err);
     } finally {
       setExporting(false);
@@ -14397,7 +14397,7 @@ const SettingsPage = ({ adminKey }) => {
 const TranslatorLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -14406,7 +14406,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrorr('');
     setLoading(true);
 
     try {
@@ -14414,7 +14414,7 @@ const TranslatorLogin = ({ onLogin }) => {
       if (response.data && response.data.token) {
         // Only allow translators to login here
         if (response.data.role !== 'translator') {
-          setError('This portal is for translators only. Please use the admin panel.');
+          setErrorr('This portal is for translators only. Please use the admin panel.');
           setLoading(false);
           return;
         }
@@ -14428,7 +14428,7 @@ const TranslatorLogin = ({ onLogin }) => {
         });
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid credentials');
+      setErrorr(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -14441,7 +14441,7 @@ const TranslatorLogin = ({ onLogin }) => {
       await axios.post(`${API}/admin/auth/forgot-password`, { email: resetEmail });
       setResetSent(true);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to send reset email');
+      setErrorr(err.response?.data?.detail || 'Failed to send reset email');
     } finally {
       setResetLoading(false);
     }
@@ -14527,7 +14527,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
                   <button
                     type="button"
-                    onClick={() => { setShowForgotPassword(false); setError(''); }}
+                    onClick={() => { setShowForgotPassword(false); setErrorr(''); }}
                     className="w-full py-3 text-gray-600 hover:text-gray-800 font-medium"
                   >
                     Back to Login
@@ -14578,7 +14578,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
               <div className="mt-6 text-center">
                 <button
-                  onClick={() => { setShowForgotPassword(true); setError(''); }}
+                  onClick={() => { setShowForgotPassword(true); setErrorr(''); }}
                   className="text-blue-600 hover:text-blue-700 text-sm hover:underline"
                 >
                   Forgot password?
@@ -14711,7 +14711,7 @@ const ReviewPage = ({ adminKey, user }) => {
           ]);
         }
       } catch (err) {
-        console.error('Error loading review data:', err);
+        console.error('Errorr loading review data:', err);
       } finally {
         setLoading(false);
       }
@@ -14744,7 +14744,7 @@ const ReviewPage = ({ adminKey, user }) => {
       setFullScreenReview(false);
       alert('Translation approved and sent to client!');
     } catch (err) {
-      alert('Error approving: ' + (err.response?.data?.detail || err.message));
+      alert('Errorr approving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -14763,7 +14763,7 @@ const ReviewPage = ({ adminKey, user }) => {
       setFullScreenReview(false);
       alert('Revision requested from translator!');
     } catch (err) {
-      alert('Error: ' + (err.response?.data?.detail || err.message));
+      alert('Errorr: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -14777,7 +14777,7 @@ const ReviewPage = ({ adminKey, user }) => {
       alert('Changes saved!');
       fetchPendingSubmissions();
     } catch (err) {
-      alert('Error saving: ' + (err.response?.data?.detail || err.message));
+      alert('Errorr saving: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSaving(false);
     }
@@ -15223,7 +15223,7 @@ const UsersPage = ({ adminKey, user }) => {
   const TRANSLATOR_DOC_TYPES = [
     { value: 'id_document', label: 'Documento de Identidade (RG/ID)' },
     { value: 'cpf', label: 'CPF' },
-    { value: 'address_proof', label: 'Comprovante de Residência' },
+    { value: 'address_proof', label: 'Proof de Residência' },
     { value: 'contract', label: 'Contrato de Prestação de Serviço' },
     { value: 'bank_info', label: 'Dados Bancários' },
     { value: 'certification', label: 'Certificação/Diploma' },
@@ -15236,7 +15236,7 @@ const UsersPage = ({ adminKey, user }) => {
       const response = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
       setUsers(response.data);
     } catch (err) {
-      console.error('Error fetching users:', err);
+      console.error('Errorr fetching users:', err);
     } finally {
       setLoading(false);
     }
@@ -15250,7 +15250,7 @@ const UsersPage = ({ adminKey, user }) => {
       const response = await axios.get(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`);
       setUserDocuments(prev => ({ ...prev, [userId]: response.data.documents || [] }));
     } catch (err) {
-      console.error('Error fetching user documents:', err);
+      console.error('Errorr fetching user documents:', err);
       setUserDocuments(prev => ({ ...prev, [userId]: [] }));
     }
   };
@@ -15290,10 +15290,10 @@ const UsersPage = ({ adminKey, user }) => {
       await fetchUsers();
       setEditingUser(null);
       setEditForm({});
-      alert('Perfil atualizado com sucesso!');
+      alert('Perfil atualizado successfully!');
     } catch (err) {
-      console.error('Error updating user:', err);
-      alert(err.response?.data?.detail || 'Erro ao atualizar perfil');
+      console.error('Errorr updating user:', err);
+      alert(err.response?.data?.detail || 'Error ao update perfil');
     } finally {
       setSavingUser(false);
     }
@@ -15311,10 +15311,10 @@ const UsersPage = ({ adminKey, user }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       await fetchUserDocuments(userId);
-      alert('Documento enviado com sucesso!');
+      alert('Documento sent successfully!');
     } catch (err) {
-      console.error('Error uploading document:', err);
-      alert('Erro ao enviar documento');
+      console.error('Errorr uploading document:', err);
+      alert('Error ao enviar document');
     } finally {
       setUploadingDoc(false);
     }
@@ -15329,20 +15329,20 @@ const UsersPage = ({ adminKey, user }) => {
       link.download = filename;
       link.click();
     } catch (err) {
-      console.error('Error downloading document:', err);
-      alert('Erro ao baixar documento');
+      console.error('Errorr downloading document:', err);
+      alert('Error ao baixar document');
     }
   };
 
   // Delete document
   const handleDeleteDocument = async (userId, docId) => {
-    if (!window.confirm('Excluir este documento?')) return;
+    if (!window.confirm('Excluir este document?')) return;
     try {
       await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
       await fetchUserDocuments(userId);
     } catch (err) {
-      console.error('Error deleting document:', err);
-      alert('Erro ao excluir documento');
+      console.error('Errorr deleting document:', err);
+      alert('Error ao excluir document');
     }
   };
 
@@ -15382,7 +15382,7 @@ const UsersPage = ({ adminKey, user }) => {
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+          alert('Link copiado! Envie to o usuário por WhatsApp ou outro meio.');
         }
       } else {
         alert(response.data?.message || 'User created!');
@@ -15392,7 +15392,7 @@ const UsersPage = ({ adminKey, user }) => {
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error creating user');
+      alert(err.response?.data?.detail || 'Errorr creating user');
     } finally {
       setCreating(false);
     }
@@ -15403,7 +15403,7 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.put(`${API}/admin/users/${userId}/toggle-active?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Error toggling user status');
+      alert('Errorr toggling user status');
     }
   };
 
@@ -15413,12 +15413,12 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.delete(`${API}/admin/users/${userId}?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Error deleting user');
+      alert('Errorr deleting user');
     }
   };
 
   const handleResendInvitation = async (userId, userName, userEmail) => {
-    if (!window.confirm(`Reenviar convite para "${userName}" (${userEmail})?`)) return;
+    if (!window.confirm(`Reenviar convite to "${userName}" (${userEmail})?`)) return;
     try {
       const response = await axios.post(`${API}/admin/auth/resend-invitation?admin_key=${adminKey}`, {
         user_id: userId
@@ -15433,13 +15433,13 @@ const UsersPage = ({ adminKey, user }) => {
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copiado! Envie para o usuário por WhatsApp ou outro meio.');
+          alert('Link copiado! Envie to o usuário por WhatsApp ou outro meio.');
         }
       } else {
-        alert(response.data?.message || 'Convite reenviado!');
+        alert(response.data?.message || 'Convite resent!');
       }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao reenviar convite');
+      alert(err.response?.data?.detail || 'Error ao reenviar convite');
     }
   };
 
@@ -15751,7 +15751,7 @@ const UsersPage = ({ adminKey, user }) => {
                               </div>
                             </div>
                             <div>
-                              <span className="text-gray-500 text-xs">Valor por Página:</span>
+                              <span className="text-gray-500 text-xs">Amount por Página:</span>
                               {editingUser === u.id ? (
                                 <input
                                   type="number"
@@ -15768,7 +15768,7 @@ const UsersPage = ({ adminKey, user }) => {
                               )}
                             </div>
                             <div>
-                              <span className="text-gray-500 text-xs">Valor por Palavra:</span>
+                              <span className="text-gray-500 text-xs">Amount por Palavra:</span>
                               {editingUser === u.id ? (
                                 <input
                                   type="number"
@@ -15836,7 +15836,7 @@ const UsersPage = ({ adminKey, user }) => {
                                   className="px-2 py-1.5 text-xs border rounded flex-1"
                                   defaultValue=""
                                 >
-                                  <option value="" disabled>Tipo de documento...</option>
+                                  <option value="" disabled>Tipo de document...</option>
                                   {TRANSLATOR_DOC_TYPES.map(dt => (
                                     <option key={dt.value} value={dt.value}>{dt.label}</option>
                                   ))}
@@ -15851,7 +15851,7 @@ const UsersPage = ({ adminKey, user }) => {
                                     onChange={(e) => {
                                       const docType = document.getElementById(`doc-type-${u.id}`).value;
                                       if (!docType) {
-                                        alert('Selecione o tipo de documento primeiro');
+                                        alert('Select o tipo de document first');
                                         e.target.value = '';
                                         return;
                                       }
@@ -15904,7 +15904,7 @@ const UsersPage = ({ adminKey, user }) => {
                             ) : (
                               <div className="text-center py-4 text-gray-400 text-xs">
                                 <div className="text-2xl mb-1">📭</div>
-                                Nenhum documento enviado
+                                No document sent
                               </div>
                             )}
                           </div>
@@ -15951,7 +15951,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/production/stats?admin_key=${adminKey}`);
       setStats(response.data.stats || []);
     } catch (err) {
-      console.error('Error fetching production stats:', err);
+      console.error('Errorr fetching production stats:', err);
     }
   };
 
@@ -15960,7 +15960,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments?admin_key=${adminKey}`);
       setPayments(response.data.payments || []);
     } catch (err) {
-      console.error('Error fetching payments:', err);
+      console.error('Errorr fetching payments:', err);
     }
   };
 
@@ -15969,7 +15969,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}&status=completed`);
       setTranslatorOrders(response.data.orders || []);
     } catch (err) {
-      console.error('Error fetching translator orders:', err);
+      console.error('Errorr fetching translator orders:', err);
     }
   };
 
@@ -16011,20 +16011,20 @@ const ProductionPage = ({ adminKey }) => {
       setShowPaymentModal(false);
       fetchStats();
       fetchPayments();
-      alert('Pagamento registrado com sucesso!');
+      alert('Payment registrado successfully!');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Erro ao registrar pagamento');
+      alert(err.response?.data?.detail || 'Error ao registrar pagamento');
     }
   };
 
   const handleMarkAsPaid = async (paymentId) => {
-    if (!window.confirm('Confirmar pagamento como realizado?')) return;
+    if (!window.confirm('Confirm pagamento como completed?')) return;
     try {
       await axios.put(`${API}/admin/payments/${paymentId}?admin_key=${adminKey}`, { status: 'paid' });
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Erro ao atualizar pagamento');
+      alert('Error ao update pagamento');
     }
   };
 
@@ -16035,7 +16035,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Error deleting payment');
+      alert('Errorr deleting payment');
     }
   };
 
@@ -16101,7 +16101,7 @@ const ProductionPage = ({ adminKey }) => {
                           onClick={(e) => { e.stopPropagation(); openPaymentModal(translator); }}
                           className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
                         >
-                          Registrar Pagamento
+                          Register Payment
                         </button>
                       )}
                     </div>
@@ -16223,7 +16223,7 @@ const ProductionPage = ({ adminKey }) => {
                             onClick={() => handleMarkAsPaid(payment.id)}
                             className="text-green-600 hover:text-green-800"
                           >
-                            Confirmar
+                            Confirm
                           </button>
                         )}
                         <button
@@ -16247,7 +16247,7 @@ const ProductionPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-bold text-gray-800">Registrar Pagamento</h3>
+              <h3 className="font-bold text-gray-800">Register Payment</h3>
               <button onClick={() => setShowPaymentModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
             <form onSubmit={handleCreatePayment} className="p-4 space-y-4">
@@ -16292,7 +16292,7 @@ const ProductionPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Valor por Página ($)</label>
+                  <label className="block text-xs text-gray-600 mb-1">Amount por Página ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -16311,7 +16311,7 @@ const ProductionPage = ({ adminKey }) => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Valor Total</label>
+                <label className="block text-xs text-gray-600 mb-1">Amount Total</label>
                 <input
                   type="text"
                   value={formatCurrency(paymentForm.total_amount)}
@@ -16320,7 +16320,7 @@ const ProductionPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Método de Pagamento</label>
+                <label className="block text-xs text-gray-600 mb-1">Método de Payment</label>
                 <select
                   value={paymentForm.payment_method}
                   onChange={(e) => setPaymentForm({...paymentForm, payment_method: e.target.value})}
@@ -16393,6 +16393,9 @@ const FinancesPage = ({ adminKey }) => {
   const [selectedTranslatorForPayment, setSelectedTranslatorForPayment] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentType, setPaymentType] = useState('translation');
+  const [commissionRate, setCommissionRate] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   // QuickBooks state
@@ -16440,7 +16443,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/finances/summary?admin_key=${adminKey}&period=${period}`);
       setSummary(response.data);
     } catch (err) {
-      console.error('Error fetching financial summary:', err);
+      console.error('Errorr fetching financial summary:', err);
     }
   };
 
@@ -16449,7 +16452,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
       setExpenses(response.data.expenses || []);
     } catch (err) {
-      console.error('Error fetching expenses:', err);
+      console.error('Errorr fetching expenses:', err);
     }
   };
 
@@ -16459,7 +16462,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payment-proofs?admin_key=${adminKey}${statusParam}`);
       setPaymentProofs(response.data.payment_proofs || []);
     } catch (err) {
-      console.error('Error fetching payment proofs:', err);
+      console.error('Errorr fetching payment proofs:', err);
     }
   };
 
@@ -16468,7 +16471,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payment-proofs/${proofId}?admin_key=${adminKey}`);
       setSelectedProof(response.data.payment_proof);
     } catch (err) {
-      console.error('Error fetching proof detail:', err);
+      console.error('Errorr fetching proof detail:', err);
     }
   };
 
@@ -16481,8 +16484,8 @@ const FinancesPage = ({ adminKey }) => {
       fetchPaymentProofs();
       alert(status === 'approved' ? 'Payment approved!' : 'Payment rejected');
     } catch (err) {
-      console.error('Error reviewing proof:', err);
-      alert('Error processing review');
+      console.error('Errorr reviewing proof:', err);
+      alert('Errorr processing review');
     }
   };
 
@@ -16492,7 +16495,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
       setTranslators(response.data || []);
     } catch (err) {
-      console.error('Error fetching translators:', err);
+      console.error('Errorr fetching translators:', err);
     }
   };
 
@@ -16501,7 +16504,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments/report?admin_key=${adminKey}`);
       setPaymentReport(response.data);
     } catch (err) {
-      console.error('Error fetching payment report:', err);
+      console.error('Errorr fetching payment report:', err);
     }
   };
 
@@ -16510,31 +16513,37 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments/translator/${translatorId}?admin_key=${adminKey}`);
       setTranslatorPayments(response.data.payments || []);
     } catch (err) {
-      console.error('Error fetching translator payments:', err);
+      console.error('Errorr fetching translator payments:', err);
     }
   };
 
   const handleRegisterPayment = async () => {
-    if (!selectedTranslatorForPayment || !paymentAmount) {
-      alert('Selecione um tradutor e informe o valor do pagamento');
+    if (!selectedTranslatorForPayment || !paymentAmount || !paymentMethod) {
+      alert('Please select a vendor, enter amount and payment method');
       return;
     }
     try {
       await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
         translator_id: selectedTranslatorForPayment._id,
         amount: parseFloat(paymentAmount),
-        note: paymentNote
+        note: paymentNote,
+        payment_method: paymentMethod,
+        payment_type: paymentType,
+        commission_rate: paymentType === 'sales_commission' ? parseFloat(commissionRate) : null
       });
-      alert('Pagamento registrado com sucesso!');
+      alert('Payment registered successfully!');
       setPaymentAmount('');
       setPaymentNote('');
+      setPaymentMethod('');
+      setPaymentType('translation');
+      setCommissionRate('');
       fetchTranslatorsForPayment();
       fetchPaymentReport();
       if (selectedTranslatorForPayment) {
         fetchTranslatorPaymentHistory(selectedTranslatorForPayment._id);
       }
     } catch (err) {
-      alert('Erro ao registrar pagamento: ' + (err.response?.data?.detail || err.message));
+      alert('Errorr registering payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -16566,6 +16575,16 @@ const FinancesPage = ({ adminKey }) => {
       setPartnerStats(response.data);
     } catch (err) {
       console.error('Failed to fetch partner statistics:', err);
+    }
+  };
+
+  const deletePartner = async (partnerId) => {
+    try {
+      await axios.delete(`${API}/admin/partners/${partnerId}?admin_key=${adminKey}`);
+      alert('Partner deleted successfully');
+      fetchPartnerStats(); // Refresh the list
+    } catch (err) {
+      alert('Errorr deleting partner: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -16639,7 +16658,7 @@ const FinancesPage = ({ adminKey }) => {
     if (activeView === 'payment-proofs') {
       fetchPaymentProofs();
     }
-    if (activeView === 'translator-payments') {
+    if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
       fetchPaymentReport();
     }
@@ -16658,7 +16677,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Error creating expense');
+      alert('Errorr creating expense');
     }
   };
 
@@ -16669,7 +16688,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Error deleting expense');
+      alert('Errorr deleting expense');
     }
   };
 
@@ -16685,7 +16704,7 @@ const FinancesPage = ({ adminKey }) => {
   // Simple Donut Chart Component
   const DonutChart = ({ data, total }) => {
     const items = Object.entries(data).filter(([_, v]) => v.amount > 0);
-    if (items.length === 0) return <div className="text-center text-gray-500 py-8">Sem dados</div>;
+    if (items.length === 0) return <div className="text-center text-gray-500 py-8">Without dados</div>;
 
     let currentAngle = 0;
     const segments = items.map(([key, value]) => {
@@ -16774,7 +16793,7 @@ const FinancesPage = ({ adminKey }) => {
               onClick={() => setActiveView('payment-proofs')}
               className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'payment-proofs' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              Comprovantes
+              Proofs
               {paymentProofs.filter(p => p.status === 'pending').length > 0 && (
                 <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                   {paymentProofs.filter(p => p.status === 'pending').length}
@@ -16782,10 +16801,10 @@ const FinancesPage = ({ adminKey }) => {
               )}
             </button>
             <button
-              onClick={() => setActiveView('translator-payments')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'translator-payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              onClick={() => setActiveView('pay-vendors')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'pay-vendors' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
-              💰 Pagar Tradutores
+              💰 Pay Vendors
             </button>
             <button
               onClick={() => setActiveView('quickbooks')}
@@ -16942,7 +16961,7 @@ const FinancesPage = ({ adminKey }) => {
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Categoria</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Descrição</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-600">Fornecedor</th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-600">Valor</th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
                   <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
                 </tr>
               </thead>
@@ -17010,7 +17029,7 @@ const FinancesPage = ({ adminKey }) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Valor ($)</label>
+                  <label className="block text-xs text-gray-600 mb-1">Amount ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -17113,7 +17132,7 @@ const FinancesPage = ({ adminKey }) => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Data</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Cliente</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Método</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Valor</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Amount</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Ações</th>
                 </tr>
@@ -17122,7 +17141,7 @@ const FinancesPage = ({ adminKey }) => {
                 {paymentProofs.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                      Nenhum comprovante encontrado
+                      No comprovante found
                     </td>
                   </tr>
                 ) : (
@@ -17189,7 +17208,7 @@ const FinancesPage = ({ adminKey }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800">Comprovante de Pagamento</h3>
+              <h3 className="font-bold text-gray-800">Proof de Payment</h3>
               <button onClick={() => setSelectedProof(null)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[calc(90vh-200px)]">
@@ -17204,7 +17223,7 @@ const FinancesPage = ({ adminKey }) => {
                   )}
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500">Pagamento</label>
+                  <label className="text-xs text-gray-500">Payment</label>
                   <div className="font-medium">
                     <span className={`inline-flex items-center px-2 py-1 rounded text-sm ${
                       selectedProof.payment_method === 'pix'
@@ -17228,7 +17247,7 @@ const FinancesPage = ({ adminKey }) => {
 
               {/* Proof Image/PDF */}
               <div className="mb-4">
-                <label className="text-xs text-gray-500 block mb-2">Comprovante ({selectedProof.proof_filename})</label>
+                <label className="text-xs text-gray-500 block mb-2">Proof ({selectedProof.proof_filename})</label>
                 <div className="border rounded-lg overflow-hidden bg-gray-100">
                   {selectedProof.proof_file_type?.startsWith('image/') ? (
                     <img
@@ -17250,7 +17269,7 @@ const FinancesPage = ({ adminKey }) => {
                     </div>
                   ) : (
                     <div className="p-4 text-center text-gray-500">
-                      Formato não suportado para visualização
+                      Formato não suportado to visualização
                     </div>
                   )}
                 </div>
@@ -17292,7 +17311,7 @@ const FinancesPage = ({ adminKey }) => {
                   onClick={() => reviewProof(selectedProof.id, 'approved')}
                   className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 >
-                  Aprovar Pagamento
+                  Approve Payment
                 </button>
               </div>
             )}
@@ -17300,129 +17319,201 @@ const FinancesPage = ({ adminKey }) => {
         </div>
       )}
 
-      {/* Translator Payments View */}
-      {activeView === 'translator-payments' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Translators List */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">👥 Tradutores</h2>
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {translators.length === 0 ? (
-                <p className="text-gray-500 text-sm">Nenhum tradutor encontrado.</p>
-              ) : (
-                translators.map((translator) => (
-                  <div
-                    key={translator._id}
-                    onClick={() => {
-                      setSelectedTranslatorForPayment(translator);
-                      fetchTranslatorPaymentHistory(translator._id);
-                    }}
-                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                      selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-medium text-sm">{translator.name}</div>
-                        <div className="text-xs text-gray-500">{translator.email}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-gray-500">Páginas pendentes</div>
-                        <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>Taxa: ${translator.rate_per_page || 25}/página</span>
-                      <span className="font-medium text-green-600">
-                        Total: ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
+      {/* Pay Vendors View */}
+      {activeView === 'pay-vendors' && (
+        <div className="space-y-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Pending</div>
+              <div className="text-2xl font-bold text-yellow-600">${paymentReport?.total_pending?.toFixed(2) || '0.00'}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Paid This Month</div>
+              <div className="text-2xl font-bold text-green-600">${paymentReport?.total_paid_month?.toFixed(2) || '0.00'}</div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Vendors</div>
+              <div className="text-2xl font-bold text-gray-800">{translators.length}</div>
             </div>
           </div>
 
-          {/* Payment Form & History */}
-          <div className="space-y-4">
-            {/* Payment Form */}
-            {selectedTranslatorForPayment && (
-              <div className="bg-white rounded-lg shadow p-4">
-                <h2 className="text-sm font-bold text-gray-700 mb-3">💳 Registrar Pagamento: {selectedTranslatorForPayment.name}</h2>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Valor do Pagamento ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      className="w-full border rounded p-2 text-sm"
-                      placeholder={`Sugerido: $${((selectedTranslatorForPayment.pending_payment_pages || 0) * (selectedTranslatorForPayment.rate_per_page || 25)).toFixed(2)}`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Nota (opcional)</label>
-                    <textarea
-                      value={paymentNote}
-                      onChange={(e) => setPaymentNote(e.target.value)}
-                      className="w-full border rounded p-2 text-sm"
-                      rows={2}
-                      placeholder="Referência de pagamento, período, etc."
-                    />
-                  </div>
-                  <button
-                    onClick={handleRegisterPayment}
-                    className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
-                  >
-                    ✅ Registrar Pagamento
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Payment History */}
-            {selectedTranslatorForPayment && (
-              <div className="bg-white rounded-lg shadow p-4">
-                <h2 className="text-sm font-bold text-gray-700 mb-3">📜 Histórico de Pagamentos</h2>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {translatorPayments.length === 0 ? (
-                    <p className="text-gray-500 text-sm">Nenhum pagamento registrado.</p>
-                  ) : (
-                    translatorPayments.map((payment, idx) => (
-                      <div key={idx} className="p-2 border rounded text-sm">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium text-green-600">${payment.amount.toFixed(2)}</span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(payment.paid_at).toLocaleDateString('en-US')}
-                          </span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Vendors List */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h2 className="text-sm font-bold text-gray-700 mb-3">👥 Vendors / Contractors</h2>
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {translators.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No vendors found.</p>
+                ) : (
+                  translators.map((translator) => (
+                    <div
+                      key={translator._id}
+                      onClick={() => {
+                        setSelectedTranslatorForPayment(translator);
+                        fetchTranslatorPaymentHistory(translator._id);
+                      }}
+                      className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
+                        selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-sm">{translator.name}</div>
+                          <div className="text-xs text-gray-500">{translator.email}</div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            {translator.role === 'translator' ? '📝 Translator' : translator.role === 'sales' ? '💼 Sales' : '👤 ' + (translator.role || 'Vendor')}
+                          </div>
                         </div>
-                        {payment.note && (
-                          <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
-                        )}
+                        <div className="text-right">
+                          <div className="text-xs text-gray-500">Pending Pages</div>
+                          <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
+                          <div className="text-xs text-green-600 font-medium">
+                            ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
+                          </div>
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    </div>
+                  ))
+                )}
               </div>
-            )}
+            </div>
 
-            {/* Payment Report Summary */}
-            {paymentReport && (
-              <div className="bg-white rounded-lg shadow p-4">
-                <h2 className="text-sm font-bold text-gray-700 mb-3">📊 Resumo Geral</h2>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="p-3 bg-yellow-50 rounded">
-                    <div className="text-xs text-gray-500">Total Pendente</div>
-                    <div className="font-bold text-xl text-yellow-600">${paymentReport.total_pending?.toFixed(2) || '0.00'}</div>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded">
-                    <div className="text-xs text-gray-500">Total Pago (Mês)</div>
-                    <div className="font-bold text-xl text-green-600">${paymentReport.total_paid_month?.toFixed(2) || '0.00'}</div>
+            {/* Payment Form & History */}
+            <div className="space-y-4">
+              {/* Payment Form */}
+              {selectedTranslatorForPayment ? (
+                <div className="bg-white rounded-lg shadow p-4">
+                  <h2 className="text-sm font-bold text-gray-700 mb-3">💳 Register Payment: {selectedTranslatorForPayment.name}</h2>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          className="w-full border rounded p-2 text-sm"
+                          placeholder={`Suggested: $${((selectedTranslatorForPayment.pending_payment_pages || 0) * (selectedTranslatorForPayment.rate_per_page || 25)).toFixed(2)}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Payment Method</label>
+                        <select
+                          value={paymentMethod || ''}
+                          onChange={(e) => setPaymentMethod(e.target.value)}
+                          className="w-full border rounded p-2 text-sm"
+                        >
+                          <option value="">Select method...</option>
+                          <option value="zelle">Zelle</option>
+                          <option value="pix">Pix</option>
+                          <option value="wise">Wise</option>
+                          <option value="western_union">Western Union</option>
+                          <option value="paypal">PayPal</option>
+                          <option value="bank_transfer">Bank Transfer</option>
+                          <option value="check">Check</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Payment Type</label>
+                      <select
+                        value={paymentType || 'translation'}
+                        onChange={(e) => setPaymentType(e.target.value)}
+                        className="w-full border rounded p-2 text-sm"
+                      >
+                        <option value="translation">Translation Payment</option>
+                        <option value="sales_commission">Sales Commission</option>
+                        <option value="bonus">Bonus</option>
+                        <option value="reimbursement">Reimbursement</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    {paymentType === 'sales_commission' && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Commission Rate (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={commissionRate || ''}
+                          onChange={(e) => setCommissionRate(e.target.value)}
+                          className="w-full border rounded p-2 text-sm"
+                          placeholder="e.g., 10 for 10%"
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Note (optional)</label>
+                      <textarea
+                        value={paymentNote}
+                        onChange={(e) => setPaymentNote(e.target.value)}
+                        className="w-full border rounded p-2 text-sm"
+                        rows={2}
+                        placeholder="Payment reference, period, order numbers..."
+                      />
+                    </div>
+                    <button
+                      onClick={handleRegisterPayment}
+                      disabled={!paymentAmount || !paymentMethod}
+                      className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      ✅ Register Payment
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="bg-white rounded-lg shadow p-8 text-center">
+                  <div className="text-4xl mb-3">👈</div>
+                  <p className="text-gray-500">Select a vendor to register payment</p>
+                </div>
+              )}
+
+              {/* Payment History */}
+              {selectedTranslatorForPayment && (
+                <div className="bg-white rounded-lg shadow p-4">
+                  <h2 className="text-sm font-bold text-gray-700 mb-3">📜 Payment History</h2>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {translatorPayments.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-4">No payments recorded yet.</p>
+                    ) : (
+                      translatorPayments.map((payment, idx) => (
+                        <div key={idx} className="p-3 border rounded text-sm hover:bg-gray-50">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-green-600">${payment.amount.toFixed(2)}</span>
+                              {payment.payment_method && (
+                                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                                  {payment.payment_method === 'zelle' ? 'Zelle' :
+                                   payment.payment_method === 'pix' ? 'Pix' :
+                                   payment.payment_method === 'wise' ? 'Wise' :
+                                   payment.payment_method === 'western_union' ? 'Western Union' :
+                                   payment.payment_method === 'paypal' ? 'PayPal' :
+                                   payment.payment_method === 'bank_transfer' ? 'Bank Transfer' :
+                                   payment.payment_method === 'check' ? 'Check' :
+                                   payment.payment_method}
+                                </span>
+                              )}
+                              {payment.payment_type && payment.payment_type !== 'translation' && (
+                                <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
+                                  {payment.payment_type === 'sales_commission' ? 'Commission' : payment.payment_type}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {new Date(payment.paid_at).toLocaleDateString('en-US')}
+                            </span>
+                          </div>
+                          {payment.note && (
+                            <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -17595,12 +17686,13 @@ const FinancesPage = ({ adminKey }) => {
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Pending</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {partnerStats.partners?.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
                         No partner orders found
                       </td>
                     </tr>
@@ -17629,6 +17721,19 @@ const FinancesPage = ({ adminKey }) => {
                         <td className="px-4 py-3 text-right font-bold text-gray-800">
                           {formatCurrency(partner.total_received + partner.total_pending)}
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
+                                deletePartner(partner.partner_id);
+                              }
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete partner"
+                          >
+                            🗑️
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -17646,7 +17751,7 @@ const FinancesPage = ({ adminKey }) => {
 const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -17678,7 +17783,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         const response = await axios.get(`${API}/admin/auth/verify-invitation?token=${inviteToken}`);
         setUserInfo(response.data.user);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Invalid or expired invitation link');
+        setErrorr(err.response?.data?.detail || 'Invalid or expired invitation link');
       } finally {
         setVerifying(false);
       }
@@ -17688,15 +17793,15 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 
   const handlePasswordStep = (e) => {
     e.preventDefault();
-    setError('');
+    setErrorr('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setErrorr('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setErrorr('Password must be at least 6 characters');
       return;
     }
 
@@ -17709,21 +17814,21 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   };
 
   const handleFinalSubmit = async () => {
-    setError('');
+    setErrorr('');
 
     // Validate terms acceptance for translators and PMs
     if (requiresTerms) {
       if (!acceptedTerms) {
-        setError('You must accept the terms and conditions');
+        setErrorr('You must accept the terms and conditions');
         return;
       }
       if (!acceptedProhibitedUse) {
-        setError('You must accept the prohibited use clause');
+        setErrorr('You must accept the prohibited use clause');
         return;
       }
       // Ethics only required for translators
       if (isTranslator && !acceptedEthics) {
-        setError('You must accept the translator ethics guidelines');
+        setErrorr('You must accept the translator ethics guidelines');
         return;
       }
     }
@@ -17760,7 +17865,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       setSuccess('Account set up successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to set up account');
+      setErrorr(err.response?.data?.detail || 'Failed to set up account');
     } finally {
       setLoading(false);
     }
@@ -17841,7 +17946,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     onChange={(e) => setLanguagePairs(e.target.value)}
                     placeholder="e.g. EN-PT, EN-ES, PT-EN"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Separate multiple pairs with commas</p>
+                  <p className="text-xs text-gray-500 mt-1">Setote multiple pairs with commas</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -18159,7 +18264,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 const ResetPasswordPage = ({ resetToken, onComplete }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setErrorr] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(true);
@@ -18171,7 +18276,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
         await axios.get(`${API}/admin/auth/verify-reset-token?token=${resetToken}`);
         setTokenValid(true);
       } catch (err) {
-        setError(err.response?.data?.detail || 'Invalid or expired reset link');
+        setErrorr(err.response?.data?.detail || 'Invalid or expired reset link');
       } finally {
         setVerifying(false);
       }
@@ -18181,15 +18286,15 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setErrorr('');
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setErrorr('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setErrorr('Password must be at least 6 characters');
       return;
     }
 
@@ -18202,7 +18307,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
       setSuccess('Password reset successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to reset password');
+      setErrorr(err.response?.data?.detail || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -18335,7 +18440,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Proofreading state
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
-  const [proofreadingError, setProofreadingError] = useState('');
+  const [proofreadingErrorr, setProofreadingErrorr] = useState('');
 
   const [stats, setStats] = useState({
     totalProjects: 0,
@@ -18417,7 +18522,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       tagline: 'Serviços Profissionais de Tradução Juramentada',
       quoteNumber: 'Orçamento #',
       date: 'Data',
-      validUntil: 'Válido Até',
+      validUntil: 'Golido Até',
       clientInfo: 'Informações do Cliente',
       name: 'Nome',
       email: 'E-mail',
@@ -18432,7 +18537,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       normal: 'Normal (2-3 dias úteis)',
       priority: 'Prioritário (24 horas)',
       urgent: 'Urgente (12 horas)',
-      pricing: 'Valores',
+      pricing: 'Amountes',
       pages: 'Número de Páginas',
       pricePerPage: 'Preço por Página',
       subtotal: 'Subtotal',
@@ -18453,7 +18558,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       tagline: 'Servicios Profesionales de Traducción Certificada',
       quoteNumber: 'Cotización #',
       date: 'Fecha',
-      validUntil: 'Válido Hasta',
+      validUntil: 'Golido Hasta',
       clientInfo: 'Información del Cliente',
       name: 'Nombre',
       email: 'Correo Electrónico',
@@ -18500,7 +18605,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Send quote via email
   const sendQuoteEmail = async () => {
     if (!quoteForm.clientEmail) {
-      alert('Por favor, informe o email do cliente.');
+      alert('Please enter the client email.');
       return;
     }
     setSendingQuote(true);
@@ -18523,11 +18628,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         }
       });
 
-      alert(`✅ Orçamento enviado com sucesso para ${quoteForm.clientEmail}!`);
+      alert(`✅ Orçamento sent successfully to ${quoteForm.clientEmail}!`);
       setShowQuotePreview(false);
     } catch (err) {
       console.error('Failed to send quote:', err);
-      alert('❌ Erro ao enviar orçamento. Tente novamente.');
+      alert('❌ Error ao enviar orçamento. Tente novamente.');
     } finally {
       setSendingQuote(false);
     }
@@ -18666,7 +18771,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Error downloading document');
+      alert('Errorr downloading document');
     }
   };
 
@@ -18774,7 +18879,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           htmlContent = result.value;
         } catch (err) {
           console.error('Word conversion error:', err);
-          alert(`Error converting Word document: ${file.name}`);
+          alert(`Errorr converting Word document: ${file.name}`);
         }
       }
       // Plain text
@@ -18906,8 +19011,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           } else {
             templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
           }
-          return templateParagraphs.map(paragraph => {
-            const processedParagraph = paragraph
+          return templateParagraphs.map(tograph => {
+            const processedParagraph = tograph
               .replace(/\{\{sourceLanguage\}\}/g, order?.source_language || sourceLanguage || 'Portuguese')
               .replace(/\{\{targetLanguage\}\}/g, order?.target_language || targetLanguage || 'English');
             return `<p class="body-text">${processedParagraph}</p>`;
@@ -18978,7 +19083,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
     </div>`;
     }
-    // Priority 2: translatedContent from PM Dashboard (loaded from database)
+    // Priority 2: translatedContent from PM Dashboard (loaded from dattabse)
     else if (translatedContent && pmTranslationFiles.length === 0) {
       const translationHTML = translatedContent.html || translatedContent.data || '';
       translationPagesHTML = `
@@ -19330,7 +19435,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert(alertMessage);
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('❌ Erro ao aprovar tradução');
+      alert('❌ Error ao aprovar translation');
     } finally {
       setSendingAction(false);
     }
@@ -19362,7 +19467,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           from: user?.name,
           to: translator.name,
           toId: translator.id,
-          content: `📝 Correção necessária para ${selectedReview.order_number}:\n${correctionNotes}`,
+          content: `📝 Correção necessária to ${selectedReview.order_number}:\n${correctionNotes}`,
           timestamp: new Date().toISOString(),
           read: false,
           type: 'correction'
@@ -19385,7 +19490,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert('📨 Solicitação de correção enviada ao tradutor!');
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('❌ Erro ao solicitar correção');
+      alert('❌ Error ao solicitar correção');
     } finally {
       setSendingAction(false);
     }
@@ -19394,7 +19499,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Execute automatic proofreading
   const executeProofreading = async () => {
     if (!selectedReview || !translatedContent) {
-      setProofreadingError('Nenhuma tradução selecionada para revisão.');
+      setProofreadingErrorr('Noa translation selected to review.');
       return;
     }
 
@@ -19414,17 +19519,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       try {
         translatedText = atob(translatedContent.data);
       } catch (e) {
-        translatedText = 'Não foi possível extrair texto da tradução';
+        translatedText = 'Não foi possível extrair texto da translation';
       }
     }
 
     if (!translatedText.trim()) {
-      setProofreadingError('Não foi possível extrair o texto da tradução para revisão.');
+      setProofreadingErrorr('Não foi possível extrair o texto da translation to review.');
       return;
     }
 
     setIsProofreading(true);
-    setProofreadingError('');
+    setProofreadingErrorr('');
     setProofreadingResult(null);
 
     try {
@@ -19432,7 +19537,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const claudeApiKey = localStorage.getItem('claude_api_key') || '';
 
       if (!claudeApiKey) {
-        setProofreadingError('Chave API do Claude não configurada. Configure em Configurações.');
+        setProofreadingErrorr('Chave API do Claude não configurada. Configure em Configurações.');
         setIsProofreading(false);
         return;
       }
@@ -19449,11 +19554,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       if (response.data.proofreading_result) {
         setProofreadingResult(response.data.proofreading_result);
       } else if (response.data.raw_response) {
-        setProofreadingError(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
+        setProofreadingErrorr(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
       }
     } catch (error) {
       console.error('Proofreading error:', error);
-      setProofreadingError(error.response?.data?.detail || error.message || 'Erro ao executar revisão automática');
+      setProofreadingErrorr(error.response?.data?.detail || error.message || 'Error ao executar review automática');
     } finally {
       setIsProofreading(false);
     }
@@ -19798,7 +19903,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
                     className="w-full px-2 py-1.5 text-xs border rounded"
                     rows="2"
-                    placeholder="Observações adicionais para o orçamento..."
+                    placeholder="Observações adicionais to o orçamento..."
                   />
                 </div>
 
@@ -20372,15 +20477,15 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         Analisando...
                       </>
                     ) : (
-                      <>🔍 Executar Proofreading</>
+                      <>🔍 Run Proofreading</>
                     )}
                   </button>
                 </div>
 
-                {/* Error Message */}
-                {proofreadingError && (
+                {/* Errorr Message */}
+                {proofreadingErrorr && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded mb-3">
-                    <p className="text-xs text-red-600">❌ {proofreadingError}</p>
+                    <p className="text-xs text-red-600">❌ {proofreadingErrorr}</p>
                   </div>
                 )}
 
@@ -20400,7 +20505,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                            '❌ REPROVADO'}
                         </span>
                         <span className="text-xs text-gray-600">
-                          {proofreadingResult.resumo?.total_erros || 0} erro(s) encontrado(s)
+                          {proofreadingResult.resumo?.total_erros || 0} erro(s) found(s)
                         </span>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-[10px]">
@@ -20423,7 +20528,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
                     </div>
 
-                    {/* Error List */}
+                    {/* Errorr List */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                       <div className="max-h-60 overflow-y-auto border rounded">
                         <table className="w-full text-[10px]">
@@ -20446,7 +20551,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               }`}>
                                 <td className="p-2">{erro.tipo}</td>
                                 <td className="p-2 font-mono">{erro.original || '-'}</td>
-                                <td className="p-2 font-mono text-red-600">{erro.encontrado || '-'}</td>
+                                <td className="p-2 font-mono text-red-600">{erro.found || '-'}</td>
                                 <td className="p-2 font-mono text-green-600">{erro.sugerido || '-'}</td>
                                 <td className="p-2 text-center">
                                   <span className={`px-1 py-0.5 rounded text-white ${
@@ -20480,9 +20585,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 )}
 
                 {/* No review yet message */}
-                {!proofreadingResult && !proofreadingError && !isProofreading && (
+                {!proofreadingResult && !proofreadingErrorr && !isProofreading && (
                   <div className="text-center py-4 text-gray-400 text-xs">
-                    Clique em "Executar Proofreading" para analisar a tradução automaticamente
+                    Click em "Run Proofreading" to analyze a translation automatically
                   </div>
                 )}
               </div>
@@ -20585,7 +20690,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
                     <div className="text-xs text-gray-600">{order.client_name}</div>
                     <div className="text-[10px] text-gray-500">
-                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'Sem tradutor'}
+                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'Without tradutor'}
                     </div>
                   </div>
                   <div className="text-right">
@@ -20614,7 +20719,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {getUpcomingDeadlines().length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-4xl mb-2">📅</div>
-                  <p>Nenhum prazo pendente</p>
+                  <p>No deadline pending</p>
                 </div>
               )}
             </div>
@@ -20737,12 +20842,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'messages' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Tradutores</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Translatores</h3>
 
             <div className="grid grid-cols-3 gap-4">
               {/* Translator List */}
               <div className="border rounded-lg p-3">
-                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Tradutor</h4>
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Translator</h4>
                 <div className="space-y-1 max-h-80 overflow-y-auto">
                   {translators.length > 0 ? (
                     translators.map(translator => (
@@ -20761,8 +20866,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     ))
                   ) : (
                     <div className="text-center py-4 text-gray-400 text-xs">
-                      <p>Nenhum tradutor cadastrado.</p>
-                      <p className="mt-1">Cadastre tradutores na aba "Translators".</p>
+                      <p>No tradutor registered.</p>
+                      <p className="mt-1">Register translators na tab "Translators".</p>
                     </div>
                   )}
                 </div>
@@ -20797,7 +20902,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         ))}
                       {messages.filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name).length === 0 && (
                         <div className="text-center py-8 text-gray-400 text-xs">
-                          Nenhuma mensagem ainda
+                          Noa message yet
                         </div>
                       )}
                     </div>
@@ -20809,7 +20914,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                        placeholder="Digite sua mensagem..."
+                        placeholder="Digite sua message..."
                         className="flex-1 px-3 py-2 border rounded text-xs"
                       />
                       <button
@@ -20824,7 +20929,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <div className="h-full flex items-center justify-center text-gray-400">
                     <div className="text-center">
                       <div className="text-3xl mb-2">👈</div>
-                      <p className="text-xs">Selecione um tradutor para iniciar conversa</p>
+                      <p className="text-xs">Select um tradutor to iniciar conversa</p>
                     </div>
                   </div>
                 )}
@@ -20849,12 +20954,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
             {/* Content */}
             <div className="p-4 overflow-y-auto flex-1">
-              <p className="text-xs text-gray-500 mb-3">Selecione um tradutor para cada arquivo. Arquivos diferentes podem ser atribuídos a tradutores diferentes.</p>
+              <p className="text-xs text-gray-500 mb-3">Select um tradutor to cada file. Different files can be assigned to different translators diferentes.</p>
 
               {loadingProjectDocs ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
-                  Carregando arquivos...
+                  Carregando files...
                 </div>
               ) : projectDocuments.length > 0 ? (
                 <div className="space-y-3">
@@ -20882,7 +20987,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                       {/* Translator Assignment */}
                       <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
-                        <span className="text-xs text-gray-500">Atribuir para:</span>
+                        <span className="text-xs text-gray-500">Atribuir to:</span>
                         <select
                           value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
                           onChange={(e) => {
@@ -20893,7 +20998,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           }}
                           className="flex-1 px-2 py-1.5 text-xs border rounded bg-white"
                         >
-                          <option value="">-- Selecione o Tradutor --</option>
+                          <option value="">-- Select o Translator --</option>
                           {translators.map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
@@ -20908,7 +21013,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               ) : (
                 <div className="text-center py-8 text-gray-400">
                   <div className="text-4xl mb-2">📭</div>
-                  <p className="text-sm">Nenhum arquivo encontrado neste projeto</p>
+                  <p className="text-sm">No file found in this project</p>
                 </div>
               )}
             </div>
@@ -20941,7 +21046,7 @@ function AdminApp() {
   const inviteToken = urlParams.get('invite_token');
   const resetToken = urlParams.get('reset_token');
 
-  // Clear URL parameters after reading, but keep the #/admin hash
+  // Clear URL tometers after reading, but keep the #/admin hash
   const clearUrlParams = () => {
     window.history.replaceState({}, document.title, window.location.pathname + '#/admin');
   };
@@ -20963,7 +21068,7 @@ function AdminApp() {
             setActiveTab('translation');
           }
         } catch (e) {
-          console.error('Error parsing saved user:', e);
+          console.error('Errorr parsing saved user:', e);
         }
       }
     }
@@ -21069,7 +21174,7 @@ function AdminApp() {
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
                   >
-                    Abrir em nova aba ↗
+                    Abrir em nova tab ↗
                   </a>
                 </div>
               </div>

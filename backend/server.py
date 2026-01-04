@@ -4557,8 +4557,19 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to get payment history")
 
 @api_router.post("/admin/payments/register")
-async def register_payment(admin_key: str, translator_id: str = Body(...), amount: float = Body(...), pages_paid: int = Body(0), payment_method: str = Body(""), reference: str = Body(""), notes: str = Body("")):
-    """Register a payment made to a translator (admin only)"""
+async def register_payment(
+    admin_key: str,
+    translator_id: str = Body(...),
+    amount: float = Body(...),
+    pages_paid: int = Body(0),
+    payment_method: str = Body(""),
+    reference: str = Body(""),
+    notes: str = Body(""),
+    note: str = Body(""),  # Alternative field name
+    payment_type: str = Body("translation"),  # translation, sales_commission, bonus, reimbursement, other
+    commission_rate: float = Body(None)
+):
+    """Register a payment made to a vendor/contractor (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
@@ -4568,9 +4579,14 @@ async def register_payment(admin_key: str, translator_id: str = Body(...), amoun
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        # Find user (translator, sales, or any role)
+        translator = await db.admin_users.find_one({"id": translator_id})
         if not translator:
-            raise HTTPException(status_code=404, detail="Translator not found")
+            # Try by _id
+            translator = await db.admin_users.find_one({"_id": translator_id})
+        if not translator:
+            raise HTTPException(status_code=404, detail="Vendor not found")
+
         payment_id = str(uuid.uuid4())
         payment = {
             "id": payment_id,
@@ -4579,18 +4595,31 @@ async def register_payment(admin_key: str, translator_id: str = Body(...), amoun
             "amount": amount,
             "pages_paid": pages_paid,
             "payment_method": payment_method or translator.get("payment_method", ""),
+            "payment_type": payment_type,
+            "commission_rate": commission_rate,
             "reference": reference,
-            "notes": notes,
+            "notes": notes or note,  # Support both field names
+            "paid_at": datetime.utcnow(),
             "payment_date": datetime.utcnow(),
             "created_at": datetime.utcnow(),
             "status": "completed"
         }
         await db.translator_payments.insert_one(payment)
-        current_pending = translator.get("pages_pending_payment", 0) or 0
-        new_pending = max(0, current_pending - pages_paid)
-        await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_pending_payment": new_pending}})
-        logger.info(f"Payment registered: ${amount} to {translator.get('name')} for {pages_paid} pages")
-        return {"status": "success", "payment_id": payment_id, "message": f"Payment of ${amount:.2f} registered successfully", "new_pending_pages": new_pending}
+
+        # Only update pending pages for translation payments
+        new_pending = None
+        if payment_type == "translation" and pages_paid > 0:
+            current_pending = translator.get("pages_pending_payment", 0) or 0
+            new_pending = max(0, current_pending - pages_paid)
+            await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_pending_payment": new_pending}})
+
+        logger.info(f"Payment registered: ${amount} ({payment_type}) to {translator.get('name')} via {payment_method}")
+        return {
+            "status": "success",
+            "payment_id": payment_id,
+            "message": f"Payment of ${amount:.2f} registered successfully",
+            "new_pending_pages": new_pending
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -6285,6 +6314,45 @@ async def get_partner_statistics(admin_key: str):
             "total_pending": sum(p["total_pending"] for p in result)
         }
     }
+
+
+@api_router.delete("/admin/partners/{partner_id}")
+async def delete_partner(partner_id: str, admin_key: str):
+    """Delete a partner and optionally their orders (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Find the partner
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        partner_name = partner.get("company_name", partner.get("name", "Unknown"))
+
+        # Delete the partner
+        await db.partners.delete_one({"id": partner_id})
+
+        # Optionally mark their orders as orphaned (don't delete orders, just remove partner reference)
+        await db.translation_orders.update_many(
+            {"partner_id": partner_id},
+            {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+        )
+
+        logger.info(f"Partner deleted: {partner_name} (ID: {partner_id})")
+
+        return {
+            "status": "success",
+            "message": f"Partner '{partner_name}' deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting partner: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete partner")
+
 
 @api_router.get("/admin/orders/{order_id}")
 async def admin_get_single_order(order_id: str, admin_key: str):
