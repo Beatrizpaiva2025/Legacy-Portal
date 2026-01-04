@@ -20859,9 +20859,9 @@ function AdminApp() {
   const inviteToken = urlParams.get('invite_token');
   const resetToken = urlParams.get('reset_token');
 
-  // Clear URL parameters after reading
+  // Clear URL parameters after reading, but keep the #/admin hash
   const clearUrlParams = () => {
-    window.history.replaceState({}, document.title, window.location.pathname);
+    window.history.replaceState({}, document.title, window.location.pathname + '#/admin');
   };
 
   // Get current path
