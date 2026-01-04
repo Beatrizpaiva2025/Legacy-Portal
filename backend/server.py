@@ -66,6 +66,12 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Health check endpoint for Render to keep service alive
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and keeping service alive"""
+    return {"status": "healthy", "service": "legacy-portal-backend"}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -6387,10 +6393,10 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                         # Send email to translator with accept/decline links
                         if translator.get("email"):
                             try:
-                                # Build accept/decline URLs
-                                base_url = os.environ.get("API_BASE_URL", "https://legacy-portal.onrender.com")
-                                accept_url = f"{base_url}/api/translator/assignment/{assignment_token}/accept"
-                                decline_url = f"{base_url}/api/translator/assignment/{assignment_token}/decline"
+                                # Build accept/decline URLs - point to frontend for better UX (no cold start screen)
+                                frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+                                accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
+                                decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
 
                                 # Prepare order details for email
                                 deadline_str = "To be confirmed"
@@ -7287,6 +7293,67 @@ async def decline_translator_assignment(token: str):
 
     return HTMLResponse(content=get_assignment_response_page("declined", f"You have declined the assignment for project {order.get('order_number', '')}. The team will be notified to assign another translator."))
 
+# POST endpoints for frontend to call (returns JSON)
+@api_router.post("/translator/assignment/{token}/accept")
+async def accept_translator_assignment_api(token: str):
+    """Accept a translator assignment via frontend (returns JSON)"""
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
+
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "accepted",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_accepted",
+        title="Translator Accepted Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has ACCEPTED the assignment for project {order.get('order_number', order['id'])}.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return {"status": "accepted", "message": "Assignment accepted successfully", "order_number": order.get("order_number", "")}
+
+@api_router.post("/translator/assignment/{token}/decline")
+async def decline_translator_assignment_api(token: str):
+    """Decline a translator assignment via frontend (returns JSON)"""
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
+
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "declined",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_declined",
+        title="Translator Declined Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has DECLINED the assignment for project {order.get('order_number', order['id'])}. Please assign another translator.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return {"status": "declined", "message": "Assignment declined successfully", "order_number": order.get("order_number", "")}
+
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
     portal_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
@@ -7295,8 +7362,8 @@ def get_assignment_response_page(status: str, message: str) -> str:
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
-        # Auto-redirect to translator portal after 3 seconds
-        redirect_url = f"{portal_url}/#/translation-tool"
+        # Auto-redirect to admin panel after 3 seconds (translator will login there)
+        redirect_url = f"{portal_url}/#/admin"
         redirect_script = f'''
         <script>
             setTimeout(function() {{
@@ -7307,7 +7374,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         button_html = f'''
         <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Você será redirecionado automaticamente em 3 segundos...</p>
         <a href="{redirect_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Acessar Portal do Tradutor
+            🔐 Acessar Painel Admin
         </a>
         '''
     elif status == "declined":
@@ -7321,8 +7388,8 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#6c757d"
         title = "Already Responded"
         button_html = f'''
-        <a href="{portal_url}/#/translation-tool" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Acessar Portal do Tradutor
+        <a href="{portal_url}/#/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Painel Admin
         </a>
         '''
         redirect_script = ""
