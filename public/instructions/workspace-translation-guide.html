@@ -657,12 +657,17 @@ Formate a resposta de forma clara e organizada, usando títulos e bullets.
                     </pre>
                 </div>
 
-                <button class="ask-claude" onclick="copyPrompt()">
-                    📋 Copiar Prompt
-                </button>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <button class="ask-claude" onclick="copyPrompt()">
+                        📋 Copiar Prompt
+                    </button>
+                    <button class="ask-claude" onclick="copyAll()" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                        📄 Copiar Guia Completo
+                    </button>
+                </div>
 
                 <p style="color: #888; margin-top: 15px; font-size: 0.9rem;">
-                    * Cole este prompt no chat do MIA Bot ou em qualquer interface do Claude AI
+                    * Cole o prompt no chat do MIA Bot ou copie o guia completo para usar como referência
                 </p>
             </div>
         </div>
@@ -710,6 +715,242 @@ Formate a resposta de forma clara e organizada, usando títulos e bullets.`;
                 setTimeout(() => {
                     btn.textContent = '📋 Copiar Prompt';
                     btn.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                }, 2000);
+            });
+        }
+
+        function copyAll() {
+            const guiaCompleto = `═══════════════════════════════════════════════════════════════════
+                    GUIA DO WORKSPACE TRANSLATION
+                    Legacy Translations - Sistema de Tradução Profissional com IA
+═══════════════════════════════════════════════════════════════════
+
+📋 VISÃO GERAL DO SISTEMA
+─────────────────────────────────────────────────────────────────
+O Workspace Translation é uma ferramenta completa para tradução profissional
+de documentos, integrando inteligência artificial (Claude AI) para OCR e
+tradução automática. O sistema guia o tradutor através de um fluxo de
+trabalho estruturado em 8 abas, desde o upload do documento até a entrega
+final com carta de certificação.
+
+FLUXO DE TRABALHO:
+📋 START → 📝 TRANSLATION → ✏️ REVIEW → 🔍 PROOFREADING → 📤 DELIVER
+
+═══════════════════════════════════════════════════════════════════
+                    AS 8 ABAS DO SISTEMA
+═══════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────┐
+│  1. START - Configuração Inicial                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  🔑 Configuração da API Key                                      │
+│     Configure sua chave de API do Claude para habilitar          │
+│     tradução e OCR com inteligência artificial.                  │
+│                                                                  │
+│  📖 Guia de Início Rápido                                        │
+│     Instruções passo a passo para começar a traduzir.            │
+│                                                                  │
+│  ⚙️ Configurações de Projeto                                     │
+│     • Número do pedido                                           │
+│     • Tipo de documento                                          │
+│     • Idioma de origem/destino                                   │
+│     • Seleção do tradutor                                        │
+│                                                                  │
+│  🏢 Logos da Empresa                                             │
+│     Upload de logos para carta de certificação:                  │
+│     logo esquerdo, logo ATA, e carimbo oficial.                  │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  2. TRANSLATION - Upload e Tradução                              │
+├─────────────────────────────────────────────────────────────────┤
+│  📤 Upload de Documentos                                         │
+│     • Suporta JPG, PNG, PDF                                      │
+│     • Arrastar e soltar                                          │
+│     • Upload múltiplo                                            │
+│     • Visualização do original                                   │
+│                                                                  │
+│  🤖 Tradução com Claude AI                                       │
+│     Tradução automática usando inteligência artificial           │
+│     com preservação do layout original do documento.             │
+│                                                                  │
+│  👁️ Visualização Lado a Lado                                     │
+│     Veja o documento original e a tradução simultaneamente.      │
+│                                                                  │
+│  📄 Processamento em Lote                                        │
+│     Traduza múltiplos documentos de uma vez com navegação        │
+│     entre páginas e progresso em tempo real.                     │
+│                                                                  │
+│  💡 DICA: Para melhores resultados, use imagens de alta          │
+│     qualidade e selecione corretamente o tipo de documento.      │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  3. REVIEW - Revisão e Edição                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  📖 Modo Visualização                                            │
+│     Visualize a tradução formatada em HTML sem possibilidade     │
+│     de edição acidental.                                         │
+│                                                                  │
+│  ✍️ Modo Edição                                                  │
+│     • Editor visual WYSIWYG                                      │
+│     • Negrito, itálico, sublinhado                               │
+│     • Tamanho de fonte                                           │
+│     • Alinhamento de texto                                       │
+│                                                                  │
+│  🔧 Correções com IA                                             │
+│     Envie comandos em linguagem natural para o Claude            │
+│     corrigir a tradução automaticamente.                         │
+│     Ex: "Mude certificado para diploma"                          │
+│     Ex: "Corrija a formatação da tabela"                         │
+│                                                                  │
+│  💾 Download Individual                                          │
+│     Salve cada tradução individualmente ou baixe todas           │
+│     combinadas em um único arquivo HTML.                         │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  4. PROOFREADING - Revisão Final                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  ✅ Verificação de Qualidade                                     │
+│     Revisão final para garantir precisão e consistência.         │
+│                                                                  │
+│  📋 Checklist de Revisão                                         │
+│     • Verificar terminologia                                     │
+│     • Conferir formatação                                        │
+│     • Validar números e datas                                    │
+│     • Revisar nomes próprios                                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  5. DELIVER - Aprovação e Entrega                                │
+├─────────────────────────────────────────────────────────────────┤
+│  ✅ Checklist de Aprovação                                       │
+│     ☐ Carta de certificação incluída                             │
+│     ☐ Revisão final completa                                     │
+│     ☐ Logos e carimbo configurados                               │
+│                                                                  │
+│  📝 Carta de Certificação                                        │
+│     Geração automática de carta profissional com cabeçalho       │
+│     da empresa, certificação ATA, e assinatura do tradutor.      │
+│                                                                  │
+│  📥 Opções de Download                                           │
+│     • Download HTML completo                                     │
+│     • Imprimir/Salvar como PDF                                   │
+│     • Com ou sem carta de certificação                           │
+│                                                                  │
+│  📊 Enviar para Projetos                                         │
+│     Integração direta com o sistema de gerenciamento             │
+│     de projetos para atualização do status do pedido.            │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  6. GLOSSARIES - Glossários de Termos                            │
+├─────────────────────────────────────────────────────────────────┤
+│  📖 Criar Glossários                                             │
+│     • Nome personalizado                                         │
+│     • Par de idiomas                                             │
+│     • Campo/especialidade                                        │
+│     • Bidirecional (opcional)                                    │
+│                                                                  │
+│  📝 Gerenciar Termos                                             │
+│     Adicione termos com origem, tradução e notas                 │
+│     explicativas para consistência terminológica.                │
+│                                                                  │
+│  🔄 Importação em Lote                                           │
+│     Importe grandes listas de termos de uma vez.                 │
+│                                                                  │
+│  ℹ️ BENEFÍCIOS: Glossários garantem consistência                 │
+│     terminológica entre diferentes traduções e tradutores.       │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  7. TM - Translation Memory (Memória de Tradução)                │
+├─────────────────────────────────────────────────────────────────┤
+│  💾 Armazenar Traduções                                          │
+│     Salve segmentos traduzidos para reutilização                 │
+│     em projetos futuros.                                         │
+│                                                                  │
+│  🔍 Busca Inteligente                                            │
+│     Encontre traduções anteriores similares para                 │
+│     manter consistência e acelerar o trabalho.                   │
+│                                                                  │
+│  📊 Estatísticas de Match                                        │
+│     Visualize percentuais de correspondência para                │
+│     estimar tempo e custo de projetos.                           │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  8. INSTRUCTIONS - Instruções de Tradução                        │
+├─────────────────────────────────────────────────────────────────┤
+│  📝 Criar Instruções                                             │
+│     • Título descritivo                                          │
+│     • Par de idiomas                                             │
+│     • Tipo de documento                                          │
+│     • Campo específico                                           │
+│                                                                  │
+│  📋 Instruções por Documento                                     │
+│     Crie instruções específicas para cada tipo:                  │
+│     certidões, passaportes, diplomas, etc.                       │
+│                                                                  │
+│  🤖 Integração com IA                                            │
+│     As instruções são automaticamente incluídas nos              │
+│     prompts do Claude para traduções mais precisas.              │
+│                                                                  │
+│  💡 DICA: Instruções detalhadas melhoram significativamente      │
+│     a qualidade das traduções automáticas.                       │
+└─────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+                    IDIOMAS SUPORTADOS
+═══════════════════════════════════════════════════════════════════
+
+🇺🇸 English      🇪🇸 Spanish     🇧🇷 Portuguese    🇫🇷 French
+🇩🇪 German       🇮🇹 Italian     🇨🇳 Chinese       🇯🇵 Japanese
+🇰🇷 Korean       🇸🇦 Arabic      🇷🇺 Russian       🇳🇱 Dutch
++ outros idiomas disponíveis
+
+═══════════════════════════════════════════════════════════════════
+                    FLUXO DE TRABALHO RECOMENDADO
+═══════════════════════════════════════════════════════════════════
+
+PASSO 1: CONFIGURAÇÃO (Aba START)
+   → Configure sua API Key do Claude
+   → Faça upload dos logos da empresa
+   → Defina os dados do projeto (número, tipo, idiomas)
+
+PASSO 2: UPLOAD E TRADUÇÃO (Aba TRANSLATION)
+   → Faça upload do documento (JPG, PNG ou PDF)
+   → Clique em "Traduzir" para processar com Claude AI
+   → Aguarde a tradução ser gerada
+
+PASSO 3: REVISÃO (Aba REVIEW)
+   → Revise a tradução lado a lado com o original
+   → Use o modo edição para ajustes manuais
+   → Envie comandos de correção para a IA se necessário
+
+PASSO 4: VERIFICAÇÃO FINAL (Aba PROOFREADING)
+   → Complete o checklist de qualidade
+   → Verifique terminologia, formatação e dados
+
+PASSO 5: ENTREGA (Aba DELIVER)
+   → Marque os itens de aprovação
+   → Gere a carta de certificação
+   → Baixe o documento final ou envie para projetos
+
+═══════════════════════════════════════════════════════════════════
+                    © Legacy Translations
+                Sistema de Tradução Profissional com IA
+═══════════════════════════════════════════════════════════════════`;
+
+            navigator.clipboard.writeText(guiaCompleto).then(() => {
+                const btns = document.querySelectorAll('.ask-claude');
+                const btn = btns[1];
+                btn.textContent = '✅ Guia Copiado!';
+                btn.style.background = 'linear-gradient(135deg, #20c997, #28a745)';
+                setTimeout(() => {
+                    btn.textContent = '📄 Copiar Guia Completo';
+                    btn.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
                 }, 2000);
             });
         }
