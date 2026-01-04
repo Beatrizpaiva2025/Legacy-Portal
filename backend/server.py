@@ -963,7 +963,10 @@ class TranslationOrder(BaseModel):
     order_number: str = Field(default_factory=lambda: f"ORD-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
     partner_id: str
     partner_company: str
-    # Client info (end customer)
+    # Partner contact (for invoices/receipts)
+    partner_email: Optional[str] = None
+    partner_name: Optional[str] = None
+    # Client info (end customer - for translation delivery only)
     client_name: str
     client_email: EmailStr
     # Translation details
@@ -4690,6 +4693,8 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         order = TranslationOrder(
             partner_id=partner["id"],
             partner_company=partner["company_name"],
+            partner_email=partner.get("email"),  # Store partner email for receipts
+            partner_name=partner.get("contact_name", partner.get("name")),
             client_name=order_data.client_name,
             client_email=order_data.client_email,
             service_type=order_data.service_type,
@@ -13732,6 +13737,131 @@ async def quickbooks_sync_invoice(
         raise
     except Exception as e:
         logger.error(f"QuickBooks sync invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/receipt")
+async def quickbooks_sync_receipt(
+    admin_key: str = None,
+    order_id: str = Body(...),
+    customer_id: str = Body(None),
+    customer_name: str = Body(None),
+    customer_email: str = Body(None),
+    send_email: bool = Body(True),
+    is_partner_order: bool = Body(False)
+):
+    """
+    Create and optionally send a Sales Receipt in QuickBooks for a PAID order.
+
+    Sales Receipts are used for transactions where payment has already been received,
+    unlike Invoices which are requests for payment.
+
+    For Partner orders (B2B): Receipt goes to the Partner, not the end client.
+    For Direct orders: Receipt goes to the client.
+    """
+    try:
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        # Get order details - check both collections
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            order = await db.translation_orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # For Partner orders, get partner info for the receipt
+        receipt_email = customer_email
+        receipt_name = customer_name
+
+        if is_partner_order and order.get("partner_id"):
+            # Try to get partner details
+            partner = await db.partners.find_one({"id": order.get("partner_id")})
+            if partner:
+                receipt_email = receipt_email or partner.get("email")
+                receipt_name = receipt_name or partner.get("company_name", partner.get("name"))
+
+        # Get or create customer in QuickBooks
+        qb_customer_id = customer_id
+        if not qb_customer_id:
+            # Try to find existing customer by email
+            if receipt_email:
+                existing = qb_client.find_customer_by_email(receipt_email)
+                if existing.get("success"):
+                    customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                    if customers:
+                        qb_customer_id = customers[0].get("Id")
+
+            if not qb_customer_id:
+                # Create customer
+                cust_name = receipt_name or order.get("client_name", "Customer")
+                cust_result = qb_client.create_customer(
+                    display_name=cust_name,
+                    email=receipt_email or order.get("client_email")
+                )
+                if cust_result.get("success"):
+                    qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+                else:
+                    raise HTTPException(status_code=400, detail="Failed to create customer")
+
+        # Create line items from order
+        doc_type = order.get('document_type', order.get('service_type', 'Document'))
+        source_lang = order.get('translate_from', order.get('source_language', 'Source'))
+        target_lang = order.get('translate_to', order.get('target_language', 'Target'))
+
+        line_items = [{
+            "description": f"Translation Service - {doc_type} ({source_lang} to {target_lang})",
+            "amount": order.get("total_price", 0),
+            "quantity": 1
+        }]
+
+        # Create Sales Receipt (not Invoice - payment already received)
+        receipt_result = qb_client.create_sales_receipt(
+            customer_id=qb_customer_id,
+            line_items=line_items,
+            memo=f"Order #{order.get('order_number', order_id)} - Payment Received"
+        )
+
+        if not receipt_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create receipt: {receipt_result.get('error')}")
+
+        receipt = receipt_result.get("data", {}).get("SalesReceipt", {})
+        receipt_id = receipt.get("Id")
+        receipt_number = receipt.get("DocNumber")
+
+        # Send receipt via email if requested
+        if send_email and receipt_id and receipt_email:
+            send_result = qb_client.send_sales_receipt(receipt_id, receipt_email)
+            if not send_result.get("success"):
+                logger.warning(f"Failed to send receipt email: {send_result.get('error')}")
+
+        # Update order with QuickBooks info (use same fields for consistency)
+        update_data = {
+            "quickbooks_invoice_id": receipt_id,  # Reusing field for receipt ID
+            "quickbooks_invoice_number": receipt_number,
+            "quickbooks_receipt_type": "sales_receipt",
+            "quickbooks_synced_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+
+        # Update in both possible collections
+        await db.orders.update_one({"id": order_id}, {"$set": update_data})
+        await db.translation_orders.update_one({"id": order_id}, {"$set": update_data})
+
+        return {
+            "success": True,
+            "receipt_id": receipt_id,
+            "receipt_number": receipt_number,
+            "email_sent": send_email and bool(receipt_email),
+            "sent_to": receipt_email if send_email else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync receipt error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

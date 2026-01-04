@@ -12413,6 +12413,68 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           </tr>
                         </tbody>
                       </table>
+
+                      {/* QuickBooks Invoice/Receipt Buttons */}
+                      {qbConnected && (
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs">
+                              <span className="font-medium text-gray-700">QuickBooks:</span>
+                              {viewingOrder.quickbooks_invoice_id ? (
+                                <span className="ml-2 text-green-600">
+                                  ✓ {viewingOrder.quickbooks_receipt_type === 'sales_receipt' ? 'Receipt' : 'Invoice'} #{viewingOrder.quickbooks_invoice_number}
+                                </span>
+                              ) : (
+                                <span className="ml-2 text-gray-500">Not synced</span>
+                              )}
+                            </div>
+                            {!viewingOrder.quickbooks_invoice_id && (
+                              <div className="flex gap-2">
+                                {viewingOrder.payment_status === 'paid' ? (
+                                  <button
+                                    onClick={() => syncOrderToQuickBooks(viewingOrder)}
+                                    disabled={qbSyncing[viewingOrder.id]}
+                                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300"
+                                  >
+                                    {qbSyncing[viewingOrder.id] ? 'Sending...' : '🧾 Send Receipt'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      // For unpaid orders, send Invoice (not Receipt)
+                                      setQbSyncing(prev => ({ ...prev, [viewingOrder.id]: true }));
+                                      axios.post(`${API}/quickbooks/sync/invoice?admin_key=${adminKey}`, {
+                                        order_id: viewingOrder.id,
+                                        customer_name: viewingOrder.partner_company || viewingOrder.client_name,
+                                        customer_email: viewingOrder.partner_email || viewingOrder.client_email,
+                                        send_email: true
+                                      }).then(response => {
+                                        if (response.data.success) {
+                                          alert(`Invoice #${response.data.invoice_number} sent!`);
+                                          fetchOrders();
+                                          setViewingOrder(prev => ({
+                                            ...prev,
+                                            quickbooks_invoice_id: response.data.invoice_id,
+                                            quickbooks_invoice_number: response.data.invoice_number
+                                          }));
+                                        }
+                                      }).catch(err => {
+                                        alert('Failed: ' + (err.response?.data?.detail || err.message));
+                                      }).finally(() => {
+                                        setQbSyncing(prev => ({ ...prev, [viewingOrder.id]: false }));
+                                      });
+                                    }}
+                                    disabled={qbSyncing[viewingOrder.id]}
+                                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
+                                  >
+                                    {qbSyncing[viewingOrder.id] ? 'Sending...' : '📄 Send Invoice'}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                     </>
@@ -16510,15 +16572,22 @@ const FinancesPage = ({ adminKey }) => {
   const syncOrderToQuickBooks = async (order) => {
     setQbSyncing(prev => ({ ...prev, [order.id]: true }));
     try {
-      const response = await axios.post(`${API}/quickbooks/sync/invoice?admin_key=${adminKey}`, {
+      // For Partner orders, use Sales Receipt (already paid) and send to Partner
+      // For direct client orders, use Invoice and send to client
+      const isPartnerOrder = order.partner_id && order.partner_id !== 'manual' && order.partner_id !== 'direct_client' && order.partner_id !== 'admin_quote';
+
+      const response = await axios.post(`${API}/quickbooks/sync/receipt?admin_key=${adminKey}`, {
         order_id: order.id,
-        customer_name: order.client_name,
-        customer_email: order.client_email,
-        send_email: true
+        // Use partner info for B2B orders, client info for direct orders
+        customer_name: isPartnerOrder ? (order.partner_company || order.partner_name) : order.client_name,
+        customer_email: isPartnerOrder ? order.partner_email : order.client_email,
+        send_email: true,
+        is_partner_order: isPartnerOrder
       });
 
       if (response.data.success) {
-        alert(`Invoice #${response.data.invoice_number} created and sent to ${order.client_email || 'client'}!`);
+        const recipient = isPartnerOrder ? (order.partner_company || 'partner') : (order.client_email || 'client');
+        alert(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
         fetchPaidOrders(); // Refresh the list
       }
     } catch (err) {
@@ -17391,31 +17460,44 @@ const FinancesPage = ({ adminKey }) => {
 
           {qbConnected ? (
             <>
-              {/* Paid Orders - Ready to Invoice */}
+              {/* Paid Orders - Send Receipts */}
               <div className="bg-white rounded-lg shadow">
                 <div className="p-4 border-b bg-gray-50">
-                  <h2 className="text-sm font-bold text-gray-700">📄 Paid Orders - Create Invoices</h2>
-                  <p className="text-xs text-gray-500 mt-1">Send invoices to clients via QuickBooks</p>
+                  <h2 className="text-sm font-bold text-gray-700">🧾 Paid Orders - Send Receipts</h2>
+                  <p className="text-xs text-gray-500 mt-1">Send payment receipts to Partners via QuickBooks</p>
                 </div>
                 <div className="p-4">
                   {paidOrders.length === 0 ? (
                     <p className="text-gray-500 text-sm text-center py-4">No paid orders found</p>
                   ) : (
                     <div className="space-y-2">
-                      {paidOrders.map(order => (
+                      {paidOrders.map(order => {
+                        const isPartnerOrder = order.partner_id && order.partner_id !== 'manual' && order.partner_id !== 'direct_client' && order.partner_id !== 'admin_quote';
+                        return (
                         <div key={order.id} className="flex items-center justify-between p-3 border rounded hover:bg-gray-50">
                           <div className="flex-1">
                             <div className="flex items-center space-x-3">
                               <span className="font-medium text-sm text-gray-800">#{order.order_number}</span>
-                              <span className="text-xs text-gray-500">{order.client_name}</span>
-                              <span className="text-xs text-gray-400">{order.client_email}</span>
+                              {isPartnerOrder ? (
+                                <>
+                                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">Partner</span>
+                                  <span className="text-xs text-gray-500">{order.partner_company || order.client_name}</span>
+                                  <span className="text-xs text-gray-400">{order.partner_email || order.client_email}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Direct</span>
+                                  <span className="text-xs text-gray-500">{order.client_name}</span>
+                                  <span className="text-xs text-gray-400">{order.client_email}</span>
+                                </>
+                              )}
                             </div>
                             <div className="flex items-center space-x-3 mt-1">
                               <span className="text-sm font-bold text-green-600">{formatCurrency(order.total_price)}</span>
                               <span className="text-xs text-gray-500">{order.document_type || order.service_type}</span>
                               {order.quickbooks_invoice_id && (
                                 <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-                                  QB Invoice #{order.quickbooks_invoice_number}
+                                  QB Receipt #{order.quickbooks_invoice_number}
                                 </span>
                               )}
                             </div>
@@ -17440,13 +17522,13 @@ const FinancesPage = ({ adminKey }) => {
                                     Syncing...
                                   </>
                                 ) : (
-                                  <>📤 Create Invoice & Send</>
+                                  <>🧾 Send Receipt</>
                                 )}
                               </button>
                             )}
                           </div>
                         </div>
-                      ))}
+                      );})}
                     </div>
                   )}
                 </div>
@@ -17454,12 +17536,12 @@ const FinancesPage = ({ adminKey }) => {
 
               {/* Info Box */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-blue-800 mb-2">How QuickBooks Sync Works</h3>
+                <h3 className="text-sm font-medium text-blue-800 mb-2">How Partner Receipts Work</h3>
                 <ul className="text-xs text-blue-700 space-y-1">
-                  <li>• Click "Create Invoice & Send" to create an invoice in QuickBooks</li>
-                  <li>• QuickBooks will email the invoice to the client automatically</li>
-                  <li>• Client can pay via credit card or bank transfer through the invoice link</li>
-                  <li>• Payment will be recorded automatically in QuickBooks</li>
+                  <li>• Click "Send Receipt" to create a sales receipt in QuickBooks for paid orders</li>
+                  <li>• The receipt confirms payment and is sent to the Partner (not the end client)</li>
+                  <li>• Partners receive payments from their clients and remit to Legacy Translations</li>
+                  <li>• Receipts are for record-keeping only - the payment has already been received</li>
                 </ul>
               </div>
             </>

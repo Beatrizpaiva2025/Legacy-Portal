@@ -337,6 +337,60 @@ class QuickBooksClient:
 
         return self._make_request("POST", "payment", payment_data)
 
+    # ==================== SALES RECEIPT OPERATIONS ====================
+
+    def create_sales_receipt(self, customer_id: str, line_items: list,
+                            payment_method: str = None, memo: str = None) -> Dict[str, Any]:
+        """
+        Create a Sales Receipt in QuickBooks (for already-paid transactions)
+
+        Unlike invoices, sales receipts represent payment already received.
+        Used for B2B partner orders where payment has already been collected.
+
+        line_items format:
+        [
+            {
+                "description": "Translation Service - Birth Certificate",
+                "amount": 75.00,
+                "quantity": 1
+            }
+        ]
+        """
+        receipt_lines = []
+        for idx, item in enumerate(line_items):
+            receipt_lines.append({
+                "LineNum": idx + 1,
+                "Amount": item.get("amount", 0) * item.get("quantity", 1),
+                "DetailType": "SalesItemLineDetail",
+                "Description": item.get("description", "Translation Service"),
+                "SalesItemLineDetail": {
+                    "Qty": item.get("quantity", 1),
+                    "UnitPrice": item.get("amount", 0)
+                }
+            })
+
+        receipt_data = {
+            "CustomerRef": {"value": customer_id},
+            "Line": receipt_lines,
+            "CustomerMemo": {"value": memo} if memo else None,
+            "PaymentMethodRef": {"value": payment_method} if payment_method else None
+        }
+        # Remove None values
+        receipt_data = {k: v for k, v in receipt_data.items() if v is not None}
+
+        return self._make_request("POST", "salesreceipt", receipt_data)
+
+    def send_sales_receipt(self, receipt_id: str, email: str = None) -> Dict[str, Any]:
+        """Send sales receipt to customer via email"""
+        endpoint = f"salesreceipt/{receipt_id}/send"
+        if email:
+            endpoint += f"?sendTo={email}"
+        return self._make_request("POST", endpoint)
+
+    def get_sales_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        """Get sales receipt details"""
+        return self._make_request("GET", f"salesreceipt/{receipt_id}")
+
     # ==================== UTILITY OPERATIONS ====================
 
     def get_company_info(self) -> Dict[str, Any]:
