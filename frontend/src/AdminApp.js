@@ -10623,6 +10623,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // "In Progress" filter should include orders being translated or pending translation
+    if (statusFilter === 'in_translation') {
+      matchStatus = o.translation_status === 'in_translation' ||
+                    o.translation_status === 'pending' ||
+                    (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
+    }
     // "PM Review" filter should include both 'review' and 'pending_pm_review'
     if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
       matchStatus = true;
@@ -16514,9 +16520,10 @@ const FinancesPage = ({ adminKey }) => {
   const fetchTranslatorsForPayment = async () => {
     try {
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
-      setTranslators(response.data || []);
+      // API returns { translators: [...], total: X }
+      setTranslators(response.data?.translators || response.data || []);
     } catch (err) {
-      console.error('Errorr fetching translators:', err);
+      console.error('Error fetching translators:', err);
     }
   };
 
@@ -16543,9 +16550,10 @@ const FinancesPage = ({ adminKey }) => {
       alert('Please select a vendor, enter amount and payment method');
       return;
     }
+    const translatorId = selectedTranslatorForPayment.translator_id || selectedTranslatorForPayment._id;
     try {
       await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
-        translator_id: selectedTranslatorForPayment._id,
+        translator_id: translatorId,
         amount: parseFloat(paymentAmount),
         note: paymentNote,
         payment_method: paymentMethod,
@@ -16561,10 +16569,10 @@ const FinancesPage = ({ adminKey }) => {
       fetchTranslatorsForPayment();
       fetchPaymentReport();
       if (selectedTranslatorForPayment) {
-        fetchTranslatorPaymentHistory(selectedTranslatorForPayment._id);
+        fetchTranslatorPaymentHistory(translatorId);
       }
     } catch (err) {
-      alert('Errorr registering payment: ' + (err.response?.data?.detail || err.message));
+      alert('Error registering payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -17369,13 +17377,13 @@ const FinancesPage = ({ adminKey }) => {
                 ) : (
                   translators.map((translator) => (
                     <div
-                      key={translator._id}
+                      key={translator.translator_id || translator._id}
                       onClick={() => {
                         setSelectedTranslatorForPayment(translator);
-                        fetchTranslatorPaymentHistory(translator._id);
+                        fetchTranslatorPaymentHistory(translator.translator_id || translator._id);
                       }}
                       className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                        selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
+                        (selectedTranslatorForPayment?.translator_id || selectedTranslatorForPayment?._id) === (translator.translator_id || translator._id) ? 'border-teal-500 bg-teal-50' : ''
                       }`}
                     >
                       <div className="flex justify-between items-start">
@@ -17388,9 +17396,9 @@ const FinancesPage = ({ adminKey }) => {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-gray-500">Pending Pages</div>
-                          <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
+                          <div className="font-bold text-lg text-yellow-600">{translator.pages_pending_payment || translator.pending_payment_pages || 0}</div>
                           <div className="text-xs text-green-600 font-medium">
-                            ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
+                            ${((translator.pages_pending_payment || translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
                           </div>
                         </div>
                       </div>
