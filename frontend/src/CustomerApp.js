@@ -1320,7 +1320,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setSupportError(t.pleaseEnterEmail);
       return;
     }
-    if (!supportIssueType || !supportDescription.trim()) {
+    if (!supportIssueType) {
       setSupportError(t.supportError);
       return;
     }
@@ -1552,7 +1552,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                   <button
                     type="button"
                     onClick={handleSupportSubmit}
-                    disabled={sendingSupport || !(guestEmail || supportEmail) || !supportIssueType || !supportDescription.trim()}
+                    disabled={sendingSupport || !(guestEmail || supportEmail) || !supportIssueType}
                     className="px-6 py-2 bg-amber-200 text-gray-800 rounded-md font-semibold hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
                   >
                     {sendingSupport ? '...' : t.sendRequest}
