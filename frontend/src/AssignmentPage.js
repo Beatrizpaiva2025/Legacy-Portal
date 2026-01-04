@@ -150,12 +150,17 @@ const AssignmentPage = () => {
                 <p className="text-sm text-gray-500 mb-4">
                   You can now access the project in your translator portal.
                 </p>
-                <a
-                  href="/#/admin"
-                  className="inline-block w-full py-3 px-6 bg-gradient-to-r from-teal-500 to-teal-600 text-white font-semibold rounded-lg shadow-md hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
+                <button
+                  onClick={() => {
+                    // Clear any existing session to force fresh login
+                    localStorage.removeItem('admin_key');
+                    localStorage.removeItem('admin_user');
+                    window.location.href = '/#/admin';
+                  }}
+                  className="w-full py-3 px-6 bg-gradient-to-r from-teal-500 to-teal-600 text-white font-semibold rounded-lg shadow-md hover:from-teal-600 hover:to-teal-700 transition-all duration-200"
                 >
                   Go to Translator Portal
-                </a>
+                </button>
               </>
             )}
 
@@ -166,12 +171,17 @@ const AssignmentPage = () => {
             )}
 
             {(status === 'error' || status === 'already_responded') && (
-              <a
-                href="/#/admin"
-                className="inline-block w-full py-3 px-6 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-semibold rounded-lg shadow-md hover:from-gray-600 hover:to-gray-700 transition-all duration-200"
+              <button
+                onClick={() => {
+                  // Clear any existing session to force fresh login
+                  localStorage.removeItem('admin_key');
+                  localStorage.removeItem('admin_user');
+                  window.location.href = '/#/admin';
+                }}
+                className="w-full py-3 px-6 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-semibold rounded-lg shadow-md hover:from-gray-600 hover:to-gray-700 transition-all duration-200"
               >
                 Go to Portal
-              </a>
+              </button>
             )}
           </div>
         )}
