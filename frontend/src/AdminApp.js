@@ -3908,17 +3908,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const span = document.createElement('span');
 
         // Get current font size from selection or default to 12pt
-        let currentSize = 12;
+        // Note: computedStyle.fontSize returns pixels, so we convert to points (px * 0.75 = pt)
+        let currentSizePt = 12;
         const parentElement = range.commonAncestorContainer.parentElement;
         if (parentElement) {
           const computedStyle = window.getComputedStyle(parentElement);
-          currentSize = parseFloat(computedStyle.fontSize) || 12;
+          const fontSizePx = parseFloat(computedStyle.fontSize) || 16;
+          currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
         // Increase or decrease by 2pt
         const newSize = command === 'increaseFontSize'
-          ? Math.min(currentSize + 2, 48)
-          : Math.max(currentSize - 2, 8);
+          ? Math.min(currentSizePt + 2, 48)
+          : Math.max(currentSizePt - 2, 8);
         span.style.fontSize = `${newSize}pt`;
 
         try {
