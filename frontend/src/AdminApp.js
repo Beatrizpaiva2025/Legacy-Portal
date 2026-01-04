@@ -9541,6 +9541,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // QuickBooks state
+  const [qbConnected, setQbConnected] = useState(false);
+  const [qbSyncing, setQbSyncing] = useState({});
+
   // Review Modal state (PM Side-by-Side Review)
   const [reviewingOrder, setReviewingOrder] = useState(null);
   const [reviewOriginalDocs, setReviewOriginalDocs] = useState([]);
@@ -9828,6 +9832,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to delete:', err);
       alert('Error ao deletar pedido');
+    }
+  };
+
+  // QuickBooks sync function
+  const syncOrderToQuickBooks = async (order) => {
+    setQbSyncing(prev => ({ ...prev, [order.id]: true }));
+    try {
+      const isPartnerOrder = order.partner_id && order.partner_id !== 'manual' && order.partner_id !== 'direct_client' && order.partner_id !== 'admin_quote';
+      const response = await axios.post(`${API}/quickbooks/sync/receipt?admin_key=${adminKey}`, {
+        order_id: order.id,
+        customer_name: isPartnerOrder ? (order.partner_company || order.partner_name) : order.client_name,
+        customer_email: isPartnerOrder ? order.partner_email : order.client_email,
+        send_email: true,
+        is_partner_order: isPartnerOrder
+      });
+      if (response.data.success) {
+        const recipient = isPartnerOrder ? (order.partner_company || 'partner') : (order.client_email || 'client');
+        alert(`Receipt #${response.data.receipt_number} created and sent to ${recipient}!`);
+        fetchOrders();
+      }
+    } catch (err) {
+      console.error('Failed to sync to QuickBooks:', err);
+      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setQbSyncing(prev => ({ ...prev, [order.id]: false }));
     }
   };
 
