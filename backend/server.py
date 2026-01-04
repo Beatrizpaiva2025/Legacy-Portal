@@ -6393,10 +6393,10 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                         # Send email to translator with accept/decline links
                         if translator.get("email"):
                             try:
-                                # Build accept/decline URLs
-                                base_url = os.environ.get("API_BASE_URL", "https://legacy-portal.onrender.com")
-                                accept_url = f"{base_url}/api/translator/assignment/{assignment_token}/accept"
-                                decline_url = f"{base_url}/api/translator/assignment/{assignment_token}/decline"
+                                # Build accept/decline URLs - point to frontend for better UX (no cold start screen)
+                                frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+                                accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
+                                decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
 
                                 # Prepare order details for email
                                 deadline_str = "To be confirmed"
@@ -7292,6 +7292,67 @@ async def decline_translator_assignment(token: str):
     )
 
     return HTMLResponse(content=get_assignment_response_page("declined", f"You have declined the assignment for project {order.get('order_number', '')}. The team will be notified to assign another translator."))
+
+# POST endpoints for frontend to call (returns JSON)
+@api_router.post("/translator/assignment/{token}/accept")
+async def accept_translator_assignment_api(token: str):
+    """Accept a translator assignment via frontend (returns JSON)"""
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
+
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "accepted",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_accepted",
+        title="Translator Accepted Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has ACCEPTED the assignment for project {order.get('order_number', order['id'])}.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return {"status": "accepted", "message": "Assignment accepted successfully", "order_number": order.get("order_number", "")}
+
+@api_router.post("/translator/assignment/{token}/decline")
+async def decline_translator_assignment_api(token: str):
+    """Decline a translator assignment via frontend (returns JSON)"""
+    order = await db.translation_orders.find_one({"translator_assignment_token": token})
+    if not order:
+        raise HTTPException(status_code=404, detail="Invalid or expired link. This assignment token was not found.")
+
+    if order.get("translator_assignment_status") in ["accepted", "declined"]:
+        status = order.get("translator_assignment_status")
+        raise HTTPException(status_code=400, detail=f"You have already {status} this assignment.")
+
+    await db.translation_orders.update_one(
+        {"id": order["id"]},
+        {"$set": {
+            "translator_assignment_status": "declined",
+            "translator_assignment_responded_at": datetime.utcnow()
+        }}
+    )
+
+    await create_notification(
+        user_id=order.get("assigned_pm_id") or "admin",
+        notif_type="assignment_declined",
+        title="Translator Declined Assignment",
+        message=f"Translator {order.get('assigned_translator_name', 'Unknown')} has DECLINED the assignment for project {order.get('order_number', order['id'])}. Please assign another translator.",
+        order_id=order["id"],
+        order_number=order.get("order_number")
+    )
+
+    return {"status": "declined", "message": "Assignment declined successfully", "order_number": order.get("order_number", "")}
 
 def get_assignment_response_page(status: str, message: str) -> str:
     """Generate HTML page for assignment response"""
