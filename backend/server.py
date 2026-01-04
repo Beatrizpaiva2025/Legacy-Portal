@@ -66,6 +66,12 @@ app = FastAPI()
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Health check endpoint for Render to keep service alive
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and keeping service alive"""
+    return {"status": "healthy", "service": "legacy-portal-backend"}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
