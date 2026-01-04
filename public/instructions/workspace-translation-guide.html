@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia do Workspace Translation - Legacy Translations</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .workflow-steps {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .step-badge {
+            background: white;
+            color: #667eea;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .step-badge.active {
+            background: #28a745;
+            color: white;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .section-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+
+        .icon-start { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        .icon-translation { background: linear-gradient(135deg, #4ecdc4, #44a08d); }
+        .icon-review { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .icon-proofreading { background: linear-gradient(135deg, #f093fb, #f5576c); }
+        .icon-deliver { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+        .icon-glossary { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+        .icon-tm { background: linear-gradient(135deg, #fa709a, #fee140); }
+        .icon-instructions { background: linear-gradient(135deg, #a8edea, #fed6e3); }
+
+        .section-title h2 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+
+        .section-title span.tab-name {
+            background: #e9ecef;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-card h4 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-card p {
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .feature-card ul {
+            color: #666;
+            font-size: 0.95rem;
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .feature-card li {
+            margin-bottom: 5px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            border: 1px solid #667eea30;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+        }
+
+        .highlight-box h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .tip-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .tip-box::before {
+            content: "💡 Dica: ";
+            font-weight: bold;
+        }
+
+        .workflow-diagram {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 30px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .workflow-diagram h3 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .workflow-flow {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .flow-item {
+            background: #667eea;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .flow-arrow {
+            color: #667eea;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .languages-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .lang-badge {
+            background: #e9ecef;
+            padding: 8px 15px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #333;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            padding: 20px;
+        }
+
+        .footer p {
+            opacity: 0.8;
+        }
+
+        .ask-claude {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .ask-claude:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Guia do Workspace Translation</h1>
+            <p>Sistema completo de tradução profissional com IA</p>
+        </div>
+
+        <div class="workflow-steps">
+            <span class="step-badge">1. START</span>
+            <span class="step-badge">2. TRANSLATION</span>
+            <span class="step-badge active">3. REVIEW</span>
+            <span class="step-badge">4. PROOFREADING</span>
+            <span class="step-badge">5. DELIVER</span>
+            <span class="step-badge">6. GLOSSARIES</span>
+            <span class="step-badge">7. TM</span>
+            <span class="step-badge">8. INSTRUCTIONS</span>
+        </div>
+
+        <div class="main-content">
+            <!-- Visão Geral -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-start">🎯</div>
+                    <h2>Visão Geral do Sistema</h2>
+                </div>
+                <p style="color: #666; font-size: 1.1rem; line-height: 1.8;">
+                    O <strong>Workspace Translation</strong> é uma ferramenta completa para tradução profissional de documentos,
+                    integrando inteligência artificial (Claude AI) para OCR e tradução automática. O sistema guia o tradutor
+                    através de um fluxo de trabalho estruturado em 8 abas, desde o upload do documento até a entrega final
+                    com carta de certificação.
+                </p>
+
+                <div class="workflow-diagram">
+                    <h3>Fluxo de Trabalho</h3>
+                    <div class="workflow-flow">
+                        <div class="flow-item">📋 START</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-item">📝 TRANSLATION</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-item">✏️ REVIEW</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-item">🔍 PROOFREADING</div>
+                        <span class="flow-arrow">→</span>
+                        <div class="flow-item">📤 DELIVER</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 1: START -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-start">📋</div>
+                    <h2>1. START</h2>
+                    <span class="tab-name">Configuração Inicial</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>🔑 Configuração da API Key</h4>
+                        <p>Configure sua chave de API do Claude para habilitar tradução e OCR com inteligência artificial.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📖 Guia de Início Rápido</h4>
+                        <p>Instruções passo a passo para começar a traduzir documentos imediatamente.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>⚙️ Configurações de Projeto</h4>
+                        <ul>
+                            <li>Número do pedido</li>
+                            <li>Tipo de documento</li>
+                            <li>Idioma de origem/destino</li>
+                            <li>Seleção do tradutor</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🏢 Logos da Empresa</h4>
+                        <p>Upload de logos para carta de certificação: logo esquerdo, logo ATA, e carimbo oficial.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: TRANSLATION -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-translation">📝</div>
+                    <h2>2. TRANSLATION</h2>
+                    <span class="tab-name">Upload e Tradução</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📤 Upload de Documentos</h4>
+                        <ul>
+                            <li>Suporta JPG, PNG, PDF</li>
+                            <li>Arrastar e soltar</li>
+                            <li>Upload múltiplo</li>
+                            <li>Visualização do original</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🤖 Tradução com Claude AI</h4>
+                        <p>Tradução automática usando inteligência artificial com preservação do layout original do documento.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>👁️ Visualização Lado a Lado</h4>
+                        <p>Veja o documento original e a tradução simultaneamente para comparação fácil.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📄 Processamento em Lote</h4>
+                        <p>Traduza múltiplos documentos de uma vez com navegação entre páginas e progresso em tempo real.</p>
+                    </div>
+                </div>
+
+                <div class="tip-box">
+                    Para melhores resultados, use imagens de alta qualidade e selecione corretamente o tipo de documento.
+                </div>
+            </div>
+
+            <!-- TAB 3: REVIEW -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-review">✏️</div>
+                    <h2>3. REVIEW</h2>
+                    <span class="tab-name">Revisão e Edição</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📖 Modo Visualização</h4>
+                        <p>Visualize a tradução formatada em HTML sem possibilidade de edição acidental.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>✍️ Modo Edição</h4>
+                        <ul>
+                            <li>Editor visual WYSIWYG</li>
+                            <li>Negrito, itálico, sublinhado</li>
+                            <li>Tamanho de fonte</li>
+                            <li>Alinhamento de texto</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔧 Correções com IA</h4>
+                        <p>Envie comandos em linguagem natural para o Claude corrigir a tradução automaticamente.</p>
+                        <p style="margin-top: 10px; font-style: italic; color: #888;">
+                            Ex: "Mude certificado para diploma" ou "Corrija a formatação da tabela"
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>💾 Download Individual</h4>
+                        <p>Salve cada tradução individualmente ou baixe todas combinadas em um único arquivo HTML.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: PROOFREADING -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-proofreading">🔍</div>
+                    <h2>4. PROOFREADING</h2>
+                    <span class="tab-name">Revisão Final</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>✅ Verificação de Qualidade</h4>
+                        <p>Revisão final para garantir precisão e consistência na tradução.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📋 Checklist de Revisão</h4>
+                        <ul>
+                            <li>Verificar terminologia</li>
+                            <li>Conferir formatação</li>
+                            <li>Validar números e datas</li>
+                            <li>Revisar nomes próprios</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: DELIVER -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-deliver">📤</div>
+                    <h2>5. DELIVER</h2>
+                    <span class="tab-name">Aprovação e Entrega</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>✅ Checklist de Aprovação</h4>
+                        <ul>
+                            <li>☐ Carta de certificação incluída</li>
+                            <li>☐ Revisão final completa</li>
+                            <li>☐ Logos e carimbo configurados</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📝 Carta de Certificação</h4>
+                        <p>Geração automática de carta profissional com cabeçalho da empresa, certificação ATA, e assinatura do tradutor.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📥 Opções de Download</h4>
+                        <ul>
+                            <li>Download HTML completo</li>
+                            <li>Imprimir/Salvar como PDF</li>
+                            <li>Com ou sem carta de certificação</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Enviar para Projetos</h4>
+                        <p>Integração direta com o sistema de gerenciamento de projetos para atualização do status do pedido.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 6: GLOSSARIES -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-glossary">📚</div>
+                    <h2>6. GLOSSARIES</h2>
+                    <span class="tab-name">Glossários de Termos</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📖 Criar Glossários</h4>
+                        <ul>
+                            <li>Nome personalizado</li>
+                            <li>Par de idiomas</li>
+                            <li>Campo/especialidade</li>
+                            <li>Bidirecional (opcional)</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📝 Gerenciar Termos</h4>
+                        <p>Adicione termos com origem, tradução e notas explicativas para consistência terminológica.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔄 Importação em Lote</h4>
+                        <p>Importe grandes listas de termos de uma vez para agilizar a criação de glossários.</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <h4>Benefícios do Glossário</h4>
+                    <p>Glossários garantem consistência terminológica entre diferentes traduções e tradutores,
+                    especialmente importante para documentos técnicos e jurídicos.</p>
+                </div>
+            </div>
+
+            <!-- TAB 7: TM (Translation Memory) -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-tm">💎</div>
+                    <h2>7. TM (Translation Memory)</h2>
+                    <span class="tab-name">Memória de Tradução</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>💾 Armazenar Traduções</h4>
+                        <p>Salve segmentos traduzidos para reutilização em projetos futuros.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔍 Busca Inteligente</h4>
+                        <p>Encontre traduções anteriores similares para manter consistência e acelerar o trabalho.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📊 Estatísticas de Match</h4>
+                        <p>Visualize percentuais de correspondência para estimar tempo e custo de projetos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 8: INSTRUCTIONS -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon icon-instructions">📋</div>
+                    <h2>8. INSTRUCTIONS</h2>
+                    <span class="tab-name">Instruções de Tradução</span>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>📝 Criar Instruções</h4>
+                        <ul>
+                            <li>Título descritivo</li>
+                            <li>Par de idiomas</li>
+                            <li>Tipo de documento</li>
+                            <li>Campo específico</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <h4>📋 Instruções por Documento</h4>
+                        <p>Crie instruções específicas para cada tipo de documento: certidões, passaportes, diplomas, etc.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🤖 Integração com IA</h4>
+                        <p>As instruções são automaticamente incluídas nos prompts do Claude para traduções mais precisas.</p>
+                    </div>
+                </div>
+
+                <div class="tip-box">
+                    Instruções detalhadas melhoram significativamente a qualidade das traduções automáticas.
+                </div>
+            </div>
+
+            <!-- Idiomas Suportados -->
+            <div class="section">
+                <div class="section-title">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">🌍</div>
+                    <h2>Idiomas Suportados</h2>
+                </div>
+
+                <div class="languages-grid">
+                    <span class="lang-badge">🇺🇸 English</span>
+                    <span class="lang-badge">🇪🇸 Spanish</span>
+                    <span class="lang-badge">🇧🇷 Portuguese</span>
+                    <span class="lang-badge">🇫🇷 French</span>
+                    <span class="lang-badge">🇩🇪 German</span>
+                    <span class="lang-badge">🇮🇹 Italian</span>
+                    <span class="lang-badge">🇨🇳 Chinese</span>
+                    <span class="lang-badge">🇯🇵 Japanese</span>
+                    <span class="lang-badge">🇰🇷 Korean</span>
+                    <span class="lang-badge">🇸🇦 Arabic</span>
+                    <span class="lang-badge">🇷🇺 Russian</span>
+                    <span class="lang-badge">🇳🇱 Dutch</span>
+                    <span class="lang-badge">+ mais...</span>
+                </div>
+            </div>
+
+            <!-- Prompt para Claude -->
+            <div class="section" style="background: linear-gradient(135deg, #28a74515, #20c99715); border-radius: 15px; padding: 30px; border: 2px solid #28a745;">
+                <div class="section-title">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #28a745, #20c997);">🤖</div>
+                    <h2>Prompt para Pedir Apresentação ao Claude</h2>
+                </div>
+
+                <p style="color: #666; margin-bottom: 20px;">
+                    Copie e cole o texto abaixo para pedir ao Claude uma apresentação detalhada sobre o Workspace Translation:
+                </p>
+
+                <div style="background: #1e1e1e; color: #d4d4d4; padding: 25px; border-radius: 10px; font-family: 'Courier New', monospace; font-size: 0.95rem; line-height: 1.6; overflow-x: auto;">
+                    <pre style="white-space: pre-wrap; margin: 0;">
+Por favor, me apresente uma visão geral completa do sistema "Workspace Translation"
+da Legacy Translations, incluindo:
+
+1. **Visão Geral**: O que é o Workspace Translation e qual seu propósito principal?
+
+2. **As 8 Abas do Sistema**:
+   - START: Configuração inicial e API Key
+   - TRANSLATION: Upload e tradução de documentos
+   - REVIEW: Revisão e edição das traduções
+   - PROOFREADING: Verificação final de qualidade
+   - DELIVER: Aprovação e entrega com certificação
+   - GLOSSARIES: Gerenciamento de glossários de termos
+   - TM: Memória de Tradução
+   - INSTRUCTIONS: Instruções personalizadas de tradução
+
+3. **Funcionalidades Principais**:
+   - Como funciona a tradução com Claude AI?
+   - Como usar o modo de edição e correções com IA?
+   - Como gerar a carta de certificação?
+   - Como usar glossários e memória de tradução?
+
+4. **Fluxo de Trabalho Recomendado**:
+   Descreva o passo a passo ideal para traduzir um documento do início ao fim.
+
+5. **Dicas e Melhores Práticas**:
+   O que fazer para obter os melhores resultados?
+
+Formate a resposta de forma clara e organizada, usando títulos e bullets.
+                    </pre>
+                </div>
+
+                <button class="ask-claude" onclick="copyPrompt()">
+                    📋 Copiar Prompt
+                </button>
+
+                <p style="color: #888; margin-top: 15px; font-size: 0.9rem;">
+                    * Cole este prompt no chat do MIA Bot ou em qualquer interface do Claude AI
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Legacy Translations - Workspace Translation Guide</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">© 2024 - Sistema de Tradução Profissional com IA</p>
+        </div>
+    </div>
+
+    <script>
+        function copyPrompt() {
+            const prompt = `Por favor, me apresente uma visão geral completa do sistema "Workspace Translation" da Legacy Translations, incluindo:
+
+1. **Visão Geral**: O que é o Workspace Translation e qual seu propósito principal?
+
+2. **As 8 Abas do Sistema**:
+   - START: Configuração inicial e API Key
+   - TRANSLATION: Upload e tradução de documentos
+   - REVIEW: Revisão e edição das traduções
+   - PROOFREADING: Verificação final de qualidade
+   - DELIVER: Aprovação e entrega com certificação
+   - GLOSSARIES: Gerenciamento de glossários de termos
+   - TM: Memória de Tradução
+   - INSTRUCTIONS: Instruções personalizadas de tradução
+
+3. **Funcionalidades Principais**:
+   - Como funciona a tradução com Claude AI?
+   - Como usar o modo de edição e correções com IA?
+   - Como gerar a carta de certificação?
+   - Como usar glossários e memória de tradução?
+
+4. **Fluxo de Trabalho Recomendado**:
+   Descreva o passo a passo ideal para traduzir um documento do início ao fim.
+
+5. **Dicas e Melhores Práticas**:
+   O que fazer para obter os melhores resultados?
+
+Formate a resposta de forma clara e organizada, usando títulos e bullets.`;
+
+            navigator.clipboard.writeText(prompt).then(() => {
+                const btn = document.querySelector('.ask-claude');
+                btn.textContent = '✅ Copiado!';
+                btn.style.background = 'linear-gradient(135deg, #20c997, #28a745)';
+                setTimeout(() => {
+                    btn.textContent = '📋 Copiar Prompt';
+                    btn.style.background = 'linear-gradient(135deg, #28a745, #20c997)';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
