@@ -1717,10 +1717,64 @@ const OrdersPage = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [orderDocuments, setOrderDocuments] = useState({});
+  const [loadingDocuments, setLoadingDocuments] = useState({});
 
   useEffect(() => {
     fetchOrders();
   }, [filter]);
+
+  const fetchOrderDocuments = async (orderId) => {
+    if (orderDocuments[orderId]) return; // Already fetched
+
+    setLoadingDocuments(prev => ({ ...prev, [orderId]: true }));
+    try {
+      const response = await axios.get(`${API}/orders/${orderId}/documents?token=${token}`);
+      setOrderDocuments(prev => ({ ...prev, [orderId]: response.data.documents || [] }));
+    } catch (err) {
+      console.error('Failed to fetch documents:', err);
+      setOrderDocuments(prev => ({ ...prev, [orderId]: [] }));
+    } finally {
+      setLoadingDocuments(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  const downloadDocument = async (documentId, filename) => {
+    try {
+      const response = await axios.get(`${API}/documents/${documentId}/download?token=${token}`);
+      const { file_data, content_type } = response.data;
+
+      // Decode base64 and create download
+      const byteCharacters = atob(file_data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: content_type });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download document:', err);
+      alert('Failed to download document. Please try again.');
+    }
+  };
+
+  const handleOrderClick = (orderId) => {
+    if (selectedOrder === orderId) {
+      setSelectedOrder(null);
+    } else {
+      setSelectedOrder(orderId);
+      fetchOrderDocuments(orderId);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -1794,7 +1848,7 @@ const OrdersPage = ({ token }) => {
             <div key={order.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div
                 className="p-6 cursor-pointer hover:bg-gray-50"
-                onClick={() => setSelectedOrder(selectedOrder === order.id ? null : order.id)}
+                onClick={() => handleOrderClick(order.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
@@ -1880,6 +1934,58 @@ const OrdersPage = ({ token }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Documents Section */}
+                  <div className="mt-4">
+                    <div className="text-sm text-gray-500 mb-2">Documents Sent for Translation</div>
+                    {loadingDocuments[order.id] ? (
+                      <div className="flex items-center text-gray-500">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-600 mr-2"></div>
+                        Loading documents...
+                      </div>
+                    ) : orderDocuments[order.id]?.length > 0 ? (
+                      <div className="space-y-2">
+                        {orderDocuments[order.id].map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-teal-300 transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="text-teal-600">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-800">{doc.filename}</div>
+                                <div className="text-xs text-gray-500">
+                                  {doc.word_count > 0 && `${doc.word_count} words`}
+                                  {doc.word_count > 0 && doc.file_size && ' • '}
+                                  {doc.file_size && `${(doc.file_size / 1024).toFixed(1)} KB`}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                downloadDocument(doc.id, doc.filename);
+                              }}
+                              className="flex items-center space-x-1 px-3 py-1 text-sm text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              <span>Download</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 text-sm p-3 bg-white rounded-lg border border-gray-200">
+                        No documents uploaded for this order
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
