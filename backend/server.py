@@ -6222,6 +6222,59 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         }
     }
 
+@api_router.get("/admin/finances/partners")
+async def get_partner_statistics(admin_key: str):
+    """Get partner statistics: total received and pending amounts by company"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get all partner orders
+    partner_orders = await db.translation_orders.find({
+        "partner_id": {"$exists": True, "$ne": None}
+    }).to_list(10000)
+
+    # Group by partner company
+    partner_stats = {}
+    for order in partner_orders:
+        company = order.get("partner_company", "Unknown")
+        partner_id = order.get("partner_id")
+
+        if company not in partner_stats:
+            partner_stats[company] = {
+                "partner_id": partner_id,
+                "company_name": company,
+                "total_received": 0,
+                "total_pending": 0,
+                "orders_paid": 0,
+                "orders_pending": 0
+            }
+
+        total_price = order.get("total_price", 0)
+        payment_status = order.get("payment_status", "pending")
+
+        if payment_status == "paid":
+            partner_stats[company]["total_received"] += total_price
+            partner_stats[company]["orders_paid"] += 1
+        else:
+            partner_stats[company]["total_pending"] += total_price
+            partner_stats[company]["orders_pending"] += 1
+
+    # Convert to list and sort by total (received + pending) descending
+    result = sorted(
+        partner_stats.values(),
+        key=lambda x: x["total_received"] + x["total_pending"],
+        reverse=True
+    )
+
+    return {
+        "partners": result,
+        "summary": {
+            "total_partners": len(result),
+            "total_received": sum(p["total_received"] for p in result),
+            "total_pending": sum(p["total_pending"] for p in result)
+        }
+    }
+
 @api_router.get("/admin/orders/{order_id}")
 async def admin_get_single_order(order_id: str, admin_key: str):
     """Get a single order by ID (admin or PM)"""
