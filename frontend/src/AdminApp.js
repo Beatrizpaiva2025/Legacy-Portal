@@ -419,9 +419,6 @@ const AdminLogin = ({ onLogin }) => {
           >
             {useAdminKey ? '← Login with email' : 'Use admin key instead'}
           </button>
-          <div>
-            <a href="/" className="text-teal-600 hover:underline text-xs">← Back to Partner Portal</a>
-          </div>
         </div>
       </div>
     </div>
