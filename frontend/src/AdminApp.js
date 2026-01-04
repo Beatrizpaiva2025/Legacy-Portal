@@ -18336,6 +18336,9 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
         token: resetToken,
         new_password: password
       });
+      // Clear any existing session to force fresh login with new credentials
+      localStorage.removeItem('admin_key');
+      localStorage.removeItem('admin_user');
       setSuccess('Password reset successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
