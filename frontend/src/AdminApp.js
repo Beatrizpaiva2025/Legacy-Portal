@@ -5046,7 +5046,47 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   };
 
   return (
-    <div className="p-4">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* Top header bar */}
+      <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
+            <div>
+              <div className="font-bold text-sm">Legacy Admin</div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center px-3 py-1.5 rounded bg-teal-600 text-white">
+          <span className="mr-1.5">✍️</span>
+          <span>Translation</span>
+        </div>
+        <div className="flex items-center space-x-3">
+          {user && (
+            <div className="flex items-center space-x-2">
+              <div className={`px-3 py-1 ${user?.role === 'admin' ? 'bg-red-500' : user?.role === 'pm' ? 'bg-blue-500' : 'bg-green-500'} rounded text-[10px] font-medium text-center`}>
+                {user?.role === 'admin' ? 'Administrator' : user?.role === 'pm' ? 'Project Manager' : 'Translator'}
+              </div>
+              {user.name && (
+                <span className="text-white text-[11px]">
+                  Welcome, {user.name.split(' ')[0]}
+                </span>
+              )}
+            </div>
+          )}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="px-3 py-1.5 text-slate-300 hover:bg-slate-700 rounded text-xs"
+            >
+              ← Back to Projects
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main content area */}
+      <div className="flex-1 overflow-auto p-4">
       {/* Header with order info and back button */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
@@ -9444,6 +9484,7 @@ translation juramentada | certified translation`}
         </div>
       )}
 
+      </div>
     </div>
   );
 };
@@ -21336,6 +21377,11 @@ function AdminApp() {
   // If translation-tool route, render standalone page
   if (isTranslationTool) {
     return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
+  }
+
+  // If in translation workspace, render as full page without admin header
+  if (activeTab === 'translation') {
+    return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
   }
 
   return (
