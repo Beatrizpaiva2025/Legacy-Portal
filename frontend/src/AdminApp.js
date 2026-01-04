@@ -63,6 +63,7 @@ const LANGUAGES = [
 ];
 
 const TRANSLATORS = [
+  { name: "Admin (Self)", title: "Administrator", isAdmin: true },
   { name: "Beatriz Paiva", title: "Managing Director" },
   { name: "Ana Clara", title: "Project Manager" },
   { name: "Yasmin Costa", title: "Certified Translator" },
@@ -2233,7 +2234,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             order.translation_html
           );
         }
-        // For admin: show all orders with translation
+        // For admin: show orders assigned to "Admin (Self)" or "Admin"
+        if (user.role === 'admin') {
+          return (
+            order.assigned_translator === 'Admin (Self)' ||
+            order.assigned_translator === 'Admin' ||
+            order.assigned_translator_name === 'Admin (Self)' ||
+            order.assigned_translator_name === 'Admin'
+          );
+        }
+        // Fallback: show all orders with translation
         return order.translation_ready || order.translation_html;
       }).filter(order =>
         // Include most statuses for translators to see their work
@@ -5183,12 +5193,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
-          {/* Assigned Projects Section - For Translators */}
-          {user?.role === 'translator' && (
-            <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-lg p-4">
-              <h3 className="text-sm font-bold text-teal-800 mb-3">📋 Meus Projetos Atribuídos</h3>
+          {/* Assigned Projects Section - For Translators and Admin */}
+          {(user?.role === 'translator' || user?.role === 'admin') && (
+            <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-purple-50 to-indigo-50 border-purple-200' : 'from-teal-50 to-emerald-50 border-teal-200'} border rounded-lg p-4`}>
+              <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-purple-800' : 'text-teal-800'} mb-3`}>
+                {user?.role === 'admin' ? '👑 Admin Translation Projects' : '📋 My Assigned Projects'}
+              </h3>
               {loadingAssigned ? (
-                <div className="text-center py-4 text-gray-500 text-sm">Carregando projects...</div>
+                <div className="text-center py-4 text-gray-500 text-sm">Loading projects...</div>
               ) : assignedOrders.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {assignedOrders.map(order => (
@@ -5216,15 +5228,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {order.translate_from} → {order.translate_to}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {order.document_type || 'Document'} • {order.page_count || 1} página(s)
+                        {order.document_type || 'Document'} • {order.page_count || 1} page(s)
                       </div>
                       {order.deadline && (
                         <div className="text-[10px] text-orange-600 mt-1">
-                          ⏰ Prazo: {new Date(order.deadline).toLocaleDateString('en-US')}
+                          ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
                         </div>
                       )}
                       {selectedOrderId === order.id && (
-                        <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Projeto selecionado</div>
+                        <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Project selected</div>
                       )}
                     </div>
                   ))}
@@ -5232,8 +5244,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               ) : (
                 <div className="text-center py-6 text-gray-500">
                   <div className="text-3xl mb-2">📭</div>
-                  <p className="text-sm">No project assigned yet</p>
-                  <p className="text-xs mt-1">Aguarde a atribuição de projects pelo PM</p>
+                  <p className="text-sm">No projects assigned yet</p>
+                  <p className="text-xs mt-1">{user?.role === 'admin' ? 'Use "Assign to Me" button in Projects to assign projects to yourself' : 'Wait for project assignment by PM'}</p>
                 </div>
               )}
             </div>
@@ -10611,6 +10623,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
+    // "In Progress" filter should include orders being translated or pending translation
+    if (statusFilter === 'in_translation') {
+      matchStatus = o.translation_status === 'in_translation' ||
+                    o.translation_status === 'pending' ||
+                    (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
+    }
     // "PM Review" filter should include both 'review' and 'pending_pm_review'
     if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
       matchStatus = true;
@@ -11613,6 +11631,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => assignTranslator(order.id, 'Admin (Self)')}
+                            className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 flex items-center gap-1"
+                            title="Assign to yourself as Admin"
+                          >
+                            👑 Assign to Me
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -16493,9 +16520,10 @@ const FinancesPage = ({ adminKey }) => {
   const fetchTranslatorsForPayment = async () => {
     try {
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
-      setTranslators(response.data || []);
+      // API returns { translators: [...], total: X }
+      setTranslators(response.data?.translators || response.data || []);
     } catch (err) {
-      console.error('Errorr fetching translators:', err);
+      console.error('Error fetching translators:', err);
     }
   };
 
@@ -16522,9 +16550,10 @@ const FinancesPage = ({ adminKey }) => {
       alert('Please select a vendor, enter amount and payment method');
       return;
     }
+    const translatorId = selectedTranslatorForPayment.translator_id || selectedTranslatorForPayment._id;
     try {
       await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
-        translator_id: selectedTranslatorForPayment._id,
+        translator_id: translatorId,
         amount: parseFloat(paymentAmount),
         note: paymentNote,
         payment_method: paymentMethod,
@@ -16540,10 +16569,10 @@ const FinancesPage = ({ adminKey }) => {
       fetchTranslatorsForPayment();
       fetchPaymentReport();
       if (selectedTranslatorForPayment) {
-        fetchTranslatorPaymentHistory(selectedTranslatorForPayment._id);
+        fetchTranslatorPaymentHistory(translatorId);
       }
     } catch (err) {
-      alert('Errorr registering payment: ' + (err.response?.data?.detail || err.message));
+      alert('Error registering payment: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -17348,13 +17377,13 @@ const FinancesPage = ({ adminKey }) => {
                 ) : (
                   translators.map((translator) => (
                     <div
-                      key={translator._id}
+                      key={translator.translator_id || translator._id}
                       onClick={() => {
                         setSelectedTranslatorForPayment(translator);
-                        fetchTranslatorPaymentHistory(translator._id);
+                        fetchTranslatorPaymentHistory(translator.translator_id || translator._id);
                       }}
                       className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                        selectedTranslatorForPayment?._id === translator._id ? 'border-teal-500 bg-teal-50' : ''
+                        (selectedTranslatorForPayment?.translator_id || selectedTranslatorForPayment?._id) === (translator.translator_id || translator._id) ? 'border-teal-500 bg-teal-50' : ''
                       }`}
                     >
                       <div className="flex justify-between items-start">
@@ -17367,9 +17396,9 @@ const FinancesPage = ({ adminKey }) => {
                         </div>
                         <div className="text-right">
                           <div className="text-xs text-gray-500">Pending Pages</div>
-                          <div className="font-bold text-lg text-yellow-600">{translator.pending_payment_pages || 0}</div>
+                          <div className="font-bold text-lg text-yellow-600">{translator.pages_pending_payment || translator.pending_payment_pages || 0}</div>
                           <div className="text-xs text-green-600 font-medium">
-                            ${((translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
+                            ${((translator.pages_pending_payment || translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
                           </div>
                         </div>
                       </div>
