@@ -7295,8 +7295,8 @@ def get_assignment_response_page(status: str, message: str) -> str:
         icon = "✓"
         color = "#28a745"
         title = "Assignment Accepted"
-        # Auto-redirect to translator portal after 3 seconds
-        redirect_url = f"{portal_url}/#/translation-tool"
+        # Auto-redirect to admin panel after 3 seconds (translator will login there)
+        redirect_url = f"{portal_url}/#/admin"
         redirect_script = f'''
         <script>
             setTimeout(function() {{
@@ -7307,7 +7307,7 @@ def get_assignment_response_page(status: str, message: str) -> str:
         button_html = f'''
         <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Você será redirecionado automaticamente em 3 segundos...</p>
         <a href="{redirect_url}" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 10px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Acessar Portal do Tradutor
+            🔐 Acessar Painel Admin
         </a>
         '''
     elif status == "declined":
@@ -7321,8 +7321,8 @@ def get_assignment_response_page(status: str, message: str) -> str:
         color = "#6c757d"
         title = "Already Responded"
         button_html = f'''
-        <a href="{portal_url}/#/translation-tool" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
-            🔐 Acessar Portal do Tradutor
+        <a href="{portal_url}/#/admin" style="display: inline-block; background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); color: white; text-decoration: none; padding: 14px 30px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-top: 20px; box-shadow: 0 4px 15px rgba(13, 148, 136, 0.3);">
+            🔐 Acessar Painel Admin
         </a>
         '''
         redirect_script = ""
