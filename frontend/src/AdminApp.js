@@ -733,6 +733,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [selectedProjectFiles, setSelectedProjectFiles] = useState([]); // Files for selected project
   const [loadingProjectFiles, setLoadingProjectFiles] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState(null); // Currently loaded file
+
+  // Translator messages
+  const [translatorMessages, setTranslatorMessages] = useState([]);
+  const [showTranslatorMessages, setShowTranslatorMessages] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
   const [customCoverLetters, setCustomCoverLetters] = useState(() => {
@@ -1938,10 +1942,37 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Fetch messages for translator
+  const fetchTranslatorMessages = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await axios.get(`${API}/translator/messages?admin_key=${adminKey}&translator_id=${user.id}`);
+      setTranslatorMessages(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch translator messages:', err);
+    }
+  };
+
+  // Mark translator message as read
+  const markTranslatorMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/translator/messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchTranslatorMessages();
+    } catch (err) {
+      console.error('Failed to mark message as read:', err);
+    }
+  };
+
   useEffect(() => {
     // Fetch assigned orders for all roles (admin, pm, translator)
     if (user?.role) {
       fetchAssignedOrders();
+      if (user.role === 'translator') {
+        fetchTranslatorMessages();
+        // Poll for messages every 30 seconds
+        const interval = setInterval(fetchTranslatorMessages, 30000);
+        return () => clearInterval(interval);
+      }
     }
   }, [user]);
 
@@ -4915,6 +4946,65 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Translator Messages Panel */}
+          {user?.role === 'translator' && translatorMessages.filter(m => !m.read).length > 0 && (
+            <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center">
+                  <span className="text-purple-600 mr-2 text-xl">💬</span>
+                  <span className="text-sm font-bold text-purple-800">
+                    {translatorMessages.filter(m => !m.read).length} New Message(s) from Admin/PM
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowTranslatorMessages(!showTranslatorMessages)}
+                  className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-white rounded border border-purple-200"
+                >
+                  {showTranslatorMessages ? 'Hide' : 'View Messages'}
+                </button>
+              </div>
+              {showTranslatorMessages && (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {translatorMessages.filter(m => !m.read).map((msg) => (
+                    <div
+                      key={msg.id}
+                      className="p-3 bg-white rounded border border-purple-200"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm text-purple-800">
+                              From: {msg.from_admin_name}
+                            </span>
+                            {msg.order_number && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                                {msg.order_number}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded mt-2">
+                            {msg.content}
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-2">
+                            {new Date(msg.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end mt-2 pt-2 border-t">
+                        <button
+                          onClick={() => markTranslatorMessageRead(msg.id)}
+                          className="px-3 py-1 text-purple-600 border border-purple-200 rounded text-xs hover:bg-purple-50"
+                        >
+                          ✓ Mark as read
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Assigned Projects Section - For Translators and Admin */}
           {(user?.role === 'translator' || user?.role === 'admin') && (
             <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-purple-50 to-indigo-50 border-purple-200' : 'from-teal-50 to-emerald-50 border-teal-200'} border rounded-lg p-4`}>
@@ -9257,6 +9347,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [additionalAttachments, setAdditionalAttachments] = useState([]); // Multiple uploaded files
   const [selectedAttachments, setSelectedAttachments] = useState({ workspace: true, uploaded: [] }); // Which attachments to send
 
+  // Send message to translator state
+  const [messagingTranslator, setMessagingTranslator] = useState(null); // { id, name, email, order_number }
+  const [translatorMessageContent, setTranslatorMessageContent] = useState('');
+  const [sendingTranslatorMessage, setSendingTranslatorMessage] = useState(false);
+
   // Translator Assignment Modal state
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null); // Order to assign
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -10092,6 +10187,30 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('Failed to send reply. Please try again.');
     } finally {
       setSendingReply(false);
+    }
+  };
+
+  // Send message to translator
+  const sendMessageToTranslator = async () => {
+    if (!messagingTranslator || !translatorMessageContent.trim()) return;
+    setSendingTranslatorMessage(true);
+    try {
+      await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+        translator_id: messagingTranslator.id,
+        translator_name: messagingTranslator.name,
+        translator_email: messagingTranslator.email,
+        content: translatorMessageContent,
+        order_number: messagingTranslator.order_number,
+        admin_name: user?.name || 'Admin'
+      });
+      alert('Message sent to ' + messagingTranslator.name + '!');
+      setMessagingTranslator(null);
+      setTranslatorMessageContent('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSendingTranslatorMessage(false);
     }
   };
 
@@ -12649,13 +12768,34 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
                     <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
                       <div className="text-xs font-medium text-purple-700 mb-2">Translator Assignment</div>
-                      <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
-                      <div className={`text-xs mt-1 ${
-                        viewingOrder.translator_assignment_status === 'accepted' ? 'text-green-600' :
-                        viewingOrder.translator_assignment_status === 'declined' ? 'text-red-600' :
-                        'text-yellow-600'
-                      }`}>
-                        Status: {viewingOrder.translator_assignment_status || 'pending'}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
+                          <div className={`text-xs mt-1 ${
+                            viewingOrder.translator_assignment_status === 'accepted' ? 'text-green-600' :
+                            viewingOrder.translator_assignment_status === 'declined' ? 'text-red-600' :
+                            'text-yellow-600'
+                          }`}>
+                            Status: {viewingOrder.translator_assignment_status || 'pending'}
+                          </div>
+                        </div>
+                        {isAdmin && viewingOrder.assigned_translator && (
+                          <button
+                            onClick={() => {
+                              // Find translator details
+                              const translator = translators.find(t => t.id === viewingOrder.assigned_translator);
+                              setMessagingTranslator({
+                                id: viewingOrder.assigned_translator,
+                                name: viewingOrder.assigned_translator_name || translator?.name || 'Translator',
+                                email: translator?.email || '',
+                                order_number: viewingOrder.order_number
+                              });
+                            }}
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 flex items-center gap-1"
+                          >
+                            💬 Send Message
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -13020,6 +13160,76 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Message to Translator Modal */}
+      {messagingTranslator && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            {/* Header */}
+            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold">💬 Send Message to Translator</h3>
+                  <p className="text-xs opacity-80 mt-1">
+                    To: {messagingTranslator.name}
+                    {messagingTranslator.order_number && ` • Project: ${messagingTranslator.order_number}`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setMessagingTranslator(null); setTranslatorMessageContent(''); }}
+                  className="text-white hover:text-gray-200 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              <div className="mb-4">
+                <label className="text-xs font-medium text-gray-600 mb-2 block">Message:</label>
+                <textarea
+                  value={translatorMessageContent}
+                  onChange={(e) => setTranslatorMessageContent(e.target.value)}
+                  placeholder="Type your message to the translator..."
+                  className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  rows={5}
+                />
+              </div>
+
+              {messagingTranslator.email && (
+                <div className="text-xs text-gray-500 mb-4">
+                  📧 A notification will be sent to: {messagingTranslator.email}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end gap-2">
+              <button
+                onClick={() => { setMessagingTranslator(null); setTranslatorMessageContent(''); }}
+                className="px-4 py-2 bg-gray-400 text-white rounded text-sm hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendMessageToTranslator}
+                disabled={sendingTranslatorMessage || !translatorMessageContent.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+              >
+                {sendingTranslatorMessage ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>📤 Send Message</>
+                )}
+              </button>
             </div>
           </div>
         </div>
