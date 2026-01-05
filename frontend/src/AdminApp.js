@@ -5277,6 +5277,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
                         </div>
                       )}
+                      {order.internal_notes && (
+                        <div className="text-[10px] text-amber-600 mt-1">
+                          📝 Has instructions from PM
+                        </div>
+                      )}
                       {selectedOrderId === order.id && (
                         <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Project selected</div>
                       )}
@@ -5290,6 +5295,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <p className="text-xs mt-1">{user?.role === 'admin' ? 'Use "Assign to Me" button in Projects to assign projects to yourself' : 'Wait for project assignment by PM'}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* PM Instructions - Show when project is selected and has internal notes */}
+          {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">📝</div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-amber-800 mb-2">Instructions from PM</h3>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
