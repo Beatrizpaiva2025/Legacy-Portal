@@ -2356,7 +2356,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Load a specific file from the project
   const loadProjectFile = async (doc) => {
-    setProcessingStatus(`📂 Carregando "${doc.filename}"...`);
+    setProcessingStatus(`📂 Loading "${doc.filename}"...`);
     try {
       const downloadResponse = await axios.get(`${API}/admin/order-documents/${doc.id}/download?admin_key=${adminKey}`);
 
@@ -2380,25 +2380,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
         // For PDFs, convert to images (one per page)
         if (contentType === 'application/pdf' || doc.filename?.toLowerCase().endsWith('.pdf')) {
-          setProcessingStatus(`📄 Extraindo páginas do PDF...`);
+          setProcessingStatus(`📄 Extracting PDF pages...`);
           try {
             const images = await convertPdfToImages(file, (currentPage, totalPages) => {
-              setProcessingStatus(`📄 Extraindo página ${currentPage} de ${totalPages}...`);
+              setProcessingStatus(`📄 Extracting page ${currentPage} of ${totalPages}...`);
             });
             setOriginalImages(images);
-            setProcessingStatus(`✅ "${doc.filename}" carregado! (${images.length} página${images.length > 1 ? 's' : ''})`);
+            setProcessingStatus(`✅ "${doc.filename}" loaded! (${images.length} page${images.length > 1 ? 's' : ''})`);
           } catch (pdfErr) {
             console.error('Failed to convert PDF to images:', pdfErr);
             // Fallback to single image
             const dataUrl = `data:${contentType};base64,${base64Data}`;
             setOriginalImages([{ filename: doc.filename, data: dataUrl }]);
-            setProcessingStatus(`✅ "${doc.filename}" carregado! (PDF não pôde ser dividido em páginas)`);
+            setProcessingStatus(`✅ "${doc.filename}" loaded! (PDF could not be split into pages)`);
           }
         } else {
           // For images, just store directly
           const dataUrl = `data:${contentType};base64,${base64Data}`;
           setOriginalImages([{ filename: doc.filename, data: base64Data, type: contentType }]);
-          setProcessingStatus(`✅ "${doc.filename}" carregado!`);
+          setProcessingStatus(`✅ "${doc.filename}" loaded!`);
         }
 
         // Only redirect to translate tab if coming from start tab
@@ -6036,7 +6036,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <h3 className="text-xs font-bold text-blue-800 mb-3">📁 Project Documents - Click to Load</h3>
 
                   {loadingProjectFiles ? (
-                    <div className="text-sm text-gray-500 text-center py-4">Carregando files...</div>
+                    <div className="text-sm text-gray-500 text-center py-4">Loading files...</div>
                   ) : selectedProjectFiles.length > 0 ? (
                     <>
                       <div className="space-y-2">
@@ -6064,7 +6064,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   <div className={`text-sm font-medium truncate ${
                                     selectedFileId === doc.id ? 'text-green-700' : 'text-gray-700'
                                   }`}>
-                                    {doc.filename || `Arquivo ${idx + 1}`}
+                                    {doc.filename || `File ${idx + 1}`}
                                   </div>
                                   <div className="text-xs text-gray-400">
                                     {selectedFileId === doc.id ? '✓ Loaded - Ready to translate' : 'Click to load'}
@@ -6126,11 +6126,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                           // Refresh files
                                           const response = await axios.get(`${API}/admin/orders/${selectedOrderId}/documents?admin_key=${adminKey}`);
                                           setSelectedProjectFiles(response.data.documents || []);
-                                          setProcessingStatus(`✅ Arquivo substituído: ${file.name}`);
+                                          setProcessingStatus(`✅ File replaced: ${file.name}`);
                                         };
                                         reader.readAsDataURL(file);
                                       } catch (err) {
-                                        alert('Error ao substituir file');
+                                        alert('Error replacing file');
                                       }
                                     }}
                                   />
@@ -6199,13 +6199,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {!selectedOrderId && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-center">
               <div className="text-3xl mb-2">📋</div>
-              <p className="text-sm text-yellow-800 font-medium">Select um project first</p>
-              <p className="text-xs text-yellow-600 mt-1">Go to a tab START e selecione um project to load os documents</p>
+              <p className="text-sm text-yellow-800 font-medium">Select a project first</p>
+              <p className="text-xs text-yellow-600 mt-1">Go to the START tab and select a project to load the documents</p>
               <button
                 onClick={() => setActiveSubTab('start')}
                 className="mt-3 px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700"
               >
-                Ir to START
+                Go to START
               </button>
             </div>
           )}
@@ -10061,22 +10061,22 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       if (response.data.attachments_sent > 0) {
         message += `📎 ${response.data.attachments_sent} attachment(s) sent(s)\n`;
         if (response.data.attachment_filenames) {
-          message += `   Arquivos: ${response.data.attachment_filenames.join(', ')}\n`;
+          message += `   Files: ${response.data.attachment_filenames.join(', ')}\n`;
         }
       } else if (response.data.attachment_sent) {
-        message += `📎 Anexo: ${response.data.attachment_filename || 'Sim'}\n`;
+        message += `📎 Attachment: ${response.data.attachment_filename || 'Yes'}\n`;
       } else {
-        message += '⚠️ Without attachment (nenhum file de translation found)\n';
+        message += '⚠️ Without attachment (no translation file found)\n';
         if (response.data.debug) {
           message += `\nDebug: had_file=${response.data.debug.had_file}, had_html=${response.data.debug.had_html}, html_length=${response.data.debug.html_length}`;
         }
       }
 
       if (response.data.pm_notified) {
-        message += '\n📧 PM notificado.';
+        message += '\n📧 PM notified.';
       }
       if (response.data.bcc_sent) {
-        message += '\n📧 Cópia BCC enviada.';
+        message += '\n📧 BCC copy sent.';
       }
 
       alert(message);
@@ -12857,9 +12857,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Translated Document Status */}
               <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Tradução to Anexar:</div>
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📄 Translation to Attach:</div>
                 {!translatedDocInfo ? (
-                  <div className="text-center py-2 text-gray-500 text-[10px]">Carregando...</div>
+                  <div className="text-center py-2 text-gray-500 text-[10px]">Loading...</div>
                 ) : (
                   <div className="space-y-2">
                     {/* Workspace translation with checkbox */}
@@ -12874,7 +12874,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           />
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-green-800 font-medium">✅ Tradução do Workspace</span>
+                              <span className="text-[10px] text-green-800 font-medium">✅ Workspace Translation</span>
                               <button
                                 onClick={(e) => { e.preventDefault(); downloadTranslatedDocument(sendingOrder.id, 'translation.html'); }}
                                 className="px-2 py-0.5 bg-green-600 text-white rounded text-[10px] hover:bg-green-700"
@@ -12916,7 +12916,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               />
                               <div className="flex-1 flex items-center justify-between">
                                 <span className="text-[10px] text-blue-800 font-medium truncate">
-                                  📎 Arquivo: {attachment.filename}
+                                  📎 File: {attachment.filename}
                                 </span>
                                 <button
                                   onClick={(e) => {
@@ -12958,7 +12958,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Upload new document - External translation (supports multiple) */}
               <div className="mb-3">
-                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload Tradução Externa:</div>
+                <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Upload External Translation:</div>
                 <input
                   type="file"
                   id="translationFile"
@@ -15462,10 +15462,10 @@ const UsersPage = ({ adminKey, user }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       await fetchUserDocuments(userId);
-      alert('Documento sent successfully!');
+      alert('Document sent successfully!');
     } catch (err) {
       console.error('Errorr uploading document:', err);
-      alert('Error ao enviar document');
+      alert('Error uploading document');
     } finally {
       setUploadingDoc(false);
     }
@@ -16911,7 +16911,7 @@ const FinancesPage = ({ adminKey }) => {
     );
   };
 
-  if (loading) return <div className="p-6 text-center">Carregando dados financeiros...</div>;
+  if (loading) return <div className="p-6 text-center">Loading financial data...</div>;
 
   return (
     <div className="p-6">
@@ -19603,7 +19603,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Request correction
   const requestCorrection = async () => {
     if (!selectedReview || !correctionNotes.trim()) {
-      alert('Por favor, adicione notas de correção.');
+      alert('Please add correction notes.');
       return;
     }
     setSendingAction(true);
@@ -19626,7 +19626,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           from: user?.name,
           to: translator.name,
           toId: translator.id,
-          content: `📝 Correção necessária to ${selectedReview.order_number}:\n${correctionNotes}`,
+          content: `📝 Correction needed for ${selectedReview.order_number}:\n${correctionNotes}`,
           timestamp: new Date().toISOString(),
           read: false,
           type: 'correction'
@@ -19646,10 +19646,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setTranslatedContent(null);
       setCorrectionNotes('');
 
-      alert('📨 Solicitação de correção enviada ao tradutor!');
+      alert('📨 Correction request sent to translator!');
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('❌ Error ao solicitar correção');
+      alert('❌ Error requesting correction');
     } finally {
       setSendingAction(false);
     }
@@ -20112,7 +20112,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   return (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">{quoteForm.pageCount} página(s) × ${quoteForm.pricePerPage.toFixed(2)}</span>
+                        <span className="text-gray-600">{quoteForm.pageCount} page(s) × ${quoteForm.pricePerPage.toFixed(2)}</span>
                         <span className="font-medium">${prices.basePrice.toFixed(2)}</span>
                       </div>
                       {prices.urgencyFee > 0 && (
@@ -20849,7 +20849,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
                     <div className="text-xs text-gray-600">{order.client_name}</div>
                     <div className="text-[10px] text-gray-500">
-                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'Without tradutor'}
+                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'No translator assigned'}
                     </div>
                   </div>
                   <div className="text-right">
@@ -21025,8 +21025,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     ))
                   ) : (
                     <div className="text-center py-4 text-gray-400 text-xs">
-                      <p>No tradutor registered.</p>
-                      <p className="mt-1">Register translators na tab "Translators".</p>
+                      <p>No translator registered.</p>
+                      <p className="mt-1">Register translators in the "Translators" tab.</p>
                     </div>
                   )}
                 </div>
@@ -21088,7 +21088,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <div className="h-full flex items-center justify-center text-gray-400">
                     <div className="text-center">
                       <div className="text-3xl mb-2">👈</div>
-                      <p className="text-xs">Select um tradutor to iniciar conversa</p>
+                      <p className="text-xs">Select a translator to start a conversation</p>
                     </div>
                   </div>
                 )}
@@ -21105,7 +21105,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             {/* Header */}
             <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-t-lg">
               <div>
-                <h3 className="font-bold">📁 Arquivos do Projeto {selectedProject.order_number}</h3>
+                <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
                 <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
               </div>
               <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
@@ -21113,12 +21113,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
             {/* Content */}
             <div className="p-4 overflow-y-auto flex-1">
-              <p className="text-xs text-gray-500 mb-3">Select um tradutor to cada file. Different files can be assigned to different translators diferentes.</p>
+              <p className="text-xs text-gray-500 mb-3">Select a translator for each file. Different files can be assigned to different translators.</p>
 
               {loadingProjectDocs ? (
                 <div className="text-center py-8 text-gray-500">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
-                  Carregando files...
+                  Loading files...
                 </div>
               ) : projectDocuments.length > 0 ? (
                 <div className="space-y-3">
@@ -21130,9 +21130,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
                           </span>
                           <div>
-                            <div className="text-sm font-medium">{doc.filename || 'Documento'}</div>
+                            <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                             <div className="text-[10px] text-gray-500">
-                              {doc.source === 'manual_upload' ? 'Upload manual' : 'Portal do parceiro'}
+                              {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
                             </div>
                           </div>
                         </div>
