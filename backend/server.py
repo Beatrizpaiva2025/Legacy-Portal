@@ -11145,7 +11145,7 @@ async def process_quote_followups(admin_key: str):
 
 async def send_followup_email(email: str, name: str, quote: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for abandoned quote"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-customer.onrender.com')
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
     total_price = quote.get("total_price", 0)
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
 
@@ -11211,7 +11211,7 @@ async def send_followup_email(email: str, name: str, quote: dict, reminder_numbe
 
 async def send_quote_order_followup_email(email: str, name: str, order: dict, reminder_number: int, discount_percent: int, discount_code: str = None):
     """Send follow-up email for quote order"""
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-customer.onrender.com')
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com/#/customer')
     total_price = order.get("total_price", order.get("base_price", 0))
     discounted_price = total_price * (1 - discount_percent / 100) if discount_percent > 0 else total_price
     order_number = order.get("order_number", "N/A")
@@ -11299,12 +11299,19 @@ async def get_followup_status(admin_key: str):
     try:
         now = datetime.utcnow()
 
-        # Get abandoned quotes with follow-up info
-        abandoned = await db.abandoned_quotes.find({}).sort("created_at", -1).to_list(500)
+        # Get abandoned quotes with follow-up info (exclude those marked as excluded)
+        abandoned = await db.abandoned_quotes.find({
+            "excluded_from_followup": {"$ne": True},
+            "status": {"$nin": ["excluded", "recovered"]}
+        }).sort("created_at", -1).to_list(500)
 
-        # Get quote orders
+        # Get quote orders (exclude those marked as excluded)
         quote_orders = await db.translation_orders.find({
-            "translation_status": {"$regex": "^Quote", "$options": "i"}
+            "$and": [
+                {"translation_status": {"$regex": "^Quote", "$options": "i"}},
+                {"translation_status": {"$ne": "Quote - Excluded"}},
+                {"excluded_from_followup": {"$ne": True}}
+            ]
         }).sort("created_at", -1).to_list(500)
 
         result = {
@@ -11334,28 +11341,37 @@ async def get_followup_status(admin_key: str):
                 "days_since_creation": days_since,
                 "reminder_count": reminder_count,
                 "status": q.get("status"),
-                "next_action": None
+                "next_action": None,
+                "followup_stage": None,
+                "type": "abandoned"
             }
 
             if q.get("status") == "lost":
                 result["summary"]["marked_lost"] += 1
                 status_info["next_action"] = "None - marked as lost"
+                status_info["followup_stage"] = "lost"
             elif q.get("status") == "recovered":
                 status_info["next_action"] = "None - converted to order"
+                status_info["followup_stage"] = "recovered"
             elif days_since >= 21:
                 status_info["next_action"] = "Will be marked as lost"
+                status_info["followup_stage"] = "lost"
             elif days_since >= 14 and reminder_count < 3:
                 result["summary"]["needs_third_reminder"] += 1
                 status_info["next_action"] = "Third reminder (15% discount)"
+                status_info["followup_stage"] = "third"
             elif days_since >= 7 and reminder_count < 2:
                 result["summary"]["needs_second_reminder"] += 1
                 status_info["next_action"] = "Second reminder (10% discount)"
+                status_info["followup_stage"] = "second"
             elif days_since >= 3 and reminder_count < 1:
                 result["summary"]["needs_first_reminder"] += 1
                 status_info["next_action"] = "First reminder (no discount)"
+                status_info["followup_stage"] = "first"
             else:
                 result["summary"]["total_pending"] += 1
                 status_info["next_action"] = f"Wait {3 - days_since} more days"
+                status_info["followup_stage"] = "pending"
 
             result["abandoned_quotes"].append(status_info)
 
@@ -11375,26 +11391,34 @@ async def get_followup_status(admin_key: str):
                 "days_since_creation": days_since,
                 "followup_count": reminder_count,
                 "status": o.get("translation_status"),
-                "next_action": None
+                "next_action": None,
+                "followup_stage": None,
+                "type": "order"
             }
 
             if o.get("translation_status") == "Quote - Lost":
                 result["summary"]["marked_lost"] += 1
                 status_info["next_action"] = "None - marked as lost"
+                status_info["followup_stage"] = "lost"
             elif days_since >= 21:
                 status_info["next_action"] = "Will be marked as lost"
+                status_info["followup_stage"] = "lost"
             elif days_since >= 14 and reminder_count < 3:
                 result["summary"]["needs_third_reminder"] += 1
                 status_info["next_action"] = "Third reminder (15% discount)"
+                status_info["followup_stage"] = "third"
             elif days_since >= 7 and reminder_count < 2:
                 result["summary"]["needs_second_reminder"] += 1
                 status_info["next_action"] = "Second reminder (10% discount)"
+                status_info["followup_stage"] = "second"
             elif days_since >= 3 and reminder_count < 1:
                 result["summary"]["needs_first_reminder"] += 1
                 status_info["next_action"] = "First reminder (no discount)"
+                status_info["followup_stage"] = "first"
             else:
                 result["summary"]["total_pending"] += 1
                 status_info["next_action"] = f"Wait {3 - days_since} more days"
+                status_info["followup_stage"] = "pending"
 
             result["quote_orders"].append(status_info)
 
@@ -11403,6 +11427,37 @@ async def get_followup_status(admin_key: str):
     except Exception as e:
         logger.error(f"Error getting follow-up status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get follow-up status")
+
+@api_router.post("/admin/quotes/exclude-from-followup")
+async def exclude_from_followup(admin_key: str, quote_id: str, quote_type: str = "abandoned"):
+    """Exclude a quote from the follow-up system"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        if quote_type == "abandoned":
+            # Mark abandoned quote as excluded from follow-ups
+            result = await db.abandoned_quotes.update_one(
+                {"id": quote_id},
+                {"$set": {"excluded_from_followup": True, "status": "excluded"}}
+            )
+        else:
+            # Mark quote order as excluded from follow-ups
+            result = await db.translation_orders.update_one(
+                {"id": quote_id},
+                {"$set": {"excluded_from_followup": True, "translation_status": "Quote - Excluded"}}
+            )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        return {"success": True, "message": "Quote excluded from follow-ups"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error excluding quote from follow-ups: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to exclude quote")
 
 # ==================== DISCOUNT CODES ====================
 
