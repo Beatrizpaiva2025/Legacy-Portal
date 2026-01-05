@@ -9284,6 +9284,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Partner Messages state
+  const [partnerMessages, setPartnerMessages] = useState([]);
+  const [showPartnerMessages, setShowPartnerMessages] = useState(false);
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+
   // QuickBooks state
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
@@ -10044,11 +10051,59 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Poll for notifications
+  // Fetch partner messages
+  const fetchPartnerMessages = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}`);
+      setPartnerMessages(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch partner messages:', err);
+    }
+  };
+
+  // Mark partner message as read
+  const markPartnerMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchPartnerMessages();
+    } catch (err) {
+      console.error('Failed to mark message as read:', err);
+    }
+  };
+
+  // Reply to partner message
+  const replyToPartnerMessage = async () => {
+    if (!replyingToMessage || !replyContent.trim()) return;
+    setSendingReply(true);
+    try {
+      // Send reply via email to partner
+      await axios.post(`${API}/admin/partner-messages/${replyingToMessage.id}/reply?admin_key=${adminKey}`, {
+        content: replyContent,
+        partner_email: replyingToMessage.from_partner_email,
+        partner_name: replyingToMessage.from_partner_name,
+        admin_name: user?.name || 'Admin'
+      });
+      alert('Reply sent to ' + replyingToMessage.from_partner_name + '!');
+      setReplyingToMessage(null);
+      setReplyContent('');
+      fetchPartnerMessages();
+    } catch (err) {
+      console.error('Failed to send reply:', err);
+      alert('Failed to send reply. Please try again.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Poll for notifications and partner messages
   useEffect(() => {
     if (adminKey && (isAdmin || isPM)) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000); // Every 30 seconds
+      fetchPartnerMessages();
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchPartnerMessages();
+      }, 30000); // Every 30 seconds
       return () => clearInterval(interval);
     }
   }, [adminKey, user]);
@@ -10538,6 +10593,130 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Partner Messages Panel */}
+      {partnerMessages.filter(m => !m.read).length > 0 && (
+        <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-purple-600 mr-2">💬</span>
+              <span className="text-sm font-medium text-purple-800">
+                {partnerMessages.filter(m => !m.read).length} message(s) from partners
+              </span>
+            </div>
+            <button
+              onClick={() => setShowPartnerMessages(!showPartnerMessages)}
+              className="text-xs text-purple-600 hover:text-purple-800"
+            >
+              {showPartnerMessages ? 'Hide' : 'View'}
+            </button>
+          </div>
+          {showPartnerMessages && (
+            <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+              {partnerMessages.filter(m => !m.read).map((msg) => (
+                <div
+                  key={msg.id}
+                  className="p-3 bg-white rounded border border-purple-200"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm text-purple-800">
+                          {msg.from_partner_name}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">
+                          {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {msg.from_partner_email}
+                      </div>
+                      <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                        {msg.content}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-2">
+                        {new Date(msg.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2 pt-2 border-t">
+                    <button
+                      onClick={() => {
+                        setReplyingToMessage(msg);
+                        setReplyContent('');
+                      }}
+                      className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700"
+                    >
+                      📧 Reply
+                    </button>
+                    <button
+                      onClick={() => markPartnerMessageRead(msg.id)}
+                      className="px-3 py-1 text-gray-600 border rounded text-xs hover:bg-gray-100"
+                    >
+                      Mark as read
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reply to Partner Message Modal */}
+      {replyingToMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📧 Reply to Partner</h3>
+                <p className="text-xs opacity-80">{replyingToMessage.from_partner_name}</p>
+              </div>
+              <button onClick={() => setReplyingToMessage(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4">
+              {/* Original Message */}
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs text-gray-500 mb-1">Original message:</div>
+                <div className="text-sm text-gray-700">{replyingToMessage.content}</div>
+              </div>
+
+              {/* Reply */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Your Reply *</label>
+                <textarea
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  rows="4"
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Type your reply..."
+                />
+              </div>
+
+              <div className="mt-3 p-2 bg-purple-50 rounded text-xs text-purple-700">
+                <span className="font-medium">📧</span> Reply will be sent to: {replyingToMessage.from_partner_email}
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setReplyingToMessage(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={replyToPartnerMessage}
+                disabled={sendingReply || !replyContent.trim()}
+                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {sendingReply ? 'Sending...' : '📤 Send Reply'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
