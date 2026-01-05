@@ -7610,6 +7610,7 @@ class PartnerMessageRequest(BaseModel):
     content: str
     partner_name: Optional[str] = None
     partner_email: Optional[str] = None
+    order_number: Optional[str] = None
 
 
 @api_router.post("/partner/messages")
@@ -7639,6 +7640,7 @@ async def send_partner_message(request: PartnerMessageRequest):
         "from_partner_email": request.partner_email or partner.get("email"),
         "recipient_type": recipient_type,
         "recipient_name": recipient_name,
+        "order_number": request.order_number,
         "content": request.content,
         "read": False,
         "created_at": now
@@ -7773,6 +7775,79 @@ async def reply_to_partner_message(message_id: str, request: ReplyToPartnerReque
         # Don't fail the request even if email fails
 
     return {"status": "success", "message": "Reply sent"}
+
+
+@api_router.get("/admin/partner-response-times")
+async def get_partner_response_times(admin_key: str):
+    """Get response time statistics for partner messages"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get all partner messages
+    messages = await db.partner_messages.find().sort("created_at", -1).to_list(1000)
+
+    # Group by partner and calculate stats
+    partner_stats = {}
+    for msg in messages:
+        partner_id = msg.get("from_partner_id", "unknown")
+        partner_name = msg.get("from_partner_name", "Unknown Partner")
+
+        if partner_id not in partner_stats:
+            partner_stats[partner_id] = {
+                "partner_id": partner_id,
+                "partner_name": partner_name,
+                "partner_email": msg.get("from_partner_email", ""),
+                "total_messages": 0,
+                "replied_messages": 0,
+                "pending_messages": 0,
+                "response_times": [],
+                "messages": []
+            }
+
+        partner_stats[partner_id]["total_messages"] += 1
+
+        msg_data = {
+            "id": msg.get("id"),
+            "content": msg.get("content", "")[:100] + ("..." if len(msg.get("content", "")) > 100 else ""),
+            "order_number": msg.get("order_number"),
+            "created_at": msg.get("created_at").isoformat() if msg.get("created_at") else None,
+            "replied": msg.get("replied", False),
+            "replied_at": msg.get("replied_at").isoformat() if msg.get("replied_at") else None,
+            "response_time_hours": None
+        }
+
+        if msg.get("replied") and msg.get("replied_at") and msg.get("created_at"):
+            response_time = (msg["replied_at"] - msg["created_at"]).total_seconds() / 3600
+            msg_data["response_time_hours"] = round(response_time, 2)
+            partner_stats[partner_id]["response_times"].append(response_time)
+            partner_stats[partner_id]["replied_messages"] += 1
+        else:
+            partner_stats[partner_id]["pending_messages"] += 1
+
+        partner_stats[partner_id]["messages"].append(msg_data)
+
+    # Calculate averages
+    result = []
+    for partner_id, stats in partner_stats.items():
+        avg_response_time = None
+        if stats["response_times"]:
+            avg_response_time = round(sum(stats["response_times"]) / len(stats["response_times"]), 2)
+
+        result.append({
+            "partner_id": stats["partner_id"],
+            "partner_name": stats["partner_name"],
+            "partner_email": stats["partner_email"],
+            "total_messages": stats["total_messages"],
+            "replied_messages": stats["replied_messages"],
+            "pending_messages": stats["pending_messages"],
+            "avg_response_time_hours": avg_response_time,
+            "messages": stats["messages"][:10]  # Last 10 messages
+        })
+
+    # Sort by pending messages first, then by avg response time
+    result.sort(key=lambda x: (-x["pending_messages"], x["avg_response_time_hours"] or 999))
+
+    return {"partner_stats": result}
 
 
 @api_router.get("/admin/read-receipts")
