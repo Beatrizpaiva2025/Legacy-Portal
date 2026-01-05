@@ -7793,6 +7793,83 @@ async def get_read_receipts(admin_key: str, limit: int = 50):
     return {"receipts": receipts}
 
 
+# ==================== TRANSLATOR MESSAGES ====================
+
+class TranslatorMessageRequest(BaseModel):
+    translator_id: str
+    translator_name: str
+    translator_email: Optional[str] = None
+    content: str
+    order_number: Optional[str] = None
+    admin_name: Optional[str] = "Admin"
+
+
+@api_router.post("/admin/translator-messages")
+async def send_translator_message(request: TranslatorMessageRequest, admin_key: str):
+    """Admin/PM sends a message to a translator"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    translator_message = {
+        "id": message_id,
+        "type": "admin_to_translator",
+        "to_translator_id": request.translator_id,
+        "to_translator_name": request.translator_name,
+        "to_translator_email": request.translator_email,
+        "from_admin_name": request.admin_name,
+        "order_number": request.order_number,
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.translator_messages.insert_one(translator_message)
+
+    return {"status": "success", "message_id": message_id}
+
+
+@api_router.get("/translator/messages")
+async def get_translator_messages(admin_key: str, translator_id: str = None, token: str = None):
+    """Get messages for a translator"""
+    # Can be accessed by admin or by translator with token
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    if not translator_id:
+        raise HTTPException(status_code=400, detail="translator_id required")
+
+    messages = await db.translator_messages.find(
+        {"to_translator_id": translator_id}
+    ).sort("created_at", -1).limit(50).to_list(50)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
+@api_router.put("/translator/messages/{message_id}/read")
+async def mark_translator_message_read(message_id: str, admin_key: str):
+    """Mark a translator message as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.translator_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
 @api_router.get("/messages/unread-count")
 async def get_unread_count(token: str):
     """Get count of unread messages"""
