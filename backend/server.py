@@ -7850,6 +7850,119 @@ async def get_partner_response_times(admin_key: str):
     return {"partner_stats": result}
 
 
+class PartnerNotificationRequest(BaseModel):
+    partner_id: str
+    partner_email: str
+    partner_name: str
+    subject: Optional[str] = "Message from Legacy Translations"
+    content: str
+    admin_name: Optional[str] = "Admin"
+
+
+@api_router.post("/admin/send-partner-notification")
+async def send_partner_notification(request: PartnerNotificationRequest, admin_key: str):
+    """Admin sends a notification/message to a partner"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Create a message record
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    admin_message = {
+        "id": message_id,
+        "type": "admin_to_partner",
+        "to_partner_id": request.partner_id,
+        "to_partner_name": request.partner_name,
+        "to_partner_email": request.partner_email,
+        "from_admin_name": request.admin_name,
+        "subject": request.subject,
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.partner_notifications.insert_one(admin_message)
+
+    # Send email to partner
+    try:
+        email_html = f'''
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0;">Legacy Translations</h1>
+            </div>
+            <div style="padding: 30px; background: #f9fafb;">
+                <p style="color: #374151;">Dear {request.partner_name},</p>
+                <p style="color: #374151;">You have received a new message:</p>
+
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <p style="color: #0284c7; font-weight: bold; margin: 0 0 10px 0;">Message from {request.admin_name}:</p>
+                    <p style="color: #374151; margin: 0; white-space: pre-wrap;">{request.content}</p>
+                </div>
+
+                <p style="color: #374151;">You can reply to this message through your partner portal.</p>
+
+                <p style="color: #374151; margin-top: 30px;">Best regards,<br><strong>Legacy Translations Team</strong></p>
+            </div>
+        </div>
+        '''
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = request.subject
+        msg['From'] = os.environ.get("SMTP_EMAIL", "noreply@legacytranslations.com")
+        msg['To'] = request.partner_email
+        msg.attach(MIMEText(email_html, 'html'))
+
+        smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_email = os.environ.get("SMTP_EMAIL")
+        smtp_password = os.environ.get("SMTP_PASSWORD")
+
+        if smtp_email and smtp_password:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_email, smtp_password)
+                server.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send partner notification email: {e}")
+
+    return {"status": "success", "message_id": message_id}
+
+
+@api_router.get("/partner/notifications")
+async def get_partner_notifications(token: str):
+    """Get notifications for a partner"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    notifications = await db.partner_notifications.find(
+        {"to_partner_id": partner["id"]}
+    ).sort("created_at", -1).limit(50).to_list(50)
+
+    for notif in notifications:
+        notif["_id"] = str(notif["_id"])
+        if notif.get("created_at"):
+            notif["created_at"] = notif["created_at"].isoformat()
+
+    return {"notifications": notifications}
+
+
+@api_router.put("/partner/notifications/{notification_id}/read")
+async def mark_partner_notification_read(notification_id: str, token: str):
+    """Mark a partner notification as read"""
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    result = await db.partner_notifications.update_one(
+        {"id": notification_id, "to_partner_id": partner["id"]},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    return {"status": "success"}
+
+
 @api_router.get("/admin/read-receipts")
 async def get_read_receipts(admin_key: str, limit: int = 50):
     """Get read receipts for admin - shows when partners read messages"""

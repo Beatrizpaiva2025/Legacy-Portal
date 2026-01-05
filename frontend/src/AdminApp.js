@@ -4948,11 +4948,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="space-y-4">
           {/* Translator Messages Panel */}
           {user?.role === 'translator' && (
-            <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-purple-50 border-purple-300' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
-                  <span className={`mr-2 text-xl ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-600' : 'text-gray-400'}`}>💬</span>
-                  <span className={`text-sm font-bold ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-800' : 'text-gray-600'}`}>
+                  <span className={`mr-2 text-xl ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-orange-600' : 'text-gray-400'}`}>💬</span>
+                  <span className={`text-sm font-bold ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-orange-800' : 'text-gray-600'}`}>
                     {translatorMessages.filter(m => !m.read).length > 0
                       ? `${translatorMessages.filter(m => !m.read).length} New Message(s) from Admin/PM`
                       : 'Messages from Admin/PM'}
@@ -4961,7 +4961,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {translatorMessages.length > 0 && (
                   <button
                     onClick={() => setShowTranslatorMessages(!showTranslatorMessages)}
-                    className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-white rounded border border-purple-200"
+                    className="text-xs text-orange-600 hover:text-orange-800 px-2 py-1 bg-white rounded border border-orange-200"
                   >
                     {showTranslatorMessages ? 'Hide' : `View All (${translatorMessages.length})`}
                   </button>
@@ -4977,12 +4977,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {translatorMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`p-3 rounded border ${msg.read ? 'bg-gray-50 border-gray-200' : 'bg-white border-purple-200'}`}
+                      className={`p-3 rounded border ${msg.read ? 'bg-gray-50 border-gray-200' : 'bg-white border-orange-200'}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`font-medium text-sm ${msg.read ? 'text-gray-600' : 'text-purple-800'}`}>
+                            <span className={`font-medium text-sm ${msg.read ? 'text-gray-600' : 'text-orange-800'}`}>
                               From: {msg.from_admin_name}
                             </span>
                             {msg.order_number && (
@@ -5008,7 +5008,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="flex justify-end mt-2 pt-2 border-t">
                           <button
                             onClick={() => markTranslatorMessageRead(msg.id)}
-                            className="px-3 py-1 text-purple-600 border border-purple-200 rounded text-xs hover:bg-purple-50"
+                            className="px-3 py-1 text-orange-600 border border-orange-200 rounded text-xs hover:bg-orange-50"
                           >
                             ✓ Mark as read
                           </button>
@@ -12805,8 +12805,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Translator Assignment Status */}
                   {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
-                    <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="text-xs font-medium text-purple-700 mb-2">Translator Assignment</div>
+                    <div className="mt-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                      <div className="text-xs font-medium text-orange-700 mb-2">Translator Assignment</div>
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
@@ -12833,7 +12833,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 order_number: viewingOrder.order_number
                               });
                             }}
-                            className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 flex items-center gap-1"
                           >
                             💬 Send Message
                           </button>
@@ -13212,7 +13212,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             {/* Header */}
-            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+            <div className="p-4 border-b bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold">💬 Send Message to Translator</h3>
@@ -13238,7 +13238,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   value={translatorMessageContent}
                   onChange={(e) => setTranslatorMessageContent(e.target.value)}
                   placeholder="Type your message to the translator..."
-                  className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   rows={5}
                 />
               </div>
@@ -13261,7 +13261,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button
                 onClick={sendMessageToTranslator}
                 disabled={sendingTranslatorMessage || !translatorMessageContent.trim()}
-                className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                className="px-4 py-2 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:bg-gray-300 flex items-center gap-2"
               >
                 {sendingTranslatorMessage ? (
                   <>
@@ -21469,6 +21469,212 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   );
 };
 
+// ==================== FLOATING CHAT WIDGET ====================
+const FloatingChatWidget = ({ adminKey, user }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [recipientType, setRecipientType] = useState('translator'); // 'translator' or 'partner'
+  const [selectedRecipient, setSelectedRecipient] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sending, setSending] = useState(false);
+  const [translators, setTranslators] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchRecipients();
+    }
+  }, [isOpen, recipientType]);
+
+  useEffect(() => {
+    // Fetch unread partner messages count
+    const fetchUnread = async () => {
+      try {
+        const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+        const unread = (response.data.messages || []).filter(m => !m.read).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [adminKey]);
+
+  const fetchRecipients = async () => {
+    try {
+      if (recipientType === 'translator') {
+        const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+        setTranslators(response.data || []);
+      } else {
+        const response = await axios.get(`${API}/admin/partners?admin_key=${adminKey}`);
+        setPartners(response.data.partners || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipients:', err);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!selectedRecipient || !messageContent.trim()) return;
+    setSending(true);
+    try {
+      if (recipientType === 'translator') {
+        const translator = translators.find(t => t.id === selectedRecipient);
+        await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+          translator_id: selectedRecipient,
+          translator_name: translator?.name || 'Translator',
+          translator_email: translator?.email || '',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      } else {
+        // For partners, we'll create a notification/message
+        const partner = partners.find(p => p.id === selectedRecipient);
+        await axios.post(`${API}/admin/send-partner-notification?admin_key=${adminKey}`, {
+          partner_id: selectedRecipient,
+          partner_email: partner?.email || '',
+          partner_name: partner?.company_name || partner?.contact_name || 'Partner',
+          subject: 'Message from Legacy Translations',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      }
+      alert('Message sent successfully!');
+      setMessageContent('');
+      setSelectedRecipient('');
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Don't show for translators
+  if (user?.role === 'translator') return null;
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 flex items-center justify-center z-50 transition-all hover:scale-105"
+      >
+        {isOpen ? (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
+        {unreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+            <h3 className="font-bold text-lg">Send Message</h3>
+            <p className="text-xs text-blue-100">Contact translators or partners</p>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 space-y-4">
+            {/* Recipient Type Toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => { setRecipientType('translator'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'translator'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Translator
+              </button>
+              <button
+                onClick={() => { setRecipientType('partner'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'partner'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Partner
+              </button>
+            </div>
+
+            {/* Recipient Select */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Select {recipientType === 'translator' ? 'Translator' : 'Partner'}:
+              </label>
+              <select
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Select --</option>
+                {recipientType === 'translator'
+                  ? translators.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  : partners.map(p => (
+                      <option key={p.id} value={p.id}>{p.company_name || p.contact_name}</option>
+                    ))
+                }
+              </select>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Message:</label>
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="Type your message..."
+                className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+              />
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={sendMessage}
+              disabled={sending || !selectedRecipient || !messageContent.trim()}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {sending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send Message
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ==================== MAIN APP ====================
 function AdminApp() {
   const [adminKey, setAdminKey] = useState(null);
@@ -21664,6 +21870,7 @@ function AdminApp() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
+      <FloatingChatWidget adminKey={adminKey} user={user} />
     </div>
   );
 }

@@ -2181,7 +2181,7 @@ const OrdersPage = ({ token }) => {
                         setMessageOrder(order);
                         setShowMessageModal(true);
                       }}
-                      className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -2200,7 +2200,7 @@ const OrdersPage = ({ token }) => {
       {showMessageModal && messageOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+            <div className="p-4 border-b bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-lg">Send Message</h3>
@@ -2220,7 +2220,7 @@ const OrdersPage = ({ token }) => {
                 value={messageContent}
                 onChange={(e) => setMessageContent(e.target.value)}
                 placeholder="Type your message here..."
-                className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 rows={5}
               />
               <p className="text-xs text-gray-500 mt-2">
@@ -2237,7 +2237,7 @@ const OrdersPage = ({ token }) => {
               <button
                 onClick={sendMessage}
                 disabled={sendingMessage || !messageContent.trim()}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 disabled:bg-gray-300 flex items-center gap-2"
               >
                 {sendingMessage ? (
                   <>
@@ -2604,6 +2604,191 @@ const VerificationPage = ({ certificationId }) => {
   );
 };
 
+// ==================== PARTNER FLOATING CHAT WIDGET ====================
+const PartnerFloatingChatWidget = ({ token, partner }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messageContent, setMessageContent] = useState('');
+  const [sending, setSending] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  useEffect(() => {
+    if (token) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
+
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get(`${API}/partner/notifications?token=${token}`);
+      setNotifications(response.data.notifications || []);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      await axios.put(`${API}/partner/notifications/${notificationId}/read?token=${token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!messageContent.trim()) return;
+    setSending(true);
+    try {
+      await axios.post(`${API}/partner/messages`, {
+        token,
+        recipient: 'admin',
+        content: messageContent,
+        partner_name: partner?.company_name || partner?.contact_name || 'Partner',
+        partner_email: partner?.email
+      });
+      alert('Message sent successfully!');
+      setMessageContent('');
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => { setIsOpen(!isOpen); setShowNotifications(false); }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 flex items-center justify-center z-50 transition-all hover:scale-105"
+      >
+        {isOpen ? (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
+        {unreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+            <h3 className="font-bold text-lg">Contact Us</h3>
+            <p className="text-xs text-blue-100">Send a message to Legacy Translations</p>
+          </div>
+
+          {/* Tab Toggle */}
+          <div className="flex border-b">
+            <button
+              onClick={() => setShowNotifications(false)}
+              className={`flex-1 py-2 text-sm font-medium ${!showNotifications ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600'}`}
+            >
+              New Message
+            </button>
+            <button
+              onClick={() => setShowNotifications(true)}
+              className={`flex-1 py-2 text-sm font-medium relative ${showNotifications ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600' : 'text-gray-600'}`}
+            >
+              Inbox
+              {unreadCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-4">
+            {!showNotifications ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Your Message:</label>
+                  <textarea
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
+                    placeholder="How can we help you?"
+                    className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    rows={4}
+                  />
+                </div>
+                <button
+                  onClick={sendMessage}
+                  disabled={sending || !messageContent.trim()}
+                  className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {sending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      Send Message
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="text-center text-gray-500 py-4">
+                    <div className="text-2xl mb-2">📭</div>
+                    <p className="text-sm">No messages yet</p>
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`p-3 rounded-lg border ${notif.read ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'}`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-medium text-blue-700">{notif.from_admin_name}</span>
+                        {!notif.read && (
+                          <button
+                            onClick={() => markAsRead(notif.id)}
+                            className="text-xs text-blue-600 hover:underline"
+                          >
+                            Mark read
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700">{notif.content}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {notif.created_at ? new Date(notif.created_at).toLocaleString() : ''}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ==================== MAIN APP ====================
 function App() {
   const [partner, setPartner] = useState(null);
@@ -2768,6 +2953,7 @@ function App() {
         </header>
         {renderContent()}
       </div>
+      <PartnerFloatingChatWidget token={token} partner={partner} />
     </div>
   );
 }
