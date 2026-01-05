@@ -2126,18 +2126,21 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 Document={'Bytes': content}
             )
 
-            # Extract text preserving layout
+            # Extract text - try layout preservation first, fallback to simple extraction
+            text = ""
             if preserve_layout:
                 text = reconstruct_layout_from_textract(response.get('Blocks', []))
-            else:
-                # Simple extraction (original behavior)
+
+            # Fallback to simple extraction if layout reconstruction returned empty
+            if not text or len(text.strip()) < 10:
                 text_parts = []
                 for block in response.get('Blocks', []):
                     if block['BlockType'] == 'LINE':
                         text_parts.append(block['Text'])
                 text = '\n'.join(text_parts)
+                logger.info(f"AWS Textract: layout reconstruction empty, using simple extraction")
 
-            logger.info(f"AWS Textract extracted {len(text)} characters from image (layout preserved: {preserve_layout})")
+            logger.info(f"AWS Textract extracted {len(text)} characters from image")
             return text
 
         # For PDFs, convert pages to images first
@@ -2176,10 +2179,13 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                         Document={'Bytes': img_data}
                     )
 
-                    # Extract text preserving layout
+                    # Extract text - try layout preservation first, fallback to simple extraction
+                    page_text = ""
                     if preserve_layout:
                         page_text = reconstruct_layout_from_textract(response.get('Blocks', []))
-                    else:
+
+                    # Fallback to simple extraction if layout reconstruction returned empty
+                    if not page_text or len(page_text.strip()) < 5:
                         page_text = ""
                         for block in response.get('Blocks', []):
                             if block['BlockType'] == 'LINE':
