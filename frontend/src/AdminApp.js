@@ -10877,10 +10877,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
                   <option value="">-- Choose Translator --</option>
-                  {/* Option for admin/PM to assign to themselves */}
-                  {(user?.role === 'admin' || user?.role === 'pm') && (
+                  {/* Option for admin to assign to themselves */}
+                  {user?.role === 'admin' && (
                     <option value="self" className="font-medium bg-purple-50">
-                      👤 Myself ({user?.name || user?.role}) - No email notification
+                      👤 Myself ({user?.name || 'Admin'}) - No email notification
                     </option>
                   )}
                   {translatorList.filter(t => t.is_active !== false).map(t => (
