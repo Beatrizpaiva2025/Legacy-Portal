@@ -1266,326 +1266,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       `
     },
-    'historico-escolar-sp': {
-      name: "Histórico Escolar SP",
-      description: 'Ensino Fundamental',
-      category: 'education',
-      isForm: true,
-      formHTML: `
-        <div style="font-family: Arial, sans-serif; font-size: 10px; line-height: 1.3; max-width: 800px; margin: 0 auto; padding: 15px; background: #fff; border: 1px solid #000;">
-
-          <!-- Header -->
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #000;">
-            <div style="text-align: center; width: 80px;">
-              <div style="width: 60px; height: 60px; border: 1px solid #000; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 7px;">
-                State of<br/>São Paulo<br/>Coat of Arms
-              </div>
-            </div>
-            <div style="text-align: center; flex: 1;">
-              <div style="font-size: 11px; font-weight: bold;">SECRETARIA DA EDUCAÇÃO DO ESTADO DE SÃO PAULO</div>
-              <div style="font-size: 10px; font-weight: bold;">DEPARTMENT OF EDUCATION OF THE STATE OF SÃO PAULO</div>
-              <div style="font-size: 13px; font-weight: bold; margin-top: 5px;">HISTÓRICO ESCOLAR / SCHOOL TRANSCRIPT</div>
-              <div style="font-size: 9px;">ENSINO FUNDAMENTAL / ELEMENTARY AND MIDDLE SCHOOL</div>
-            </div>
-            <div style="text-align: center; width: 80px;">
-              <div style="width: 60px; height: 60px; border: 1px solid #000; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 7px;">
-                School<br/>Logo
-              </div>
-            </div>
-          </div>
-
-          <!-- School Information -->
-          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px; background: #f5f5f5;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">ESTABELECIMENTO DE ENSINO / EDUCATIONAL INSTITUTION:</div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <div style="flex: 2;">
-                <span style="font-size: 8px;">Nome/Name:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Código CIE:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
-              <div style="flex: 2;">
-                <span style="font-size: 8px;">Endereço/Address:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Município/City:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="width: 80px;">
-                <span style="font-size: 8px;">UF/State:</span>
-                <input type="text" value="SP" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Student Information -->
-          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">IDENTIFICAÇÃO DO ALUNO / STUDENT IDENTIFICATION:</div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <div style="flex: 2;">
-                <span style="font-size: 8px;">Nome Completo/Full Name:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">RA (Registro do Aluno):</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
-              <div style="width: 120px;">
-                <span style="font-size: 8px;">Data de Nascimento/DOB:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Naturalidade/Place of Birth:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="width: 100px;">
-                <span style="font-size: 8px;">Nacionalidade/Nationality:</span>
-                <input type="text" value="Brasileira/Brazilian" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Filiação - Pai/Father:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Mãe/Mother:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px;">
-              <div style="width: 150px;">
-                <span style="font-size: 8px;">RG/ID Number:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="width: 150px;">
-                <span style="font-size: 8px;">CPF:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-              <div style="flex: 1;">
-                <span style="font-size: 8px;">Certidão de Nascimento/Birth Certificate:</span>
-                <input type="text" style="border: none; border-bottom: 1px solid #000; width: 100%; padding: 2px; font-size: 10px; background: #fff;" contenteditable="true" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Grades Table -->
-          <div style="margin-bottom: 8px;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">APROVEITAMENTO ESCOLAR / ACADEMIC RECORD:</div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
-              <thead>
-                <tr style="background: #e0e0e0;">
-                  <th style="border: 1px solid #000; padding: 4px; text-align: left; width: 180px;">COMPONENTES CURRICULARES<br/><span style="font-size: 7px; font-weight: normal;">SUBJECTS</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">1º Ano<br/><span style="font-size: 7px;">1st Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">2º Ano<br/><span style="font-size: 7px;">2nd Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">3º Ano<br/><span style="font-size: 7px;">3rd Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">4º Ano<br/><span style="font-size: 7px;">4th Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">5º Ano<br/><span style="font-size: 7px;">5th Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">6º Ano<br/><span style="font-size: 7px;">6th Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">7º Ano<br/><span style="font-size: 7px;">7th Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">8º Ano<br/><span style="font-size: 7px;">8th Grade</span></th>
-                  <th style="border: 1px solid #000; padding: 4px; text-align: center; width: 45px;">9º Ano<br/><span style="font-size: 7px;">9th Grade</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Língua Portuguesa / Portuguese</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Matemática / Mathematics</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Ciências / Science</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">História / History</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Geografia / Geography</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Educação Física / Physical Ed.</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Arte / Art</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Língua Inglesa / English</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr style="background: #f0f0f0;">
-                  <td style="border: 1px solid #000; padding: 3px; font-weight: bold;">RESULTADO / RESULT</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Carga Horária / Hours</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Dias Letivos / School Days</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-                <tr>
-                  <td style="border: 1px solid #000; padding: 3px;">Frequência % / Attendance %</td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                  <td style="border: 1px solid #000; padding: 3px; text-align: center;" contenteditable="true"></td>
-                </tr>
-              </tbody>
-            </table>
-            <div style="font-size: 8px; margin-top: 3px; color: #555;">
-              <strong>Legenda / Legend:</strong> A = Aprovado/Passed | R = Retido/Retained | AP = Aprovado por Progressão/Passed by Progression | T = Transferido/Transferred
-            </div>
-          </div>
-
-          <!-- Observations -->
-          <div style="border: 1px solid #000; padding: 8px; margin-bottom: 8px;">
-            <div style="font-weight: bold; margin-bottom: 5px; font-size: 9px;">OBSERVAÇÕES / OBSERVATIONS:</div>
-            <div style="min-height: 40px; border: 1px dashed #ccc; padding: 5px; font-size: 9px;" contenteditable="true">
-              Escala de notas: 0 a 10 (Média to aprovação: 5,0) / Grading scale: 0 to 10 (Passing grade: 5.0)
-            </div>
-          </div>
-
-          <!-- Signatures -->
-          <div style="display: flex; gap: 20px; margin-top: 15px;">
-            <div style="flex: 1; text-align: center;">
-              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
-                <div style="font-size: 9px;">Local e Data / Place and Date</div>
-                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
-                <div style="font-size: 9px;">Secretário(a) Escolar / School Secretary</div>
-                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
-              </div>
-            </div>
-            <div style="flex: 1; text-align: center;">
-              <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 5px;">
-                <div style="font-size: 9px;">Diretor(a) / Principal</div>
-                <input type="text" style="border: none; width: 100%; text-align: center; font-size: 10px; margin-top: 5px;" contenteditable="true" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Footer -->
-          <div style="margin-top: 15px; padding-top: 8px; border-top: 1px solid #000; font-size: 8px; text-align: center; color: #666;">
-            <div>Este document não contém emendas ou rasuras / This document contains no amendments or erasures</div>
-            <div style="margin-top: 3px;">Documento válido em todo território nacional conforme Lei nº 9.394/96 (LDB)</div>
-            <div>Valid document throughout national territory according to Law No. 9,394/96 (LDB)</div>
-          </div>
-
-        </div>
-      `
-    },
     'cnh-brasil': {
       name: "CNH Brasil",
       description: 'Driver License',
@@ -5274,6 +4954,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
                         </div>
                       )}
+                      {order.internal_notes && (
+                        <div className="text-[10px] text-amber-600 mt-1">
+                          📝 Has instructions from PM
+                        </div>
+                      )}
                       {selectedOrderId === order.id && (
                         <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Project selected</div>
                       )}
@@ -5287,6 +4972,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <p className="text-xs mt-1">{user?.role === 'admin' ? 'Use "Assign to Me" button in Projects to assign projects to yourself' : 'Wait for project assignment by PM'}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* PM Instructions - Show when project is selected and has internal notes */}
+          {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
+            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-2xl">📝</div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-amber-800 mb-2">Instructions from PM</h3>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -9581,6 +9281,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Partner Messages state
+  const [partnerMessages, setPartnerMessages] = useState([]);
+  const [showPartnerMessages, setShowPartnerMessages] = useState(false);
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+
   // QuickBooks state
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
@@ -10341,11 +10048,59 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
-  // Poll for notifications
+  // Fetch partner messages
+  const fetchPartnerMessages = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}`);
+      setPartnerMessages(response.data.messages || []);
+    } catch (err) {
+      console.error('Failed to fetch partner messages:', err);
+    }
+  };
+
+  // Mark partner message as read
+  const markPartnerMessageRead = async (messageId) => {
+    try {
+      await axios.put(`${API}/admin/partner-messages/${messageId}/read?admin_key=${adminKey}`);
+      fetchPartnerMessages();
+    } catch (err) {
+      console.error('Failed to mark message as read:', err);
+    }
+  };
+
+  // Reply to partner message
+  const replyToPartnerMessage = async () => {
+    if (!replyingToMessage || !replyContent.trim()) return;
+    setSendingReply(true);
+    try {
+      // Send reply via email to partner
+      await axios.post(`${API}/admin/partner-messages/${replyingToMessage.id}/reply?admin_key=${adminKey}`, {
+        content: replyContent,
+        partner_email: replyingToMessage.from_partner_email,
+        partner_name: replyingToMessage.from_partner_name,
+        admin_name: user?.name || 'Admin'
+      });
+      alert('Reply sent to ' + replyingToMessage.from_partner_name + '!');
+      setReplyingToMessage(null);
+      setReplyContent('');
+      fetchPartnerMessages();
+    } catch (err) {
+      console.error('Failed to send reply:', err);
+      alert('Failed to send reply. Please try again.');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  // Poll for notifications and partner messages
   useEffect(() => {
     if (adminKey && (isAdmin || isPM)) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000); // Every 30 seconds
+      fetchPartnerMessages();
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchPartnerMessages();
+      }, 30000); // Every 30 seconds
       return () => clearInterval(interval);
     }
   }, [adminKey, user]);
@@ -10835,6 +10590,130 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Partner Messages Panel */}
+      {partnerMessages.filter(m => !m.read).length > 0 && (
+        <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <span className="text-purple-600 mr-2">💬</span>
+              <span className="text-sm font-medium text-purple-800">
+                {partnerMessages.filter(m => !m.read).length} message(s) from partners
+              </span>
+            </div>
+            <button
+              onClick={() => setShowPartnerMessages(!showPartnerMessages)}
+              className="text-xs text-purple-600 hover:text-purple-800"
+            >
+              {showPartnerMessages ? 'Hide' : 'View'}
+            </button>
+          </div>
+          {showPartnerMessages && (
+            <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+              {partnerMessages.filter(m => !m.read).map((msg) => (
+                <div
+                  key={msg.id}
+                  className="p-3 bg-white rounded border border-purple-200"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm text-purple-800">
+                          {msg.from_partner_name}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">
+                          {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {msg.from_partner_email}
+                      </div>
+                      <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                        {msg.content}
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-2">
+                        {new Date(msg.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2 pt-2 border-t">
+                    <button
+                      onClick={() => {
+                        setReplyingToMessage(msg);
+                        setReplyContent('');
+                      }}
+                      className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700"
+                    >
+                      📧 Reply
+                    </button>
+                    <button
+                      onClick={() => markPartnerMessageRead(msg.id)}
+                      className="px-3 py-1 text-gray-600 border rounded text-xs hover:bg-gray-100"
+                    >
+                      Mark as read
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reply to Partner Message Modal */}
+      {replyingToMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📧 Reply to Partner</h3>
+                <p className="text-xs opacity-80">{replyingToMessage.from_partner_name}</p>
+              </div>
+              <button onClick={() => setReplyingToMessage(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4">
+              {/* Original Message */}
+              <div className="mb-4 p-3 bg-gray-50 rounded border">
+                <div className="text-xs text-gray-500 mb-1">Original message:</div>
+                <div className="text-sm text-gray-700">{replyingToMessage.content}</div>
+              </div>
+
+              {/* Reply */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Your Reply *</label>
+                <textarea
+                  value={replyContent}
+                  onChange={(e) => setReplyContent(e.target.value)}
+                  rows="4"
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Type your reply..."
+                />
+              </div>
+
+              <div className="mt-3 p-2 bg-purple-50 rounded text-xs text-purple-700">
+                <span className="font-medium">📧</span> Reply will be sent to: {replyingToMessage.from_partner_email}
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setReplyingToMessage(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={replyToPartnerMessage}
+                disabled={sendingReply || !replyContent.trim()}
+                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {sendingReply ? 'Sending...' : '📤 Send Reply'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

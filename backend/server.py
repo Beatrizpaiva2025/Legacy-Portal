@@ -7604,6 +7604,177 @@ async def mark_message_read(message_id: str, token: str):
     return {"status": "success", "read_at": read_at.isoformat()}
 
 
+class PartnerMessageRequest(BaseModel):
+    token: str
+    recipient: str
+    content: str
+    partner_name: Optional[str] = None
+    partner_email: Optional[str] = None
+
+
+@api_router.post("/partner/messages")
+async def send_partner_message(request: PartnerMessageRequest):
+    """Partner sends a message to PM or Admin"""
+    # Verify token
+    partner = await db.partners.find_one({"token": request.token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Create the message
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    # Determine recipient type
+    recipient_type = "admin"
+    recipient_name = "Admin"
+    if request.recipient.startswith("pm:"):
+        recipient_type = "pm"
+        recipient_name = request.recipient.replace("pm:", "")
+
+    partner_message = {
+        "id": message_id,
+        "type": "partner_message",
+        "from_partner_id": partner["id"],
+        "from_partner_name": request.partner_name or partner.get("company_name", partner.get("contact_name", "Partner")),
+        "from_partner_email": request.partner_email or partner.get("email"),
+        "recipient_type": recipient_type,
+        "recipient_name": recipient_name,
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.partner_messages.insert_one(partner_message)
+
+    # Create notification for admin
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "partner_message",
+        "title": f"New message from {partner_message['from_partner_name']}",
+        "message": request.content[:100] + ("..." if len(request.content) > 100 else ""),
+        "partner_id": partner["id"],
+        "partner_name": partner_message['from_partner_name'],
+        "recipient_type": recipient_type,
+        "recipient_name": recipient_name,
+        "is_read": False,
+        "created_at": now
+    }
+    await db.notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
+
+
+@api_router.get("/admin/partner-messages")
+async def get_admin_partner_messages(admin_key: str, limit: int = 50):
+    """Get messages sent by partners for admin view"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
+@api_router.put("/admin/partner-messages/{message_id}/read")
+async def mark_partner_message_read(message_id: str, admin_key: str):
+    """Mark a partner message as read by admin"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.partner_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
+class ReplyToPartnerRequest(BaseModel):
+    content: str
+    partner_email: str
+    partner_name: str
+    admin_name: Optional[str] = "Admin"
+
+
+@api_router.post("/admin/partner-messages/{message_id}/reply")
+async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
+    """Admin replies to a partner message via email"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    # Get the original message
+    message = await db.partner_messages.find_one({"id": message_id})
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # Mark message as read
+    await db.partner_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow(), "replied": True, "replied_at": datetime.utcnow()}}
+    )
+
+    # Send email reply to partner
+    try:
+        email_html = f'''
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0;">Legacy Translations</h1>
+            </div>
+            <div style="padding: 30px; background: #f9fafb;">
+                <p style="color: #374151;">Dear {request.partner_name},</p>
+                <p style="color: #374151;">You have received a reply to your message:</p>
+
+                <div style="background: #e0e7ff; border-left: 4px solid #6366f1; padding: 15px; margin: 20px 0;">
+                    <p style="color: #4338ca; font-style: italic; margin: 0;">Your message:</p>
+                    <p style="color: #374151; margin: 10px 0 0 0;">{message.get('content', '')}</p>
+                </div>
+
+                <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <p style="color: #7c3aed; font-weight: bold; margin: 0 0 10px 0;">Reply from {request.admin_name}:</p>
+                    <p style="color: #374151; margin: 0; white-space: pre-wrap;">{request.content}</p>
+                </div>
+
+                <p style="color: #374151;">If you have any further questions, please feel free to reply to this email or send a new message through the portal.</p>
+
+                <p style="color: #374151; margin-top: 30px;">Best regards,<br><strong>Legacy Translations Team</strong></p>
+            </div>
+            <div style="background: #1f2937; padding: 15px; text-align: center;">
+                <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2024 Legacy Translations. All rights reserved.</p>
+            </div>
+        </div>
+        '''
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = f"Reply from Legacy Translations - {request.admin_name}"
+        msg['From'] = os.environ.get("SMTP_EMAIL", "noreply@legacytranslations.com")
+        msg['To'] = request.partner_email
+        msg.attach(MIMEText(email_html, 'html'))
+
+        smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_email = os.environ.get("SMTP_EMAIL")
+        smtp_password = os.environ.get("SMTP_PASSWORD")
+
+        if smtp_email and smtp_password:
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_email, smtp_password)
+                server.send_message(msg)
+    except Exception as e:
+        print(f"Failed to send reply email: {e}")
+        # Don't fail the request even if email fails
+
+    return {"status": "success", "message": "Reply sent"}
+
+
 @api_router.get("/admin/read-receipts")
 async def get_read_receipts(admin_key: str, limit: int = 50):
     """Get read receipts for admin - shows when partners read messages"""
