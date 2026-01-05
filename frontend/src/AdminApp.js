@@ -6863,8 +6863,31 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Side by side view */}
               <div className="border rounded mb-4">
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
-                  <div className="px-3 py-2 border-r">
+                  <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
+                    <label className="px-2 py-1 bg-orange-500 text-white text-[10px] rounded cursor-pointer hover:bg-orange-600">
+                      📤 Upload
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = {
+                                data: event.target.result,
+                                filename: file.name
+                              };
+                              setOriginalImages(newOriginalImages);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
                   </div>
                   <div className="px-3 py-2">
                     <span className="text-xs font-bold text-gray-700">
