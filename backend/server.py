@@ -4484,7 +4484,8 @@ async def get_translators_payment_summary(admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+        # Include all vendor roles: translator, admin, pm, sales
+        translators = await db.admin_users.find({"role": {"$in": ["translator", "admin", "pm", "sales"]}}).to_list(100)
         result = []
         for translator in translators:
             payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
@@ -4496,6 +4497,7 @@ async def get_translators_payment_summary(admin_key: str):
                 "translator_id": translator["id"],
                 "name": translator.get("name", ""),
                 "email": translator.get("email", ""),
+                "role": translator.get("role", "translator"),
                 "rate_per_page": rate_per_page,
                 "rate_per_word": translator.get("rate_per_word", 0) or 0,
                 "pages_translated": translator.get("pages_translated", 0) or 0,
@@ -4526,9 +4528,10 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        # Include all vendor roles: translator, admin, pm, sales
+        translator = await db.admin_users.find_one({"id": translator_id, "role": {"$in": ["translator", "admin", "pm", "sales"]}})
         if not translator:
-            raise HTTPException(status_code=404, detail="Translator not found")
+            raise HTTPException(status_code=404, detail="Vendor not found")
         payments = await db.translator_payments.find({"translator_id": translator_id}).sort("payment_date", -1).to_list(100)
         for payment in payments:
             if "_id" in payment:
@@ -4542,6 +4545,7 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
                 "id": translator["id"],
                 "name": translator.get("name", ""),
                 "email": translator.get("email", ""),
+                "role": translator.get("role", "translator"),
                 "rate_per_page": translator.get("rate_per_page", 0),
                 "pages_translated": translator.get("pages_translated", 0),
                 "pages_pending_payment": translator.get("pages_pending_payment", 0),
@@ -4644,9 +4648,10 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        translator = await db.admin_users.find_one({"id": translator_id, "role": "translator"})
+        # Include all vendor roles: translator, admin, pm, sales
+        translator = await db.admin_users.find_one({"id": translator_id, "role": {"$in": ["translator", "admin", "pm", "sales"]}})
         if not translator:
-            raise HTTPException(status_code=404, detail="Translator not found")
+            raise HTTPException(status_code=404, detail="Vendor not found")
         current_translated = translator.get("pages_translated", 0) or 0
         current_pending = translator.get("pages_pending_payment", 0) or 0
         await db.admin_users.update_one({"id": translator_id}, {"$set": {"pages_translated": current_translated + pages, "pages_pending_payment": current_pending + pages}})
@@ -4689,7 +4694,8 @@ async def get_payment_report(admin_key: str, start_date: str = None, end_date: s
             by_translator[tid]["total_paid"] += p.get("amount", 0)
             by_translator[tid]["total_pages"] += p.get("pages_paid", 0)
             by_translator[tid]["payment_count"] += 1
-        translators = await db.admin_users.find({"role": "translator"}).to_list(100)
+        # Include all vendor roles: translator, admin, pm, sales
+        translators = await db.admin_users.find({"role": {"$in": ["translator", "admin", "pm", "sales"]}}).to_list(100)
         total_pending = 0
         for t in translators:
             rate = t.get("rate_per_page", 0) or 0
