@@ -1878,6 +1878,11 @@ const OrdersPage = ({ token }) => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderDocuments, setOrderDocuments] = useState({});
   const [loadingDocuments, setLoadingDocuments] = useState({});
+  // Messaging state
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageOrder, setMessageOrder] = useState(null);
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -1944,6 +1949,28 @@ const OrdersPage = ({ token }) => {
       console.error('Failed to fetch orders:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!messageContent.trim() || !messageOrder) return;
+    setSendingMessage(true);
+    try {
+      await axios.post(`${API}/partner/messages`, {
+        token,
+        recipient: 'admin',
+        content: messageContent,
+        order_number: messageOrder.order_number
+      });
+      alert('Message sent successfully!');
+      setShowMessageModal(false);
+      setMessageContent('');
+      setMessageOrder(null);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -2145,10 +2172,84 @@ const OrdersPage = ({ token }) => {
                       </div>
                     )}
                   </div>
+
+                  {/* Send Message Button */}
+                  <div className="mt-4 pt-4 border-t">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMessageOrder(order);
+                        setShowMessageModal(true);
+                      }}
+                      className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span>Send Message About This Order</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Message Modal */}
+      {showMessageModal && messageOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-lg">Send Message</h3>
+                  <p className="text-sm opacity-80">Order: #{messageOrder.order_number}</p>
+                </div>
+                <button
+                  onClick={() => { setShowMessageModal(false); setMessageContent(''); setMessageOrder(null); }}
+                  className="text-white hover:text-gray-200 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Your Message:</label>
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="Type your message here..."
+                className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                rows={5}
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                This message will be sent to our team regarding order #{messageOrder.order_number}
+              </p>
+            </div>
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end gap-2">
+              <button
+                onClick={() => { setShowMessageModal(false); setMessageContent(''); setMessageOrder(null); }}
+                className="px-4 py-2 bg-gray-400 text-white rounded-lg text-sm hover:bg-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendMessage}
+                disabled={sendingMessage || !messageContent.trim()}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+              >
+                {sendingMessage ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>Send Message</>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
