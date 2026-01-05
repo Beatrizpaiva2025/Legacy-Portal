@@ -1213,7 +1213,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     if (!guestEmail) {
       errors.email = t.pleaseEnterEmail;
     }
-    if (wordCount === 0) {
+    if (uploadedFiles.length === 0) {
       errors.files = t.pleaseUploadDocument;
     }
     if ((needsPhysicalCopy || formData.service_type === 'rmv') &&
@@ -2011,7 +2011,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             {/* Continue to Payment Button */}
             <button
               type="submit"
-              disabled={submitting || wordCount === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
+              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
               className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
             >
               {submitting ? t.processingBtn : t.continueToPayment}
