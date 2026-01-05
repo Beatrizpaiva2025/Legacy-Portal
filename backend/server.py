@@ -7604,6 +7604,99 @@ async def mark_message_read(message_id: str, token: str):
     return {"status": "success", "read_at": read_at.isoformat()}
 
 
+class PartnerMessageRequest(BaseModel):
+    token: str
+    recipient: str
+    content: str
+    partner_name: Optional[str] = None
+    partner_email: Optional[str] = None
+
+
+@api_router.post("/partner/messages")
+async def send_partner_message(request: PartnerMessageRequest):
+    """Partner sends a message to PM or Admin"""
+    # Verify token
+    partner = await db.partners.find_one({"token": request.token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Create the message
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    # Determine recipient type
+    recipient_type = "admin"
+    recipient_name = "Admin"
+    if request.recipient.startswith("pm:"):
+        recipient_type = "pm"
+        recipient_name = request.recipient.replace("pm:", "")
+
+    partner_message = {
+        "id": message_id,
+        "type": "partner_message",
+        "from_partner_id": partner["id"],
+        "from_partner_name": request.partner_name or partner.get("company_name", partner.get("contact_name", "Partner")),
+        "from_partner_email": request.partner_email or partner.get("email"),
+        "recipient_type": recipient_type,
+        "recipient_name": recipient_name,
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+
+    await db.partner_messages.insert_one(partner_message)
+
+    # Create notification for admin
+    notification = {
+        "id": str(uuid.uuid4()),
+        "type": "partner_message",
+        "title": f"New message from {partner_message['from_partner_name']}",
+        "message": request.content[:100] + ("..." if len(request.content) > 100 else ""),
+        "partner_id": partner["id"],
+        "partner_name": partner_message['from_partner_name'],
+        "recipient_type": recipient_type,
+        "recipient_name": recipient_name,
+        "is_read": False,
+        "created_at": now
+    }
+    await db.notifications.insert_one(notification)
+
+    return {"status": "success", "message_id": message_id}
+
+
+@api_router.get("/admin/partner-messages")
+async def get_admin_partner_messages(admin_key: str, limit: int = 50):
+    """Get messages sent by partners for admin view"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
+
+    for msg in messages:
+        msg["_id"] = str(msg["_id"])
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+
+    return {"messages": messages}
+
+
+@api_router.put("/admin/partner-messages/{message_id}/read")
+async def mark_partner_message_read(message_id: str, admin_key: str):
+    """Mark a partner message as read by admin"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    result = await db.partner_messages.update_one(
+        {"id": message_id},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    return {"status": "success"}
+
+
 @api_router.get("/admin/read-receipts")
 async def get_read_receipts(admin_key: str, limit: int = 50):
     """Get read receipts for admin - shows when partners read messages"""

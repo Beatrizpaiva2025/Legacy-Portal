@@ -751,6 +751,69 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [sendingSupport, setSendingSupport] = useState(false);
   const supportFileInputRef = useRef(null);
 
+  // Human messaging states
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [messageRecipient, setMessageRecipient] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [messageSuccess, setMessageSuccess] = useState('');
+  const [partnerOrders, setPartnerOrders] = useState([]);
+
+  // Fetch partner's orders to get assigned PMs
+  useEffect(() => {
+    const fetchPartnerOrders = async () => {
+      if (!token) return;
+      try {
+        const response = await axios.get(`${API}/orders?token=${token}`);
+        setPartnerOrders(response.data.orders || []);
+      } catch (err) {
+        console.error('Failed to fetch orders for PM info:', err);
+      }
+    };
+    fetchPartnerOrders();
+  }, [token]);
+
+  // Get unique PMs from orders
+  const getAvailablePMs = () => {
+    const pms = new Set();
+    partnerOrders.forEach(order => {
+      if (order.assigned_pm) {
+        pms.add(order.assigned_pm);
+      }
+    });
+    return Array.from(pms);
+  };
+
+  // Send human message
+  const sendHumanMessage = async () => {
+    if (!messageRecipient || !messageContent.trim()) {
+      alert('Please select a recipient and enter a message');
+      return;
+    }
+    setSendingMessage(true);
+    try {
+      await axios.post(`${API}/partner/messages`, {
+        token,
+        recipient: messageRecipient,
+        content: messageContent,
+        partner_name: partner?.company_name || partner?.name || 'Partner',
+        partner_email: partner?.email
+      });
+      setMessageSuccess('Message sent successfully! You will receive a response via email.');
+      setMessageContent('');
+      setMessageRecipient('');
+      setTimeout(() => {
+        setShowMessageModal(false);
+        setMessageSuccess('');
+      }, 3000);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   // Format price with currency conversion
   const formatPrice = (usdPrice) => {
     const converted = usdPrice * currency.rate;
@@ -1564,30 +1627,31 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             <h2 className="text-xl font-bold text-gray-800 mb-1">Get Support</h2>
             <p className="text-gray-600 text-sm mb-4">Share details about your issue and our team will respond via email.</p>
 
-            {/* Live Chat Option */}
-            <a
-              href="https://mia-atendimento-1.onrender.com/webchat/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block mb-6 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200 hover:from-teal-100 hover:to-teal-150 transition-colors"
+            {/* Message Your Team Option */}
+            <button
+              onClick={() => {
+                setShowContactModal(false);
+                setShowMessageModal(true);
+              }}
+              className="block w-full mb-6 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200 hover:from-purple-100 hover:to-purple-150 transition-colors text-left"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                  <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
                     <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-teal-800">Live Chat</h3>
-                    <p className="text-xs text-teal-600">Instant support available</p>
+                    <h3 className="font-semibold text-purple-800">Message Your Team</h3>
+                    <p className="text-xs text-purple-600">Send a message to your PM or Admin</p>
                   </div>
                 </div>
-                <span className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold text-sm">
-                  Start Chat
+                <span className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold text-sm">
+                  Send Message
                 </span>
               </div>
-            </a>
+            </button>
 
             <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
@@ -1700,6 +1764,101 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     className="px-6 py-2 bg-amber-200 text-gray-800 rounded-md font-semibold hover:bg-amber-300 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
                   >
                     {sendingSupport ? '...' : 'SEND REQUEST'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Human Message Modal */}
+      {showMessageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md relative">
+            <button
+              onClick={() => {
+                setShowMessageModal(false);
+                setMessageContent('');
+                setMessageRecipient('');
+                setMessageSuccess('');
+              }}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl"
+            >
+              &times;
+            </button>
+
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">💬</span>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">How can we help you?</h2>
+              <p className="text-gray-600 text-sm">Send a message to your team</p>
+            </div>
+
+            {messageSuccess ? (
+              <div className="p-4 bg-green-100 text-green-700 rounded-md text-center">
+                <span className="text-2xl mb-2 block">✅</span>
+                {messageSuccess}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Recipient Selection */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Send to *</label>
+                  <select
+                    value={messageRecipient}
+                    onChange={(e) => setMessageRecipient(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">-- Select recipient --</option>
+                    {getAvailablePMs().map(pm => (
+                      <option key={pm} value={`pm:${pm}`}>
+                        📋 {pm} (Project Manager)
+                      </option>
+                    ))}
+                    <option value="admin">👤 Admin - Legacy Translations</option>
+                  </select>
+                  {getAvailablePMs().length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">No PM assigned yet. You can message the Admin directly.</p>
+                  )}
+                </div>
+
+                {/* Message Content */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Your Message *</label>
+                  <textarea
+                    value={messageContent}
+                    onChange={(e) => setMessageContent(e.target.value)}
+                    placeholder="Type your message here..."
+                    rows="4"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                  />
+                </div>
+
+                {/* Info */}
+                <div className="p-3 bg-purple-50 rounded-md text-xs text-purple-700">
+                  <span className="font-medium">📧 Note:</span> You will receive a response via email at {partner?.email}
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowMessageModal(false);
+                      setMessageContent('');
+                      setMessageRecipient('');
+                    }}
+                    className="px-4 py-2 text-gray-600 font-medium hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={sendHumanMessage}
+                    disabled={sendingMessage || !messageRecipient || !messageContent.trim()}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-md font-semibold hover:bg-purple-700 disabled:bg-gray-300 transition-colors"
+                  >
+                    {sendingMessage ? 'Sending...' : '📤 Send Message'}
                   </button>
                 </div>
               </div>
