@@ -13876,6 +13876,8 @@ const FollowupsPage = ({ adminKey }) => {
   const [processing, setProcessing] = useState(false);
   const [followupData, setFollowupData] = useState(null);
   const [error, setErrorr] = useState('');
+  const [selectedStage, setSelectedStage] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   const fetchFollowupStatus = async () => {
     setLoading(true);
@@ -13903,6 +13905,41 @@ const FollowupsPage = ({ adminKey }) => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const excludeFromFollowup = async (quoteId, quoteType) => {
+    if (!window.confirm('Tem certeza que deseja remover este cliente do follow-up automático?')) {
+      return;
+    }
+    try {
+      await axios.post(`${API}/admin/quotes/exclude-from-followup?admin_key=${adminKey}&quote_id=${quoteId}&quote_type=${quoteType}`);
+      fetchFollowupStatus();
+    } catch (err) {
+      alert('Erro ao excluir cliente do follow-up');
+      console.error(err);
+    }
+  };
+
+  const openStageModal = (stage) => {
+    setSelectedStage(stage);
+    setShowModal(true);
+  };
+
+  const getClientsForStage = (stage) => {
+    if (!followupData) return [];
+    const allClients = [
+      ...(followupData.abandoned_quotes || []),
+      ...(followupData.quote_orders || [])
+    ];
+    return allClients.filter(client => client.followup_stage === stage);
+  };
+
+  const stageLabels = {
+    pending: { title: 'Pending (0-3 days)', color: 'gray' },
+    first: { title: '1st Reminder', color: 'yellow' },
+    second: { title: '2nd Reminder (10%)', color: 'blue' },
+    third: { title: '3rd Reminder (15%)', color: 'red' },
+    lost: { title: 'Marked Lost', color: 'gray' }
   };
 
   useEffect(() => {
@@ -13944,28 +13981,48 @@ const FollowupsPage = ({ adminKey }) => {
           </button>
         </div>
 
-        {/* Summary Cards */}
+        {/* Summary Cards - Clickable */}
         {followupData?.summary && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4 text-center">
+            <div
+              onClick={() => openStageModal('pending')}
+              className="bg-white rounded-lg shadow p-4 text-center cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-300"
+            >
               <div className="text-3xl font-bold text-gray-600">{followupData.summary.total_pending}</div>
               <div className="text-xs text-gray-500">Pending (0-3 days)</div>
+              <div className="text-xs text-gray-400 mt-1">Click to view</div>
             </div>
-            <div className="bg-yellow-50 rounded-lg shadow p-4 text-center border border-yellow-200">
+            <div
+              onClick={() => openStageModal('first')}
+              className="bg-yellow-50 rounded-lg shadow p-4 text-center border border-yellow-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-yellow-400"
+            >
               <div className="text-3xl font-bold text-yellow-600">{followupData.summary.needs_first_reminder}</div>
               <div className="text-xs text-yellow-700">Need 1st Reminder</div>
+              <div className="text-xs text-yellow-500 mt-1">Click to view</div>
             </div>
-            <div className="bg-blue-50 rounded-lg shadow p-4 text-center border border-blue-200">
+            <div
+              onClick={() => openStageModal('second')}
+              className="bg-blue-50 rounded-lg shadow p-4 text-center border border-blue-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-blue-400"
+            >
               <div className="text-3xl font-bold text-blue-600">{followupData.summary.needs_second_reminder}</div>
               <div className="text-xs text-blue-700">Need 2nd Reminder (10%)</div>
+              <div className="text-xs text-blue-500 mt-1">Click to view</div>
             </div>
-            <div className="bg-red-50 rounded-lg shadow p-4 text-center border border-red-200">
+            <div
+              onClick={() => openStageModal('third')}
+              className="bg-red-50 rounded-lg shadow p-4 text-center border border-red-200 cursor-pointer hover:shadow-lg transition-shadow hover:border-red-400"
+            >
               <div className="text-3xl font-bold text-red-600">{followupData.summary.needs_third_reminder}</div>
               <div className="text-xs text-red-700">Need 3rd Reminder (15%)</div>
+              <div className="text-xs text-red-500 mt-1">Click to view</div>
             </div>
-            <div className="bg-gray-100 rounded-lg shadow p-4 text-center">
+            <div
+              onClick={() => openStageModal('lost')}
+              className="bg-gray-100 rounded-lg shadow p-4 text-center cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-gray-400"
+            >
               <div className="text-3xl font-bold text-gray-500">{followupData.summary.marked_lost}</div>
               <div className="text-xs text-gray-500">Marked Lost</div>
+              <div className="text-xs text-gray-400 mt-1">Click to view</div>
             </div>
           </div>
         )}
@@ -14094,6 +14151,81 @@ const FollowupsPage = ({ adminKey }) => {
             <div className="text-6xl mb-4">✅</div>
             <h3 className="text-lg font-semibold text-gray-700">All caught up!</h3>
             <p className="text-gray-500">No quotes requiring follow-up at this time.</p>
+          </div>
+        )}
+
+        {/* Modal for Stage Details */}
+        {showModal && selectedStage && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                selectedStage === 'first' ? 'bg-yellow-50' :
+                selectedStage === 'second' ? 'bg-blue-50' :
+                selectedStage === 'third' ? 'bg-red-50' :
+                'bg-gray-50'
+              }`}>
+                <h2 className="text-xl font-bold text-gray-800">
+                  {stageLabels[selectedStage]?.title || selectedStage}
+                </h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[60vh]">
+                {getClientsForStage(selectedStage).length === 0 ? (
+                  <p className="text-center text-gray-500 py-8">Nenhum cliente nesta categoria</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Cliente</th>
+                        <th className="px-4 py-2 text-left">Email</th>
+                        <th className="px-4 py-2 text-right">Valor</th>
+                        <th className="px-4 py-2 text-center">Dias</th>
+                        <th className="px-4 py-2 text-center">Reminders</th>
+                        <th className="px-4 py-2 text-center">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getClientsForStage(selectedStage).map((client, idx) => (
+                        <tr key={idx} className="border-t hover:bg-gray-50">
+                          <td className="px-4 py-2 font-medium">
+                            {client.client_name || client.name}
+                            {client.order_number && (
+                              <span className="text-xs text-gray-500 ml-2">#{client.order_number}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">{client.client_email || client.email}</td>
+                          <td className="px-4 py-2 text-right">${(client.total_price || 0).toFixed(2)}</td>
+                          <td className="px-4 py-2 text-center">{client.days_since_creation}</td>
+                          <td className="px-4 py-2 text-center">{client.followup_count || client.reminder_count || 0}</td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              onClick={() => excludeFromFollowup(client.id, client.type)}
+                              className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
+                              title="Remover do follow-up automático"
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              <div className="px-6 py-4 border-t bg-gray-50 flex justify-end">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
