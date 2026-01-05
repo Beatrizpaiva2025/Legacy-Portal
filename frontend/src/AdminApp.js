@@ -10,21 +10,21 @@ const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
-  'Quote': 'bg-gray-100 text-gray-700',
+  'Quote': 'bg-slate-100 text-slate-700',
   'Confirmed': 'bg-blue-100 text-blue-700',
   'In progress': 'bg-yellow-100 text-yellow-700',
   'Completed': 'bg-green-100 text-green-700',
-  'Client Review': 'bg-orange-100 text-orange-700',
-  'Delivered': 'bg-teal-100 text-teal-700',
-  'received': 'bg-gray-100 text-gray-700',
+  'Client Review': 'bg-sky-100 text-sky-700',
+  'Delivered': 'bg-blue-100 text-blue-700',
+  'received': 'bg-slate-100 text-slate-700',
   'in_translation': 'bg-yellow-100 text-yellow-700',
-  'review': 'bg-indigo-100 text-indigo-700',
-  'pending_pm_review': 'bg-purple-100 text-purple-700',
+  'review': 'bg-blue-100 text-blue-700',
+  'pending_pm_review': 'bg-sky-100 text-sky-700',
   'pending_admin_approval': 'bg-blue-100 text-blue-700',
-  'client_review': 'bg-orange-100 text-orange-700',
+  'client_review': 'bg-sky-100 text-sky-700',
   'ready': 'bg-green-100 text-green-700',
-  'delivered': 'bg-teal-100 text-teal-700',
-  'final': 'bg-purple-100 text-purple-700'
+  'delivered': 'bg-blue-100 text-blue-700',
+  'final': 'bg-indigo-100 text-indigo-700'
 };
 
 const PAYMENT_COLORS = {
@@ -279,7 +279,7 @@ const AdminLogin = ({ onLogin }) => {
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
           <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl text-white">🔑</span>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Reset Password</h1>
@@ -304,7 +304,7 @@ const AdminLogin = ({ onLogin }) => {
               <input
                 type="email"
                 required
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="your@email.com"
@@ -314,7 +314,7 @@ const AdminLogin = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
             >
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
@@ -323,7 +323,7 @@ const AdminLogin = ({ onLogin }) => {
           <div className="mt-4 text-center">
             <button
               onClick={() => { setShowForgotPassword(false); setErrorr(''); setSuccess(''); }}
-              className="text-teal-600 hover:underline text-xs"
+              className="text-blue-600 hover:underline text-xs"
             >
               ← Back to Login
             </button>
@@ -337,7 +337,7 @@ const AdminLogin = ({ onLogin }) => {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔐</span>
           </div>
           <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
@@ -363,7 +363,7 @@ const AdminLogin = ({ onLogin }) => {
               <input
                 type="password"
                 required
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 value={adminKey}
                 onChange={(e) => setAdminKey(e.target.value)}
                 placeholder="Enter admin key..."
@@ -376,7 +376,7 @@ const AdminLogin = ({ onLogin }) => {
                 <input
                   type="email"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
@@ -387,7 +387,7 @@ const AdminLogin = ({ onLogin }) => {
                 <input
                   type="password"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -399,7 +399,7 @@ const AdminLogin = ({ onLogin }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
           >
             {loading ? 'Verifying...' : 'Login'}
           </button>
@@ -409,17 +409,20 @@ const AdminLogin = ({ onLogin }) => {
           {!useAdminKey && (
             <button
               onClick={() => setShowForgotPassword(true)}
-              className="text-teal-600 hover:underline text-xs block w-full"
+              className="text-blue-600 hover:underline text-xs block w-full"
             >
               Forgot Password?
             </button>
           )}
           <button
             onClick={() => setUseAdminKey(!useAdminKey)}
-            className="text-gray-500 hover:text-teal-600 text-xs"
+            className="text-gray-500 hover:text-blue-600 text-xs"
           >
             {useAdminKey ? '← Login with email' : 'Use admin key instead'}
           </button>
+          <div>
+            <a href="/" className="text-blue-600 hover:underline text-xs">← Back to Partner Portal</a>
+          </div>
         </div>
       </div>
     </div>
@@ -550,7 +553,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     admin: { label: 'Administrator', color: 'bg-red-500' },
     pm: { label: 'Project Manager', color: 'bg-blue-500' },
     translator: { label: 'Translator', color: 'bg-green-500' },
-    sales: { label: 'Sales', color: 'bg-purple-500' }
+    sales: { label: 'Sales', color: 'bg-blue-500' }
   };
 
   const roleInfo = roleConfig[userRole] || roleConfig.admin;
@@ -560,7 +563,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
       {/* Logo and Brand */}
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
+          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-sm">🌐</div>
           <div>
             <div className="font-bold text-sm">Legacy Admin</div>
           </div>
@@ -575,9 +578,9 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
             onClick={() => setActiveTab(item.id)}
             className={`flex items-center px-3 py-1.5 rounded transition-colors ${
               activeTab === item.id
-                ? item.id === 'mia-bot' ? 'bg-purple-600 text-white' : 'bg-teal-600 text-white'
+                ? item.id === 'mia-bot' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
                 : item.id === 'mia-bot'
-                ? 'text-purple-300 hover:bg-purple-700 bg-purple-900/50'
+                ? 'text-blue-300 hover:bg-blue-700 bg-blue-900/50'
                 : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
@@ -620,7 +623,7 @@ const SearchBar = ({ value, onChange, placeholder }) => (
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder || "Search by name or email..."}
-      className="w-64 px-3 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 pl-8"
+      className="w-64 px-3 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 pl-8"
     />
     <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">🔍</span>
   </div>
@@ -4759,13 +4762,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-teal-500 rounded flex items-center justify-center text-sm">🌐</div>
+            <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-sm">🌐</div>
             <div>
               <div className="font-bold text-sm">Legacy Admin</div>
             </div>
           </div>
         </div>
-        <div className="flex items-center px-3 py-1.5 rounded bg-teal-600 text-white">
+        <div className="flex items-center px-3 py-1.5 rounded bg-blue-600 text-white">
           <span className="mr-1.5">✍️</span>
           <span>Translation</span>
         </div>
@@ -4945,11 +4948,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="space-y-4">
           {/* Translator Messages Panel */}
           {user?.role === 'translator' && (
-            <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-purple-50 border-purple-300' : 'bg-gray-50 border-gray-200'}`}>
+            <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
-                  <span className={`mr-2 text-xl ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-600' : 'text-gray-400'}`}>💬</span>
-                  <span className={`text-sm font-bold ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-800' : 'text-gray-600'}`}>
+                  <span className={`mr-2 text-xl ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>💬</span>
+                  <span className={`text-sm font-bold ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-blue-800' : 'text-gray-600'}`}>
                     {translatorMessages.filter(m => !m.read).length > 0
                       ? `${translatorMessages.filter(m => !m.read).length} New Message(s) from Admin/PM`
                       : 'Messages from Admin/PM'}
@@ -4958,7 +4961,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {translatorMessages.length > 0 && (
                   <button
                     onClick={() => setShowTranslatorMessages(!showTranslatorMessages)}
-                    className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-white rounded border border-purple-200"
+                    className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-white rounded border border-blue-200"
                   >
                     {showTranslatorMessages ? 'Hide' : `View All (${translatorMessages.length})`}
                   </button>
@@ -4974,12 +4977,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {translatorMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className={`p-3 rounded border ${msg.read ? 'bg-gray-50 border-gray-200' : 'bg-white border-purple-200'}`}
+                      className={`p-3 rounded border ${msg.read ? 'bg-gray-50 border-gray-200' : 'bg-white border-blue-200'}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`font-medium text-sm ${msg.read ? 'text-gray-600' : 'text-purple-800'}`}>
+                            <span className={`font-medium text-sm ${msg.read ? 'text-gray-600' : 'text-blue-800'}`}>
                               From: {msg.from_admin_name}
                             </span>
                             {msg.order_number && (
@@ -5005,7 +5008,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="flex justify-end mt-2 pt-2 border-t">
                           <button
                             onClick={() => markTranslatorMessageRead(msg.id)}
-                            className="px-3 py-1 text-purple-600 border border-purple-200 rounded text-xs hover:bg-purple-50"
+                            className="px-3 py-1 text-blue-600 border border-blue-200 rounded text-xs hover:bg-blue-50"
                           >
                             ✓ Mark as read
                           </button>
@@ -5020,8 +5023,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {/* Assigned Projects Section - For Translators and Admin */}
           {(user?.role === 'translator' || user?.role === 'admin') && (
-            <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-purple-50 to-indigo-50 border-purple-200' : 'from-teal-50 to-emerald-50 border-teal-200'} border rounded-lg p-4`}>
-              <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-purple-800' : 'text-teal-800'} mb-3`}>
+            <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-blue-50 to-blue-100 border-blue-200' : 'from-blue-50 to-blue-100 border-blue-200'} border rounded-lg p-4`}>
+              <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'} mb-3`}>
                 {user?.role === 'admin' ? '👑 Admin Translation Projects' : '📋 My Assigned Projects'}
               </h3>
               {loadingAssigned ? (
@@ -5034,16 +5037,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => selectProject(order)}
                       className={`p-3 rounded-lg cursor-pointer transition-all border ${
                         selectedOrderId === order.id
-                          ? 'bg-teal-100 border-teal-500 shadow-md'
-                          : 'bg-white border-gray-200 hover:border-teal-400 hover:shadow'
+                          ? 'bg-blue-100 border-blue-500 shadow-md'
+                          : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-teal-700 text-sm">{order.order_number}</span>
+                        <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded ${
                           order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
                           order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
-                          order.translation_status === 'review' ? 'bg-purple-100 text-purple-700' :
+                          order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {order.translation_status}
@@ -5056,17 +5059,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {order.document_type || 'Document'} • {order.page_count || 1} page(s)
                       </div>
                       {order.deadline && (
-                        <div className="text-[10px] text-orange-600 mt-1">
+                        <div className="text-[10px] text-blue-600 mt-1">
                           ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
                         </div>
                       )}
                       {order.internal_notes && (
-                        <div className="text-[10px] text-amber-600 mt-1">
+                        <div className="text-[10px] text-sky-600 mt-1">
                           📝 Has instructions from PM
                         </div>
                       )}
                       {selectedOrderId === order.id && (
-                        <div className="mt-2 text-[10px] text-teal-600 font-medium">✓ Project selected</div>
+                        <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
                       )}
                     </div>
                   ))}
@@ -5083,11 +5086,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
           {/* PM Instructions - Show when project is selected and has internal notes */}
           {selectedOrderId && assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes && (
-            <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+            <div className="bg-sky-50 border border-sky-300 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className="text-2xl">📝</div>
                 <div className="flex-1">
-                  <h3 className="text-sm font-bold text-amber-800 mb-2">Instructions from PM</h3>
+                  <h3 className="text-sm font-bold text-sky-800 mb-2">Instructions from PM</h3>
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">
                     {assignedOrders.find(o => o.id === selectedOrderId)?.internal_notes}
                   </p>
@@ -5138,7 +5141,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">📁</span>
                   <span className="text-sm font-bold">Document Type</span>
-                  {documentType && <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">{documentType}</span>}
+                  {documentType && <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{documentType}</span>}
                 </div>
                 <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
               </summary>
@@ -5147,25 +5150,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-4 gap-2 mb-3">
                   <button
                     onClick={() => setDocumentCategory('financial')}
-                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-blue-100 border'}`}
                   >
                     📊 Financial
                   </button>
                   <button
                     onClick={() => setDocumentCategory('education')}
-                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-blue-100 border'}`}
                   >
                     🎓 Education
                   </button>
                   <button
                     onClick={() => setDocumentCategory('general')}
-                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-blue-100 border'}`}
                   >
                     📄 General
                   </button>
                   <button
                     onClick={() => setDocumentCategory('personal')}
-                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-purple-100 border'}`}
+                    className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-blue-100 border'}`}
                   >
                     👤 Personal
                   </button>
@@ -5232,7 +5235,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <select
                       value={translatorNoteSettings.sourceCurrency}
                       onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, sourceCurrency: e.target.value, exchangeRate: ''})}
-                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       {Object.entries(CURRENCIES).map(([code, curr]) => (
                         <option key={code} value={code}>{curr.flag} {code} - {curr.name}</option>
@@ -5244,7 +5247,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <select
                       value={translatorNoteSettings.targetCurrency}
                       onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, targetCurrency: e.target.value, exchangeRate: ''})}
-                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       {Object.entries(CURRENCIES).map(([code, curr]) => (
                         <option key={code} value={code}>{curr.flag} {code} - {curr.name}</option>
@@ -5266,7 +5269,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         value={translatorNoteSettings.exchangeRate}
                         onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, exchangeRate: e.target.value})}
                         placeholder="Ex: 5.1234"
-                        className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                        className="flex-1 px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                       <button
                         onClick={fetchExchangeRate}
@@ -5283,7 +5286,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="date"
                       value={translatorNoteSettings.rateDate}
                       onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, rateDate: e.target.value})}
-                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
@@ -5294,7 +5297,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <select
                     value={translatorNoteSettings.rateSource}
                     onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, rateSource: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
                     {RATE_SOURCES.map(source => (
                       <option key={source.id} value={source.id}>{source.name} - {source.url}</option>
@@ -5309,7 +5312,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     id="convertValues"
                     checked={translatorNoteSettings.convertValues}
                     onChange={(e) => setTranslatorNoteSettings({...translatorNoteSettings, convertValues: e.target.checked})}
-                    className="w-4 h-4 text-teal-600 rounded"
+                    className="w-4 h-4 text-blue-600 rounded"
                   />
                   <label htmlFor="convertValues" className="text-xs text-yellow-800">
                     <strong>Convert main values in document</strong> (totals, subtotals, balances, loans, credits)
@@ -5755,30 +5758,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <h2 className="text-sm font-bold mb-2">📄 Document Translation</h2>
 
           {/* Translation Type Selector */}
-          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <label className="block text-xs font-medium text-purple-700 mb-2">📁 Document Type</label>
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <label className="block text-xs font-medium text-blue-700 mb-2">📁 Document Type</label>
             <div className="grid grid-cols-4 gap-2">
               <button
                 onClick={() => setDocumentCategory('financial')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'financial' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-blue-100 border'}`}
               >
                 📊 Financial
               </button>
               <button
                 onClick={() => setDocumentCategory('education')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'education' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-blue-100 border'}`}
               >
                 🎓 Education
               </button>
               <button
                 onClick={() => setDocumentCategory('general')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'general' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-blue-100 border'}`}
               >
                 📄 General
               </button>
               <button
                 onClick={() => setDocumentCategory('personal')}
-                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-purple-100 border'}`}
+                className={`px-3 py-2 text-xs rounded-lg transition-all ${documentCategory === 'personal' ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-blue-100 border'}`}
               >
                 👤 Personal
               </button>
@@ -5906,7 +5909,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                                 {/* Replace Button - File input */}
                                 <label
-                                  className="px-2 py-1.5 bg-orange-100 text-orange-600 rounded text-xs hover:bg-orange-200 transition-colors cursor-pointer"
+                                  className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors cursor-pointer"
                                   title="Substituir file"
                                 >
                                   🔄
@@ -5949,7 +5952,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                     setDocumentType(nameWithoutExt);
                                     setProcessingStatus(`✅ Document type set to: "${nameWithoutExt}"`);
                                   }}
-                                  className="px-2 py-1.5 bg-purple-100 text-purple-600 rounded text-xs hover:bg-purple-200 transition-colors"
+                                  className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
                                   title="Usar nome do file na Capa"
                                 >
                                   📋
@@ -6155,8 +6158,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Special Instructions for Claude */}
-              <div className="mt-4 p-3 bg-purple-50 border border-purple-200 rounded">
-                <label className="block text-xs font-medium text-purple-700 mb-1">
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <label className="block text-xs font-medium text-blue-700 mb-1">
                   📝 Special Instructions for Claude (Optional)
                 </label>
                 <textarea
@@ -6165,7 +6168,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   placeholder='e.g., "Describe what is written in Arabic between brackets" or "Keep original formatting with tables"'
                   className="w-full px-2 py-1.5 text-xs border rounded h-16 resize-none"
                 />
-                <p className="text-[10px] text-purple-600 mt-1">
+                <p className="text-[10px] text-blue-600 mt-1">
                   These instructions will be sent to Claude along with each page. Max recommended: 5-10 pages at once.
                 </p>
               </div>
@@ -6214,7 +6217,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <button
                         onClick={handleApplyCorrection}
                         disabled={!correctionCommand.trim() || applyingCorrection}
-                        className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
+                        className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300"
                       >
                         {applyingCorrection ? '⏳' : '✨ Apply'}
                       </button>
@@ -6234,7 +6237,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             link.click();
                           });
                         }}
-                        className="w-full px-3 py-2 bg-orange-100 text-orange-700 text-xs rounded hover:bg-orange-200 flex items-center justify-center gap-1"
+                        className="w-full px-3 py-2 bg-blue-100 text-blue-700 text-xs rounded hover:bg-blue-200 flex items-center justify-center gap-1"
                       >
                         📄 Download Original ({originalImages.length})
                       </button>
@@ -6274,7 +6277,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               setProcessingStatus('❌ Failed to convert: ' + err.message);
                             }
                           }}
-                          className="mt-1 w-full px-3 py-1.5 bg-orange-50 text-orange-600 text-[10px] rounded border border-orange-200 hover:bg-orange-100"
+                          className="mt-1 w-full px-3 py-1.5 bg-blue-50 text-blue-600 text-[10px] rounded border border-blue-200 hover:bg-blue-100"
                         >
                           🖼️ Download as Images (PNG)
                         </button>
@@ -6377,10 +6380,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               {/* Side by Side Upload */}
               <div className="grid grid-cols-2 gap-4 mb-4">
                 {/* Original Document Upload */}
-                <div className="border-2 border-dashed border-orange-300 rounded-lg p-4 bg-orange-50">
-                  <h3 className="text-sm font-bold text-orange-700 mb-2 text-center">📄 Original Document</h3>
+                <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 bg-blue-50">
+                  <h3 className="text-sm font-bold text-blue-700 mb-2 text-center">📄 Original Document</h3>
                   <div
-                    className="text-center cursor-pointer hover:bg-orange-100 rounded p-4 transition-colors"
+                    className="text-center cursor-pointer hover:bg-blue-100 rounded p-4 transition-colors"
                     onClick={() => externalOriginalInputRef.current?.click()}
                   >
                     <input
@@ -6394,20 +6397,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {externalOriginalImages.length > 0 ? (
                       <div>
                         <div className="text-3xl mb-2">✅</div>
-                        <p className="text-xs text-orange-700 font-medium">{externalOriginalImages.length} file(s) uploaded</p>
+                        <p className="text-xs text-blue-700 font-medium">{externalOriginalImages.length} file(s) uploaded</p>
                         <div className="mt-2 max-h-32 overflow-auto">
                           {externalOriginalImages.map((img, idx) => (
                             <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
                           ))}
                         </div>
-                        <button className="mt-2 px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600">
+                        <button className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                           Change Files
                         </button>
                       </div>
                     ) : (
                       <div>
                         <div className="text-3xl mb-2">📤</div>
-                        <button className="px-3 py-1.5 bg-orange-500 text-white text-xs rounded hover:bg-orange-600">
+                        <button className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                           Upload Original
                         </button>
                         <p className="text-[10px] text-gray-500 mt-1">Image or PDF (auto-converted)</p>
@@ -6673,7 +6676,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setDocumentType(nameWithoutExt);
                             setProcessingStatus(`✅ Document type: "${nameWithoutExt}"`);
                           }}
-                          className="mt-2 w-full px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 transition-colors"
+                          className="mt-2 w-full px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 transition-colors"
                           title="Use this filename for Cover Letter"
                         >
                           📋 Use for Cover
@@ -6881,7 +6884,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
                   <div className="px-3 py-2 border-r flex items-center justify-between">
                     <span className="text-xs font-bold text-gray-700">📄 Original Document</span>
-                    <label className="px-2 py-1 bg-orange-500 text-white text-[10px] rounded cursor-pointer hover:bg-orange-600">
+                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
                       📤 Upload
                       <input
                         type="file"
@@ -6974,7 +6977,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <button
                     onClick={handleApplyCorrection}
                     disabled={!correctionCommand.trim() || applyingCorrection}
-                    className="px-3 py-1.5 bg-purple-500 text-white text-xs rounded hover:bg-purple-600 disabled:bg-gray-300"
+                    className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300"
                   >
                     {applyingCorrection ? '⏳' : '✨ Apply'}
                   </button>
@@ -7078,7 +7081,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         alert('Translation sent to PM for proofreading!');
                       }}
                       disabled={sendingToProjects || translationResults.length === 0}
-                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
                     >
                       📤 Send to PM
                     </button>
@@ -7357,7 +7360,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
                         Críticos: <strong>{proofreadingResult.criticos || 0}</strong>
                       </span>
-                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
                         Altos: <strong>{proofreadingResult.altos || 0}</strong>
                       </span>
                       <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
@@ -7407,14 +7410,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                   <tr key={idx} className={`border-t ${
                                     erro.applied ? 'bg-green-50 opacity-60' :
                                     severity === 'CRÍTICO' ? 'bg-red-50' :
-                                    severity === 'ALTO' ? 'bg-orange-50' :
+                                    severity === 'ALTO' ? 'bg-blue-50' :
                                     severity === 'MÉDIO' ? 'bg-yellow-50' :
                                     'bg-blue-50'
                                   }`}>
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
-                                        severity === 'ALTO' ? 'bg-orange-500 text-white' :
+                                        severity === 'ALTO' ? 'bg-blue-500 text-white' :
                                         severity === 'MÉDIO' ? 'bg-yellow-500 text-white' :
                                         'bg-blue-500 text-white'
                                       }`}>
@@ -7506,7 +7509,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        isPM && !isAdmin ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
+                        isPM && !isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
                       {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
@@ -7750,11 +7753,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Upload Originals */}
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-orange-700 mb-2">📑 Upload Original Documents</h3>
-                <p className="text-[10px] text-orange-600 mb-3">Upload original document (PDF auto-converted to images)</p>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-2">📑 Upload Original Documents</h3>
+                <p className="text-[10px] text-blue-600 mb-3">Upload original document (PDF auto-converted to images)</p>
 
-                <div className={`border-2 border-dashed border-orange-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-orange-500'}`}>
+                <div className={`border-2 border-dashed border-blue-300 rounded-lg p-4 text-center transition-colors mb-2 ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-blue-500'}`}>
                   <input
                     type="file"
                     multiple
@@ -7765,8 +7768,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     disabled={quickPackageLoading}
                   />
                   <label htmlFor="quick-original-upload" className={quickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
-                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-orange-600" />
-                    <span className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded hover:bg-orange-700">
+                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-blue-600" />
+                    <span className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">
                       Upload Originals
                     </span>
                     <p className="text-[10px] text-gray-500 mt-1">PDF or images (PDF auto-converted)</p>
@@ -7775,7 +7778,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {quickOriginalFiles.length > 0 && (
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-orange-700">{quickOriginalFiles.length} page(s) uploaded:</p>
+                    <p className="text-xs font-medium text-blue-700">{quickOriginalFiles.length} page(s) uploaded:</p>
                     <div className="max-h-32 overflow-y-auto">
                       {quickOriginalFiles.map((file, idx) => (
                         <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs mb-1">
@@ -7838,8 +7841,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Document Order Preview */}
-              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-purple-700 mb-2">📋 Final Document Order</h3>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
                 <div className="flex items-center gap-2 text-xs flex-wrap">
                   {includeCover && (
                     <>
@@ -7853,13 +7856,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {includeOriginal && quickOriginalFiles.length > 0 && (
                     <>
                       <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
                     </>
                   )}
                   {includeAuthenticityStatement && (
                     <>
                       <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">📋 Authenticity Statement</span>
+                      <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
                     </>
                   )}
                 </div>
@@ -7881,12 +7884,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className={`p-4 rounded mb-4 ${
                 isApprovalComplete
                   ? 'bg-green-50 border border-green-200'
-                  : 'bg-purple-50 border-2 border-purple-300'
+                  : 'bg-blue-50 border-2 border-purple-300'
               }`}>
-                <h3 className="text-sm font-bold text-purple-700 mb-1">
+                <h3 className="text-sm font-bold text-blue-700 mb-1">
                   📋 Translation Checklist <span className="text-red-500">*</span>
                 </h3>
-                <p className="text-[10px] text-purple-600 mb-3">⚠️ Complete all items before submitting</p>
+                <p className="text-[10px] text-blue-600 mb-3">⚠️ Complete all items before submitting</p>
                 <div className="space-y-2">
                   <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
                     approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
@@ -7895,7 +7898,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.projectNumber}
                       onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Did you include the correct project number?</span>
                     {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
@@ -7907,7 +7910,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.languageCorrect}
                       onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Is the source and target language correct?</span>
                     {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
@@ -7919,7 +7922,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.proofread}
                       onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Did you proofread the entire document carefully?</span>
                     {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
@@ -7938,11 +7941,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Submit for Review - For All Roles */}
-              <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-teal-700 mb-2">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-2">
                   📤 {user?.role === 'translator' ? 'Submit for Review' : 'Submit & Notify Team'}
                 </h3>
-                <p className="text-[10px] text-teal-600 mb-3">
+                <p className="text-[10px] text-blue-600 mb-3">
                   {user?.role === 'translator'
                     ? 'Send your translation to Admin/PM for review and approval'
                     : 'Link translation to order and notify team members'}
@@ -7967,13 +7970,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <button
                   onClick={() => sendToProjects('review')}
                   disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                  className="w-full py-2 bg-teal-600 text-white text-sm font-bold rounded hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
                   {sendingToProjects ? '⏳ Sending...' : (user?.role === 'translator' ? '📤 Submit for Admin/PM Review' : '📤 Submit & Notify Admin/PM')}
                 </button>
 
                 {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                  <p className="text-[10px] text-orange-600 mt-2">
+                  <p className="text-[10px] text-blue-600 mt-2">
                     ⚠️ Fill document type and upload translation first
                   </p>
                 )}
@@ -8035,12 +8038,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div className={`p-4 rounded mb-4 ${
                 isApprovalComplete
                   ? 'bg-green-50 border border-green-200'
-                  : 'bg-purple-50 border-2 border-purple-300'
+                  : 'bg-blue-50 border-2 border-purple-300'
               }`}>
-                <h3 className="text-sm font-bold text-purple-700 mb-1">
+                <h3 className="text-sm font-bold text-blue-700 mb-1">
                   📋 Translation Approval Checklist <span className="text-red-500">*</span>
                 </h3>
-                <p className="text-[10px] text-purple-600 mb-3">⚠️ All items must be checked before sending</p>
+                <p className="text-[10px] text-blue-600 mb-3">⚠️ All items must be checked before sending</p>
                 <div className="space-y-2">
                   <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
                     approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
@@ -8049,7 +8052,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.projectNumber}
                       onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Did you include the correct project number?</span>
                     {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
@@ -8061,7 +8064,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.languageCorrect}
                       onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Is the source and target language correct?</span>
                     {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
@@ -8073,7 +8076,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={approvalChecks.proofread}
                       onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
-                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium">Did you proofread the entire document carefully?</span>
                     {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
@@ -8092,16 +8095,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Non-Certified Translation Options */}
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-orange-700 mb-2">📄 For non-certified translations</h3>
-                <p className="text-[10px] text-orange-600 mb-3">Check to EXCLUDE from final document:</p>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-slate-700 mb-2">📄 For non-certified translations</h3>
+                <p className="text-[10px] text-slate-600 mb-3">Check to EXCLUDE from final document:</p>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
                       checked={!includeCover}
                       onChange={(e) => setIncludeCover(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span className="font-medium">Exclude Certificate of Accuracy</span>
                   </label>
@@ -8110,7 +8113,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={!includeLetterhead}
                       onChange={(e) => setIncludeLetterhead(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span className="font-medium">Exclude Letterhead</span>
                   </label>
@@ -8119,7 +8122,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={!includeOriginal}
                       onChange={(e) => setIncludeOriginal(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
@@ -8128,7 +8131,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       type="checkbox"
                       checked={!includeAuthenticityStatement}
                       onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
                   </label>
@@ -8136,32 +8139,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
 
               {/* Translation Memory Option */}
-              <div className="p-4 bg-teal-50 border border-teal-200 rounded mb-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
                       checked={saveToTM}
                       onChange={(e) => setSaveToTM(e.target.checked)}
-                      className="mr-3 w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <div>
                       <span className="font-medium">💾 Save to Translation Memory</span>
-                      <p className="text-[10px] text-teal-600 mt-0.5">
+                      <p className="text-[10px] text-blue-600 mt-0.5">
                         Category: {documentCategory === 'financial' ? '📊 Financial' : documentCategory === 'education' ? '🎓 Education' : documentCategory === 'personal' ? '👤 Personal' : '📄 General'}
                       </p>
                     </div>
                   </label>
-                  <span className="text-[10px] bg-teal-200 text-teal-800 px-2 py-0.5 rounded">
+                  <span className="text-[10px] bg-blue-200 text-blue-800 px-2 py-0.5 rounded">
                     {glossaries.filter(g => g.name?.startsWith('TM -')).length} TMs saved
                   </span>
                 </div>
 
                 {/* View Saved TMs */}
                 {glossaries.filter(g => g.name?.startsWith('TM -')).length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-teal-200">
+                  <div className="mt-3 pt-3 border-t border-blue-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-medium text-teal-700">📚 Saved Translation Memories:</span>
+                      <span className="text-[10px] font-medium text-blue-700">📚 Saved Translation Memories:</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => {
@@ -8173,7 +8176,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.json`;
                             link.click();
                           }}
-                          className="px-2 py-1 text-[9px] bg-teal-600 text-white rounded hover:bg-teal-700"
+                          className="px-2 py-1 text-[9px] bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                           📥 Export All (JSON)
                         </button>
@@ -8208,7 +8211,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             link.download = `translation_memories_${new Date().toISOString().split('T')[0]}.tmx`;
                             link.click();
                           }}
-                          className="px-2 py-1 text-[9px] bg-purple-600 text-white rounded hover:bg-purple-700"
+                          className="px-2 py-1 text-[9px] bg-blue-600 text-white rounded hover:bg-blue-700"
                         >
                           📥 Export All (TMX)
                         </button>
@@ -8457,7 +8460,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
                             {gloss.sourceLang || 'PT'} {gloss.bidirectional ? '↔' : '→'} {gloss.targetLang || 'EN'}
                           </span>
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{gloss.field}</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{gloss.field}</span>
                           <span className="text-[10px] text-gray-500">{gloss.terms?.length || 0} terms</span>
                           {gloss.bidirectional && (
                             <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded text-[10px]">↔ Bidirectional</span>
@@ -8566,9 +8569,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">
                             {instr.sourceLang || 'PT'} → {instr.targetLang || 'EN'}
                           </span>
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{instr.field || 'General'}</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{instr.field || 'General'}</span>
                           {instr.documentType && instr.documentType !== 'All Documents' && (
-                            <span className="px-2 py-0.5 bg-orange-50 text-orange-600 rounded text-[10px]">{instr.documentType}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{instr.documentType}</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-600 line-clamp-2">{instr.content}</p>
@@ -8758,7 +8761,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.source}>{tm.source}</td>
                         <td className="px-3 py-2 max-w-xs truncate" title={tm.target}>{tm.target}</td>
                         <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px]">{tm.field || 'General'}</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[10px]">{tm.field || 'General'}</span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
@@ -10753,17 +10756,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       {/* Partner Messages Panel */}
       {partnerMessages.filter(m => !m.read).length > 0 && (
-        <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-purple-600 mr-2">💬</span>
-              <span className="text-sm font-medium text-purple-800">
+              <span className="text-blue-600 mr-2">💬</span>
+              <span className="text-sm font-medium text-blue-800">
                 {partnerMessages.filter(m => !m.read).length} message(s) from partners
               </span>
             </div>
             <button
               onClick={() => setShowPartnerMessages(!showPartnerMessages)}
-              className="text-xs text-purple-600 hover:text-purple-800"
+              className="text-xs text-blue-600 hover:text-blue-800"
             >
               {showPartnerMessages ? 'Hide' : 'View'}
             </button>
@@ -10773,15 +10776,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {partnerMessages.filter(m => !m.read).map((msg) => (
                 <div
                   key={msg.id}
-                  className="p-3 bg-white rounded border border-purple-200"
+                  className="p-3 bg-white rounded border border-blue-200"
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm text-purple-800">
+                        <span className="font-medium text-sm text-blue-800">
                           {msg.from_partner_name}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
                           {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
                         </span>
                       </div>
@@ -10802,7 +10805,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         setReplyingToMessage(msg);
                         setReplyContent('');
                       }}
-                      className="px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700"
+                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
                     >
                       📧 Reply
                     </button>
@@ -10824,7 +10827,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {replyingToMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
               <div>
                 <h3 className="font-bold">📧 Reply to Partner</h3>
                 <p className="text-xs opacity-80">{replyingToMessage.from_partner_name}</p>
@@ -10851,7 +10854,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 />
               </div>
 
-              <div className="mt-3 p-2 bg-purple-50 rounded text-xs text-purple-700">
+              <div className="mt-3 p-2 bg-blue-50 rounded text-xs text-blue-700">
                 <span className="font-medium">📧</span> Reply will be sent to: {replyingToMessage.from_partner_email}
               </div>
             </div>
@@ -10866,7 +10869,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button
                 onClick={replyToPartnerMessage}
                 disabled={sendingReply || !replyContent.trim()}
-                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {sendingReply ? 'Sending...' : '📤 Send Reply'}
               </button>
@@ -10879,7 +10882,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       {assigningTranslatorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white rounded-t-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
               <div>
                 <h3 className="font-bold">👤 Assign Translator</h3>
                 <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
@@ -10913,7 +10916,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   <option value="">-- Choose Translator --</option>
                   {/* Option for admin to assign to themselves */}
                   {user?.role === 'admin' && (
-                    <option value="self" className="font-medium bg-purple-50">
+                    <option value="self" className="font-medium bg-blue-50">
                       👤 Myself ({user?.name || 'Admin'}) - No email notification
                     </option>
                   )}
@@ -10924,10 +10927,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   ))}
                 </select>
                 {translatorList.length === 0 && (
-                  <p className="text-[10px] text-orange-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                  <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
                 )}
                 {translatorList.length > 0 && translatorList.filter(t => t.is_active !== false).length === 0 && (
-                  <p className="text-[10px] text-orange-600 mt-1">All translators are inactive. They need to accept their invitation first.</p>
+                  <p className="text-[10px] text-blue-600 mt-1">All translators are inactive. They need to accept their invitation first.</p>
                 )}
               </div>
 
@@ -10987,7 +10990,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button
                 onClick={sendTranslatorAssignment}
                 disabled={sendingAssignment || !assignmentDetails.translator_id}
-                className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
+                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
               >
                 {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
               </button>
@@ -11047,8 +11050,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="flex-1 grid grid-cols-2 gap-0 overflow-hidden">
                   {/* Left: Original Document */}
                   <div className="border-r flex flex-col">
-                    <div className="px-4 py-2 bg-orange-50 border-b">
-                      <span className="text-sm font-bold text-orange-700">📄 Original Document</span>
+                    <div className="px-4 py-2 bg-blue-50 border-b">
+                      <span className="text-sm font-bold text-blue-700">📄 Original Document</span>
                       {reviewOriginalDocs[reviewCurrentPage] && (
                         <span className="text-xs text-gray-500 ml-2">{reviewOriginalDocs[reviewCurrentPage].filename}</span>
                       )}
@@ -11254,7 +11257,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           {isAdmin && (
             <button
               onClick={() => setShowNewProjectForm(!showNewProjectForm)}
-              className="px-3 py-1 bg-teal-600 text-white text-xs rounded hover:bg-teal-700"
+              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
             >
               + New Project
             </button>
@@ -11631,7 +11634,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button type="button" onClick={() => setShowNewProjectForm(false)} className="px-4 py-1.5 text-gray-600 text-xs">
                 Cancel
               </button>
-              <button type="submit" disabled={creatingProject} className="px-4 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-400">
+              <button type="submit" disabled={creatingProject} className="px-4 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-400">
                 {creatingProject ? 'Creating...' : 'Create Project'}
               </button>
             </div>
@@ -11697,7 +11700,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           className={`px-1 py-0.5 rounded text-[9px] ${
                             order.translation_status === 'delivered'
                               ? 'bg-blue-500 text-white hover:bg-blue-600'
-                              : 'bg-teal-500 text-white hover:bg-teal-600'
+                              : 'bg-blue-500 text-white hover:bg-blue-600'
                           }`}
                           title={order.translation_status === 'delivered' ? 'Resend translation' : 'Send translation to client'}
                         >
@@ -11805,7 +11808,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {isAdmin && (
                           <button
                             onClick={() => assignTranslator(order.id, 'Admin (Self)')}
-                            className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs hover:bg-purple-200 flex items-center gap-1"
+                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
                             title="Assign to yourself as Admin"
                           >
                             👑 Assign to Me
@@ -11879,7 +11882,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <span className="px-1.5 py-1 bg-blue-50 text-blue-500 rounded text-xs cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3.5 h-3.5 inline" /></span>
                         )}
                         {order.internal_notes && (
-                          <span className="px-1.5 py-1 bg-amber-50 text-amber-500 rounded text-xs cursor-help border border-amber-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3.5 h-3.5 inline" /></span>
+                          <span className="px-1.5 py-1 bg-sky-50 text-sky-500 rounded text-xs cursor-help border border-sky-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3.5 h-3.5 inline" /></span>
                         )}
                         {!order.notes && !order.internal_notes && (
                           <span className="text-gray-300 text-xs">-</span>
@@ -11975,9 +11978,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {(isAdmin || isPM) && order.translation_status === 'received' && (isAdmin || order.translator_assignment_status === 'accepted') && (
                             <button
                               onClick={() => { updateStatus(order.id, 'in_translation'); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-amber-50 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-sky-50 flex items-center gap-2"
                             >
-                              <PlayIcon className="w-4 h-4 text-amber-500" />
+                              <PlayIcon className="w-4 h-4 text-sky-500" />
                               Start Translation
                             </button>
                           )}
@@ -12017,9 +12020,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'client_review'); setOpenActionsDropdown(null); }}
-                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-orange-50 flex items-center gap-2"
+                                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
                               >
-                                <MailIcon className="w-4 h-4 text-orange-500" />
+                                <MailIcon className="w-4 h-4 text-blue-500" />
                                 Send to Client Review
                               </button>
                               <button
@@ -12067,7 +12070,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {isAdmin && order.translation_status === 'ready' && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-teal-50 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
                             >
                               <SendIcon className="w-4 h-4 text-teal-500" />
                               Deliver to Client (Quick)
@@ -12078,7 +12081,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {isAdmin && (order.translation_status === 'delivered' || order.translation_status === 'ready') && (
                             <button
                               onClick={() => { updateStatus(order.id, 'final'); setOpenActionsDropdown(null); }}
-                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-purple-50 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
                             >
                               <CheckIcon className="w-4 h-4 text-purple-500" />
                               Mark as Final
@@ -12475,7 +12478,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Urgency</td>
                               <td className="py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>
+                                <span className={`px-2 py-0.5 rounded text-[10px] ${viewingOrder.urgency === 'urgent' ? 'bg-red-100 text-red-700' : viewingOrder.urgency === 'priority' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
                                   {viewingOrder.urgency === 'no' ? 'Normal' : viewingOrder.urgency || 'Normal'}
                                 </span>
                               </td>
@@ -12488,7 +12491,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               <td className="py-2 font-medium text-gray-600">Deadline</td>
                               <td className="py-2">
                                 {viewingOrder.deadline ? (
-                                  <span className="text-orange-600 font-medium">
+                                  <span className="text-blue-600 font-medium">
                                     {new Date(viewingOrder.deadline).toLocaleString()}
                                   </span>
                                 ) : '-'}
@@ -12802,8 +12805,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Translator Assignment Status */}
                   {(viewingOrder.assigned_translator_name || viewingOrder.assigned_translator) && (
-                    <div className="mt-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
-                      <div className="text-xs font-medium text-purple-700 mb-2">Translator Assignment</div>
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-xs font-medium text-blue-700 mb-2">Translator Assignment</div>
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-sm">{viewingOrder.assigned_translator_name || viewingOrder.assigned_translator}</div>
@@ -12830,7 +12833,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 order_number: viewingOrder.order_number
                               });
                             }}
-                            className="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 flex items-center gap-1"
+                            className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-1"
                           >
                             💬 Send Message
                           </button>
@@ -12841,8 +12844,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Delivery Info & Resend Option - Admin only */}
                   {viewingOrder.translation_status === 'delivered' && (
-                    <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
-                      <div className="text-xs font-medium text-teal-700 mb-2">📤 Delivery Information</div>
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-xs font-medium text-blue-700 mb-2">📤 Delivery Information</div>
                       {viewingOrder.delivered_at && (
                         <div className="text-xs text-gray-600 mb-2">
                           Delivered: {new Date(viewingOrder.delivered_at).toLocaleString()}
@@ -12857,7 +12860,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             setViewingOrder(null);
                             openSendToClientModal(viewingOrder);
                           }}
-                          className="px-3 py-1.5 bg-teal-600 text-white rounded text-xs hover:bg-teal-700 flex items-center gap-1"
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
                         >
                           🔄 Resend Translation
                         </button>
@@ -12907,7 +12910,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] flex flex-col">
             <div className={`p-3 border-b flex justify-between items-center rounded-t-lg flex-shrink-0 ${
-              sendingOrder.translation_status === 'delivered' ? 'bg-blue-600' : 'bg-teal-600'
+              sendingOrder.translation_status === 'delivered' ? 'bg-blue-600' : 'bg-blue-600'
             } text-white`}>
               <div>
                 <h3 className="font-bold text-sm">
@@ -13066,15 +13069,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
               {/* Notify PM Option */}
               {sendingOrder?.assigned_pm_id && (
-                <div className="mb-3 p-2 bg-purple-50 border border-purple-200 rounded">
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={notifyPM}
                       onChange={(e) => setNotifyPM(e.target.checked)}
-                      className="w-3 h-3 text-purple-600 rounded"
+                      className="w-3 h-3 text-blue-600 rounded"
                     />
-                    <span className="text-[10px] text-purple-700">
+                    <span className="text-[10px] text-blue-700">
                       Notify PM ({sendingOrder.assigned_pm_name || 'Assigned'})
                     </span>
                   </label>
@@ -13108,7 +13111,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 className={`px-3 py-1.5 text-white rounded text-xs disabled:bg-gray-400 ${
                   sendingOrder.translation_status === 'delivered'
                     ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-teal-600 hover:bg-teal-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
                 {sendingToClient ? 'Sending...' : (sendingOrder.translation_status === 'delivered' ? '🔄 Resend' : '📤 Send')}
@@ -13123,7 +13126,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-t-lg">
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">
               <div>
                 <h3 className="font-bold text-lg">📧 Preview & Send Translation</h3>
                 <p className="text-xs opacity-80">
@@ -13187,7 +13190,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <button
                   onClick={sendDeliveryEmail}
                   disabled={deliverySending || !deliveryTranslationHtml}
-                  className="px-6 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-300 text-sm font-medium flex items-center gap-2"
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 text-sm font-medium flex items-center gap-2"
                 >
                   {deliverySending ? (
                     <>
@@ -13209,7 +13212,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             {/* Header */}
-            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-t-lg">
+            <div className="p-4 border-b bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
               <div className="flex justify-between items-center">
                 <div>
                   <h3 className="font-bold">💬 Send Message to Translator</h3>
@@ -13235,7 +13238,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   value={translatorMessageContent}
                   onChange={(e) => setTranslatorMessageContent(e.target.value)}
                   placeholder="Type your message to the translator..."
-                  className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full border rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   rows={5}
                 />
               </div>
@@ -13258,7 +13261,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <button
                 onClick={sendMessageToTranslator}
                 disabled={sendingTranslatorMessage || !translatorMessageContent.trim()}
-                className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-300 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 flex items-center gap-2"
               >
                 {sendingTranslatorMessage ? (
                   <>
@@ -13477,7 +13480,7 @@ const NewQuotePage = ({ adminKey, user }) => {
           </p>
           <button
             onClick={() => setSuccess(false)}
-            className="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Create Another Quote
           </button>
@@ -13508,7 +13511,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Client Name *</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={formData.client_name}
                   onChange={(e) => setFormData({...formData, client_name: e.target.value})}
                   placeholder="John Smith"
@@ -13518,7 +13521,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                 <input
                   type="email"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={formData.client_email}
                   onChange={(e) => setFormData({...formData, client_email: e.target.value})}
                   placeholder="john@example.com"
@@ -13528,7 +13531,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
                 <input
                   type="tel"
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={formData.client_phone}
                   onChange={(e) => setFormData({...formData, client_phone: e.target.value})}
                   placeholder="+1 (555) 123-4567"
@@ -13544,7 +13547,7 @@ const NewQuotePage = ({ adminKey, user }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">From Language</label>
                 <select
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={formData.translate_from}
                   onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
                 >
@@ -13556,7 +13559,7 @@ const NewQuotePage = ({ adminKey, user }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">To Language</label>
                 <select
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   value={formData.translate_to}
                   onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
                 >
@@ -13574,7 +13577,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                 {Object.entries(SERVICE_TYPES).map(([key, service]) => (
                   <label
                     key={key}
-                    className={`flex items-center p-3 border rounded-lg ${service.comingSoon ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer'} ${formData.service_type === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}
+                    className={`flex items-center p-3 border rounded-lg ${service.comingSoon ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer'} ${formData.service_type === key ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}
                   >
                     <input
                       type="radio"
@@ -13599,7 +13602,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                       </div>
                       <div className="text-sm text-gray-500">{service.description}</div>
                     </div>
-                    <div className="font-bold text-teal-600">${service.price}/page</div>
+                    <div className="font-bold text-blue-600">${service.price}/page</div>
                   </label>
                 ))}
               </div>
@@ -13624,7 +13627,7 @@ const NewQuotePage = ({ adminKey, user }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Turnaround Time</label>
               <div className="space-y-2">
                 {Object.entries(TURNAROUND).map(([key, option]) => (
-                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.turnaround === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.turnaround === key ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
                     <input
                       type="radio"
                       name="turnaround"
@@ -13644,23 +13647,23 @@ const NewQuotePage = ({ adminKey, user }) => {
                       <div className="font-medium">{option.name}</div>
                     </div>
                     {option.multiplier > 1 && (
-                      <div className="text-sm text-orange-600">+{((option.multiplier - 1) * 100).toFixed(0)}%</div>
+                      <div className="text-sm text-blue-600">+{((option.multiplier - 1) * 100).toFixed(0)}%</div>
                     )}
                   </label>
                 ))}
               </div>
               {/* Custom Urgency Multiplier */}
-              <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                <label className="block text-xs font-medium text-orange-800 mb-1">Custom Urgency Multiplier</label>
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <label className="block text-xs font-medium text-blue-800 mb-1">Custom Urgency Multiplier</label>
                 <input
                   type="number"
                   step="0.01"
                   min="1"
                   value={formData.custom_urgency_multiplier}
                   onChange={(e) => { setFormData({...formData, custom_urgency_multiplier: parseFloat(e.target.value) || 1}); setQuote(null); }}
-                  className="w-full px-2 py-1 text-sm border border-orange-300 rounded focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-orange-600 mt-1">1.0 = no fee, 1.25 = +25%, 2.0 = +100%</p>
+                <p className="text-xs text-blue-600 mt-1">1.0 = no fee, 1.25 = +25%, 2.0 = +100%</p>
               </div>
             </div>
 
@@ -13669,7 +13672,7 @@ const NewQuotePage = ({ adminKey, user }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Method</label>
               <div className="space-y-2">
                 {Object.entries(DELIVERY_OPTIONS).map(([key, option]) => (
-                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.delivery_method === key ? 'border-teal-500 bg-teal-50' : 'hover:bg-gray-50'}`}>
+                  <label key={key} className={`flex items-center p-3 border rounded-lg cursor-pointer ${formData.delivery_method === key ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'}`}>
                     <input
                       type="radio"
                       name="delivery_method"
@@ -13719,7 +13722,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                 max="100"
                 value={formData.discount}
                 onChange={(e) => { setFormData({...formData, discount: parseFloat(e.target.value) || 0}); setQuote(null); }}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0"
               />
               <p className="text-xs text-gray-500 mt-1">Enter discount percentage (e.g., 10 for 10% off)</p>
@@ -13731,7 +13734,7 @@ const NewQuotePage = ({ adminKey, user }) => {
             <h2 className="text-lg font-bold text-gray-800 mb-4">Documents</h2>
 
             {/* Upload Area */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-teal-500 transition-colors">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
               <input
                 type="file"
                 multiple
@@ -13774,7 +13777,7 @@ const NewQuotePage = ({ adminKey, user }) => {
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Instructions (optional)</label>
               <textarea
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 rows={3}
                 value={formData.special_instructions}
                 onChange={(e) => setFormData({...formData, special_instructions: e.target.value})}
@@ -13787,7 +13790,7 @@ const NewQuotePage = ({ adminKey, user }) => {
         {/* Right Column - Quote Summary */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-xl shadow p-6 sticky top-6">
-            <h2 className="text-lg font-bold text-teal-700 mb-4">Quote Summary</h2>
+            <h2 className="text-lg font-bold text-blue-700 mb-4">Quote Summary</h2>
 
             {quote ? (
               <>
@@ -13815,7 +13818,7 @@ const NewQuotePage = ({ adminKey, user }) => {
                   {quote.turnaround_fee > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Rush Fee</span>
-                      <span className="text-orange-600">+${quote.turnaround_fee.toFixed(2)}</span>
+                      <span className="text-blue-600">+${quote.turnaround_fee.toFixed(2)}</span>
                     </div>
                   )}
                   {quote.delivery_fee > 0 && (
@@ -13832,14 +13835,14 @@ const NewQuotePage = ({ adminKey, user }) => {
                   )}
                   <div className="border-t pt-3 flex justify-between">
                     <span className="font-bold">Total</span>
-                    <span className="font-bold text-2xl text-teal-600">${quote.total.toFixed(2)}</span>
+                    <span className="font-bold text-2xl text-blue-600">${quote.total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <button
                   onClick={sendQuote}
                   disabled={sending}
-                  className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 font-medium"
+                  className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
                 >
                   {sending ? 'Sending...' : '📧 Send Quote to Client'}
                 </button>
@@ -13925,7 +13928,7 @@ const FollowupsPage = ({ adminKey }) => {
           <button
             onClick={processFollowups}
             disabled={processing}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-400 flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
           >
             {processing ? (
               <>
@@ -13952,9 +13955,9 @@ const FollowupsPage = ({ adminKey }) => {
               <div className="text-3xl font-bold text-yellow-600">{followupData.summary.needs_first_reminder}</div>
               <div className="text-xs text-yellow-700">Need 1st Reminder</div>
             </div>
-            <div className="bg-orange-50 rounded-lg shadow p-4 text-center border border-orange-200">
-              <div className="text-3xl font-bold text-orange-600">{followupData.summary.needs_second_reminder}</div>
-              <div className="text-xs text-orange-700">Need 2nd Reminder (10%)</div>
+            <div className="bg-blue-50 rounded-lg shadow p-4 text-center border border-blue-200">
+              <div className="text-3xl font-bold text-blue-600">{followupData.summary.needs_second_reminder}</div>
+              <div className="text-xs text-blue-700">Need 2nd Reminder (10%)</div>
             </div>
             <div className="bg-red-50 rounded-lg shadow p-4 text-center border border-red-200">
               <div className="text-3xl font-bold text-red-600">{followupData.summary.needs_third_reminder}</div>
@@ -14463,15 +14466,15 @@ const SettingsPage = ({ adminKey }) => {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Certified Translation</span>
-              <span className="font-bold text-teal-600">$24.99/page</span>
+              <span className="font-bold text-blue-600">$24.99/page</span>
             </div>
             <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Professional Translation</span>
-              <span className="font-bold text-teal-600">$19.50/page</span>
+              <span className="font-bold text-blue-600">$19.50/page</span>
             </div>
             <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Priority Fee</span>
-              <span className="font-bold text-teal-600">+25%</span>
+              <span className="font-bold text-blue-600">+25%</span>
             </div>
             <div className="flex justify-between p-2 bg-gray-50 rounded">
               <span>Urgent Fee</span>
@@ -14489,14 +14492,14 @@ const SettingsPage = ({ adminKey }) => {
                 <span className="mr-2">💳</span>
                 <span>Stripe</span>
               </div>
-              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
               <div className="flex items-center">
                 <span className="mr-2">📧</span>
                 <span>Resend Email</span>
               </div>
-              <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
             </div>
             {/* QuickBooks Integration */}
             <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
@@ -14513,7 +14516,7 @@ const SettingsPage = ({ adminKey }) => {
                 <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px]">Checking...</span>
               ) : qbStatus.connected ? (
                 <div className="flex items-center space-x-2">
-                  <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded text-[10px] font-medium">Connected</span>
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">Connected</span>
                   <button
                     onClick={disconnectQuickBooks}
                     className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-[10px] hover:bg-red-200"
@@ -14546,21 +14549,21 @@ const SettingsPage = ({ adminKey }) => {
               <span>In Translation</span>
               <span className="text-yellow-700">Translator working</span>
             </div>
-            <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
+            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
               <span>PM Review</span>
-              <span className="text-purple-700">PM reviewing</span>
+              <span className="text-blue-700">PM reviewing</span>
             </div>
-            <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
+            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
               <span>Client Review</span>
-              <span className="text-orange-700">Client reviewing</span>
+              <span className="text-blue-700">Client reviewing</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-green-50 rounded">
               <span>Ready</span>
               <span className="text-green-700">Ready to deliver</span>
             </div>
-            <div className="flex items-center justify-between p-2 bg-teal-50 rounded">
+            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
               <span>Delivered</span>
-              <span className="text-teal-700">Sent to client</span>
+              <span className="text-blue-700">Sent to client</span>
             </div>
           </div>
         </div>
@@ -14588,7 +14591,7 @@ const SettingsPage = ({ adminKey }) => {
                 <button
                   onClick={() => exportProjects('csv')}
                   disabled={exporting}
-                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
                   CSV
                 </button>
@@ -14610,7 +14613,7 @@ const SettingsPage = ({ adminKey }) => {
                 <button
                   onClick={() => exportClients('csv')}
                   disabled={exporting}
-                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
                   CSV
                 </button>
@@ -14632,7 +14635,7 @@ const SettingsPage = ({ adminKey }) => {
                 <button
                   onClick={() => exportTranslators('csv')}
                   disabled={exporting}
-                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
                   CSV
                 </button>
@@ -14654,7 +14657,7 @@ const SettingsPage = ({ adminKey }) => {
                 <button
                   onClick={() => exportFinancialReport('csv')}
                   disabled={exporting}
-                  className="flex-1 px-2 py-1.5 bg-teal-600 text-white text-xs rounded hover:bg-teal-700 disabled:bg-gray-300"
+                  className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
                   CSV
                 </button>
@@ -15147,7 +15150,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   handleRequestRevision(selectedSubmission._id);
                 }
               }}
-              className="px-4 py-1.5 bg-orange-500 rounded hover:bg-orange-600 text-sm"
+              className="px-4 py-1.5 bg-blue-500 rounded hover:bg-blue-600 text-sm"
             >
               ↻ Request Revision
             </button>
@@ -15261,14 +15264,14 @@ const ReviewPage = ({ adminKey, user }) => {
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setActiveSection('submissions')}
-          className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'submissions' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+          className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'submissions' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
         >
           Pending Reviews ({filteredSubmissions.length})
         </button>
         {isAdmin && (
           <button
             onClick={() => setActiveSection('security')}
-            className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'security' ? 'bg-teal-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+            className={`px-4 py-2 text-sm font-medium rounded ${activeSection === 'security' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
           >
             Security {suspiciousUsers.length > 0 && <span className="ml-1 bg-red-500 text-white px-1.5 rounded-full text-xs">{suspiciousUsers.length}</span>}
           </button>
@@ -15289,7 +15292,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   <div
                     key={sub._id}
                     onClick={() => setSelectedSubmission(sub)}
-                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${selectedSubmission?._id === sub._id ? 'border-teal-500 bg-teal-50' : ''}`}
+                    className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${selectedSubmission?._id === sub._id ? 'border-blue-500 bg-blue-50' : ''}`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -15320,7 +15323,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   <h2 className="text-sm font-bold text-gray-700">{selectedSubmission.order_number}</h2>
                   <button
                     onClick={() => setFullScreenReview(true)}
-                    className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700 flex items-center"
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 flex items-center"
                   >
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -15398,7 +15401,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   </button>
                   <button
                     onClick={() => handleRequestRevision(selectedSubmission._id)}
-                    className="flex-1 py-2 bg-orange-500 text-white rounded text-sm font-medium hover:bg-orange-600"
+                    className="flex-1 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600"
                   >
                     ↻ Request Revision
                   </button>
@@ -15750,7 +15753,7 @@ const UsersPage = ({ adminKey, user }) => {
     admin: 'bg-red-100 text-red-800',
     pm: 'bg-blue-100 text-blue-800',
     translator: 'bg-green-100 text-green-800',
-    sales: 'bg-purple-100 text-purple-800'
+    sales: 'bg-blue-100 text-blue-800'
   };
 
   // PM can only see translators
@@ -15786,7 +15789,7 @@ const UsersPage = ({ adminKey, user }) => {
           </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
             + {isPM ? 'Register Translator' : 'Create User'}
           </button>
@@ -15872,7 +15875,7 @@ const UsersPage = ({ adminKey, user }) => {
 
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setShowCreateForm(false)} className="px-4 py-2 text-gray-600 text-sm">Cancel</button>
-              <button type="submit" disabled={creating} className="px-4 py-2 bg-teal-600 text-white rounded text-sm disabled:bg-gray-400">
+              <button type="submit" disabled={creating} className="px-4 py-2 bg-blue-600 text-white rounded text-sm disabled:bg-gray-400">
                 {creating ? 'Creating...' : 'Create'}
               </button>
             </div>
@@ -15897,12 +15900,12 @@ const UsersPage = ({ adminKey, user }) => {
           <tbody className="divide-y divide-gray-200">
             {filteredUsers.map((u) => (
               <React.Fragment key={u.id}>
-                <tr className={`hover:bg-gray-50 ${expandedUser === u.id ? 'bg-teal-50' : ''}`}>
+                <tr className={`hover:bg-gray-50 ${expandedUser === u.id ? 'bg-blue-50' : ''}`}>
                   <td className="px-4 py-3 font-medium">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleExpandUser(u.id)}
-                        className={`text-gray-400 hover:text-teal-600 transition-transform ${expandedUser === u.id ? 'rotate-90' : ''}`}
+                        className={`text-gray-400 hover:text-blue-600 transition-transform ${expandedUser === u.id ? 'rotate-90' : ''}`}
                       >
                         ▶
                       </button>
@@ -15935,14 +15938,14 @@ const UsersPage = ({ adminKey, user }) => {
                   <td className="px-4 py-3 space-x-2">
                     <button
                       onClick={() => toggleExpandUser(u.id)}
-                      className="text-teal-600 hover:text-teal-800 text-xs"
+                      className="text-blue-600 hover:text-blue-800 text-xs"
                     >
                       {expandedUser === u.id ? 'Fechar' : 'Ver Perfil'}
                     </button>
                     {u.invitation_pending && (
                       <button
                         onClick={() => handleResendInvitation(u.id, u.name, u.email)}
-                        className="text-orange-600 hover:text-orange-800 text-xs"
+                        className="text-blue-600 hover:text-blue-800 text-xs"
                       >
                         Resend Invitation
                       </button>
@@ -16144,7 +16147,7 @@ const UsersPage = ({ adminKey, user }) => {
                                     <option key={dt.value} value={dt.value}>{dt.label}</option>
                                   ))}
                                 </select>
-                                <label className="px-3 py-1.5 bg-teal-500 text-white text-xs rounded cursor-pointer hover:bg-teal-600">
+                                <label className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
                                   {uploadingDoc ? '⏳...' : '📤 Upload'}
                                   <input
                                     type="file"
@@ -16371,19 +16374,19 @@ const ProductionPage = ({ adminKey }) => {
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveView('stats')}
-            className={`px-4 py-2 rounded text-sm ${activeView === 'stats' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'stats' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
             Statistics
           </button>
           <button
             onClick={() => setActiveView('payments')}
-            className={`px-4 py-2 rounded text-sm ${activeView === 'payments' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'payments' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
             Payment History
           </button>
           <button
             onClick={() => setActiveView('response_times')}
-            className={`px-4 py-2 rounded text-sm ${activeView === 'response_times' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+            className={`px-4 py-2 rounded text-sm ${activeView === 'response_times' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
           >
             Partner Response Times
           </button>
@@ -16407,7 +16410,7 @@ const ProductionPage = ({ adminKey }) => {
                     onClick={() => handleSelectTranslator(translator)}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedTranslator?.translator_id === translator.translator_id
-                        ? 'border-teal-500 bg-teal-50'
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-teal-300'
                     }`}
                   >
@@ -16476,7 +16479,7 @@ const ProductionPage = ({ adminKey }) => {
                           <div className="text-gray-500">{order.client_name}</div>
                         </div>
                         <div className="text-right">
-                          <div className="font-bold text-teal-600">{order.page_count || 0} pages</div>
+                          <div className="font-bold text-blue-600">{order.page_count || 0} pages</div>
                           <div className="text-gray-500">{formatDate(order.created_at)}</div>
                         </div>
                       </div>
@@ -16524,7 +16527,7 @@ const ProductionPage = ({ adminKey }) => {
                         {formatDate(payment.period_start)} - {formatDate(payment.period_end)}
                       </td>
                       <td className="px-4 py-3 text-center">{payment.pages_count}</td>
-                      <td className="px-4 py-3 text-center font-bold text-teal-600">
+                      <td className="px-4 py-3 text-center font-bold text-blue-600">
                         {formatCurrency(payment.total_amount)}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -16581,7 +16584,7 @@ const ProductionPage = ({ adminKey }) => {
                     onClick={() => setSelectedPartnerMessages(partner)}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedPartnerMessages?.partner_id === partner.partner_id
-                        ? 'border-purple-500 bg-purple-50'
+                        ? 'border-purple-500 bg-blue-50'
                         : 'border-gray-200 hover:border-purple-300'
                     }`}
                   >
@@ -16740,7 +16743,7 @@ const ProductionPage = ({ adminKey }) => {
                   type="text"
                   value={formatCurrency(paymentForm.total_amount)}
                   readOnly
-                  className="w-full px-3 py-2 border rounded text-sm bg-gray-100 font-bold text-teal-600"
+                  className="w-full px-3 py-2 border rounded text-sm bg-gray-100 font-bold text-blue-600"
                 />
               </div>
               <div>
@@ -16788,7 +16791,7 @@ const ProductionPage = ({ adminKey }) => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
                 >
                   Register Payment
                 </button>
@@ -17205,19 +17208,19 @@ const FinancesPage = ({ adminKey }) => {
           <div className="flex space-x-2">
             <button
               onClick={() => setActiveView('overview')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'overview' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Overview
             </button>
             <button
               onClick={() => setActiveView('expenses')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Expenses
             </button>
             <button
               onClick={() => setActiveView('payment-proofs')}
-              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'payment-proofs' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'payment-proofs' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Proofs
               {paymentProofs.filter(p => p.status === 'pending').length > 0 && (
@@ -17228,20 +17231,20 @@ const FinancesPage = ({ adminKey }) => {
             </button>
             <button
               onClick={() => setActiveView('pay-vendors')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'pay-vendors' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'pay-vendors' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               💰 Pay Vendors
             </button>
             <button
               onClick={() => setActiveView('quickbooks')}
-              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'quickbooks' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'quickbooks' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               📊 QuickBooks
               {qbConnected && <span className="w-2 h-2 bg-green-400 rounded-full"></span>}
             </button>
             <button
               onClick={() => setActiveView('partners')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'partners' ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'partners' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               🤝 Partners
             </button>
@@ -17355,7 +17358,7 @@ const FinancesPage = ({ adminKey }) => {
                       <span className="text-gray-600">{langPair}</span>
                       <div className="flex items-center">
                         <div className="w-24 bg-gray-200 rounded-full h-2 mr-2">
-                          <div className="h-2 rounded-full bg-teal-500" style={{ width: `${percentage}%` }}></div>
+                          <div className="h-2 rounded-full bg-blue-500" style={{ width: `${percentage}%` }}></div>
                         </div>
                         <span className="font-medium w-20 text-right">{formatCurrency(value.amount)}</span>
                       </div>
@@ -17374,7 +17377,7 @@ const FinancesPage = ({ adminKey }) => {
             <h3 className="font-bold text-gray-800">Expenses List</h3>
             <button
               onClick={() => setShowExpenseModal(true)}
-              className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
             >
               + New Expense
             </button>
@@ -17510,7 +17513,7 @@ const FinancesPage = ({ adminKey }) => {
               )}
               <div className="flex justify-end space-x-2 pt-2">
                 <button type="button" onClick={() => setShowExpenseModal(false)} className="px-4 py-2 border rounded text-sm text-gray-600">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700">Save</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save</button>
               </div>
             </form>
           </div>
@@ -17529,7 +17532,7 @@ const FinancesPage = ({ adminKey }) => {
                   onClick={() => setProofFilter(status)}
                   className={`px-3 py-1.5 rounded text-sm capitalize ${
                     proofFilter === status
-                      ? 'bg-teal-600 text-white'
+                      ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -17586,7 +17589,7 @@ const FinancesPage = ({ adminKey }) => {
                         <div className="font-medium">{proof.customer_name}</div>
                         <div className="text-xs text-gray-500">{proof.customer_email}</div>
                         {proof.order_number && (
-                          <div className="text-xs text-teal-600">Pedido: {proof.order_number}</div>
+                          <div className="text-xs text-blue-600">Pedido: {proof.order_number}</div>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -17615,7 +17618,7 @@ const FinancesPage = ({ adminKey }) => {
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={() => fetchProofDetail(proof.id)}
-                          className="text-teal-600 hover:text-teal-800 font-medium"
+                          className="text-blue-600 hover:text-blue-800 font-medium"
                         >
                           Ver
                         </button>
@@ -17666,7 +17669,7 @@ const FinancesPage = ({ adminKey }) => {
               </div>
 
               {selectedProof.order_number && (
-                <div className="mb-4 p-2 bg-teal-50 rounded text-sm">
+                <div className="mb-4 p-2 bg-blue-50 rounded text-sm">
                   <strong>Pedido vinculado:</strong> {selectedProof.order_number}
                 </div>
               )}
@@ -17688,7 +17691,7 @@ const FinancesPage = ({ adminKey }) => {
                       <a
                         href={`data:application/pdf;base64,${selectedProof.proof_file_data}`}
                         download={selectedProof.proof_filename}
-                        className="inline-flex items-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                       >
                         Baixar PDF
                       </a>
@@ -17780,7 +17783,7 @@ const FinancesPage = ({ adminKey }) => {
                         fetchTranslatorPaymentHistory(translator.translator_id || translator._id);
                       }}
                       className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                        (selectedTranslatorForPayment?.translator_id || selectedTranslatorForPayment?._id) === (translator.translator_id || translator._id) ? 'border-teal-500 bg-teal-50' : ''
+                        (selectedTranslatorForPayment?.translator_id || selectedTranslatorForPayment?._id) === (translator.translator_id || translator._id) ? 'border-blue-500 bg-blue-50' : ''
                       }`}
                     >
                       <div className="flex justify-between items-start">
@@ -17921,7 +17924,7 @@ const FinancesPage = ({ adminKey }) => {
                                 </span>
                               )}
                               {payment.payment_type && payment.payment_type !== 'translation' && (
-                                <span className="ml-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
+                                <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
                                   {payment.payment_type === 'sales_commission' ? 'Commission' : payment.payment_type}
                                 </span>
                               )}
@@ -17997,7 +18000,7 @@ const FinancesPage = ({ adminKey }) => {
                               <span className="font-medium text-sm text-gray-800">#{order.order_number}</span>
                               {isPartnerOrder ? (
                                 <>
-                                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">Partner</span>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Partner</span>
                                   <span className="text-xs text-gray-500">{order.partner_company || order.client_name}</span>
                                   <span className="text-xs text-gray-400">{order.partner_email || order.client_email}</span>
                                 </>
@@ -18325,7 +18328,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           </div>
           <button
             onClick={onComplete}
-            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm font-medium"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
           >
             Go to Login
           </button>
@@ -18340,12 +18343,12 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       <div className="min-h-screen bg-slate-900 flex items-center justify-center py-8">
         <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg mx-4">
           <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-xl text-white">📋</span>
             </div>
             <h1 className="text-xl font-bold text-gray-800">Complete Your Profile</h1>
             <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
-            <p className="text-xs text-teal-600">Step 2 of 2 - {isTranslator ? 'Translator Information' : 'Terms Acceptance'}</p>
+            <p className="text-xs text-blue-600">Step 2 of 2 - {isTranslator ? 'Translator Information' : 'Terms Acceptance'}</p>
           </div>
 
           {error && (
@@ -18370,7 +18373,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                   <label className="block text-xs font-medium text-gray-700 mb-1">Language Pairs *</label>
                   <input
                     type="text"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                     value={languagePairs}
                     onChange={(e) => setLanguagePairs(e.target.value)}
                     placeholder="e.g. EN-PT, EN-ES, PT-EN"
@@ -18383,7 +18386,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <input
                       type="number"
                       step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       value={ratePerPage}
                       onChange={(e) => setRatePerPage(e.target.value)}
                       placeholder="e.g. 15.00"
@@ -18394,7 +18397,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                     <input
                       type="number"
                       step="0.001"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       value={ratePerWord}
                       onChange={(e) => setRatePerWord(e.target.value)}
                       placeholder="e.g. 0.08"
@@ -18413,7 +18416,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Payment Method</label>
                   <select
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   >
@@ -18614,7 +18617,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
                 type="button"
                 onClick={handleFinalSubmit}
                 disabled={loading || success || !acceptedTerms || !acceptedProhibitedUse || (isTranslator && !acceptedEthics)}
-                className="flex-1 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+                className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
               >
                 {loading ? 'Setting up...' : 'Complete Setup'}
               </button>
@@ -18630,12 +18633,12 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔐</span>
           </div>
           <h1 className="text-xl font-bold text-gray-800">Set Up Your Account</h1>
           <p className="text-xs text-gray-500 mt-1">Welcome, {userInfo?.name}!</p>
-          <p className="text-xs text-teal-600 mt-1">{userInfo?.role?.toUpperCase()}</p>
+          <p className="text-xs text-blue-600 mt-1">{userInfo?.role?.toUpperCase()}</p>
           {requiresTerms && <p className="text-xs text-gray-400">Step 1 of 2 - Create Password</p>}
         </div>
 
@@ -18658,7 +18661,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
               type="password"
               required
               minLength={6}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimum 6 characters"
@@ -18669,7 +18672,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
             <input
               type="password"
               required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter password"
@@ -18679,7 +18682,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
           >
             {requiresTerms ? 'Next Step' : (loading ? 'Setting up...' : 'Set Up Account')}
           </button>
@@ -18770,7 +18773,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
           </div>
           <button
             onClick={onComplete}
-            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm font-medium"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
           >
             Go to Login
           </button>
@@ -18783,7 +18786,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center">
       <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center mx-auto mb-3">
+          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
             <span className="text-xl text-white">🔑</span>
           </div>
           <h1 className="text-xl font-bold text-gray-800">Reset Password</h1>
@@ -18809,7 +18812,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
               type="password"
               required
               minLength={6}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Minimum 6 characters"
@@ -18820,7 +18823,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
             <input
               type="password"
               required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Re-enter password"
@@ -18830,7 +18833,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:bg-gray-400 text-sm font-medium"
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
           >
             {loading ? 'Resetting...' : 'Reset Password'}
           </button>
@@ -20023,7 +20026,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         <span className="ml-3 text-gray-600">Loading dashboard...</span>
       </div>
     );
@@ -20053,7 +20056,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             onClick={() => setActiveSection(section.id)}
             className={`flex-1 px-3 py-2 rounded text-xs font-medium transition-colors ${
               activeSection === section.id
-                ? 'bg-teal-500 text-white'
+                ? 'bg-blue-500 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -20081,7 +20084,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               <div className="text-[10px] uppercase opacity-80">In Progress</div>
               <div className="text-2xl font-bold">{stats.inProgress}</div>
             </div>
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow p-4 text-white">
               <div className="text-[10px] uppercase opacity-80">Awaiting Review</div>
               <div className="text-2xl font-bold">{stats.awaitingReview}</div>
             </div>
@@ -20089,7 +20092,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               <div className="text-[10px] uppercase opacity-80">Completed</div>
               <div className="text-2xl font-bold">{stats.completed}</div>
             </div>
-            <div className="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg shadow p-4 text-white">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-700 rounded-lg shadow p-4 text-white">
               <div className="text-[10px] uppercase opacity-80">On Time</div>
               <div className="text-2xl font-bold">{stats.onTime}</div>
             </div>
@@ -20105,7 +20108,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <div className="flex gap-2">
               <button
                 onClick={() => setActiveSection('review')}
-                className="px-4 py-2 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-2"
               >
                 ✅ Review Translations ({reviewQueue.length})
               </button>
@@ -20117,7 +20120,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </button>
               <button
                 onClick={() => setActiveSection('calendar')}
-                className="px-4 py-2 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 flex items-center gap-2"
+                className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-2"
               >
                 📅 View Deadlines
               </button>
@@ -20353,7 +20356,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         onClick={() => setQuoteLanguage(lang.value)}
                         className={`px-3 py-1.5 text-xs rounded ${
                           quoteLanguage === lang.value
-                            ? 'bg-teal-500 text-white'
+                            ? 'bg-blue-500 text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -20367,7 +20370,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="pt-2">
                   <button
                     onClick={() => setShowQuotePreview(true)}
-                    className="w-full px-4 py-2 bg-teal-500 text-white rounded text-sm font-medium hover:bg-teal-600"
+                    className="w-full px-4 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600"
                   >
                     👁️ Visualizar Orçamento
                   </button>
@@ -20389,7 +20392,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <span className="font-medium">${prices.basePrice.toFixed(2)}</span>
                       </div>
                       {prices.urgencyFee > 0 && (
-                        <div className="flex justify-between text-sm text-orange-600">
+                        <div className="flex justify-between text-sm text-blue-600">
                           <span>Taxa de Urgência ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
                           <span>+${prices.urgencyFee.toFixed(2)}</span>
                         </div>
@@ -20409,7 +20412,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <div className="border-t pt-2 mt-2">
                         <div className="flex justify-between text-lg font-bold">
                           <span>TOTAL</span>
-                          <span className="text-teal-600">${prices.total.toFixed(2)}</span>
+                          <span className="text-blue-600">${prices.total.toFixed(2)}</span>
                         </div>
                       </div>
                     </div>
@@ -20429,7 +20432,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         clientName: order.client_name,
                         clientEmail: order.client_email
                       })}
-                      className="p-2 border rounded cursor-pointer hover:bg-teal-50 text-xs"
+                      className="p-2 border rounded cursor-pointer hover:bg-blue-50 text-xs"
                     >
                       <div className="font-medium">{order.client_name}</div>
                       <div className="text-gray-500">{order.client_email}</div>
@@ -20457,7 +20460,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <>
                         {/* Header with Logo */}
                         <div className="text-center border-b pb-4 mb-6">
-                          <div className="text-3xl font-bold text-teal-600 mb-1">LEGACY</div>
+                          <div className="text-3xl font-bold text-blue-600 mb-1">LEGACY</div>
                           <div className="text-sm text-gray-500">{t.tagline}</div>
                         </div>
 
@@ -20467,7 +20470,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
                             <div>
                               <span className="text-gray-500">{t.quoteNumber}</span>
-                              <div className="font-bold text-teal-600">{quoteNumber}</div>
+                              <div className="font-bold text-blue-600">{quoteNumber}</div>
                             </div>
                             <div>
                               <span className="text-gray-500">{t.date}</span>
@@ -20542,7 +20545,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 <td className="py-2 text-right">${prices.basePrice.toFixed(2)}</td>
                               </tr>
                               {prices.urgencyFee > 0 && (
-                                <tr className="border-b text-orange-600">
+                                <tr className="border-b text-blue-600">
                                   <td className="py-2">{t.urgencyFee}</td>
                                   <td className="py-2 text-right">+${prices.urgencyFee.toFixed(2)}</td>
                                 </tr>
@@ -20559,9 +20562,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                   <td className="py-2 text-right">-${prices.discountAmount.toFixed(2)}</td>
                                 </tr>
                               )}
-                              <tr className="bg-teal-50 font-bold text-lg">
-                                <td className="py-3 text-teal-700">{t.total}</td>
-                                <td className="py-3 text-right text-teal-700">${prices.total.toFixed(2)}</td>
+                              <tr className="bg-blue-50 font-bold text-lg">
+                                <td className="py-3 text-blue-700">{t.total}</td>
+                                <td className="py-3 text-right text-blue-700">${prices.total.toFixed(2)}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -20583,7 +20586,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                         {/* Footer */}
                         <div className="text-center border-t pt-4">
-                          <p className="font-medium text-teal-600 mb-3 text-base">{t.thankYou}</p>
+                          <p className="font-medium text-blue-600 mb-3 text-base">{t.thankYou}</p>
                           <div className="bg-gray-50 rounded-lg p-4 inline-block">
                             <p className="text-gray-700 font-medium mb-1">Legacy Translation Services</p>
                             <p className="text-gray-600 text-sm">legacytranslations.com | {t.phone}: +1(857)316-7770</p>
@@ -20613,7 +20616,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <button
                       onClick={sendQuoteEmail}
                       disabled={sendingQuote || !quoteForm.clientEmail}
-                      className="px-4 py-2 bg-teal-500 text-white rounded text-sm hover:bg-teal-600 disabled:bg-gray-400 flex items-center gap-1"
+                      className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
                     >
                       {sendingQuote ? '⏳ Enviando...' : '📧 Enviar por Email'}
                     </button>
@@ -20643,7 +20646,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div
                       key={order.id}
                       onClick={() => onNavigateToTranslation(order)}
-                      className="p-3 border rounded-lg hover:bg-teal-50 cursor-pointer transition-colors flex justify-between items-center"
+                      className="p-3 border rounded-lg hover:bg-blue-50 cursor-pointer transition-colors flex justify-between items-center"
                     >
                       <div>
                         <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
@@ -20656,7 +20659,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <div className="text-xs text-gray-600">
                           {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : 'No deadline'}
                         </div>
-                        <button className="mt-1 px-3 py-1 bg-teal-500 text-white text-xs rounded hover:bg-teal-600">
+                        <button className="mt-1 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                           Review →
                         </button>
                       </div>
@@ -20703,7 +20706,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <button
                       onClick={handlePmPackageDownload}
                       disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
-                      className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-1"
+                      className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
                     >
                       {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
                     </button>
@@ -20730,7 +20733,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       <h4 className="text-sm font-bold text-gray-700">
                         📄 Original Documents ({originalContents.length})
                       </h4>
-                      <label className="px-2 py-1 bg-orange-500 text-white text-xs rounded cursor-pointer hover:bg-orange-600">
+                      <label className="px-2 py-1 bg-blue-500 text-white text-xs rounded cursor-pointer hover:bg-blue-600">
                         📤 Upload
                         <input
                           type="file"
@@ -20895,13 +20898,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {/* Proofreading Section */}
               <div className="p-4 border-t bg-white">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-purple-700 flex items-center gap-2">
+                  <h4 className="text-sm font-bold text-blue-700 flex items-center gap-2">
                     🔍 Proofreading (Revisão de Qualidade)
                   </h4>
                   <button
                     onClick={executeProofreading}
                     disabled={isProofreading || !translatedContent}
-                    className="px-4 py-2 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
                   >
                     {isProofreading ? (
                       <>
@@ -20945,8 +20948,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div className="font-bold text-red-600">{proofreadingResult.resumo?.criticos || 0}</div>
                           <div className="text-gray-600">Críticos</div>
                         </div>
-                        <div className="text-center p-1 bg-orange-100 rounded">
-                          <div className="font-bold text-orange-600">{proofreadingResult.resumo?.altos || 0}</div>
+                        <div className="text-center p-1 bg-blue-100 rounded">
+                          <div className="font-bold text-blue-600">{proofreadingResult.resumo?.altos || 0}</div>
                           <div className="text-gray-600">Altos</div>
                         </div>
                         <div className="text-center p-1 bg-yellow-100 rounded">
@@ -20977,7 +20980,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             {proofreadingResult.erros.map((erro, idx) => (
                               <tr key={idx} className={`border-t ${
                                 erro.gravidade === 'CRÍTICO' ? 'bg-red-50' :
-                                erro.gravidade === 'ALTO' ? 'bg-orange-50' :
+                                erro.gravidade === 'ALTO' ? 'bg-blue-50' :
                                 erro.gravidade === 'MÉDIO' ? 'bg-yellow-50' :
                                 'bg-blue-50'
                               }`}>
@@ -20988,7 +20991,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                                 <td className="p-2 text-center">
                                   <span className={`px-1 py-0.5 rounded text-white ${
                                     erro.gravidade === 'CRÍTICO' ? 'bg-red-500' :
-                                    erro.gravidade === 'ALTO' ? 'bg-orange-500' :
+                                    erro.gravidade === 'ALTO' ? 'bg-blue-500' :
                                     erro.gravidade === 'MÉDIO' ? 'bg-yellow-500' :
                                     'bg-blue-500'
                                   }`}>
@@ -21113,7 +21116,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   key={order.id}
                   className={`p-3 rounded-lg border flex justify-between items-center ${
                     order.daysLeft < 0 ? 'bg-red-50 border-red-200' :
-                    order.daysLeft <= 2 ? 'bg-orange-50 border-orange-200' :
+                    order.daysLeft <= 2 ? 'bg-blue-50 border-blue-200' :
                     order.daysLeft <= 5 ? 'bg-yellow-50 border-yellow-200' :
                     'bg-green-50 border-green-200'
                   }`}
@@ -21128,7 +21131,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <div className="text-right">
                     <div className={`text-lg font-bold ${
                       order.daysLeft < 0 ? 'text-red-600' :
-                      order.daysLeft <= 2 ? 'text-orange-600' :
+                      order.daysLeft <= 2 ? 'text-blue-600' :
                       order.daysLeft <= 5 ? 'text-yellow-600' :
                       'text-green-600'
                     }`}>
@@ -21177,14 +21180,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 </div>
                 <div className="text-xs text-gray-600">Taxa de Conclusão</div>
               </div>
-              <div className="bg-teal-50 rounded-lg p-4 text-center">
-                <div className="text-3xl font-bold text-teal-600">
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-blue-600">
                   {stats.totalProjects > 0 ? Math.round((stats.onTime / stats.totalProjects) * 100) : 0}%
                 </div>
                 <div className="text-xs text-gray-600">On-Time Delivery</div>
               </div>
-              <div className="bg-purple-50 rounded-lg p-4 text-center">
-                <div className="text-3xl font-bold text-purple-600">{translators.length}</div>
+              <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <div className="text-3xl font-bold text-blue-600">{translators.length}</div>
                 <div className="text-xs text-gray-600">Team Translators</div>
               </div>
             </div>
@@ -21196,9 +21199,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {[
                   { status: 'received', color: 'bg-gray-400', count: orders.filter(o => o.translation_status === 'received').length },
                   { status: 'in_translation', color: 'bg-yellow-500', count: stats.inProgress },
-                  { status: 'review', color: 'bg-purple-500', count: stats.awaitingReview },
+                  { status: 'review', color: 'bg-blue-500', count: stats.awaitingReview },
                   { status: 'ready', color: 'bg-green-500', count: orders.filter(o => o.translation_status === 'ready').length },
-                  { status: 'delivered', color: 'bg-teal-500', count: orders.filter(o => o.translation_status === 'delivered').length }
+                  { status: 'delivered', color: 'bg-blue-500', count: orders.filter(o => o.translation_status === 'delivered').length }
                 ].map(item => (
                   item.count > 0 && (
                     <div
@@ -21256,7 +21259,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">{completed}</span>
                         </td>
                         <td className="py-2 px-2 text-center">
-                          <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded">
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
                             {tOrders.length > 0 ? Math.round((onTimeCount / tOrders.length) * 100) : 100}%
                           </span>
                         </td>
@@ -21288,7 +21291,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         onClick={() => setSelectedTranslator(translator)}
                         className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
                           selectedTranslator?.id === translator.id
-                            ? 'bg-teal-500 text-white'
+                            ? 'bg-blue-500 text-white'
                             : 'hover:bg-gray-100 border border-gray-100'
                         }`}
                       >
@@ -21322,7 +21325,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             key={msg.id}
                             className={`mb-2 p-2 rounded text-xs ${
                               msg.from === user?.name
-                                ? 'bg-teal-100 ml-8'
+                                ? 'bg-blue-100 ml-8'
                                 : 'bg-white mr-8 border'
                             }`}
                           >
@@ -21351,7 +21354,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       />
                       <button
                         onClick={sendMessage}
-                        className="px-4 py-2 bg-teal-500 text-white rounded text-xs hover:bg-teal-600"
+                        className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                       >
                         Enviar
                       </button>
@@ -21390,7 +21393,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
               {loadingProjectDocs ? (
                 <div className="text-center py-8 text-gray-500">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto mb-2"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
                   Loading files...
                 </div>
               ) : projectDocuments.length > 0 ? (
@@ -21454,7 +21457,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
                 onClick={() => setSelectedProject(null)}
-                className="px-4 py-2 bg-teal-600 text-white rounded text-sm hover:bg-teal-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 Fechar
               </button>
@@ -21463,6 +21466,212 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
       )}
     </div>
+  );
+};
+
+// ==================== FLOATING CHAT WIDGET ====================
+const FloatingChatWidget = ({ adminKey, user }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [recipientType, setRecipientType] = useState('translator'); // 'translator' or 'partner'
+  const [selectedRecipient, setSelectedRecipient] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sending, setSending] = useState(false);
+  const [translators, setTranslators] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchRecipients();
+    }
+  }, [isOpen, recipientType]);
+
+  useEffect(() => {
+    // Fetch unread partner messages count
+    const fetchUnread = async () => {
+      try {
+        const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+        const unread = (response.data.messages || []).filter(m => !m.read).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [adminKey]);
+
+  const fetchRecipients = async () => {
+    try {
+      if (recipientType === 'translator') {
+        const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+        setTranslators(response.data || []);
+      } else {
+        const response = await axios.get(`${API}/admin/partners?admin_key=${adminKey}`);
+        setPartners(response.data.partners || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipients:', err);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!selectedRecipient || !messageContent.trim()) return;
+    setSending(true);
+    try {
+      if (recipientType === 'translator') {
+        const translator = translators.find(t => t.id === selectedRecipient);
+        await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+          translator_id: selectedRecipient,
+          translator_name: translator?.name || 'Translator',
+          translator_email: translator?.email || '',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      } else {
+        // For partners, we'll create a notification/message
+        const partner = partners.find(p => p.id === selectedRecipient);
+        await axios.post(`${API}/admin/send-partner-notification?admin_key=${adminKey}`, {
+          partner_id: selectedRecipient,
+          partner_email: partner?.email || '',
+          partner_name: partner?.company_name || partner?.contact_name || 'Partner',
+          subject: 'Message from Legacy Translations',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      }
+      alert('Message sent successfully!');
+      setMessageContent('');
+      setSelectedRecipient('');
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Don't show for translators
+  if (user?.role === 'translator') return null;
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 flex items-center justify-center z-50 transition-all hover:scale-105"
+      >
+        {isOpen ? (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
+        {unreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+            <h3 className="font-bold text-lg">Send Message</h3>
+            <p className="text-xs text-blue-100">Contact translators or partners</p>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 space-y-4">
+            {/* Recipient Type Toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => { setRecipientType('translator'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'translator'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Translator
+              </button>
+              <button
+                onClick={() => { setRecipientType('partner'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'partner'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Partner
+              </button>
+            </div>
+
+            {/* Recipient Select */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Select {recipientType === 'translator' ? 'Translator' : 'Partner'}:
+              </label>
+              <select
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Select --</option>
+                {recipientType === 'translator'
+                  ? translators.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  : partners.map(p => (
+                      <option key={p.id} value={p.id}>{p.company_name || p.contact_name}</option>
+                    ))
+                }
+              </select>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Message:</label>
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="Type your message..."
+                className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+              />
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={sendMessage}
+              disabled={sending || !selectedRecipient || !messageContent.trim()}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {sending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send Message
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -21661,6 +21870,7 @@ function AdminApp() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
+      <FloatingChatWidget adminKey={adminKey} user={user} />
     </div>
   );
 }
