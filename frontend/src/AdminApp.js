@@ -4947,38 +4947,52 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {activeSubTab === 'start' && (
         <div className="space-y-4">
           {/* Translator Messages Panel */}
-          {user?.role === 'translator' && translatorMessages.filter(m => !m.read).length > 0 && (
-            <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
+          {user?.role === 'translator' && (
+            <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-purple-50 border-purple-300' : 'bg-gray-50 border-gray-200'}`}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
-                  <span className="text-purple-600 mr-2 text-xl">💬</span>
-                  <span className="text-sm font-bold text-purple-800">
-                    {translatorMessages.filter(m => !m.read).length} New Message(s) from Admin/PM
+                  <span className={`mr-2 text-xl ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-600' : 'text-gray-400'}`}>💬</span>
+                  <span className={`text-sm font-bold ${translatorMessages.filter(m => !m.read).length > 0 ? 'text-purple-800' : 'text-gray-600'}`}>
+                    {translatorMessages.filter(m => !m.read).length > 0
+                      ? `${translatorMessages.filter(m => !m.read).length} New Message(s) from Admin/PM`
+                      : 'Messages from Admin/PM'}
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowTranslatorMessages(!showTranslatorMessages)}
-                  className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-white rounded border border-purple-200"
-                >
-                  {showTranslatorMessages ? 'Hide' : 'View Messages'}
-                </button>
+                {translatorMessages.length > 0 && (
+                  <button
+                    onClick={() => setShowTranslatorMessages(!showTranslatorMessages)}
+                    className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-white rounded border border-purple-200"
+                  >
+                    {showTranslatorMessages ? 'Hide' : `View All (${translatorMessages.length})`}
+                  </button>
+                )}
               </div>
-              {showTranslatorMessages && (
+              {translatorMessages.filter(m => !m.read).length === 0 && !showTranslatorMessages && (
+                <div className="text-xs text-gray-500 text-center py-2">
+                  No new messages. Check back later for updates from Admin/PM.
+                </div>
+              )}
+              {showTranslatorMessages && translatorMessages.length > 0 && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {translatorMessages.filter(m => !m.read).map((msg) => (
+                  {translatorMessages.map((msg) => (
                     <div
                       key={msg.id}
-                      className="p-3 bg-white rounded border border-purple-200"
+                      className={`p-3 rounded border ${msg.read ? 'bg-gray-50 border-gray-200' : 'bg-white border-purple-200'}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-sm text-purple-800">
+                            <span className={`font-medium text-sm ${msg.read ? 'text-gray-600' : 'text-purple-800'}`}>
                               From: {msg.from_admin_name}
                             </span>
                             {msg.order_number && (
                               <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
                                 {msg.order_number}
+                              </span>
+                            )}
+                            {msg.read && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                                Read
                               </span>
                             )}
                           </div>
@@ -4990,14 +5004,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-end mt-2 pt-2 border-t">
-                        <button
-                          onClick={() => markTranslatorMessageRead(msg.id)}
-                          className="px-3 py-1 text-purple-600 border border-purple-200 rounded text-xs hover:bg-purple-50"
-                        >
-                          ✓ Mark as read
-                        </button>
-                      </div>
+                      {!msg.read && (
+                        <div className="flex justify-end mt-2 pt-2 border-t">
+                          <button
+                            onClick={() => markTranslatorMessageRead(msg.id)}
+                            className="px-3 py-1 text-purple-600 border border-purple-200 rounded text-xs hover:bg-purple-50"
+                          >
+                            ✓ Mark as read
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -12802,14 +12818,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             Status: {viewingOrder.translator_assignment_status || 'pending'}
                           </div>
                         </div>
-                        {isAdmin && viewingOrder.assigned_translator && (
+                        {isAdmin && (viewingOrder.assigned_translator_id || viewingOrder.assigned_translator) && (
                           <button
                             onClick={() => {
-                              // Find translator details
-                              const translator = translators.find(t => t.id === viewingOrder.assigned_translator);
+                              // Find translator details - use ID if available, otherwise search by name
+                              const translatorId = viewingOrder.assigned_translator_id;
+                              const translator = translatorId
+                                ? translators.find(t => t.id === translatorId)
+                                : translators.find(t => t.name === viewingOrder.assigned_translator);
                               setMessagingTranslator({
-                                id: viewingOrder.assigned_translator,
-                                name: viewingOrder.assigned_translator_name || translator?.name || 'Translator',
+                                id: translatorId || translator?.id || viewingOrder.assigned_translator,
+                                name: viewingOrder.assigned_translator_name || translator?.name || viewingOrder.assigned_translator || 'Translator',
                                 email: translator?.email || '',
                                 order_number: viewingOrder.order_number
                               });
