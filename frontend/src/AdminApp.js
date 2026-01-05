@@ -10531,8 +10531,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
     setSendingAssignment(true);
     try {
-      // Find translator info
-      const selectedTranslator = translatorList.find(t => t.id === assignmentDetails.translator_id);
+      // Check if assigning to self (admin/PM)
+      const isSelfAssignment = assignmentDetails.translator_id === 'self';
+
+      // Find translator info (or use current user for self assignment)
+      const selectedTranslator = isSelfAssignment
+        ? { name: user?.name || 'Admin', id: 'self' }
+        : translatorList.find(t => t.id === assignmentDetails.translator_id);
 
       // Build deadline if provided
       let deadline = null;
@@ -10542,19 +10547,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
       // Update order with translator assignment
       await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
-        assigned_translator_id: assignmentDetails.translator_id,
+        assigned_translator_id: isSelfAssignment ? null : assignmentDetails.translator_id,
+        assigned_translator: isSelfAssignment ? (user?.name || 'Admin') : selectedTranslator?.name,
         deadline: deadline,
-        internal_notes: assignmentDetails.project_notes
+        internal_notes: assignmentDetails.project_notes,
+        self_assigned: isSelfAssignment,
+        skip_email: isSelfAssignment
       });
 
-      alert(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
+      if (isSelfAssignment) {
+        alert(`Project assigned to yourself (${user?.name || 'Admin'})! You can start translating now.`);
+      } else {
+        alert(`Invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline.`);
+      }
       setAssigningTranslatorModal(null);
       setAssigningTranslator(null);
       fetchOrders();
       fetchNotifications();
     } catch (err) {
       console.error('Failed to assign translator:', err);
-      alert('Errorr sending assignment');
+      alert('Error sending assignment');
     } finally {
       setSendingAssignment(false);
     }
@@ -10865,6 +10877,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   className="w-full px-3 py-2 border rounded text-sm"
                 >
                   <option value="">-- Choose Translator --</option>
+                  {/* Option for admin/PM to assign to themselves */}
+                  {(user?.role === 'admin' || user?.role === 'pm') && (
+                    <option value="self" className="font-medium bg-purple-50">
+                      👤 Myself ({user?.name || user?.role}) - No email notification
+                    </option>
+                  )}
                   {translatorList.filter(t => t.is_active !== false).map(t => (
                     <option key={t.id} value={t.id}>
                       {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''} {t.invitation_pending ? '(pending)' : ''}
@@ -10914,9 +10932,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
 
               {/* Info */}
-              <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
-                <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
-              </div>
+              {assignmentDetails.translator_id === 'self' ? (
+                <div className="p-2 bg-green-50 rounded text-xs text-green-700">
+                  <span className="font-medium">👤 Self Assignment:</span> The project will be assigned directly to you. No email will be sent.
+                </div>
+              ) : (
+                <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                  <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+                </div>
+              )}
             </div>
 
             <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
@@ -10931,7 +10955,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 disabled={sendingAssignment || !assignmentDetails.translator_id}
                 className="px-4 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-400"
               >
-                {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
+                {sendingAssignment ? 'Sending...' : (assignmentDetails.translator_id === 'self' ? '✅ Assign to Myself' : '📤 Send Invitation')}
               </button>
             </div>
           </div>
