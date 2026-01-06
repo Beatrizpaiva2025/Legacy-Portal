@@ -6761,7 +6761,7 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
 
     # If the order status is in an early stage, change it to 'in_translation' (In Progress)
     # This allows work to begin once payment is received
-    early_stage_statuses = ["quote", "received"]
+    early_stage_statuses = ["quote", "Quote", "received", "pending"]
     if order.get("translation_status") in early_stage_statuses:
         update_fields["translation_status"] = "in_translation"
 

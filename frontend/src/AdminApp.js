@@ -10876,14 +10876,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    // "Quote" filter should include both 'received' and 'Quote' (from MIA bot)
-    if (statusFilter === 'received' && o.translation_status === 'Quote') {
-      matchStatus = true;
-    }
-    // "In Progress" filter should include orders being translated or pending translation
+    // "In Progress" filter should include all early stage orders (received, Quote, pending, in_translation)
     if (statusFilter === 'in_translation') {
-      matchStatus = o.translation_status === 'in_translation' ||
-                    o.translation_status === 'pending' ||
+      const inProgressStatuses = ['in_translation', 'pending', 'received', 'Quote', 'quote'];
+      matchStatus = inProgressStatuses.includes(o.translation_status) ||
                     (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
     }
     // "PM Review" filter should include both 'review' and 'pending_pm_review'
@@ -10904,8 +10900,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   const getStatusLabel = (status) => {
     const labels = {
-      'received': 'Quote',
-      'Quote': 'Quote',
+      'received': 'In Progress',
+      'Quote': 'In Progress',
+      'quote': 'In Progress',
+      'pending': 'In Progress',
       'in_translation': 'In Progress',
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
@@ -11486,7 +11484,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -11878,7 +11876,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700">Notes</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
               {/* Total and Payment columns - Admin only */}
@@ -12079,40 +12076,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Status */}
                   <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
-                  {/* Notes */}
-                  <td className="px-3 py-3">
-                    {editingTags === order.id && isAdmin ? (
-                      <div className="flex flex-col gap-1">
-                        <input
-                          type="text"
-                          placeholder="Internal note..."
-                          value={tempTagValue.notes}
-                          onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded w-32"
-                        />
-                        <div className="flex gap-1">
-                          <button onClick={() => saveTagsEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
-                          <button onClick={() => setEditingTags(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => isAdmin && startEditingTags(order)}
-                        className={`flex items-center gap-1 ${isAdmin ? 'cursor-pointer' : ''}`}
-                        title={isAdmin ? "Click to edit notes" : ""}
-                      >
-                        {order.notes && (
-                          <span className="px-1.5 py-1 bg-blue-50 text-blue-500 rounded text-xs cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3.5 h-3.5 inline" /></span>
-                        )}
-                        {order.internal_notes && (
-                          <span className="px-1.5 py-1 bg-sky-50 text-sky-500 rounded text-xs cursor-help border border-sky-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3.5 h-3.5 inline" /></span>
-                        )}
-                        {!order.notes && !order.internal_notes && (
-                          <span className="text-gray-300 text-xs">-</span>
-                        )}
-                      </div>
-                    )}
-                  </td>
                   {/* Translation Ready column - shows when translation is complete */}
                   <td className="px-3 py-3 text-center">
                     {order.translation_ready ? (
