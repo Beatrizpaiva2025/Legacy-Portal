@@ -4124,6 +4124,52 @@ async def delete_admin_user(user_id: str, admin_key: str):
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
+class QuickVendorCreate(BaseModel):
+    name: str
+    email: str
+    role: str = "translator"
+    rate_per_page: Optional[float] = 0
+
+@api_router.post("/admin/users/create")
+async def quick_create_vendor(vendor_data: QuickVendorCreate, admin_key: str):
+    """Quick create a vendor without email invitation (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check if email already exists
+        existing = await db.admin_users.find_one({"email": vendor_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create vendor directly as active
+        vendor = {
+            "id": str(uuid.uuid4()),
+            "email": vendor_data.email,
+            "name": vendor_data.name,
+            "role": vendor_data.role.lower(),
+            "is_active": True,
+            "password_hash": "",  # No password - vendor only
+            "rate_per_page": vendor_data.rate_per_page or 0,
+            "pages_pending_payment": 0,
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        await db.admin_users.insert_one(vendor)
+        logger.info(f"Quick vendor created: {vendor_data.email} as {vendor_data.role}")
+
+        return {"success": True, "id": vendor["id"], "message": "Vendor created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating vendor: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create vendor")
+
 # ==================== SHARED ASSETS (Logos, Stamp, Signature - Global for all users) ====================
 
 class SharedAssets(BaseModel):
@@ -4615,14 +4661,15 @@ async def get_translators_payment_summary(admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        # Include all vendor roles: translator, admin, pm, sales
-        # Show active users or users where is_active is not set (defaults to active)
-        translators = await db.admin_users.find({
-            "role": {"$in": ["translator", "admin", "pm", "sales"]},
-            "$or": [{"is_active": True}, {"is_active": {"$exists": False}}]
-        }).to_list(100)
+        # Get ALL users - don't filter by role or is_active to ensure we show everyone
+        # The frontend can filter if needed
+        all_users = await db.admin_users.find({}).to_list(200)
 
-        logger.info(f"Found {len(translators)} active vendors/contractors")
+        # Filter out only truly inactive users (is_active explicitly set to False)
+        # Keep users where is_active is True, not set, or any other value
+        translators = [u for u in all_users if u.get("is_active") != False]
+
+        logger.info(f"Found {len(translators)} vendors/contractors (from {len(all_users)} total users)")
 
         result = []
         for translator in translators:
@@ -4859,6 +4906,131 @@ async def get_payment_report(admin_key: str, start_date: str = None, end_date: s
     except Exception as e:
         logger.error(f"Error getting payment report: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get report")
+
+# ==================== TRANSLATOR PAGES TRACKING ====================
+
+class PagesLogCreate(BaseModel):
+    translator_id: str
+    pages: int
+    date: str
+    note: Optional[str] = ""
+
+@api_router.get("/admin/translator-pages")
+async def get_translator_pages(admin_key: str, period: str = "month"):
+    """Get translator pages logs"""
+    if admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    try:
+        # Calculate date range based on period
+        now = datetime.utcnow()
+        if period == "day":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        elif period == "year":
+            start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start_date = now - timedelta(days=365)
+
+        # Get all pages logs within the date range
+        logs = await db.translator_pages.find({
+            "date": {"$gte": start_date.isoformat()}
+        }).sort("date", -1).to_list(1000)
+
+        # Convert ObjectId to string
+        for log in logs:
+            log["_id"] = str(log["_id"])
+
+        return {"logs": logs}
+    except Exception as e:
+        logger.error(f"Error getting pages logs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get pages logs")
+
+@api_router.post("/admin/translator-pages")
+async def add_translator_pages(pages_data: PagesLogCreate, admin_key: str):
+    """Add translator pages log"""
+    if admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    try:
+        # Get translator name
+        translator = await db.admin_users.find_one({"_id": pages_data.translator_id})
+        if not translator:
+            # Try with ObjectId
+            from bson import ObjectId
+            try:
+                translator = await db.admin_users.find_one({"_id": ObjectId(pages_data.translator_id)})
+            except:
+                pass
+
+        translator_name = translator.get("name", "Unknown") if translator else "Unknown"
+
+        # Create log entry
+        log_entry = {
+            "translator_id": pages_data.translator_id,
+            "translator_name": translator_name,
+            "pages": pages_data.pages,
+            "date": pages_data.date,
+            "note": pages_data.note or "",
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        result = await db.translator_pages.insert_one(log_entry)
+
+        # Update translator's pending pages
+        if translator:
+            current_pending = translator.get("pages_pending_payment", 0) or 0
+            await db.admin_users.update_one(
+                {"_id": translator["_id"]},
+                {"$set": {"pages_pending_payment": current_pending + pages_data.pages}}
+            )
+
+        return {"success": True, "id": str(result.inserted_id)}
+    except Exception as e:
+        logger.error(f"Error adding pages log: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to add pages log")
+
+@api_router.delete("/admin/translator-pages/{log_id}")
+async def delete_translator_pages(log_id: str, admin_key: str):
+    """Delete a translator pages log entry"""
+    if admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    try:
+        from bson import ObjectId
+
+        # Get the log entry first to update translator's pending pages
+        log = await db.translator_pages.find_one({"_id": ObjectId(log_id)})
+        if not log:
+            raise HTTPException(status_code=404, detail="Log entry not found")
+
+        # Delete the log entry
+        await db.translator_pages.delete_one({"_id": ObjectId(log_id)})
+
+        # Update translator's pending pages (decrease)
+        translator_id = log.get("translator_id")
+        if translator_id:
+            translator = await db.admin_users.find_one({"_id": translator_id})
+            if not translator:
+                try:
+                    translator = await db.admin_users.find_one({"_id": ObjectId(translator_id)})
+                except:
+                    pass
+
+            if translator:
+                current_pending = translator.get("pages_pending_payment", 0) or 0
+                new_pending = max(0, current_pending - (log.get("pages", 0) or 0))
+                await db.admin_users.update_one(
+                    {"_id": translator["_id"]},
+                    {"$set": {"pages_pending_payment": new_pending}}
+                )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting pages log: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete pages log")
 
 # ==================== TRANSLATION ORDERS ====================
 

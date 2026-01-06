@@ -17513,6 +17513,15 @@ const FinancesPage = ({ adminKey }) => {
   const [paidOrders, setPaidOrders] = useState([]);
   // Partner statistics state
   const [partnerStats, setPartnerStats] = useState({ partners: [], summary: {} });
+  // Quick add vendor modal state
+  const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
+  const [quickVendorForm, setQuickVendorForm] = useState({ name: '', email: '', role: 'translator', rate_per_page: '' });
+  const [addingVendor, setAddingVendor] = useState(false);
+  // Pages tracking state
+  const [pagesLogs, setPagesLogs] = useState([]);
+  const [showAddPagesModal, setShowAddPagesModal] = useState(false);
+  const [pagesForm, setPagesForm] = useState({ translator_id: '', pages: '', date: new Date().toISOString().split('T')[0], note: '' });
+  const [addingPages, setAddingPages] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -17689,6 +17698,76 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Quick add vendor
+  const handleQuickAddVendor = async () => {
+    if (!quickVendorForm.name || !quickVendorForm.email) {
+      alert('Please fill name and email');
+      return;
+    }
+    setAddingVendor(true);
+    try {
+      await axios.post(`${API}/admin/users/create?admin_key=${adminKey}`, {
+        name: quickVendorForm.name,
+        email: quickVendorForm.email,
+        role: quickVendorForm.role || 'translator',
+        rate_per_page: parseFloat(quickVendorForm.rate_per_page) || 0
+      });
+      alert('Vendor created successfully!');
+      setShowQuickAddVendor(false);
+      setQuickVendorForm({ name: '', email: '', role: 'translator', rate_per_page: '' });
+      fetchTranslatorsForPayment();
+    } catch (err) {
+      alert('Error creating vendor: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAddingVendor(false);
+    }
+  };
+
+  // Pages tracking functions
+  const fetchPagesLogs = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/translator-pages?admin_key=${adminKey}&period=${period}`);
+      setPagesLogs(response.data.logs || []);
+    } catch (err) {
+      console.error('Failed to fetch pages logs:', err);
+    }
+  };
+
+  const handleAddPagesLog = async () => {
+    if (!pagesForm.translator_id || !pagesForm.pages) {
+      alert('Please select translator and enter pages');
+      return;
+    }
+    setAddingPages(true);
+    try {
+      await axios.post(`${API}/admin/translator-pages?admin_key=${adminKey}`, {
+        translator_id: pagesForm.translator_id,
+        pages: parseInt(pagesForm.pages),
+        date: pagesForm.date,
+        note: pagesForm.note || ''
+      });
+      alert('Pages registered successfully!');
+      setShowAddPagesModal(false);
+      setPagesForm({ translator_id: '', pages: '', date: new Date().toISOString().split('T')[0], note: '' });
+      fetchPagesLogs();
+      fetchTranslatorsForPayment();
+    } catch (err) {
+      alert('Error registering pages: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAddingPages(false);
+    }
+  };
+
+  const handleDeletePagesLog = async (logId) => {
+    if (!window.confirm('Are you sure you want to delete this entry?')) return;
+    try {
+      await axios.delete(`${API}/admin/translator-pages/${logId}?admin_key=${adminKey}`);
+      fetchPagesLogs();
+    } catch (err) {
+      alert('Error deleting entry: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const deletePartner = async (partnerId) => {
     try {
       await axios.delete(`${API}/admin/partners/${partnerId}?admin_key=${adminKey}`);
@@ -17766,6 +17845,10 @@ const FinancesPage = ({ adminKey }) => {
     if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
       fetchPaymentReport();
+    }
+    if (activeView === 'pages') {
+      fetchPagesLogs();
+      fetchTranslatorsForPayment();
     }
   }, [activeView]);
 
@@ -17912,6 +17995,12 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'partners' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               🤝 Partners
+            </button>
+            <button
+              onClick={() => setActiveView('pages')}
+              className={`px-4 py-2 rounded text-sm ${activeView === 'pages' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              📄 Pages
             </button>
           </div>
         </div>
@@ -18207,7 +18296,15 @@ const FinancesPage = ({ adminKey }) => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Vendors List */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-sm font-bold text-gray-700 mb-3">👥 Vendors / Contractors</h2>
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="text-sm font-bold text-gray-700">👥 Vendors / Contractors</h2>
+                <button
+                  onClick={() => setShowQuickAddVendor(true)}
+                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                >
+                  + Add Vendor
+                </button>
+              </div>
               <div className="space-y-2 max-h-[500px] overflow-y-auto">
                 {translators.length === 0 ? (
                   <p className="text-gray-500 text-sm">No vendors found.</p>
@@ -18446,6 +18543,262 @@ const FinancesPage = ({ adminKey }) => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Quick Add Vendor Modal */}
+          {showQuickAddVendor && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-gray-800">Add New Vendor</h3>
+                  <button
+                    onClick={() => setShowQuickAddVendor(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={quickVendorForm.name}
+                      onChange={(e) => setQuickVendorForm({...quickVendorForm, name: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                      placeholder="Vendor name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Email *</label>
+                    <input
+                      type="email"
+                      value={quickVendorForm.email}
+                      onChange={(e) => setQuickVendorForm({...quickVendorForm, email: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                      placeholder="vendor@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Role</label>
+                    <select
+                      value={quickVendorForm.role}
+                      onChange={(e) => setQuickVendorForm({...quickVendorForm, role: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                    >
+                      <option value="translator">Translator</option>
+                      <option value="sales">Sales</option>
+                      <option value="pm">Project Manager</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={quickVendorForm.rate_per_page}
+                      onChange={(e) => setQuickVendorForm({...quickVendorForm, rate_per_page: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                      placeholder="25.00"
+                    />
+                  </div>
+                  <div className="flex space-x-3 mt-4">
+                    <button
+                      onClick={() => setShowQuickAddVendor(false)}
+                      className="flex-1 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleQuickAddVendor}
+                      disabled={addingVendor || !quickVendorForm.name || !quickVendorForm.email}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {addingVendor ? 'Adding...' : 'Add Vendor'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pages Tracking View */}
+      {activeView === 'pages' && (
+        <div className="space-y-6">
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-6">
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Total Pages This Month</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {pagesLogs
+                  .filter(log => {
+                    const logDate = new Date(log.date);
+                    const now = new Date();
+                    return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+                  })
+                  .reduce((sum, log) => sum + (log.pages || 0), 0)}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Active Translators</div>
+              <div className="text-2xl font-bold text-green-600">
+                {new Set(pagesLogs.map(log => log.translator_id)).size}
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="text-xs text-gray-500 uppercase mb-1">Entries This Month</div>
+              <div className="text-2xl font-bold text-gray-800">
+                {pagesLogs.filter(log => {
+                  const logDate = new Date(log.date);
+                  const now = new Date();
+                  return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+                }).length}
+              </div>
+            </div>
+          </div>
+
+          {/* Add Pages Form */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-3">📝 Log Translated Pages</h2>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Translator</label>
+                <select
+                  value={pagesForm.translator_id}
+                  onChange={(e) => setPagesForm({...pagesForm, translator_id: e.target.value})}
+                  className="w-full border rounded p-2 text-sm"
+                >
+                  <option value="">Select translator...</option>
+                  {translators.filter(t => t.role?.toLowerCase() === 'translator').map(t => (
+                    <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={pagesForm.date}
+                  onChange={(e) => setPagesForm({...pagesForm, date: e.target.value})}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Pages</label>
+                <input
+                  type="number"
+                  value={pagesForm.pages}
+                  onChange={(e) => setPagesForm({...pagesForm, pages: e.target.value})}
+                  className="w-full border rounded p-2 text-sm"
+                  placeholder="Number of pages"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Note (optional)</label>
+                <input
+                  type="text"
+                  value={pagesForm.note}
+                  onChange={(e) => setPagesForm({...pagesForm, note: e.target.value})}
+                  className="w-full border rounded p-2 text-sm"
+                  placeholder="Project or comment"
+                />
+              </div>
+              <div>
+                <button
+                  onClick={handleAddPagesLog}
+                  disabled={addingPages || !pagesForm.translator_id || !pagesForm.pages}
+                  className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {addingPages ? 'Adding...' : '+ Add Entry'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Pages Log Table */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="text-sm font-bold text-gray-700">📊 Monthly Pages Summary</h2>
+              <button
+                onClick={fetchPagesLogs}
+                className="px-3 py-1 bg-gray-200 text-gray-700 rounded text-xs hover:bg-gray-300"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left p-3 font-medium text-gray-600">Translator</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Date</th>
+                    <th className="text-right p-3 font-medium text-gray-600">Pages</th>
+                    <th className="text-left p-3 font-medium text-gray-600">Note</th>
+                    <th className="text-center p-3 font-medium text-gray-600">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagesLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="p-8 text-center text-gray-500">
+                        No pages logged yet. Use the form above to add entries.
+                      </td>
+                    </tr>
+                  ) : (
+                    pagesLogs.map((log, idx) => (
+                      <tr key={log._id || idx} className="border-t hover:bg-gray-50">
+                        <td className="p-3 font-medium text-gray-800">{log.translator_name || log.translator_id}</td>
+                        <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US')}</td>
+                        <td className="p-3 text-right font-bold text-blue-600">{log.pages}</td>
+                        <td className="p-3 text-gray-500">{log.note || '-'}</td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => handleDeletePagesLog(log._id)}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Monthly Totals by Translator */}
+            {pagesLogs.length > 0 && (
+              <div className="p-4 border-t bg-gray-50">
+                <h3 className="text-sm font-bold text-gray-700 mb-3">📈 Totals by Translator (This Month)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {Object.entries(
+                    pagesLogs
+                      .filter(log => {
+                        const logDate = new Date(log.date);
+                        const now = new Date();
+                        return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+                      })
+                      .reduce((acc, log) => {
+                        const name = log.translator_name || log.translator_id;
+                        acc[name] = (acc[name] || 0) + (log.pages || 0);
+                        return acc;
+                      }, {})
+                  )
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, total]) => (
+                      <div key={name} className="bg-white rounded border p-3">
+                        <div className="text-xs text-gray-500 truncate">{name}</div>
+                        <div className="text-lg font-bold text-blue-600">{total} pages</div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
