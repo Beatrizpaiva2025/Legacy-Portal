@@ -8248,7 +8248,8 @@ async def admin_get_order_documents(order_id: str, admin_key: str):
             "filename": doc.get("filename"),
             "content_type": doc.get("content_type", "application/pdf"),
             "has_data": bool(doc.get("data")),
-            "source": "manual_upload"
+            "source": doc.get("source", "manual_upload"),
+            "uploaded_at": doc.get("uploaded_at").isoformat() if doc.get("uploaded_at") else None
         })
 
     return {"documents": all_docs, "count": len(all_docs)}

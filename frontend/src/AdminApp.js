@@ -2372,6 +2372,67 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Save translated document to project files
+  const saveTranslatedDocumentToFiles = async (orderId, docFilename) => {
+    try {
+      // Get the translation HTML content
+      const translationContent = translationResults.map(r => r.translatedText).join('\n\n---\n\n');
+      if (!translationContent) return;
+
+      // Create HTML document with translation
+      const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Translated Document - ${docFilename}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+        .title { font-size: 18px; font-weight: bold; color: #1e40af; }
+        .info { font-size: 12px; color: #666; margin-top: 10px; }
+        .content { margin-top: 20px; }
+        .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 11px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">Certified Translation</div>
+        <div class="info">
+            Document: ${documentType || 'Document'}<br>
+            From: ${sourceLanguage} → To: ${targetLanguage}<br>
+            Translator: ${translator?.name || selectedTranslator || 'Beatriz Paiva'}<br>
+            Date: ${translationDate}
+        </div>
+    </div>
+    <div class="content">
+        ${translationContent}
+    </div>
+    <div class="footer">
+        This is a certified translation by Legacy Translations Inc.<br>
+        Approved on: ${new Date().toLocaleDateString()}
+    </div>
+</body>
+</html>`;
+
+      // Convert to base64
+      const base64Content = btoa(unescape(encodeURIComponent(htmlContent)));
+      const filename = `${orderNumber || 'Translation'}_${documentType?.replace(/\s+/g, '_') || 'Document'}_Translated.html`;
+
+      // Upload to order documents
+      await axios.post(`${API}/admin/orders/${orderId}/documents?admin_key=${adminKey}`, {
+        filename: filename,
+        file_data: base64Content,
+        content_type: 'text/html',
+        source: 'translated_document'
+      });
+
+      console.log('Translated document saved to Files tab');
+    } catch (err) {
+      console.error('Failed to save translated document:', err);
+    }
+  };
+
   // Approve translation (PM/Admin) - sends to admin for final approval or marks as ready
   const approveTranslation = async (sendDirectToReady = false) => {
     if (!selectedOrderId) {
@@ -2398,6 +2459,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         proofreading_by: user?.name || 'PM',
         proofreading_date: new Date().toISOString()
       });
+
+      // Save translated document to Files tab when approved
+      await saveTranslatedDocumentToFiles(selectedOrderId, documentType || orderNumber);
 
       if (isPMApproval) {
         setProcessingStatus('✅ Translation APPROVED and sent to Admin for final review!');
@@ -12729,14 +12793,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </div>
                   )}
 
-                  {/* Documents List */}
+                  {/* Original Documents Section */}
                   <div>
                     <div className="text-xs font-medium text-gray-600 mb-2">📁 Original Documents</div>
                     {loadingDocuments ? (
                       <div className="text-center py-4 text-gray-500 text-xs">Loading documents...</div>
-                    ) : orderDocuments.length > 0 ? (
+                    ) : orderDocuments.filter(doc => doc.source !== 'translated_document').length > 0 ? (
                       <div className="space-y-2">
-                        {orderDocuments.map((doc, idx) => (
+                        {orderDocuments.filter(doc => doc.source !== 'translated_document').map((doc, idx) => (
                           <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100">
                             <div className="flex items-center">
                               <span className="text-2xl mr-3">
@@ -12760,14 +12824,48 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-400">
-                        <div className="text-4xl mb-2">📭</div>
-                        <div className="text-sm">No documents found</div>
+                      <div className="text-center py-4 text-gray-400">
+                        <div className="text-2xl mb-1">📭</div>
+                        <div className="text-xs">No original documents</div>
                         {viewingOrder.document_filename && (
-                          <div className="mt-2 text-xs text-gray-500">
+                          <div className="mt-1 text-[10px] text-gray-500">
                             Registered file: {viewingOrder.document_filename}
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Translated Documents Section */}
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="text-xs font-medium text-green-700 mb-2">📗 Translated Documents</div>
+                    {orderDocuments.filter(doc => doc.source === 'translated_document').length > 0 ? (
+                      <div className="space-y-2">
+                        {orderDocuments.filter(doc => doc.source === 'translated_document').map((doc, idx) => (
+                          <div key={doc.id || idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100">
+                            <div className="flex items-center">
+                              <span className="text-2xl mr-3">📗</span>
+                              <div>
+                                <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
+                                <div className="text-[10px] text-green-600">
+                                  Approved translation
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => downloadDocument(doc.id, doc.filename)}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
+                            >
+                              <span>⬇️</span> Download
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-gray-400">
+                        <div className="text-2xl mb-1">📝</div>
+                        <div className="text-xs">No translations approved yet</div>
                       </div>
                     )}
                   </div>
