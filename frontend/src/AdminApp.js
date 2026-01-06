@@ -17105,7 +17105,8 @@ const UsersPage = ({ adminKey, user }) => {
       role: u.role || '',
       rate_per_page: u.rate_per_page || '',
       rate_per_word: u.rate_per_word || '',
-      language_pairs: u.language_pairs || ''
+      language_pairs: u.language_pairs || '',
+      translator_type: u.translator_type || 'contractor'
     });
   };
 
@@ -17126,6 +17127,7 @@ const UsersPage = ({ adminKey, user }) => {
       if (editForm.rate_per_page !== '') updateData.rate_per_page = parseFloat(editForm.rate_per_page);
       if (editForm.rate_per_word !== '') updateData.rate_per_word = parseFloat(editForm.rate_per_word);
       if (editForm.language_pairs !== undefined) updateData.language_pairs = editForm.language_pairs;
+      if (editForm.translator_type) updateData.translator_type = editForm.translator_type;
 
       await axios.put(`${API}/admin/users/${userId}?admin_key=${adminKey}`, updateData);
       await fetchUsers();
@@ -17623,6 +17625,25 @@ const UsersPage = ({ adminKey, user }) => {
                                 {u.is_active ? 'Ativo' : 'Inativo'}
                               </div>
                             </div>
+                            {u.role === 'translator' && (
+                              <div>
+                                <span className="text-gray-500 text-xs">Tipo de Tradutor:</span>
+                                {editingUser === u.id ? (
+                                  <select
+                                    value={editForm.translator_type || 'contractor'}
+                                    onChange={(e) => setEditForm({...editForm, translator_type: e.target.value})}
+                                    className="w-full px-2 py-1 text-sm border rounded"
+                                  >
+                                    <option value="contractor">Contractor (Limitado)</option>
+                                    <option value="in_house">In-House (Acesso Completo)</option>
+                                  </select>
+                                ) : (
+                                  <div className={`font-medium ${u.translator_type === 'in_house' ? 'text-blue-600' : 'text-orange-600'}`}>
+                                    {u.translator_type === 'in_house' ? 'In-House' : 'Contractor'}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div>
                               <span className="text-gray-500 text-xs">Amount por Página:</span>
                               {editingUser === u.id ? (
