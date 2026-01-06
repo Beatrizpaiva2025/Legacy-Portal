@@ -722,6 +722,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // User role checks
   const isAdmin = user?.role === 'admin';
   const isPM = user?.role === 'pm';
+  const isTranslator = user?.role === 'translator';
+  const isInHouseTranslator = isTranslator && user?.translator_type === 'in_house';
+  const isContractor = isTranslator && user?.translator_type !== 'in_house';  // Contractors have limited DELIVER tab access
 
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
@@ -2358,7 +2361,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         'pm': 'PM Review',
         'ready': 'Ready for Delivery',
         'deliver': 'Client',
-        'client': 'Client (Review)'
+        'client': 'Client (Review)',
+        'pending_admin_approval': 'Admin (for client delivery)'
       };
       const destinationLabel = destinationLabels[destination] || destination;
 
@@ -2388,6 +2392,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             // For PM/Admin, just clear status after showing success
             setTimeout(() => setProcessingStatus(''), 3000);
           }
+        } else if (destination === 'pending_admin_approval') {
+          setProcessingStatus(`✅ Translation approved and sent to Admin for client delivery!`);
+          setTimeout(() => setProcessingStatus(''), 3000);
         } else {
           setProcessingStatus(`✅ Translation sent to ${destinationLabel}!`);
           setTimeout(() => setProcessingStatus(''), 3000);
@@ -5138,17 +5145,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
+      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator'] },
+          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
-        ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
+        ].filter(tab => {
+          const userRole = user?.role || 'translator';
+          // For translators, check translator_type for extended access
+          if (userRole === 'translator' && user?.translator_type === 'in_house') {
+            // In-house translators get access to tabs marked with 'translator_inhouse'
+            return tab.roles.includes('translator') || tab.roles.includes('translator_inhouse');
+          }
+          return tab.roles.includes(userRole);
+        }).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
@@ -8562,41 +8578,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       )}
 
       {/* APPROVAL TAB - Admin, PM and Translator */}
-      {activeSubTab === 'deliver' && (isAdmin || isPM || user?.role === 'translator') && (
+      {activeSubTab === 'deliver' && (isAdmin || isPM || isTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
-          {/* Mode Switch: Normal vs Quick Package */}
-          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-            <div className="flex items-center justify-center gap-3">
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  checked={!quickPackageMode}
-                  onChange={() => setQuickPackageMode(false)}
-                  className="sr-only"
-                />
-                <span className="mr-2">📝</span>
-                <span className="text-sm font-medium">Normal Flow</span>
-              </label>
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  checked={quickPackageMode}
-                  onChange={() => setQuickPackageMode(true)}
-                  className="sr-only"
-                />
-                <span className="mr-2">📦</span>
-                <span className="text-sm font-medium">Quick Package</span>
-              </label>
+          {/* Mode Switch: Normal vs Quick Package - Hidden for contractors only */}
+          {(isAdmin || isPM || isInHouseTranslator) && (
+            <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+              <div className="flex items-center justify-center gap-3">
+                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={!quickPackageMode}
+                    onChange={() => setQuickPackageMode(false)}
+                    className="sr-only"
+                  />
+                  <span className="mr-2">📝</span>
+                  <span className="text-sm font-medium">Normal Flow</span>
+                </label>
+                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={quickPackageMode}
+                    onChange={() => setQuickPackageMode(true)}
+                    className="sr-only"
+                  />
+                  <span className="mr-2">📦</span>
+                  <span className="text-sm font-medium">Quick Package</span>
+                </label>
+              </div>
+              <p className="text-[10px] text-gray-500 text-center mt-2">
+                {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
+              </p>
             </div>
-            <p className="text-[10px] text-gray-500 text-center mt-2">
-              {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
-            </p>
-          </div>
+          )}
 
           {/* ============ QUICK PACKAGE MODE ============ */}
-          {quickPackageMode && (
+          {/* Contractors always use Quick Package mode, In-house translators can choose */}
+          {(quickPackageMode || isContractor) && (
             <>
               {/* Certificate Fields */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
@@ -8800,76 +8819,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Options */}
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeCover}
-                      onChange={(e) => setIncludeCover(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Certificate of Accuracy</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeLetterhead}
-                      onChange={(e) => setIncludeLetterhead(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Letterhead on pages</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeOriginal}
-                      onChange={(e) => setIncludeOriginal(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Original Documents</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeAuthenticityStatement}
-                      onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
-                  </label>
+              {/* Options - Hidden for contractors only */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeCover}
+                        onChange={(e) => setIncludeCover(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Certificate of Accuracy</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeLetterhead}
+                        onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Letterhead on pages</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeOriginal}
+                        onChange={(e) => setIncludeOriginal(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Original Documents</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeAuthenticityStatement}
+                        onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Document Order Preview */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
-                <div className="flex items-center gap-2 text-xs flex-wrap">
-                  {includeCover && (
-                    <>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
-                      <span className="text-gray-400">→</span>
-                    </>
-                  )}
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                    📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
-                  </span>
-                  {includeOriginal && quickOriginalFiles.length > 0 && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
-                    </>
-                  )}
-                  {includeAuthenticityStatement && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
-                    </>
-                  )}
+              {/* Document Order Preview - Hidden for contractors only */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    {includeCover && (
+                      <>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                      📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
+                    </span>
+                    {includeOriginal && quickOriginalFiles.length > 0 && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                      </>
+                    )}
+                    {includeAuthenticityStatement && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Loading/Progress Indicator */}
               {quickPackageProgress && (
@@ -8943,99 +8966,221 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Submit for Review - For All Roles */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-2">
-                  📤 {user?.role === 'translator' ? 'Submit for Review' : 'Submit & Notify Team'}
-                </h3>
-                <p className="text-[10px] text-blue-600 mb-3">
-                  {user?.role === 'translator'
-                    ? 'Send your translation to Admin/PM for review and approval'
-                    : 'Link translation to order and notify team members'}
-                </p>
-
-                <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border rounded"
-                  >
-                    <option value="">-- Select Order --</option>
-                    {availableOrders.map(order => (
-                      <option key={order.id} value={order.id}>
-                        {order.order_number} - {order.client_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => sendToProjects('review')}
-                  disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                  className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {sendingToProjects ? '⏳ Sending...' : (user?.role === 'translator' ? '📤 Submit for Admin/PM Review' : '📤 Submit & Notify Admin/PM')}
-                </button>
-
-                {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                  <p className="text-[10px] text-blue-600 mt-2">
-                    ⚠️ Fill document type and upload translation first
+              {/* ============ CONTRACTOR SECTION: Send to PM ============ */}
+              {/* Only contractors see this - In-house translators use the full Admin/PM section below */}
+              {isContractor && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-purple-700 mb-2">
+                    📤 Send to Project Manager
+                  </h3>
+                  <p className="text-[10px] text-purple-600 mb-3">
+                    Send your completed translation to the PM for review and approval
                   </p>
-                )}
-              </div>
 
-              {/* Download Button */}
-              <button
-                onClick={handleQuickPackageDownload}
-                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {quickPackageLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Generating...
-                  </>
-                ) : (
-                  '📦 Generate Complete Package (Print/PDF)'
-                )}
-              </button>
-              <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Opens print window - save as PDF
-              </p>
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="">-- Select Order --</option>
+                      {availableOrders.map(order => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number} - {order.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Send options after package generation */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
-                <div className="flex gap-3 items-center">
-                  <select
-                    value={sendDestination}
-                    onChange={(e) => setSendDestination(e.target.value)}
-                    className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    disabled={sendingToProjects}
-                  >
-                    <option value="client">📧 Send to Client (Review)</option>
-                    {isPM && <option value="admin">📤 Send to Admin</option>}
-                  </select>
                   <button
-                    onClick={() => sendToProjects(sendDestination)}
-                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className={`px-6 py-3 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 ${
-                      sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
+                    onClick={() => sendToProjects('pm')}
+                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="w-full py-3 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                    {sendingToProjects ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      '📤 Send to PM for Review'
+                    )}
                   </button>
+
+                  {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                    <p className="text-[10px] text-purple-600 mt-2">
+                      ⚠️ Fill document type and upload translation first
+                    </p>
+                  )}
+
+                  {processingStatus && (
+                    <div className={`mt-3 p-2 rounded text-xs ${
+                      processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                      processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {processingStatus}
+                    </div>
+                  )}
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  Select destination and click Send
-                </p>
-              </div>
+              )}
+
+              {/* ============ ADMIN/PM/IN-HOUSE SECTION: Submit & Notify Team ============ */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
+                <>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                    <h3 className="text-sm font-bold text-blue-700 mb-2">
+                      📤 Submit & Notify Team
+                    </h3>
+                    <p className="text-[10px] text-blue-600 mb-3">
+                      Link translation to order and notify team members
+                    </p>
+
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                      <select
+                        value={selectedOrderId}
+                        onChange={(e) => setSelectedOrderId(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border rounded"
+                      >
+                        <option value="">-- Select Order --</option>
+                        {availableOrders.map(order => (
+                          <option key={order.id} value={order.id}>
+                            {order.order_number} - {order.client_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => sendToProjects('review')}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                      className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Submit & Notify Admin/PM'}
+                    </button>
+
+                    {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                      <p className="text-[10px] text-blue-600 mt-2">
+                        ⚠️ Fill document type and upload translation first
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Download Button - Admin/PM only */}
+                  <button
+                    onClick={handleQuickPackageDownload}
+                    disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                    className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {quickPackageLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      '📦 Generate Complete Package (Print/PDF)'
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-2 text-center">
+                    Opens print window - save as PDF
+                  </p>
+
+                  {/* PM External Translation Upload Section */}
+                  {isPM && (
+                    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                      <h4 className="text-sm font-bold text-orange-700 mb-2">📁 External Translation Upload</h4>
+                      <p className="text-[10px] text-orange-600 mb-3">
+                        Upload translations from external translators (outside the system)
+                      </p>
+                      <div className="bg-white rounded p-3 border border-orange-100">
+                        <p className="text-[10px] text-gray-500 mb-2">
+                          Use the "Upload Ready Translation" section above to upload external translations.
+                          After uploading, complete the checklist and send to Admin for client delivery.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PM Approval & Send to Admin Section */}
+                  {isPM && (
+                    <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <h4 className="text-sm font-bold text-indigo-700 mb-2">✅ Approve & Send to Admin</h4>
+                      <p className="text-[10px] text-indigo-600 mb-3">
+                        After reviewing the translation, approve it and send to Admin for final client delivery
+                      </p>
+
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                        <select
+                          value={selectedOrderId}
+                          onChange={(e) => setSelectedOrderId(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border rounded"
+                        >
+                          <option value="">-- Select Order --</option>
+                          {availableOrders.map(order => (
+                            <option key={order.id} value={order.id}>
+                              {order.order_number} - {order.client_name} ({order.translation_status || 'N/A'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={() => sendToProjects('pending_admin_approval')}
+                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                        className="w-full py-3 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {sendingToProjects ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Sending...
+                          </>
+                        ) : (
+                          '✅ Approve & Send to Admin'
+                        )}
+                      </button>
+                      <p className="text-[10px] text-indigo-500 mt-2 text-center">
+                        Admin will send the final translation to the client
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Send options after package generation - Admin only */}
+                  {isAdmin && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
+                      <div className="flex gap-3 items-center">
+                        <select
+                          value={sendDestination}
+                          onChange={(e) => setSendDestination(e.target.value)}
+                          className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          disabled={sendingToProjects}
+                        >
+                          <option value="client">📧 Send to Client (Review)</option>
+                        </select>
+                        <button
+                          onClick={() => sendToProjects(sendDestination)}
+                          disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                          className="px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 hover:bg-green-700"
+                        >
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2 text-center">
+                        Send translation to client for review
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
 
           {/* ============ NORMAL FLOW ============ */}
-          {!quickPackageMode && translationResults.length > 0 && (
+          {/* Normal Flow hidden for contractors only - In-house translators can use it */}
+          {!quickPackageMode && translationResults.length > 0 && !isContractor && (
             <>
               {/* Approval Checklist - ALL REQUIRED */}
               <div className={`p-4 rounded mb-4 ${
@@ -16902,7 +17047,7 @@ const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '', translator_type: 'contractor' });
   const [creating, setCreating] = useState(false);
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDocuments, setUserDocuments] = useState({});
@@ -17065,7 +17210,8 @@ const UsersPage = ({ adminKey, user }) => {
         role: newUser.role,
         rate_per_page: newUser.rate_per_page ? parseFloat(newUser.rate_per_page) : null,
         rate_per_word: newUser.rate_per_word ? parseFloat(newUser.rate_per_word) : null,
-        language_pairs: newUser.language_pairs || null
+        language_pairs: newUser.language_pairs || null,
+        translator_type: newUser.translator_type || 'contractor'
       };
       const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
 
@@ -17084,7 +17230,7 @@ const UsersPage = ({ adminKey, user }) => {
         alert(response.data?.message || 'User created!');
       }
 
-      setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+      setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '', translator_type: 'contractor' });
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
@@ -17227,40 +17373,57 @@ const UsersPage = ({ adminKey, user }) => {
 
             {/* Translator Pricing - always show for translators */}
             {(newUser.role === 'translator' || isPM) && (
-              <div className="grid grid-cols-3 gap-3 pt-2 border-t">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 15.00"
-                    value={newUser.rate_per_page}
-                    onChange={(e) => setNewUser({...newUser, rate_per_page: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
+              <>
+                <div className="grid grid-cols-4 gap-3 pt-2 border-t">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Translator Type</label>
+                    <select
+                      value={newUser.translator_type || 'contractor'}
+                      onChange={(e) => setNewUser({...newUser, translator_type: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      <option value="contractor">Contractor (Limited)</option>
+                      <option value="in_house">In-House (Full Access)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 15.00"
+                      value={newUser.rate_per_page}
+                      onChange={(e) => setNewUser({...newUser, rate_per_page: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Rate per Word ($)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      placeholder="e.g. 0.08"
+                      value={newUser.rate_per_word}
+                      onChange={(e) => setNewUser({...newUser, rate_per_word: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Language Pairs</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. EN-PT, ES-EN"
+                      value={newUser.language_pairs}
+                      onChange={(e) => setNewUser({...newUser, language_pairs: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Rate per Word ($)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    placeholder="e.g. 0.08"
-                    value={newUser.rate_per_word}
-                    onChange={(e) => setNewUser({...newUser, rate_per_word: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Language Pairs</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. EN-PT, ES-EN"
-                    value={newUser.language_pairs}
-                    onChange={(e) => setNewUser({...newUser, language_pairs: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
-                </div>
-              </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  <strong>Contractor:</strong> Limited access (START + DELIVER tabs only) |
+                  <strong> In-House:</strong> Full access (START, TRANSLATION, REVIEW, DELIVER tabs)
+                </p>
+              </>
             )}
 
             <div className="flex justify-end gap-2">
@@ -17281,6 +17444,7 @@ const UsersPage = ({ adminKey, user }) => {
               <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Type</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
@@ -17307,6 +17471,19 @@ const UsersPage = ({ adminKey, user }) => {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[u.role]}`}>
                       {u.role.toUpperCase()}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role === 'translator' ? (
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        u.translator_type === 'in_house'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {u.translator_type === 'in_house' ? 'In-House' : 'Contractor'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {u.rate_per_page ? `$${u.rate_per_page}` : '-'}
