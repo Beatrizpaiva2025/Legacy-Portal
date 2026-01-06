@@ -17644,6 +17644,8 @@ const FinancesPage = ({ adminKey }) => {
   const [showAddPagesModal, setShowAddPagesModal] = useState(false);
   const [pagesForm, setPagesForm] = useState({ translator_id: '', pages: '', date: new Date().toISOString().split('T')[0], note: '' });
   const [addingPages, setAddingPages] = useState(false);
+  const [editingPagesLog, setEditingPagesLog] = useState(null);
+  const [editPagesForm, setEditPagesForm] = useState({ pages: '', date: '', note: '' });
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -17887,6 +17889,32 @@ const FinancesPage = ({ adminKey }) => {
       fetchPagesLogs();
     } catch (err) {
       alert('Error deleting entry: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleEditPagesLog = (log) => {
+    setEditingPagesLog(log);
+    setEditPagesForm({
+      pages: log.pages || '',
+      date: log.date || '',
+      note: log.note || ''
+    });
+  };
+
+  const handleUpdatePagesLog = async () => {
+    if (!editingPagesLog) return;
+    try {
+      await axios.put(`${API}/admin/translator-pages/${editingPagesLog._id}?admin_key=${adminKey}`, {
+        pages: parseInt(editPagesForm.pages),
+        date: editPagesForm.date,
+        note: editPagesForm.note
+      });
+      setEditingPagesLog(null);
+      setEditPagesForm({ pages: '', date: '', note: '' });
+      fetchPagesLogs();
+      fetchTranslatorsForPayment();
+    } catch (err) {
+      alert('Error updating entry: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -18794,9 +18822,9 @@ const FinancesPage = ({ adminKey }) => {
                   className="w-full border rounded p-2 text-sm"
                 >
                   <option value="">Select translator...</option>
-                  {translators.filter(t => t.role?.toLowerCase() === 'translator').map(t => (
+                  {translators.map(t => (
                     <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
-                      {t.name}
+                      {t.name} {t.role ? `(${t.role})` : ''}
                     </option>
                   ))}
                 </select>
@@ -18874,11 +18902,23 @@ const FinancesPage = ({ adminKey }) => {
                   ) : (
                     pagesLogs.map((log, idx) => (
                       <tr key={log._id || idx} className="border-t hover:bg-gray-50">
-                        <td className="p-3 font-medium text-gray-800">{log.translator_name || log.translator_id}</td>
+                        <td className="p-3 font-medium text-gray-800">
+                          {log.translator_name || log.translator_id}
+                          {log.auto_generated && <span className="ml-1 text-xs text-green-600">✓ Auto</span>}
+                        </td>
                         <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US')}</td>
                         <td className="p-3 text-right font-bold text-blue-600">{log.pages}</td>
-                        <td className="p-3 text-gray-500">{log.note || '-'}</td>
-                        <td className="p-3 text-center">
+                        <td className="p-3 text-gray-500 text-xs">
+                          {log.note || '-'}
+                          {log.order_number && <span className="ml-1 text-blue-500">({log.order_number})</span>}
+                        </td>
+                        <td className="p-3 text-center space-x-2">
+                          <button
+                            onClick={() => handleEditPagesLog(log)}
+                            className="text-blue-500 hover:text-blue-700 text-xs"
+                          >
+                            Edit
+                          </button>
                           <button
                             onClick={() => handleDeletePagesLog(log._id)}
                             className="text-red-500 hover:text-red-700 text-xs"
@@ -18922,6 +18962,76 @@ const FinancesPage = ({ adminKey }) => {
               </div>
             )}
           </div>
+
+          {/* Edit Pages Modal */}
+          {editingPagesLog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-bold text-gray-800">Edit Pages Entry</h3>
+                  <button
+                    onClick={() => setEditingPagesLog(null)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Translator</label>
+                    <input
+                      type="text"
+                      value={editingPagesLog.translator_name || editingPagesLog.translator_id}
+                      disabled
+                      className="w-full border rounded p-2 text-sm bg-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={editPagesForm.date}
+                      onChange={(e) => setEditPagesForm({...editPagesForm, date: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Pages *</label>
+                    <input
+                      type="number"
+                      value={editPagesForm.pages}
+                      onChange={(e) => setEditPagesForm({...editPagesForm, pages: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Note</label>
+                    <input
+                      type="text"
+                      value={editPagesForm.note}
+                      onChange={(e) => setEditPagesForm({...editPagesForm, note: e.target.value})}
+                      className="w-full border rounded p-2 text-sm"
+                    />
+                  </div>
+                  <div className="flex space-x-3 mt-4">
+                    <button
+                      onClick={() => setEditingPagesLog(null)}
+                      className="flex-1 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleUpdatePagesLog}
+                      disabled={!editPagesForm.pages}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-300"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
