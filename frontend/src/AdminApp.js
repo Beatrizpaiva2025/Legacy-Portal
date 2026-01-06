@@ -4562,7 +4562,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
               : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
             <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
-            <div style="font-size: 14px; font-weight: bold; color: #1a365d;">Managing Director</div>
+            <div style="font-size: 14px; color: #333;">Authorized Representative</div>
+            <div style="font-size: 14px; color: #333;">Legacy Translations Inc.</div>
             <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US')}</div>
           </div>
           <div style="text-align: center;">
