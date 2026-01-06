@@ -5032,6 +5032,65 @@ async def delete_translator_pages(log_id: str, admin_key: str):
         logger.error(f"Error deleting pages log: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete pages log")
 
+class PagesLogUpdate(BaseModel):
+    pages: Optional[int] = None
+    date: Optional[str] = None
+    note: Optional[str] = None
+
+@api_router.put("/admin/translator-pages/{log_id}")
+async def update_translator_pages(log_id: str, update_data: PagesLogUpdate, admin_key: str):
+    """Update a translator pages log entry"""
+    if admin_key != ADMIN_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+    try:
+        from bson import ObjectId
+
+        # Get the existing log entry
+        log = await db.translator_pages.find_one({"_id": ObjectId(log_id)})
+        if not log:
+            raise HTTPException(status_code=404, detail="Log entry not found")
+
+        old_pages = log.get("pages", 0) or 0
+
+        # Build update dict
+        update_dict = {"updated_at": datetime.utcnow().isoformat()}
+        if update_data.pages is not None:
+            update_dict["pages"] = update_data.pages
+        if update_data.date is not None:
+            update_dict["date"] = update_data.date
+        if update_data.note is not None:
+            update_dict["note"] = update_data.note
+
+        # Update the log entry
+        await db.translator_pages.update_one({"_id": ObjectId(log_id)}, {"$set": update_dict})
+
+        # If pages changed, update translator's pending pages
+        if update_data.pages is not None and update_data.pages != old_pages:
+            translator_id = log.get("translator_id")
+            if translator_id:
+                translator = await db.admin_users.find_one({"id": translator_id})
+                if not translator:
+                    try:
+                        translator = await db.admin_users.find_one({"_id": ObjectId(translator_id)})
+                    except:
+                        pass
+
+                if translator:
+                    current_pending = translator.get("pages_pending_payment", 0) or 0
+                    # Adjust: remove old pages, add new pages
+                    new_pending = max(0, current_pending - old_pages + update_data.pages)
+                    await db.admin_users.update_one(
+                        {"_id": translator["_id"]},
+                        {"$set": {"pages_pending_payment": new_pending}}
+                    )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating pages log: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update pages log")
+
 # ==================== TRANSLATION ORDERS ====================
 
 @api_router.post("/orders/create")
@@ -6927,6 +6986,44 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                     )
             except Exception as e:
                 logger.error(f"Failed to send delivery notification: {str(e)}")
+
+        # AUTO-LOG PAGES: When status changes to "final" or "delivered", automatically log pages for translator
+        if update_data.translation_status in ["final", "Final", "delivered", "Delivered"]:
+            try:
+                # Check if pages were already logged for this order
+                existing_log = await db.translator_pages.find_one({"order_id": order_id})
+                if not existing_log:
+                    # Get page count from original document
+                    page_count = order.get("page_count", 0) or order.get("word_count", 0) // 250 or 1
+                    translator_id = order.get("assigned_translator_id")
+                    translator_name = order.get("assigned_translator_name", "Unknown")
+
+                    if translator_id and page_count > 0:
+                        # Create automatic page log entry
+                        log_entry = {
+                            "translator_id": translator_id,
+                            "translator_name": translator_name,
+                            "pages": page_count,
+                            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                            "note": f"Auto: Project {order.get('order_number', order_id)} - {order.get('document_type', 'Document')}",
+                            "order_id": order_id,
+                            "order_number": order.get("order_number"),
+                            "auto_generated": True,
+                            "created_at": datetime.utcnow().isoformat()
+                        }
+                        await db.translator_pages.insert_one(log_entry)
+
+                        # Update translator's pending pages
+                        translator = await db.admin_users.find_one({"id": translator_id})
+                        if translator:
+                            current_pending = translator.get("pages_pending_payment", 0) or 0
+                            await db.admin_users.update_one(
+                                {"id": translator_id},
+                                {"$set": {"pages_pending_payment": current_pending + page_count}}
+                            )
+                        logger.info(f"Auto-logged {page_count} pages for translator {translator_name} from order {order.get('order_number')}")
+            except Exception as e:
+                logger.error(f"Failed to auto-log pages: {str(e)}")
 
         return {"status": "success", "order": order}
 
