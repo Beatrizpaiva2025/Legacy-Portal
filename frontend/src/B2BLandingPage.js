@@ -495,7 +495,7 @@ Message: ${formData.message}
             <div className="text-center">
               <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="https://i.imgur.com/YqZK5Lv.png"
+                  src="/images/ata-member-logo.png"
                   alt="ATA Member - American Translators Association - Member #275993"
                   className="h-full object-contain"
                 />
@@ -506,7 +506,7 @@ Message: ${formData.message}
             <div className="text-center">
               <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="https://i.imgur.com/L6QhuCx.png"
+                  src="/images/bbb-accredited-logo.png"
                   alt="BBB Accredited Business A+"
                   className="h-full object-contain"
                 />
@@ -517,7 +517,7 @@ Message: ${formData.message}
           {/* Additional Certification Image */}
           <div className="mt-10 flex justify-center">
             <img
-              src="https://i.imgur.com/UImN4zI.png"
+              src="/images/professional-certification.png"
               alt="Professional Certification"
               className="max-w-full h-auto max-h-32 object-contain"
             />
