@@ -45,14 +45,10 @@ const B2BLandingPage = () => {
     try {
       await axios.post(`${API}/b2b-interest`, formData);
       setSuccess(true);
-      setFormData({
-        company_name: '',
-        contact_name: '',
-        email: '',
-        phone: '',
-        estimated_volume: '',
-        message: ''
-      });
+      // Redirect to partner portal after 2 seconds
+      setTimeout(() => {
+        window.location.href = `/#/partner?register=true&email=${encodeURIComponent(formData.email)}&company=${encodeURIComponent(formData.company_name)}&name=${encodeURIComponent(formData.contact_name)}&phone=${encodeURIComponent(formData.phone)}`;
+      }, 2000);
     } catch (err) {
       try {
         await axios.post(`${API}/support-request`, {
@@ -68,14 +64,10 @@ Message: ${formData.message}
           `.trim()
         });
         setSuccess(true);
-        setFormData({
-          company_name: '',
-          contact_name: '',
-          email: '',
-          phone: '',
-          estimated_volume: '',
-          message: ''
-        });
+        // Redirect to partner portal after 2 seconds
+        setTimeout(() => {
+          window.location.href = `/#/partner?register=true&email=${encodeURIComponent(formData.email)}&company=${encodeURIComponent(formData.company_name)}&name=${encodeURIComponent(formData.contact_name)}&phone=${encodeURIComponent(formData.phone)}`;
+        }, 2000);
       } catch (err2) {
         setError('Failed to send request. Please try again or contact us directly.');
       }
@@ -137,7 +129,7 @@ Message: ${formData.message}
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  USCIS Certified
+                  USCIS Accepted
                 </div>
                 <div className="flex items-center">
                   <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -375,15 +367,13 @@ Message: ${formData.message}
                     </svg>
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h3>
-                  <p className="text-gray-600 mb-6">
-                    Your request has been submitted. Our team will contact you within 24 hours.
+                  <p className="text-gray-600 mb-4">
+                    Your request has been submitted successfully!
                   </p>
-                  <button
-                    onClick={() => setSuccess(false)}
-                    className="text-blue-900 font-medium hover:underline"
-                  >
-                    Submit another request
-                  </button>
+                  <p className="text-blue-600 font-medium mb-6">
+                    Redirecting you to create your partner account...
+                  </p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">

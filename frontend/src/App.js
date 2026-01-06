@@ -316,17 +316,33 @@ const LANGUAGES = [
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
-  const [isLogin, setIsLogin] = useState(true);
+  // Check for registration params from B2B form
+  const getInitialState = () => {
+    const hash = window.location.hash;
+    const queryString = hash.includes('?') ? hash.split('?')[1] : '';
+    const params = new URLSearchParams(queryString);
+    const isRegister = params.get('register') === 'true';
+    return {
+      isLogin: !isRegister,
+      email: params.get('email') || '',
+      company: params.get('company') || '',
+      name: params.get('name') || '',
+      phone: params.get('phone') || ''
+    };
+  };
+
+  const initialState = getInitialState();
+  const [isLogin, setIsLogin] = useState(initialState.isLogin);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
+    email: initialState.email,
     password: '',
-    company_name: '',
-    contact_name: '',
-    phone: ''
+    company_name: initialState.company,
+    contact_name: initialState.name,
+    phone: initialState.phone
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
