@@ -770,7 +770,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       description: 'Standard Certificate',
       category: 'certificates',
       bodyParagraphs: [
-        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {{targetLanguage}} (United States) translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
+        'We, <strong>Legacy Translations Inc.</strong>, a professional translation services company and an <strong>American Translators Association (ATA) Member (No. 275993)</strong>, having no relation to the client, hereby certify that the attached {{targetLanguage}} translation of the {{sourceLanguage}} document was performed by us and is, to the best of our knowledge and belief, a <strong>true, complete, and accurate translation</strong> of the original document submitted.',
         'This certification attests <strong>only to the accuracy and completeness of the translation</strong>. We do not certify or guarantee the authenticity of the original document, nor the truthfulness of the statements contained therein. <strong>Legacy Translations Inc.</strong> assumes no responsibility or liability for the manner in which this translation is used by the client or any third party, including governmental, educational, or legal institutions.',
         'I, <strong>Beatriz Paiva</strong>, hereby certify that this translation has been <strong>reviewed and proofread</strong> and that the attached translated document is a <strong>faithful and authentic representation</strong> of the original document.',
         'A copy of the translated document and the original file(s) provided are attached hereto and form an integral part of this certification.'
@@ -4490,6 +4490,119 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Download certificate preview only (for Admin and PM)
+  const handleDownloadCertificatePreview = () => {
+    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
+    const isFormTemplate = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.isForm;
+
+    // Get template paragraphs
+    let templateParagraphs;
+    if (selectedCertificateTemplate.startsWith('custom-')) {
+      const customTemplate = customCertificateTemplates.find(t => `custom-${t.id}` === selectedCertificateTemplate);
+      templateParagraphs = customTemplate?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+    } else {
+      templateParagraphs = CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.bodyParagraphs || CERTIFICATE_TEMPLATES['default'].bodyParagraphs;
+    }
+
+    // Generate certificate HTML
+    const certificateHTML = isFormTemplate ? `
+      <div style="padding: 20px;">
+        ${CERTIFICATE_TEMPLATES[selectedCertificateTemplate].formHTML
+          .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>')
+          .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
+          .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
+          .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
+          .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))}
+      </div>
+    ` : `
+      <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 32px; background: white;">
+        <!-- Header with logos -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px;">
+          <div style="width: 128px;">
+            ${logoLeft ? `<img src="${logoLeft}" alt="Logo" style="max-height: 48px;" />` : '<div style="font-size: 10px; color: #2563eb; font-weight: bold;">LEGACY<br/><span style="font-weight: normal; font-size: 8px;">TRANSLATIONS</span></div>'}
+          </div>
+          <div style="text-align: center; flex: 1; padding: 0 16px;">
+            <div style="font-weight: bold; color: #2563eb; font-size: 14px;">Legacy Translations</div>
+            <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
+            <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
+          </div>
+          <div style="width: 80px; text-align: right;">
+            ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
+          </div>
+        </div>
+        <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
+
+        <!-- Order Number -->
+        <div style="text-align: right; margin-bottom: 24px; font-size: 14px;">
+          <span>Order # </span><strong>${orderNumber || 'P0000'}</strong>
+        </div>
+
+        <!-- Main Title -->
+        <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
+
+        <!-- Translation of ... -->
+        <p style="text-align: center; margin-bottom: 24px; font-size: 14px;">
+          Translation of <strong>${documentType}</strong> from<br/>
+          <strong>${sourceLanguage}</strong> to <strong>${targetLanguage}</strong>
+        </p>
+
+        <!-- Body paragraphs -->
+        ${templateParagraphs.map(para => {
+          const processed = para
+            .replace(/\{\{sourceLanguage\}\}/g, sourceLanguage)
+            .replace(/\{\{targetLanguage\}\}/g, targetLanguage);
+          return `<p style="text-align: justify; margin-bottom: 16px; font-size: 12px; line-height: 1.6;">${processed}</p>`;
+        }).join('')}
+
+        <!-- Signature and Stamp Section -->
+        <div style="margin-top: 32px; display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            ${signatureImage
+              ? `<img src="${signatureImage}" alt="Signature" style="height: 32px; max-width: 150px; margin-bottom: 4px;" />`
+              : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
+            <div style="font-size: 12px;">${translator?.name || 'Beatriz Paiva'}</div>
+            <div style="font-size: 12px;">Authorized Representative</div>
+            <div style="font-size: 12px;">Legacy Translations Inc.</div>
+            <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+          </div>
+          <div style="text-align: center;">
+            ${logoStamp
+              ? `<img src="${logoStamp}" alt="Stamp" style="width: 112px; height: 112px; object-fit: contain;" />`
+              : `<div style="width: 112px; height: 112px; border-radius: 50%; border: 4px double #2563eb; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
+                  <div style="font-size: 8px; color: #2563eb; font-weight: bold;">CERTIFIED TRANSLATOR</div>
+                  <div style="font-size: 10px; color: #2563eb; font-weight: bold; margin-top: 4px;">LEGACY TRANSLATIONS</div>
+                  <div style="font-size: 8px; color: #2563eb;">ATA # 275993</div>
+                </div>`}
+          </div>
+        </div>
+      </div>
+    `;
+
+    const fullHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Certificate_${orderNumber || 'P0000'}_${documentType.replace(/\s+/g, '_')}</title>
+    <style>
+        @page { size: Letter; margin: 0.5in; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        body { margin: 0; padding: 0; }
+    </style>
+</head>
+<body>
+    ${certificateHTML}
+</body>
+</html>`;
+
+    // Open in new window for printing/saving as PDF
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(fullHTML);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   // Download certificate
   const handleDownload = async (format = 'html') => {
     // Save TM if enabled
@@ -5576,6 +5689,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     : CERTIFICATE_TEMPLATES[selectedCertificateTemplate]?.name || 'Default'}
                 </span>
                 <span className="text-[10px] text-blue-500 bg-blue-50 px-2 py-1 rounded">🔄 Edit highlighted fields directly</span>
+                {(isAdmin || isPM) && (
+                  <button
+                    onClick={handleDownloadCertificatePreview}
+                    className="text-[10px] text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded flex items-center gap-1"
+                    title="Download certificate preview as PDF"
+                  >
+                    ⬇ Download
+                  </button>
+                )}
               </div>
             </div>
 
