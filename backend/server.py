@@ -4150,6 +4150,7 @@ async def quick_create_vendor(vendor_data: QuickVendorCreate, admin_key: str):
                 "name": vendor_data.name,
                 "role": vendor_data.role.lower(),
                 "rate_per_page": vendor_data.rate_per_page or existing.get("rate_per_page", 0),
+                "is_active": True,  # Ensure vendor is active
                 "updated_at": datetime.utcnow().isoformat()
             }
             await db.admin_users.update_one(
