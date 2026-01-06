@@ -724,18 +724,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isPM = user?.role === 'pm';
 
   // State
-  const [activeSubTab, setActiveSubTab] = useState(() => {
-    // Translators should start on DELIVER tab
-    return user?.role === 'translator' ? 'deliver' : 'start';
-  });
+  const [activeSubTab, setActiveSubTab] = useState('start');
   const [showProjectMenu, setShowProjectMenu] = useState(false);
-
-  // Ensure translators stay on DELIVER tab
-  React.useEffect(() => {
-    if (user?.role === 'translator' && activeSubTab !== 'deliver') {
-      setActiveSubTab('deliver');
-    }
-  }, [user?.role]);
 
   // Assigned orders for translator
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -5154,7 +5144,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
-          { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm'] },
+          { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
