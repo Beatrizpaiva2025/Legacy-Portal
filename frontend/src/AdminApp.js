@@ -733,6 +733,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [selectedProjectFiles, setSelectedProjectFiles] = useState([]); // Files for selected project
   const [loadingProjectFiles, setLoadingProjectFiles] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState(null); // Currently loaded file
+  const [allProjectFiles, setAllProjectFiles] = useState([]); // All files from all projects for individual view
+  const [viewMode, setViewMode] = useState('files'); // 'projects' or 'files' - default to files view
 
   // Translator messages
   const [translatorMessages, setTranslatorMessages] = useState([]);
@@ -1918,7 +1920,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             order.translation_html
           );
         }
-        // For admin: show orders assigned to "Admin (Self)" or "Admin"
+        // For admin: only show orders where Admin is the assigned translator
+        // Admin only sees projects in workspace when acting as translator (not as approver - that's PM's role)
         if (user.role === 'admin') {
           return (
             order.assigned_translator === 'Admin (Self)' ||
@@ -1935,6 +1938,33 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         order.translation_ready
       );
       setAssignedOrders(myOrders);
+
+      // Fetch files for all projects to create individual file view
+      const allFiles = [];
+      for (const order of myOrders) {
+        try {
+          const docsResponse = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+          const docs = docsResponse.data.documents || [];
+          for (const doc of docs) {
+            allFiles.push({
+              ...doc,
+              order_id: order.id,
+              order_number: order.order_number,
+              translate_from: order.translate_from,
+              translate_to: order.translate_to,
+              document_type: order.document_type,
+              deadline: order.deadline,
+              internal_notes: order.internal_notes,
+              project_translation_status: order.translation_status,
+              // Use document-level status if available, otherwise inherit from project
+              file_status: doc.status || doc.translation_status || order.translation_status || 'pending'
+            });
+          }
+        } catch (e) {
+          console.error(`Failed to fetch documents for order ${order.order_number}:`, e);
+        }
+      }
+      setAllProjectFiles(allFiles);
     } catch (err) {
       console.error('Failed to fetch assigned orders:', err);
     } finally {
@@ -5021,65 +5051,166 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Assigned Projects Section - For Translators and Admin */}
+          {/* Assigned Projects/Files Section - For Translators and Admin */}
           {(user?.role === 'translator' || user?.role === 'admin') && (
             <div className={`bg-gradient-to-r ${user?.role === 'admin' ? 'from-blue-50 to-blue-100 border-blue-200' : 'from-blue-50 to-blue-100 border-blue-200'} border rounded-lg p-4`}>
-              <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'} mb-3`}>
-                {user?.role === 'admin' ? '👑 Admin Translation Projects' : '📋 My Assigned Projects'}
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'}`}>
+                  {user?.role === 'admin' ? '👑 Admin Translation' : '📋 My Assigned Work'}
+                </h3>
+                {/* View Mode Toggle */}
+                <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 border">
+                  <button
+                    onClick={() => setViewMode('files')}
+                    className={`px-3 py-1 text-xs rounded-md transition-all ${
+                      viewMode === 'files'
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    📄 Files
+                  </button>
+                  <button
+                    onClick={() => setViewMode('projects')}
+                    className={`px-3 py-1 text-xs rounded-md transition-all ${
+                      viewMode === 'projects'
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    📁 Projects
+                  </button>
+                </div>
+              </div>
+
               {loadingAssigned ? (
-                <div className="text-center py-4 text-gray-500 text-sm">Loading projects...</div>
-              ) : assignedOrders.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {assignedOrders.map(order => (
-                    <div
-                      key={order.id}
-                      onClick={() => selectProject(order)}
-                      className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                        selectedOrderId === order.id
-                          ? 'bg-blue-100 border-blue-500 shadow-md'
-                          : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded ${
-                          order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
-                          order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
-                          order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {order.translation_status}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-600 mb-1">
-                        {order.translate_from} → {order.translate_to}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {order.document_type || 'Document'} • {order.page_count || 1} page(s)
-                      </div>
-                      {order.deadline && (
-                        <div className="text-[10px] text-blue-600 mt-1">
-                          ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
+                <div className="text-center py-4 text-gray-500 text-sm">Loading...</div>
+              ) : viewMode === 'files' ? (
+                /* FILES VIEW - Show individual files */
+                allProjectFiles.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {allProjectFiles.map((file, idx) => (
+                      <div
+                        key={file.id || idx}
+                        onClick={async () => {
+                          // Set order context
+                          const order = assignedOrders.find(o => o.id === file.order_id);
+                          if (order) {
+                            setSelectedOrderId(order.id);
+                            setOrderNumber(order.order_number);
+                            if (order.translate_from) setSourceLanguage(order.translate_from);
+                            if (order.translate_to) setTargetLanguage(order.translate_to);
+                          }
+                          // Load this specific file
+                          await loadProjectFile(file);
+                        }}
+                        className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                          selectedFileId === file.id
+                            ? 'bg-blue-100 border-blue-500 shadow-md'
+                            : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-blue-700 text-xs truncate max-w-[120px]" title={file.filename}>
+                            {file.filename || 'Document'}
+                          </span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded ${
+                            file.file_status === 'pending' || file.file_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                            file.file_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                            file.file_status === 'review' || file.file_status === 'pending_review' ? 'bg-purple-100 text-purple-700' :
+                            file.file_status === 'completed' || file.file_status === 'ready' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {file.file_status === 'pending' || file.file_status === 'received' ? 'Pending' :
+                             file.file_status === 'in_translation' ? 'Translating' :
+                             file.file_status === 'review' || file.file_status === 'pending_review' ? 'Review' :
+                             file.file_status === 'completed' || file.file_status === 'ready' ? 'Done' :
+                             file.file_status}
+                          </span>
                         </div>
-                      )}
-                      {order.internal_notes && (
-                        <div className="text-[10px] text-sky-600 mt-1">
-                          📝 Has instructions from PM
+                        <div className="text-[10px] text-gray-500 mb-1">
+                          Project: <span className="font-medium text-blue-600">{file.order_number}</span>
                         </div>
-                      )}
-                      {selectedOrderId === order.id && (
-                        <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        <div className="text-xs text-gray-600">
+                          {file.translate_from} → {file.translate_to}
+                        </div>
+                        {file.deadline && (
+                          <div className="text-[10px] text-blue-600 mt-1">
+                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US')}
+                          </div>
+                        )}
+                        {file.internal_notes && (
+                          <div className="text-[10px] text-sky-600 mt-1">
+                            📝 Has instructions
+                          </div>
+                        )}
+                        {selectedFileId === file.id && (
+                          <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <div className="text-3xl mb-2">📭</div>
+                    <p className="text-sm">No files found</p>
+                    <p className="text-xs mt-1">Files from assigned projects will appear here</p>
+                  </div>
+                )
               ) : (
-                <div className="text-center py-6 text-gray-500">
-                  <div className="text-3xl mb-2">📭</div>
-                  <p className="text-sm">No projects assigned yet</p>
-                  <p className="text-xs mt-1">{user?.role === 'admin' ? 'Use "Assign to Me" button in Projects to assign projects to yourself' : 'Wait for project assignment by PM'}</p>
-                </div>
+                /* PROJECTS VIEW - Original behavior */
+                assignedOrders.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {assignedOrders.map(order => (
+                      <div
+                        key={order.id}
+                        onClick={() => selectProject(order)}
+                        className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                          selectedOrderId === order.id
+                            ? 'bg-blue-100 border-blue-500 shadow-md'
+                            : 'bg-white border-gray-200 hover:border-blue-400 hover:shadow'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-blue-700 text-sm">{order.order_number}</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded ${
+                            order.translation_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                            order.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                            order.translation_status === 'review' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {order.translation_status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 mb-1">
+                          {order.translate_from} → {order.translate_to}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {order.document_type || 'Document'} • {order.page_count || 1} page(s)
+                        </div>
+                        {order.deadline && (
+                          <div className="text-[10px] text-blue-600 mt-1">
+                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
+                          </div>
+                        )}
+                        {order.internal_notes && (
+                          <div className="text-[10px] text-sky-600 mt-1">
+                            📝 Has instructions from PM
+                          </div>
+                        )}
+                        {selectedOrderId === order.id && (
+                          <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ Project selected</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <div className="text-3xl mb-2">📭</div>
+                    <p className="text-sm">No projects assigned yet</p>
+                    <p className="text-xs mt-1">{user?.role === 'admin' ? 'Use "Assign to Me" button in Projects to assign projects to yourself' : 'Wait for project assignment by PM'}</p>
+                  </div>
+                )
               )}
             </div>
           )}
@@ -7005,14 +7136,96 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               )}
 
 
+              {/* Multi-page external upload - Show when document has multiple pages */}
+              {originalImages.length > 1 && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-bold text-purple-800">📑 Multi-Page External Upload</h4>
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                      {originalImages.length} pages
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Upload translated documents for each page or upload all pages at once:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {originalImages.map((img, idx) => (
+                      <label
+                        key={idx}
+                        className={`px-3 py-2 text-xs rounded cursor-pointer transition-all border ${
+                          translationResults[idx]
+                            ? 'bg-green-100 border-green-400 text-green-700'
+                            : 'bg-white border-gray-300 hover:border-purple-400 text-gray-700'
+                        }`}
+                      >
+                        {translationResults[idx] ? '✓' : '📤'} Page {idx + 1}
+                        <input
+                          type="file"
+                          accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            if (!e.target.files || !e.target.files[0]) return;
+                            const file = e.target.files[0];
+                            const fileName = file.name.toLowerCase();
+                            setProcessingStatus(`Processing page ${idx + 1}...`);
+                            try {
+                              let html = '';
+                              if (fileName.endsWith('.docx')) {
+                                html = await convertWordToHtml(file);
+                              } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                                html = await readHtmlFile(file);
+                              } else if (fileName.endsWith('.txt')) {
+                                const text = await readTxtFile(file);
+                                html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif;">${text}</div>`;
+                              } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                                const base64 = await fileToBase64(file);
+                                html = `<div><img src="data:${file.type};base64,${base64}" style="max-width:100%;" /></div>`;
+                              }
+                              // Update specific page translation
+                              setTranslationResults(prev => {
+                                const newResults = [...prev];
+                                newResults[idx] = { translatedText: html, originalText: '', filename: `Page ${idx + 1}` };
+                                return newResults;
+                              });
+                              setSelectedResultIndex(idx);
+                              setProcessingStatus(`✅ Page ${idx + 1} uploaded!`);
+                            } catch (err) {
+                              setProcessingStatus(`❌ Error uploading page ${idx + 1}`);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Navigation */}
               <div className="mt-4 flex justify-between items-center">
-                <button
-                  onClick={() => setActiveSubTab('translate')}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
-                >
-                  <span className="mr-2">←</span> Back: Document
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveSubTab('translate')}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                  >
+                    <span className="mr-2">←</span> Back: Document
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Reset state and go to Start for new translation
+                      setTranslationResults([]);
+                      setOriginalImages([]);
+                      setFiles([]);
+                      setSelectedFileId(null);
+                      setSelectedOrderId(null);
+                      setOrderNumber('');
+                      setActiveSubTab('start');
+                    }}
+                    className="px-4 py-2 bg-orange-100 text-orange-700 text-sm font-medium rounded hover:bg-orange-200 flex items-center border border-orange-300"
+                  >
+                    🔄 Start New
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   {/* Upload external translation - for all users */}
                   <label className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 cursor-pointer flex items-center gap-2">
@@ -7076,9 +7289,19 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {/* Send to PM - for translators */}
                   {!isAdmin && !isPM && (
                     <button
-                      onClick={() => {
-                        sendToProjects('pm');
+                      onClick={async () => {
+                        await sendToProjects('pm');
                         alert('Translation sent to PM for proofreading!');
+                        // Reset state and go back to Start for new translation
+                        setTranslationResults([]);
+                        setOriginalImages([]);
+                        setFiles([]);
+                        setSelectedFileId(null);
+                        setSelectedOrderId(null);
+                        setOrderNumber('');
+                        setActiveSubTab('start');
+                        // Refresh file list
+                        fetchAssignedOrders();
                       }}
                       disabled={sendingToProjects || translationResults.length === 0}
                       className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
@@ -10653,14 +10876,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    // "Quote" filter should include both 'received' and 'Quote' (from MIA bot)
-    if (statusFilter === 'received' && o.translation_status === 'Quote') {
-      matchStatus = true;
-    }
-    // "In Progress" filter should include orders being translated or pending translation
+    // "In Progress" filter should include all early stage orders (received, Quote, pending, in_translation)
     if (statusFilter === 'in_translation') {
-      matchStatus = o.translation_status === 'in_translation' ||
-                    o.translation_status === 'pending' ||
+      const inProgressStatuses = ['in_translation', 'pending', 'received', 'Quote', 'quote'];
+      matchStatus = inProgressStatuses.includes(o.translation_status) ||
                     (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
     }
     // "PM Review" filter should include both 'review' and 'pending_pm_review'
@@ -10681,8 +10900,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   const getStatusLabel = (status) => {
     const labels = {
-      'received': 'Quote',
-      'Quote': 'Quote',
+      'received': 'In Progress',
+      'Quote': 'In Progress',
+      'quote': 'In Progress',
+      'pending': 'In Progress',
       'in_translation': 'In Progress',
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
@@ -11263,7 +11484,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -11655,7 +11876,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700">Notes</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
               {/* Total and Payment columns - Admin only */}
@@ -11856,40 +12076,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   </td>
                   {/* Status */}
                   <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
-                  {/* Notes */}
-                  <td className="px-3 py-3">
-                    {editingTags === order.id && isAdmin ? (
-                      <div className="flex flex-col gap-1">
-                        <input
-                          type="text"
-                          placeholder="Internal note..."
-                          value={tempTagValue.notes}
-                          onChange={(e) => setTempTagValue({...tempTagValue, notes: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded w-32"
-                        />
-                        <div className="flex gap-1">
-                          <button onClick={() => saveTagsEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
-                          <button onClick={() => setEditingTags(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => isAdmin && startEditingTags(order)}
-                        className={`flex items-center gap-1 ${isAdmin ? 'cursor-pointer' : ''}`}
-                        title={isAdmin ? "Click to edit notes" : ""}
-                      >
-                        {order.notes && (
-                          <span className="px-1.5 py-1 bg-blue-50 text-blue-500 rounded text-xs cursor-help border border-blue-100" title={`Client message: ${order.notes}`}><NoteIcon className="w-3.5 h-3.5 inline" /></span>
-                        )}
-                        {order.internal_notes && (
-                          <span className="px-1.5 py-1 bg-sky-50 text-sky-500 rounded text-xs cursor-help border border-sky-100" title={`Internal note: ${order.internal_notes}`}><MemoIcon className="w-3.5 h-3.5 inline" /></span>
-                        )}
-                        {!order.notes && !order.internal_notes && (
-                          <span className="text-gray-300 text-xs">-</span>
-                        )}
-                      </div>
-                    )}
-                  </td>
                   {/* Translation Ready column - shows when translation is complete */}
                   <td className="px-3 py-3 text-center">
                     {order.translation_ready ? (
