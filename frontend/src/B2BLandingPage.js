@@ -477,9 +477,6 @@ Message: ${formData.message}
       {/* Trust Badges */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10">
-            <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Professional Certifications & Accreditations</p>
-          </div>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
             {/* ATA Member Logo */}
             <div className="text-center">
@@ -509,17 +506,6 @@ Message: ${formData.message}
                 <img
                   src="/images/neta-logo.jpg"
                   alt="NETA - New England Translators Association"
-                  className="h-full object-contain"
-                />
-              </div>
-            </div>
-
-            {/* USCIS Logo */}
-            <div className="text-center">
-              <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
-                <img
-                  src="/images/uscis-logo.png"
-                  alt="USCIS - U.S. Citizenship and Immigration Services"
                   className="h-full object-contain"
                 />
               </div>
