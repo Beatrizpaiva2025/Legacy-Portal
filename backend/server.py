@@ -6618,7 +6618,7 @@ async def admin_delete_order(order_id: str, admin_key: str):
 
 @api_router.post("/admin/orders/{order_id}/mark-paid")
 async def admin_mark_order_paid(order_id: str, admin_key: str):
-    """Mark order as paid (admin only). Also changes status from 'quote' to 'in_translation'."""
+    """Mark order as paid (admin only). Also changes status to 'in_translation' (In Progress) if in early stage."""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -6630,8 +6630,10 @@ async def admin_mark_order_paid(order_id: str, admin_key: str):
     # Build the update fields
     update_fields = {"payment_status": "paid", "payment_date": datetime.utcnow()}
 
-    # If the order status is 'quote', change it to 'in_translation' (In Progress)
-    if order.get("translation_status") == "quote":
+    # If the order status is in an early stage, change it to 'in_translation' (In Progress)
+    # This allows work to begin once payment is received
+    early_stage_statuses = ["quote", "received"]
+    if order.get("translation_status") in early_stage_statuses:
         update_fields["translation_status"] = "in_translation"
 
     result = await db.translation_orders.update_one(
@@ -6870,15 +6872,24 @@ async def review_payment_proof(
         {"$set": update_data}
     )
 
-    # If approved and linked to an order, update order payment status
+    # If approved and linked to an order, update order payment status and set to In Progress if applicable
     if status == "approved" and proof.get("order_id"):
+        # First get the order to check its current status
+        order = await db.translation_orders.find_one({"id": proof["order_id"]})
+        update_fields = {
+            "payment_status": "paid",
+            "payment_date": datetime.utcnow(),
+            "payment_method": proof["payment_method"]
+        }
+
+        # If the order is in an early stage, change to in_translation (In Progress)
+        early_stage_statuses = ["quote", "received"]
+        if order and order.get("translation_status") in early_stage_statuses:
+            update_fields["translation_status"] = "in_translation"
+
         await db.translation_orders.update_one(
             {"id": proof["order_id"]},
-            {"$set": {
-                "payment_status": "paid",
-                "payment_date": datetime.utcnow(),
-                "payment_method": proof["payment_method"]
-            }}
+            {"$set": update_fields}
         )
         logger.info(f"Order {proof['order_id']} marked as paid via {proof['payment_method']}")
 
