@@ -8312,15 +8312,250 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             </>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">🔍</div>
-              <p className="text-xs mb-4">Noa translation to review. Go to a tab REVIEW to load a translation.</p>
-              <button
-                onClick={() => setActiveSubTab('review')}
-                className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-              >
-                Ir to Review
-              </button>
+            <div className="space-y-4">
+              <div className="text-center py-4 text-gray-500">
+                <div className="text-4xl mb-2">🔍</div>
+                <p className="text-sm mb-4">Upload documents to start proofreading</p>
+              </div>
+
+              {/* Direct Upload for Proofreading */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Upload Original Document */}
+                <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 bg-blue-50">
+                  <h3 className="text-xs font-bold text-blue-700 mb-2">📄 Original Document ({sourceLanguage})</h3>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    id="proofreading-original-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setProcessingStatus('🔄 Extracting text from original...');
+                      try {
+                        const fileBase64 = await fileToBase64(file);
+                        const response = await axios.post(
+                          `${API}/admin/ocr?admin_key=${adminKey}`,
+                          {
+                            file_base64: fileBase64,
+                            file_type: file.type,
+                            filename: file.name,
+                            use_claude: claudeApiKey ? true : false,
+                            claude_api_key: claudeApiKey || null,
+                            preserve_layout: true
+                          }
+                        );
+                        if (response.data.text) {
+                          setOcrResults([{ filename: file.name, text: response.data.text }]);
+                          // Create translation result entry if doesn't exist
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: '', originalText: response.data.text, filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, originalText: response.data.text } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Original text extracted!');
+                        }
+                      } catch (err) {
+                        setProcessingStatus('❌ Failed to extract text: ' + (err.response?.data?.detail || err.message));
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <label
+                    htmlFor="proofreading-original-upload"
+                    className="cursor-pointer flex flex-col items-center justify-center py-4 hover:bg-blue-100 rounded transition-colors"
+                  >
+                    <span className="text-3xl mb-2">📤</span>
+                    <span className="text-xs text-blue-600">Click to upload PDF or image</span>
+                  </label>
+                  {ocrResults[0]?.text && (
+                    <div className="mt-2 p-2 bg-white rounded border text-xs max-h-32 overflow-auto">
+                      {ocrResults[0].text.substring(0, 200)}...
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Translation */}
+                <div className="border-2 border-dashed border-green-300 rounded-lg p-4 bg-green-50">
+                  <h3 className="text-xs font-bold text-green-700 mb-2">📄 Translation ({targetLanguage})</h3>
+                  <input
+                    type="file"
+                    accept=".pdf,image/*,.html,.htm,.txt,.doc,.docx"
+                    className="hidden"
+                    id="proofreading-translation-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setProcessingStatus('🔄 Processing translation file...');
+                      try {
+                        if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                          const text = await file.text();
+                          const html = `<div style="white-space: pre-wrap;">${text}</div>`;
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, translatedText: html } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Translation loaded!');
+                        } else if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+                          const html = await file.text();
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, translatedText: html } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Translation loaded!');
+                        } else {
+                          // For PDF/images, extract text via OCR
+                          const fileBase64 = await fileToBase64(file);
+                          const response = await axios.post(
+                            `${API}/admin/ocr?admin_key=${adminKey}`,
+                            {
+                              file_base64: fileBase64,
+                              file_type: file.type,
+                              filename: file.name,
+                              use_claude: claudeApiKey ? true : false,
+                              claude_api_key: claudeApiKey || null,
+                              preserve_layout: true
+                            }
+                          );
+                          if (response.data.text) {
+                            const html = `<div style="white-space: pre-wrap;">${response.data.text}</div>`;
+                            if (translationResults.length === 0) {
+                              setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                            } else {
+                              setTranslationResults(prev => prev.map((r, idx) =>
+                                idx === 0 ? { ...r, translatedText: html } : r
+                              ));
+                            }
+                            setProcessingStatus('✅ Translation text extracted!');
+                          }
+                        }
+                      } catch (err) {
+                        setProcessingStatus('❌ Failed to process: ' + (err.response?.data?.detail || err.message));
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <label
+                    htmlFor="proofreading-translation-upload"
+                    className="cursor-pointer flex flex-col items-center justify-center py-4 hover:bg-green-100 rounded transition-colors"
+                  >
+                    <span className="text-3xl mb-2">📤</span>
+                    <span className="text-xs text-green-600">Click to upload translation file</span>
+                  </label>
+                  {translationResults[0]?.translatedText && (
+                    <div className="mt-2 p-2 bg-white rounded border text-xs max-h-32 overflow-auto">
+                      <div dangerouslySetInnerHTML={{ __html: translationResults[0].translatedText.substring(0, 200) + '...' }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Or paste text manually */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Or paste original text:</label>
+                  <textarea
+                    className="w-full h-32 text-xs p-2 border rounded resize-none"
+                    placeholder="Paste original text here..."
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      if (text.trim()) {
+                        setOcrResults([{ filename: 'Original', text: text }]);
+                        if (translationResults.length === 0) {
+                          setTranslationResults([{ translatedText: '', originalText: text, filename: 'Manual' }]);
+                        } else {
+                          setTranslationResults(prev => prev.map((r, idx) =>
+                            idx === 0 ? { ...r, originalText: text } : r
+                          ));
+                        }
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Or paste translation text:</label>
+                  <textarea
+                    className="w-full h-32 text-xs p-2 border rounded resize-none"
+                    placeholder="Paste translation text here..."
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      if (text.trim()) {
+                        const html = `<div style="white-space: pre-wrap;">${text}</div>`;
+                        if (translationResults.length === 0) {
+                          setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: 'Manual' }]);
+                        } else {
+                          setTranslationResults(prev => prev.map((r, idx) =>
+                            idx === 0 ? { ...r, translatedText: html } : r
+                          ));
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Run Proofreading Button */}
+              {translationResults[0]?.translatedText && (
+                <div className="text-center">
+                  <button
+                    onClick={runProofreading}
+                    disabled={isProofreading || !translationResults[0]?.translatedText}
+                    className="px-6 py-3 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {isProofreading ? '⏳ Analyzing...' : '🔎 Run Proofreading'}
+                  </button>
+                </div>
+              )}
+
+              {/* Proofreading Results */}
+              {proofreadingResult && (
+                <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className={`px-4 py-2 rounded-full text-sm font-bold ${
+                      proofreadingResult.classificacao === 'APROVADO'
+                        ? 'bg-green-500 text-white'
+                        : proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-red-500 text-white'
+                    }`}>
+                      {proofreadingResult.classificacao === 'APROVADO' ? '✅ APPROVED' :
+                       proofreadingResult.classificacao === 'APROVADO_COM_OBSERVACOES' ? '⚠️ APPROVED WITH OBSERVATIONS' :
+                       '❌ REJECTED'}
+                    </span>
+                    <span className="text-xs text-gray-600">
+                      Score: {proofreadingResult.pontuacao_final || proofreadingResult.score || 'N/A'}%
+                    </span>
+                  </div>
+                  {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      Found {proofreadingResult.erros.length} issue(s)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {proofreadingErrorr && (
+                <div className="p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
+                  ❌ {proofreadingErrorr}
+                </div>
+              )}
+
+              <div className="text-center">
+                <button
+                  onClick={() => setActiveSubTab('review')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
+                >
+                  ← Back to Review
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -12030,7 +12265,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
