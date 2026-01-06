@@ -18672,9 +18672,9 @@ const FinancesPage = ({ adminKey }) => {
                   className="w-full border rounded p-2 text-sm"
                 >
                   <option value="">Select translator...</option>
-                  {translators.filter(t => t.role?.toLowerCase() === 'translator').map(t => (
+                  {translators.map(t => (
                     <option key={t.translator_id || t._id} value={t.translator_id || t._id}>
-                      {t.name}
+                      {t.name} {t.role ? `(${t.role})` : ''}
                     </option>
                   ))}
                 </select>
