@@ -847,6 +847,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   });
   const USPS_PRIORITY_MAIL = 18.99;
 
+  // Payment method options
+  const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
+  const ZELLE_PHONE = '(508) 364-3298';
+
   // Calculate quote when relevant fields change
   useEffect(() => {
     if (uploadedFiles.length > 0) {
@@ -1097,12 +1101,17 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
         ...formData,
         word_count: wordCount,
         document_filename: uploadedFiles[0]?.fileName || null,
-        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean)
+        document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
+        payment_method: paymentMethod,
+        create_invoice: paymentMethod === 'invoice'
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
 
-      setSuccess(`Order ${response.data.order.order_number} created successfully!`);
+      const invoiceMsg = paymentMethod === 'invoice'
+        ? ' Invoice will be sent to your email shortly.'
+        : ` Please send payment via Zelle to ${ZELLE_PHONE}`;
+      setSuccess(`Order ${response.data.order.order_number} created successfully!${invoiceMsg}`);
 
       // Reset form
       setFormData({
@@ -1118,6 +1127,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       setWordCount(0);
       setUploadedFiles([]);
       setQuote(null);
+      setPaymentMethod('invoice');
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -1543,6 +1553,41 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 </div>
               </div>
             )}
+
+            {/* Payment Method */}
+            <div className="border-b pb-4">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment Method</h2>
+              <div className="space-y-3">
+                <label className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="invoice"
+                    checked={paymentMethod === 'invoice'}
+                    onChange={() => setPaymentMethod('invoice')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">QuickBooks Invoice (Net 30)</span>
+                    <p className="text-sm text-gray-500">Invoice will be sent automatically via email</p>
+                  </div>
+                </label>
+                <label className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="zelle"
+                    checked={paymentMethod === 'zelle'}
+                    onChange={() => setPaymentMethod('zelle')}
+                    className="mt-1"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">Zelle (Instant Payment)</span>
+                    <p className="text-sm text-gray-500">Send payment to: <span className="font-semibold text-teal-600">{ZELLE_PHONE}</span></p>
+                  </div>
+                </label>
+              </div>
+            </div>
 
             {/* Reference & Notes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
