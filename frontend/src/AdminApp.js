@@ -1920,17 +1920,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             order.translation_html
           );
         }
-        // For admin: show orders assigned to Admin OR sent to admin for review
+        // For admin: only show orders where Admin is the assigned translator
+        // Admin only sees projects in workspace when acting as translator (not as approver - that's PM's role)
         if (user.role === 'admin') {
           return (
             order.assigned_translator === 'Admin (Self)' ||
             order.assigned_translator === 'Admin' ||
             order.assigned_translator_name === 'Admin (Self)' ||
-            order.assigned_translator_name === 'Admin' ||
-            order.translation_sent_to === 'admin' ||
-            order.translation_status === 'review' ||
-            order.translation_status === 'pending_admin_approval' ||
-            order.translation_ready
+            order.assigned_translator_name === 'Admin'
           );
         }
         // Fallback: show all orders with translation
