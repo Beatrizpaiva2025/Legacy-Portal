@@ -4132,7 +4132,7 @@ class QuickVendorCreate(BaseModel):
 
 @api_router.post("/admin/users/create")
 async def quick_create_vendor(vendor_data: QuickVendorCreate, admin_key: str):
-    """Quick create a vendor without email invitation (admin only)"""
+    """Quick create or update a vendor without email invitation (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
@@ -4145,7 +4145,19 @@ async def quick_create_vendor(vendor_data: QuickVendorCreate, admin_key: str):
         # Check if email already exists
         existing = await db.admin_users.find_one({"email": vendor_data.email})
         if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
+            # Update existing vendor instead of error
+            update_data = {
+                "name": vendor_data.name,
+                "role": vendor_data.role.lower(),
+                "rate_per_page": vendor_data.rate_per_page or existing.get("rate_per_page", 0),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            await db.admin_users.update_one(
+                {"email": vendor_data.email},
+                {"$set": update_data}
+            )
+            logger.info(f"Vendor updated: {vendor_data.email} as {vendor_data.role}")
+            return {"success": True, "id": existing["id"], "message": "Vendor updated successfully"}
 
         # Create vendor directly as active
         vendor = {

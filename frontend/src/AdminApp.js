@@ -755,6 +755,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // State for fillable template mode in Translation tab
+  const [selectedFillableTemplate, setSelectedFillableTemplate] = useState(null);
+  const [fillableTemplateData, setFillableTemplateData] = useState({});
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
+
   // Predefined certificate templates with body text only (header, logos, signature are setote)
   // Template Categories for organization
   const TEMPLATE_CATEGORIES = {
@@ -5986,9 +5991,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </button>
             </div>
 
-            {/* Templates by Category */}
+            {/* Templates by Category - Only show Certificates in START tab */}
             <div className="space-y-2">
-              {Object.entries(TEMPLATE_CATEGORIES).map(([catKey, category]) => {
+              {Object.entries(TEMPLATE_CATEGORIES)
+                .filter(([catKey]) => catKey === 'certificates')
+                .map(([catKey, category]) => {
                 const templatesInCategory = Object.entries(CERTIFICATE_TEMPLATES).filter(([_, t]) => t.category === catKey);
                 if (templatesInCategory.length === 0) return null;
                 return (
@@ -6152,9 +6159,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <span className="mr-2">📝</span>
                 <span className="text-sm font-medium">OCR (CAT Tool)</span>
               </label>
+              <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${workflowMode === 'template' ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <input
+                  type="radio"
+                  name="workflowMode"
+                  value="template"
+                  checked={workflowMode === 'template'}
+                  onChange={() => setWorkflowMode('template')}
+                  className="sr-only"
+                />
+                <span className="mr-2">📋</span>
+                <span className="text-sm font-medium">Fill Template</span>
+              </label>
             </div>
             <p className="text-[10px] text-gray-500 text-center mt-2">
-              {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)'}
+              {workflowMode === 'ai' ? 'Upload document and translate with AI' : workflowMode === 'external' ? 'Upload original + existing translation for review' : workflowMode === 'ocr' ? 'Extract text for external CAT tools (SDL Trados, MemoQ, etc.)' : 'Fill document template with original for reference'}
             </p>
           </div>
 
@@ -6926,6 +6945,338 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 >
                   <span className="mr-2">←</span> Back: Details
                 </button>
+              </div>
+            </>
+          )}
+
+          {/* ============ TEMPLATE MODE ============ */}
+          {workflowMode === 'template' && (
+            <>
+              {/* Template Selection - Non-Certificate Templates */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                <h3 className="text-xs font-bold text-purple-800 mb-3">📋 Select a Document Template to Fill</h3>
+                <p className="text-[10px] text-purple-600 mb-3">Choose a template below, fill in the fields, and save as translation</p>
+
+                <div className="space-y-3">
+                  {Object.entries(TEMPLATE_CATEGORIES)
+                    .filter(([catKey]) => catKey !== 'certificates')
+                    .map(([catKey, category]) => {
+                      const templatesInCategory = Object.entries(CERTIFICATE_TEMPLATES).filter(([_, t]) => t.category === catKey);
+                      if (templatesInCategory.length === 0) return null;
+                      return (
+                        <div key={catKey} className="bg-white border rounded p-3">
+                          <div className="text-[11px] font-semibold text-gray-700 mb-2 flex items-center gap-1">
+                            <span>{category.icon}</span>
+                            <span>{category.name}</span>
+                            <span className="text-[9px] text-gray-400 font-normal">({templatesInCategory.length})</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {templatesInCategory.map(([key, template]) => (
+                              <button
+                                key={key}
+                                onClick={() => {
+                                  setSelectedFillableTemplate(key);
+                                  setFillableTemplateData({});
+                                  setShowTemplatePreview(true);
+                                }}
+                                className={`px-3 py-1.5 text-[10px] rounded-lg transition-all ${selectedFillableTemplate === key
+                                  ? 'bg-purple-600 text-white font-medium shadow'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'}`}
+                                title={template.description}
+                              >
+                                {template.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Custom Uploaded Templates */}
+                {customCertificateTemplates.filter(t => t.category && t.category !== 'certificates').length > 0 && (
+                  <div className="bg-white border border-dashed border-purple-300 rounded p-3 mt-3">
+                    <div className="text-[11px] font-semibold text-purple-700 mb-2 flex items-center gap-1">
+                      <span>⭐</span>
+                      <span>Custom Uploaded Templates</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {customCertificateTemplates
+                        .filter(t => t.category && t.category !== 'certificates')
+                        .map(tpl => (
+                          <div key={tpl.id} className="flex items-center">
+                            <button
+                              onClick={() => {
+                                setSelectedFillableTemplate(`custom-${tpl.id}`);
+                                setFillableTemplateData({});
+                                setShowTemplatePreview(true);
+                              }}
+                              className={`px-3 py-1.5 text-[10px] rounded-l-lg transition-all ${selectedFillableTemplate === `custom-${tpl.id}`
+                                ? 'bg-purple-600 text-white font-medium shadow'
+                                : 'bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700'}`}
+                            >
+                              {tpl.name}
+                            </button>
+                            {(user?.role === 'admin' || user?.role === 'pm') && (
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete "${tpl.name}"?`)) {
+                                    const updated = customCertificateTemplates.filter(t => t.id !== tpl.id);
+                                    setCustomCertificateTemplates(updated);
+                                    localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                                    if (selectedFillableTemplate === `custom-${tpl.id}`) {
+                                      setSelectedFillableTemplate(null);
+                                      setShowTemplatePreview(false);
+                                    }
+                                  }
+                                }}
+                                className="px-1.5 py-1.5 text-[10px] bg-red-100 text-red-600 rounded-r-lg hover:bg-red-200"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Template Section for Admin/PM */}
+                {(user?.role === 'admin' || user?.role === 'pm') && (
+                  <div className="mt-4 pt-4 border-t border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-purple-700 font-medium">Upload Custom Template (Admin/PM only)</span>
+                      <input
+                        type="file"
+                        accept=".html,.htm"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const htmlContent = event.target?.result;
+                              const name = prompt('Template name:');
+                              if (name && htmlContent) {
+                                const category = prompt('Category (rmv-forms, brazil-docs, education):') || 'brazil-docs';
+                                const newTemplate = {
+                                  id: Date.now(),
+                                  name,
+                                  description: 'Uploaded template',
+                                  category,
+                                  isForm: true,
+                                  formHTML: htmlContent
+                                };
+                                const updated = [...customCertificateTemplates, newTemplate];
+                                setCustomCertificateTemplates(updated);
+                                localStorage.setItem('custom_certificate_templates', JSON.stringify(updated));
+                                alert(`Template "${name}" uploaded successfully!`);
+                              }
+                            };
+                            reader.readAsText(file);
+                          }
+                        }}
+                        className="hidden"
+                        id="template-upload-input"
+                      />
+                      <label
+                        htmlFor="template-upload-input"
+                        className="px-3 py-1.5 bg-purple-100 text-purple-700 text-[10px] rounded-lg cursor-pointer hover:bg-purple-200 transition-colors"
+                      >
+                        📤 Upload HTML Template
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Template Preview and Fill Interface */}
+              {showTemplatePreview && selectedFillableTemplate && (
+                <div className="border-2 border-purple-300 rounded-lg overflow-hidden">
+                  <div className="bg-purple-100 px-4 py-2 flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-purple-800">
+                      📋 {CERTIFICATE_TEMPLATES[selectedFillableTemplate]?.name ||
+                          (selectedFillableTemplate?.startsWith('custom-') ?
+                            customCertificateTemplates.find(t => t.id === parseInt(selectedFillableTemplate.replace('custom-', '')))?.name
+                            : 'Template')}
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setShowTemplatePreview(false);
+                          setSelectedFillableTemplate(null);
+                        }}
+                        className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded hover:bg-gray-300"
+                      >
+                        ✕ Close
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-0 h-[600px]">
+                    {/* Left Side - Original Document Preview */}
+                    <div className="border-r border-purple-200 bg-gray-50 p-4 overflow-auto">
+                      <div className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-2">
+                        📄 Original Document (Reference)
+                        {selectedProjectFiles.length > 0 && (
+                          <select
+                            className="ml-2 text-xs border rounded px-2 py-1"
+                            onChange={(e) => {
+                              const fileId = parseInt(e.target.value);
+                              const doc = selectedProjectFiles.find(f => f.id === fileId);
+                              if (doc) loadProjectFile(doc);
+                            }}
+                            value={selectedFileId || ''}
+                          >
+                            <option value="">Select file...</option>
+                            {selectedProjectFiles.map(doc => (
+                              <option key={doc.id} value={doc.id}>{doc.filename}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      {uploadedImagePreview ? (
+                        <img src={uploadedImagePreview} alt="Original Document" className="max-w-full border rounded shadow" />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                          <div className="text-center">
+                            <div className="text-4xl mb-2">📄</div>
+                            <p>Load a document from project files</p>
+                            <p className="text-xs mt-1">or upload an image to reference</p>
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={handleFileSelect}
+                              className="hidden"
+                              id="template-reference-upload"
+                            />
+                            <label
+                              htmlFor="template-reference-upload"
+                              className="mt-3 inline-block px-3 py-1.5 bg-blue-100 text-blue-700 text-xs rounded cursor-pointer hover:bg-blue-200"
+                            >
+                              📤 Upload Reference
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right Side - Fillable Template */}
+                    <div className="bg-white p-4 overflow-auto">
+                      <div className="text-xs font-bold text-gray-600 mb-2">✏️ Fill Template Below</div>
+                      <div
+                        id="fillable-template-container"
+                        className="template-form"
+                        dangerouslySetInnerHTML={{
+                          __html: (() => {
+                            // Get template from either CERTIFICATE_TEMPLATES or custom templates
+                            let template = CERTIFICATE_TEMPLATES[selectedFillableTemplate];
+                            if (!template && selectedFillableTemplate?.startsWith('custom-')) {
+                              const customId = parseInt(selectedFillableTemplate.replace('custom-', ''));
+                              template = customCertificateTemplates.find(t => t.id === customId);
+                            }
+                            if (!template) return '<div class="text-gray-400 text-center p-8">Select a template</div>';
+
+                            if (template.isForm && template.formHTML) {
+                              return template.formHTML
+                                .replace(/\{\{LOGO_LEFT\}\}/g, logoLeft ? `<img src="${logoLeft}" style="max-height: 60px; max-width: 120px;" />` : '')
+                                .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" style="max-height: 60px; max-width: 80px;" />` : '')
+                                .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" style="max-height: 60px; max-width: 60px;" />` : '');
+                            }
+                            return `<div class="p-4">${template.bodyParagraphs?.map(p => `<p class="mb-3">${p}</p>`).join('') || ''}</div>`;
+                          })()
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="bg-purple-50 px-4 py-3 flex items-center justify-between border-t border-purple-200">
+                    <div className="text-[10px] text-purple-600">
+                      Fill in the template fields, then save as translation
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          // Get the filled template content
+                          const container = document.getElementById('fillable-template-container');
+                          if (container && selectedOrderId) {
+                            const filledContent = container.innerHTML;
+
+                            try {
+                              setProcessingStatus('Saving translation...');
+
+                              // Save directly to backend
+                              const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+                                translation_html: filledContent,
+                                translation_original_text: '',
+                                source_language: sourceLanguage || 'Portuguese',
+                                target_language: targetLanguage || 'English',
+                                document_type: documentType || 'Document',
+                                translator_name: user?.name || 'Translator',
+                                translation_date: new Date().toISOString().split('T')[0],
+                                include_cover: false,
+                                page_format: 'letter',
+                                translation_type: translationType || 'certified',
+                                original_images: uploadedImagePreview ? [{ filename: 'original.jpg', data: uploadedImagePreview }] : [],
+                                logo_left: logoLeft,
+                                logo_right: logoRight,
+                                logo_stamp: logoStamp,
+                                signature_image: signatureImage,
+                                send_to: 'save',
+                                submitted_by: user?.name || 'Unknown',
+                                submitted_by_role: user?.role || 'unknown'
+                              });
+
+                              if (response.data.status === 'success' || response.data.success) {
+                                setTranslatedText(filledContent);
+                                setProcessingStatus('✅ Translation saved successfully to the system!');
+                                setTimeout(() => {
+                                  setProcessingStatus('');
+                                  setActiveSubTab('review');
+                                }, 2000);
+                              } else {
+                                setProcessingStatus('❌ Error saving translation. Please try again.');
+                              }
+                            } catch (error) {
+                              console.error('Error saving translation:', error);
+                              setProcessingStatus('❌ Error saving translation: ' + (error.response?.data?.error || error.message));
+                            }
+                          } else if (!selectedOrderId) {
+                            setProcessingStatus('⚠️ Please select an order first from the START tab.');
+                          }
+                        }}
+                        disabled={!selectedOrderId}
+                        className={`px-4 py-2 text-white text-sm font-medium rounded flex items-center gap-2 ${selectedOrderId ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                      >
+                        💾 Save as Translation
+                      </button>
+                      <button
+                        onClick={() => setActiveSubTab('review')}
+                        className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 flex items-center gap-2"
+                      >
+                        Go to Review →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Navigation */}
+              <div className="mt-4 flex justify-between items-center">
+                <button
+                  onClick={() => setActiveSubTab('start')}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300 flex items-center"
+                >
+                  <span className="mr-2">←</span> Back: Details
+                </button>
+                {selectedFillableTemplate && (
+                  <button
+                    onClick={() => setActiveSubTab('review')}
+                    className="px-6 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 flex items-center"
+                  >
+                    Go to Review <span className="ml-2">→</span>
+                  </button>
+                )}
               </div>
             </>
           )}
