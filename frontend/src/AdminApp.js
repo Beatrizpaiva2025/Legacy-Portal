@@ -724,8 +724,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const isPM = user?.role === 'pm';
 
   // State
-  const [activeSubTab, setActiveSubTab] = useState('start');
+  const [activeSubTab, setActiveSubTab] = useState(() => {
+    // Translators should start on DELIVER tab
+    return user?.role === 'translator' ? 'deliver' : 'start';
+  });
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+
+  // Ensure translators stay on DELIVER tab
+  React.useEffect(() => {
+    if (user?.role === 'translator' && activeSubTab !== 'deliver') {
+      setActiveSubTab('deliver');
+    }
+  }, [user?.role]);
 
   // Assigned orders for translator
   const [assignedOrders, setAssignedOrders] = useState([]);
@@ -2358,7 +2368,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         'pm': 'PM Review',
         'ready': 'Ready for Delivery',
         'deliver': 'Client',
-        'client': 'Client (Review)'
+        'client': 'Client (Review)',
+        'pending_admin_approval': 'Admin (for client delivery)'
       };
       const destinationLabel = destinationLabels[destination] || destination;
 
@@ -2388,6 +2399,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             // For PM/Admin, just clear status after showing success
             setTimeout(() => setProcessingStatus(''), 3000);
           }
+        } else if (destination === 'pending_admin_approval') {
+          setProcessingStatus(`✅ Translation approved and sent to Admin for client delivery!`);
+          setTimeout(() => setProcessingStatus(''), 3000);
         } else {
           setProcessingStatus(`✅ Translation sent to ${destinationLabel}!`);
           setTimeout(() => setProcessingStatus(''), 3000);
@@ -5140,11 +5154,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* Sub-tabs */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
-          { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator'] },
+          { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm'] },
+          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
-          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm'] },
+          { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
@@ -8331,37 +8345,40 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
-          {/* Mode Switch: Normal vs Quick Package */}
-          <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-            <div className="flex items-center justify-center gap-3">
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  checked={!quickPackageMode}
-                  onChange={() => setQuickPackageMode(false)}
-                  className="sr-only"
-                />
-                <span className="mr-2">📝</span>
-                <span className="text-sm font-medium">Normal Flow</span>
-              </label>
-              <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                <input
-                  type="radio"
-                  checked={quickPackageMode}
-                  onChange={() => setQuickPackageMode(true)}
-                  className="sr-only"
-                />
-                <span className="mr-2">📦</span>
-                <span className="text-sm font-medium">Quick Package</span>
-              </label>
+          {/* Mode Switch: Normal vs Quick Package - Hidden for translators */}
+          {(isAdmin || isPM) && (
+            <div className="mb-4 p-3 bg-gray-100 rounded-lg">
+              <div className="flex items-center justify-center gap-3">
+                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={!quickPackageMode}
+                    onChange={() => setQuickPackageMode(false)}
+                    className="sr-only"
+                  />
+                  <span className="mr-2">📝</span>
+                  <span className="text-sm font-medium">Normal Flow</span>
+                </label>
+                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={quickPackageMode}
+                    onChange={() => setQuickPackageMode(true)}
+                    className="sr-only"
+                  />
+                  <span className="mr-2">📦</span>
+                  <span className="text-sm font-medium">Quick Package</span>
+                </label>
+              </div>
+              <p className="text-[10px] text-gray-500 text-center mt-2">
+                {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
+              </p>
             </div>
-            <p className="text-[10px] text-gray-500 text-center mt-2">
-              {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
-            </p>
-          </div>
+          )}
 
           {/* ============ QUICK PACKAGE MODE ============ */}
-          {quickPackageMode && (
+          {/* Translators always use Quick Package mode */}
+          {(quickPackageMode || user?.role === 'translator') && (
             <>
               {/* Certificate Fields */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
@@ -8565,76 +8582,80 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Options */}
-              <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeCover}
-                      onChange={(e) => setIncludeCover(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Certificate of Accuracy</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeLetterhead}
-                      onChange={(e) => setIncludeLetterhead(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Letterhead on pages</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeOriginal}
-                      onChange={(e) => setIncludeOriginal(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>Include Original Documents</span>
-                  </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={includeAuthenticityStatement}
-                      onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
-                      className="mr-3 w-4 h-4"
-                    />
-                    <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
-                  </label>
+              {/* Options - Hidden for translators */}
+              {(isAdmin || isPM) && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeCover}
+                        onChange={(e) => setIncludeCover(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Certificate of Accuracy</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeLetterhead}
+                        onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Letterhead on pages</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeOriginal}
+                        onChange={(e) => setIncludeOriginal(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>Include Original Documents</span>
+                    </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeAuthenticityStatement}
+                        onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Document Order Preview */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
-                <div className="flex items-center gap-2 text-xs flex-wrap">
-                  {includeCover && (
-                    <>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
-                      <span className="text-gray-400">→</span>
-                    </>
-                  )}
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                    📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
-                  </span>
-                  {includeOriginal && quickOriginalFiles.length > 0 && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
-                    </>
-                  )}
-                  {includeAuthenticityStatement && (
-                    <>
-                      <span className="text-gray-400">→</span>
-                      <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
-                    </>
-                  )}
+              {/* Document Order Preview - Hidden for translators */}
+              {(isAdmin || isPM) && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
+                  <div className="flex items-center gap-2 text-xs flex-wrap">
+                    {includeCover && (
+                      <>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📜 Certificate</span>
+                        <span className="text-gray-400">→</span>
+                      </>
+                    )}
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                      📄 Translation {quickTranslationHtml ? '(Document)' : `(${quickTranslationFiles.length} pages)`}
+                    </span>
+                    {includeOriginal && quickOriginalFiles.length > 0 && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                      </>
+                    )}
+                    {includeAuthenticityStatement && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Loading/Progress Indicator */}
               {quickPackageProgress && (
@@ -8708,99 +8729,220 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Submit for Review - For All Roles */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-blue-700 mb-2">
-                  📤 {user?.role === 'translator' ? 'Submit for Review' : 'Submit & Notify Team'}
-                </h3>
-                <p className="text-[10px] text-blue-600 mb-3">
-                  {user?.role === 'translator'
-                    ? 'Send your translation to Admin/PM for review and approval'
-                    : 'Link translation to order and notify team members'}
-                </p>
-
-                <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
-                  <select
-                    value={selectedOrderId}
-                    onChange={(e) => setSelectedOrderId(e.target.value)}
-                    className="w-full px-2 py-1.5 text-xs border rounded"
-                  >
-                    <option value="">-- Select Order --</option>
-                    {availableOrders.map(order => (
-                      <option key={order.id} value={order.id}>
-                        {order.order_number} - {order.client_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => sendToProjects('review')}
-                  disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                  className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  {sendingToProjects ? '⏳ Sending...' : (user?.role === 'translator' ? '📤 Submit for Admin/PM Review' : '📤 Submit & Notify Admin/PM')}
-                </button>
-
-                {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                  <p className="text-[10px] text-blue-600 mt-2">
-                    ⚠️ Fill document type and upload translation first
+              {/* ============ TRANSLATOR SECTION: Send to PM ============ */}
+              {user?.role === 'translator' && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                  <h3 className="text-sm font-bold text-purple-700 mb-2">
+                    📤 Send to Project Manager
+                  </h3>
+                  <p className="text-[10px] text-purple-600 mb-3">
+                    Send your completed translation to the PM for review and approval
                   </p>
-                )}
-              </div>
 
-              {/* Download Button */}
-              <button
-                onClick={handleQuickPackageDownload}
-                disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
-                className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {quickPackageLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Generating...
-                  </>
-                ) : (
-                  '📦 Generate Complete Package (Print/PDF)'
-                )}
-              </button>
-              <p className="text-[10px] text-gray-500 mt-2 text-center">
-                Opens print window - save as PDF
-              </p>
+                  <div className="mb-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="w-full px-2 py-1.5 text-xs border rounded"
+                    >
+                      <option value="">-- Select Order --</option>
+                      {availableOrders.map(order => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number} - {order.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {/* Send options after package generation */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
-                <div className="flex gap-3 items-center">
-                  <select
-                    value={sendDestination}
-                    onChange={(e) => setSendDestination(e.target.value)}
-                    className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    disabled={sendingToProjects}
-                  >
-                    <option value="client">📧 Send to Client (Review)</option>
-                    {isPM && <option value="admin">📤 Send to Admin</option>}
-                  </select>
                   <button
-                    onClick={() => sendToProjects(sendDestination)}
-                    disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                    className={`px-6 py-3 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 ${
-                      sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
+                    onClick={() => sendToProjects('pm')}
+                    disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                    className="w-full py-3 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                    {sendingToProjects ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      '📤 Send to PM for Review'
+                    )}
                   </button>
+
+                  {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                    <p className="text-[10px] text-purple-600 mt-2">
+                      ⚠️ Fill document type and upload translation first
+                    </p>
+                  )}
+
+                  {processingStatus && (
+                    <div className={`mt-3 p-2 rounded text-xs ${
+                      processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                      processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {processingStatus}
+                    </div>
+                  )}
                 </div>
-                <p className="text-[10px] text-gray-500 mt-2 text-center">
-                  Select destination and click Send
-                </p>
-              </div>
+              )}
+
+              {/* ============ ADMIN/PM SECTION: Submit & Notify Team ============ */}
+              {(isAdmin || isPM) && (
+                <>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                    <h3 className="text-sm font-bold text-blue-700 mb-2">
+                      📤 Submit & Notify Team
+                    </h3>
+                    <p className="text-[10px] text-blue-600 mb-3">
+                      Link translation to order and notify team members
+                    </p>
+
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                      <select
+                        value={selectedOrderId}
+                        onChange={(e) => setSelectedOrderId(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs border rounded"
+                      >
+                        <option value="">-- Select Order --</option>
+                        {availableOrders.map(order => (
+                          <option key={order.id} value={order.id}>
+                            {order.order_number} - {order.client_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => sendToProjects('review')}
+                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                      className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                    >
+                      {sendingToProjects ? '⏳ Sending...' : '📤 Submit & Notify Admin/PM'}
+                    </button>
+
+                    {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
+                      <p className="text-[10px] text-blue-600 mt-2">
+                        ⚠️ Fill document type and upload translation first
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Download Button - Admin/PM only */}
+                  <button
+                    onClick={handleQuickPackageDownload}
+                    disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                    className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-bold rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {quickPackageLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      '📦 Generate Complete Package (Print/PDF)'
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-2 text-center">
+                    Opens print window - save as PDF
+                  </p>
+
+                  {/* PM External Translation Upload Section */}
+                  {isPM && (
+                    <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                      <h4 className="text-sm font-bold text-orange-700 mb-2">📁 External Translation Upload</h4>
+                      <p className="text-[10px] text-orange-600 mb-3">
+                        Upload translations from external translators (outside the system)
+                      </p>
+                      <div className="bg-white rounded p-3 border border-orange-100">
+                        <p className="text-[10px] text-gray-500 mb-2">
+                          Use the "Upload Ready Translation" section above to upload external translations.
+                          After uploading, complete the checklist and send to Admin for client delivery.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PM Approval & Send to Admin Section */}
+                  {isPM && (
+                    <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <h4 className="text-sm font-bold text-indigo-700 mb-2">✅ Approve & Send to Admin</h4>
+                      <p className="text-[10px] text-indigo-600 mb-3">
+                        After reviewing the translation, approve it and send to Admin for final client delivery
+                      </p>
+
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                        <select
+                          value={selectedOrderId}
+                          onChange={(e) => setSelectedOrderId(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border rounded"
+                        >
+                          <option value="">-- Select Order --</option>
+                          {availableOrders.map(order => (
+                            <option key={order.id} value={order.id}>
+                              {order.order_number} - {order.client_name} ({order.translation_status || 'N/A'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <button
+                        onClick={() => sendToProjects('pending_admin_approval')}
+                        disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                        className="w-full py-3 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {sendingToProjects ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Sending...
+                          </>
+                        ) : (
+                          '✅ Approve & Send to Admin'
+                        )}
+                      </button>
+                      <p className="text-[10px] text-indigo-500 mt-2 text-center">
+                        Admin will send the final translation to the client
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Send options after package generation - Admin only */}
+                  {isAdmin && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">📤 Deliver Translation</h4>
+                      <div className="flex gap-3 items-center">
+                        <select
+                          value={sendDestination}
+                          onChange={(e) => setSendDestination(e.target.value)}
+                          className="flex-1 px-3 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          disabled={sendingToProjects}
+                        >
+                          <option value="client">📧 Send to Client (Review)</option>
+                        </select>
+                        <button
+                          onClick={() => sendToProjects(sendDestination)}
+                          disabled={sendingToProjects || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                          className="px-6 py-3 bg-green-600 text-white text-sm font-medium rounded-lg disabled:bg-gray-300 flex items-center justify-center gap-2 hover:bg-green-700"
+                        >
+                          {sendingToProjects ? '⏳ Sending...' : '📤 Send'}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-gray-500 mt-2 text-center">
+                        Send translation to client for review
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
 
           {/* ============ NORMAL FLOW ============ */}
-          {!quickPackageMode && translationResults.length > 0 && (
+          {/* Normal Flow hidden for translators - they always use Quick Package mode */}
+          {!quickPackageMode && translationResults.length > 0 && user?.role !== 'translator' && (
             <>
               {/* Approval Checklist - ALL REQUIRED */}
               <div className={`p-4 rounded mb-4 ${

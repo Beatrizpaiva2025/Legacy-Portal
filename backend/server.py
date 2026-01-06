@@ -7474,6 +7474,45 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     )
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+
+    # Send notification to PM when translator sends translation for PM review
+    if destination == "pm":
+        # Get the assigned PM for this order
+        assigned_pm_id = order.get("assigned_pm_id")
+        if assigned_pm_id:
+            # Create notification for the PM
+            translator_name = data.submitted_by or (current_user.get("name") if current_user else "Translator")
+            order_number = order.get("order_number", order_id)
+            await create_notification(
+                user_id=assigned_pm_id,
+                notif_type="translation_submitted",
+                title="Translation Ready for Review",
+                message=f"Translator {translator_name} has submitted a translation for order {order_number}. Please review and approve.",
+                order_id=order_id,
+                order_number=order_number
+            )
+            logger.info(f"Notification sent to PM {assigned_pm_id} for order {order_id}")
+        else:
+            # No PM assigned - notify all admins/PMs
+            logger.info(f"No PM assigned to order {order_id}, skipping PM notification")
+
+    # Send notification to Admin when PM approves and sends translation
+    if destination == "pending_admin_approval":
+        # Get all admin users and notify them
+        admin_users = await db.admin_users.find({"role": "admin"}).to_list(length=100)
+        pm_name = data.submitted_by or (current_user.get("name") if current_user else "PM")
+        order_number = order.get("order_number", order_id)
+        for admin_user in admin_users:
+            await create_notification(
+                user_id=admin_user.get("id"),
+                notif_type="translation_approved",
+                title="Translation Approved by PM",
+                message=f"PM {pm_name} has approved the translation for order {order_number}. Ready for client delivery.",
+                order_id=order_id,
+                order_number=order_number
+            )
+        logger.info(f"Notification sent to admins for PM-approved order {order_id}")
+
     return {"success": True, "message": status_message}
 
 class AttachmentsSelection(BaseModel):
