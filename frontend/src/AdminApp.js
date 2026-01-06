@@ -14421,8 +14421,21 @@ const FollowupsPage = ({ adminKey }) => {
 
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
-  const [exporting, setExporting] = useState(false);
+  const [exportingProjects, setExportingProjects] = useState(false);
+  const [exportingClients, setExportingClients] = useState(false);
+  const [exportingTranslators, setExportingTranslators] = useState(false);
+  const [exportingFinancial, setExportingFinancial] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
+
+  // Restore Points State
+  const [restorePoints, setRestorePoints] = useState([]);
+  const [loadingRestorePoints, setLoadingRestorePoints] = useState(false);
+  const [creatingRestorePoint, setCreatingRestorePoint] = useState(false);
+  const [restoringFrom, setRestoringFrom] = useState(null);
+  const [downloadingSource, setDownloadingSource] = useState(false);
+  const [restorePointName, setRestorePointName] = useState('');
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(null);
 
   // QuickBooks Integration State
   const [qbStatus, setQbStatus] = useState({ connected: false, company_name: null, loading: true });
@@ -14521,7 +14534,7 @@ const SettingsPage = ({ adminKey }) => {
   };
 
   const exportProjects = async (format = 'csv') => {
-    setExporting(true);
+    setExportingProjects(true);
     setExportProgress('Fetching projects...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14543,18 +14556,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(exportData, 'projects');
       else exportToJSON(exportData, 'projects');
-      setExportProgress('✅ Projects exported!');
+      setExportProgress('✅ Projects exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting projects');
+      setExportProgress('❌ Error exporting projects');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingProjects(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportClients = async (format = 'csv') => {
-    setExporting(true);
+    setExportingClients(true);
     setExportProgress('Fetching client data...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14580,18 +14593,18 @@ const SettingsPage = ({ adminKey }) => {
       const clients = Array.from(clientsMap.values());
       if (format === 'csv') exportToCSV(clients, 'clients');
       else exportToJSON(clients, 'clients');
-      setExportProgress('✅ Clients exported!');
+      setExportProgress('✅ Clients exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting clients');
+      setExportProgress('❌ Error exporting clients');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingClients(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportTranslators = async (format = 'csv') => {
-    setExporting(true);
+    setExportingTranslators(true);
     setExportProgress('Fetching translators...');
     try {
       const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
@@ -14606,18 +14619,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(exportData, 'translators');
       else exportToJSON(exportData, 'translators');
-      setExportProgress('✅ Translators exported!');
+      setExportProgress('✅ Translators exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting translators');
+      setExportProgress('❌ Error exporting translators');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingTranslators(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportFinancialReport = async (format = 'csv') => {
-    setExporting(true);
+    setExportingFinancial(true);
     setExportProgress('Generating financial report...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14636,18 +14649,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(reportData, 'financial_report');
       else exportToJSON(reportData, 'financial_report');
-      setExportProgress('✅ Financial report exported!');
+      setExportProgress('✅ Financial report exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting report');
+      setExportProgress('❌ Error exporting report');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingFinancial(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const createFullBackup = async () => {
-    setExporting(true);
+    setCreatingBackup(true);
     setExportProgress('Creating full backup...');
     try {
       // Fetch all data
@@ -14676,15 +14689,111 @@ const SettingsPage = ({ adminKey }) => {
       };
 
       exportToJSON(backupData, 'full_backup');
-      setExportProgress('✅ Full backup created!');
+      setExportProgress('✅ Full backup created! The file was saved to your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr creating backup');
+      setExportProgress('❌ Error creating backup');
       console.error(err);
     } finally {
-      setExporting(false);
-      setTimeout(() => setExportProgress(''), 3000);
+      setCreatingBackup(false);
+      setTimeout(() => setExportProgress(''), 5000);
     }
   };
+
+  // Download source code as ZIP
+  const downloadSourceCode = async () => {
+    setDownloadingSource(true);
+    setExportProgress('Downloading source code...');
+    try {
+      const response = await axios.get(`${API}/admin/backup/source-code?admin_key=${adminKey}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `legacy_portal_source_${new Date().toISOString().split('T')[0]}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setExportProgress('✅ Source code downloaded! Check your Downloads folder.');
+    } catch (err) {
+      setExportProgress('❌ Error downloading source code');
+      console.error(err);
+    } finally {
+      setDownloadingSource(false);
+      setTimeout(() => setExportProgress(''), 5000);
+    }
+  };
+
+  // Fetch restore points
+  const fetchRestorePoints = async () => {
+    setLoadingRestorePoints(true);
+    try {
+      const response = await axios.get(`${API}/admin/backup/restore-points?admin_key=${adminKey}`);
+      setRestorePoints(response.data.restore_points || []);
+    } catch (err) {
+      console.error('Error fetching restore points:', err);
+    } finally {
+      setLoadingRestorePoints(false);
+    }
+  };
+
+  // Create restore point
+  const createRestorePoint = async () => {
+    setCreatingRestorePoint(true);
+    setExportProgress('Creating restore point...');
+    try {
+      const response = await axios.post(`${API}/admin/backup/restore-point?admin_key=${adminKey}`, {
+        name: restorePointName || '',
+        description: ''
+      });
+      setExportProgress(`✅ Restore point created: ${response.data.name}`);
+      setRestorePointName('');
+      fetchRestorePoints();
+    } catch (err) {
+      setExportProgress('❌ Error creating restore point');
+      console.error(err);
+    } finally {
+      setCreatingRestorePoint(false);
+      setTimeout(() => setExportProgress(''), 5000);
+    }
+  };
+
+  // Restore from a restore point
+  const restoreFromPoint = async (restorePointId) => {
+    setRestoringFrom(restorePointId);
+    setExportProgress('Restoring database...');
+    try {
+      const response = await axios.post(`${API}/admin/backup/restore/${restorePointId}?admin_key=${adminKey}`, {
+        confirm: true
+      });
+      setExportProgress(`✅ ${response.data.message}. Auto-backup created.`);
+      setShowRestoreConfirm(null);
+      fetchRestorePoints();
+    } catch (err) {
+      setExportProgress('❌ Error restoring: ' + (err.response?.data?.detail || err.message));
+      console.error(err);
+    } finally {
+      setRestoringFrom(null);
+      setTimeout(() => setExportProgress(''), 8000);
+    }
+  };
+
+  // Delete restore point
+  const deleteRestorePoint = async (restorePointId) => {
+    if (!window.confirm('Delete this restore point?')) return;
+    try {
+      await axios.delete(`${API}/admin/backup/restore-point/${restorePointId}?admin_key=${adminKey}`);
+      fetchRestorePoints();
+    } catch (err) {
+      alert('Error deleting restore point');
+      console.error(err);
+    }
+  };
+
+  // Load restore points on mount
+  useEffect(() => {
+    fetchRestorePoints();
+  }, [adminKey]);
 
   // Permissions matrix data
   const PERMISSIONS = {
@@ -14908,17 +15017,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportProjects('csv')}
-                  disabled={exporting}
+                  disabled={exportingProjects}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingProjects ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportProjects('json')}
-                  disabled={exporting}
+                  disabled={exportingProjects}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingProjects ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14930,17 +15039,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportClients('csv')}
-                  disabled={exporting}
+                  disabled={exportingClients}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingClients ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportClients('json')}
-                  disabled={exporting}
+                  disabled={exportingClients}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingClients ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14952,17 +15061,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportTranslators('csv')}
-                  disabled={exporting}
+                  disabled={exportingTranslators}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingTranslators ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportTranslators('json')}
-                  disabled={exporting}
+                  disabled={exportingTranslators}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingTranslators ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14974,17 +15083,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportFinancialReport('csv')}
-                  disabled={exporting}
+                  disabled={exportingFinancial}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingFinancial ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportFinancialReport('json')}
-                  disabled={exporting}
+                  disabled={exportingFinancial}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingFinancial ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14997,18 +15106,166 @@ const SettingsPage = ({ adminKey }) => {
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700">Full System Backup</h3>
                   <p className="text-[10px] text-gray-500 mt-1">Create a complete backup of all projects, users, and translators in JSON format</p>
+                  <p className="text-[10px] text-blue-600 mt-1">Files are saved to your browser's Downloads folder</p>
                 </div>
                 <button
                   onClick={createFullBackup}
-                  disabled={exporting}
+                  disabled={creatingBackup}
                   className="px-4 py-2 bg-slate-700 text-white text-xs rounded hover:bg-slate-800 disabled:bg-gray-300 flex items-center"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Create Backup
+                  {creatingBackup ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Create Backup
+                    </>
+                  )}
                 </button>
               </div>
+            </div>
+
+            {/* Download Source Code */}
+            <div className="border rounded p-4 bg-blue-50 mt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-700">Download Source Code</h3>
+                  <p className="text-[10px] text-gray-500 mt-1">Download Python backend and React frontend as ZIP file</p>
+                </div>
+                <button
+                  onClick={downloadSourceCode}
+                  disabled={downloadingSource}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center"
+                >
+                  {downloadingSource ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Download ZIP
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Restore Points Section */}
+          <div className="mt-6 border-t pt-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Restore Points</h3>
+            <p className="text-xs text-gray-500 mb-4">Create restore points to save the current state of your database. You can restore to any previous point if needed.</p>
+
+            {/* Create Restore Point */}
+            <div className="flex items-center space-x-2 mb-4">
+              <input
+                type="text"
+                placeholder="Restore point name (optional)"
+                value={restorePointName}
+                onChange={(e) => setRestorePointName(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded text-xs"
+              />
+              <button
+                onClick={createRestorePoint}
+                disabled={creatingRestorePoint}
+                className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 flex items-center whitespace-nowrap"
+              >
+                {creatingRestorePoint ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  <>+ Create Restore Point</>
+                )}
+              </button>
+            </div>
+
+            {/* Restore Points List */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {loadingRestorePoints ? (
+                <p className="text-xs text-gray-500 text-center py-4">Loading restore points...</p>
+              ) : restorePoints.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-4">No restore points created yet.</p>
+              ) : (
+                restorePoints.map((rp) => (
+                  <div key={rp.id} className={`border rounded p-3 ${rp.is_auto_backup ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center">
+                          <span className="text-xs font-medium text-gray-800">{rp.name}</span>
+                          {rp.is_auto_backup && (
+                            <span className="ml-2 px-1.5 py-0.5 bg-yellow-200 text-yellow-800 text-[10px] rounded">Auto</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-1">
+                          {new Date(rp.created_at).toLocaleString()} |
+                          {rp.stats?.orders_count || 0} orders, {rp.stats?.users_count || 0} users
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {showRestoreConfirm === rp.id ? (
+                          <>
+                            <span className="text-[10px] text-red-600 mr-2">Are you sure?</span>
+                            <button
+                              onClick={() => restoreFromPoint(rp.id)}
+                              disabled={restoringFrom === rp.id}
+                              className="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 disabled:bg-gray-300"
+                            >
+                              {restoringFrom === rp.id ? 'Restoring...' : 'Yes, Restore'}
+                            </button>
+                            <button
+                              onClick={() => setShowRestoreConfirm(null)}
+                              className="px-2 py-1 bg-gray-300 text-gray-700 text-[10px] rounded hover:bg-gray-400"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => setShowRestoreConfirm(rp.id)}
+                              className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700"
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => deleteRestorePoint(rp.id)}
+                              className="px-2 py-1 bg-red-100 text-red-600 text-[10px] rounded hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="text-[10px] text-yellow-800">
+                <strong>Warning:</strong> Restoring from a point will overwrite all current data. An automatic backup is created before each restore.
+              </p>
             </div>
           </div>
         </div>
@@ -17128,10 +17385,7 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, payment-proofs, translator-payments, quickbooks
-  const [paymentProofs, setPaymentProofs] = useState([]);
-  const [selectedProof, setSelectedProof] = useState(null);
-  const [proofFilter, setProofFilter] = useState('pending');
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses, pay-vendors, quickbooks, partners
   // Translator payments state
   const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
@@ -17143,6 +17397,9 @@ const FinancesPage = ({ adminKey }) => {
   const [commissionRate, setCommissionRate] = useState('');
   const [paymentReport, setPaymentReport] = useState(null);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  // Receipt file upload state
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(null);
   // QuickBooks state
   const [qbConnected, setQbConnected] = useState(false);
   const [qbSyncing, setQbSyncing] = useState({});
@@ -17201,39 +17458,6 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
-  const fetchPaymentProofs = async () => {
-    try {
-      const statusParam = proofFilter !== 'all' ? `&status=${proofFilter}` : '';
-      const response = await axios.get(`${API}/admin/payment-proofs?admin_key=${adminKey}${statusParam}`);
-      setPaymentProofs(response.data.payment_proofs || []);
-    } catch (err) {
-      console.error('Errorr fetching payment proofs:', err);
-    }
-  };
-
-  const fetchProofDetail = async (proofId) => {
-    try {
-      const response = await axios.get(`${API}/admin/payment-proofs/${proofId}?admin_key=${adminKey}`);
-      setSelectedProof(response.data.payment_proof);
-    } catch (err) {
-      console.error('Errorr fetching proof detail:', err);
-    }
-  };
-
-  const reviewProof = async (proofId, status, notes = '') => {
-    try {
-      await axios.put(
-        `${API}/admin/payment-proofs/${proofId}/review?admin_key=${adminKey}&status=${status}${notes ? `&admin_notes=${encodeURIComponent(notes)}` : ''}`
-      );
-      setSelectedProof(null);
-      fetchPaymentProofs();
-      alert(status === 'approved' ? 'Payment approved!' : 'Payment rejected');
-    } catch (err) {
-      console.error('Errorr reviewing proof:', err);
-      alert('Errorr processing review');
-    }
-  };
-
   // Translator payments functions
   const fetchTranslatorsForPayment = async () => {
     try {
@@ -17270,13 +17494,21 @@ const FinancesPage = ({ adminKey }) => {
     }
     const translatorId = selectedTranslatorForPayment.translator_id || selectedTranslatorForPayment._id;
     try {
-      await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, {
-        translator_id: translatorId,
-        amount: parseFloat(paymentAmount),
-        note: paymentNote,
-        payment_method: paymentMethod,
-        payment_type: paymentType,
-        commission_rate: paymentType === 'sales_commission' ? parseFloat(commissionRate) : null
+      const formData = new FormData();
+      formData.append('translator_id', translatorId);
+      formData.append('amount', parseFloat(paymentAmount));
+      formData.append('note', paymentNote || '');
+      formData.append('payment_method', paymentMethod);
+      formData.append('payment_type', paymentType);
+      if (paymentType === 'sales_commission' && commissionRate) {
+        formData.append('commission_rate', parseFloat(commissionRate));
+      }
+      if (receiptFile) {
+        formData.append('receipt_file', receiptFile);
+      }
+
+      await axios.post(`${API}/admin/payments/register?admin_key=${adminKey}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
       alert('Payment registered successfully!');
       setPaymentAmount('');
@@ -17284,6 +17516,8 @@ const FinancesPage = ({ adminKey }) => {
       setPaymentMethod('');
       setPaymentType('translation');
       setCommissionRate('');
+      setReceiptFile(null);
+      setReceiptPreview(null);
       fetchTranslatorsForPayment();
       fetchPaymentReport();
       if (selectedTranslatorForPayment) {
@@ -17291,6 +17525,29 @@ const FinancesPage = ({ adminKey }) => {
       }
     } catch (err) {
       alert('Error registering payment: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleReceiptFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please upload an image (PNG, JPG, GIF) or PDF file');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      setReceiptFile(file);
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => setReceiptPreview(e.target.result);
+        reader.readAsDataURL(file);
+      } else {
+        setReceiptPreview(null);
+      }
     }
   };
 
@@ -17386,7 +17643,7 @@ const FinancesPage = ({ adminKey }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSummary(), fetchExpenses(), fetchPaymentProofs(), checkQuickBooksStatus()]);
+      await Promise.all([fetchSummary(), fetchExpenses(), checkQuickBooksStatus()]);
       setLoading(false);
     };
     loadData();
@@ -17399,17 +17656,11 @@ const FinancesPage = ({ adminKey }) => {
     if (activeView === 'partners') {
       fetchPartnerStats();
     }
-  }, [activeView]);
-
-  useEffect(() => {
-    if (activeView === 'payment-proofs') {
-      fetchPaymentProofs();
-    }
     if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
       fetchPaymentReport();
     }
-  }, [proofFilter, activeView]);
+  }, [activeView]);
 
   const handleCreateExpense = async (e) => {
     e.preventDefault();
@@ -17535,17 +17786,6 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Expenses
-            </button>
-            <button
-              onClick={() => setActiveView('payment-proofs')}
-              className={`px-4 py-2 rounded text-sm flex items-center gap-1 ${activeView === 'payment-proofs' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              Proofs
-              {paymentProofs.filter(p => p.status === 'pending').length > 0 && (
-                <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                  {paymentProofs.filter(p => p.status === 'pending').length}
-                </span>
-              )}
             </button>
             <button
               onClick={() => setActiveView('pay-vendors')}
@@ -17838,234 +18078,6 @@ const FinancesPage = ({ adminKey }) => {
         </div>
       )}
 
-      {/* Payment Proofs View */}
-      {activeView === 'payment-proofs' && (
-        <div className="space-y-4">
-          {/* Filter */}
-          <div className="flex justify-between items-center">
-            <div className="flex space-x-2">
-              {['pending', 'approved', 'rejected', 'all'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setProofFilter(status)}
-                  className={`px-3 py-1.5 rounded text-sm capitalize ${
-                    proofFilter === status
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {status === 'all' ? 'Todos' : status === 'pending' ? 'Pendentes' : status === 'approved' ? 'Aprovados' : 'Rejeitados'}
-                  {status === 'pending' && paymentProofs.filter(p => p.status === 'pending').length > 0 && (
-                    <span className="ml-1 bg-red-500 text-white text-xs px-1.5 rounded-full">
-                      {paymentProofs.filter(p => p.status === 'pending').length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={fetchPaymentProofs}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200"
-            >
-              Atualizar
-            </button>
-          </div>
-
-          {/* Proofs List */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Data</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Cliente</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Método</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Amount</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paymentProofs.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                      No comprovante found
-                    </td>
-                  </tr>
-                ) : (
-                  paymentProofs.map((proof) => (
-                    <tr key={proof.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        {new Date(proof.created_at).toLocaleDateString('en-US', {
-                          month: '2-digit',
-                          day: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium">{proof.customer_name}</div>
-                        <div className="text-xs text-gray-500">{proof.customer_email}</div>
-                        {proof.order_number && (
-                          <div className="text-xs text-blue-600">Pedido: {proof.order_number}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                          proof.payment_method === 'pix'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-indigo-100 text-indigo-700'
-                        }`}>
-                          {proof.payment_method.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        {proof.currency === 'BRL' ? 'R$' : '$'} {proof.amount.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                          proof.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : proof.status === 'approved'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {proof.status === 'pending' ? 'Pendente' : proof.status === 'approved' ? 'Aprovado' : 'Rejeitado'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => fetchProofDetail(proof.id)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Ver
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Proof Detail Modal */}
-      {selectedProof && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800">Proof de Payment</h3>
-              <button onClick={() => setSelectedProof(null)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
-            </div>
-            <div className="p-4 overflow-y-auto max-h-[calc(90vh-200px)]">
-              {/* Customer Info */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-xs text-gray-500">Cliente</label>
-                  <div className="font-medium">{selectedProof.customer_name}</div>
-                  <div className="text-sm text-gray-600">{selectedProof.customer_email}</div>
-                  {selectedProof.customer_phone && (
-                    <div className="text-sm text-gray-600">{selectedProof.customer_phone}</div>
-                  )}
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Payment</label>
-                  <div className="font-medium">
-                    <span className={`inline-flex items-center px-2 py-1 rounded text-sm ${
-                      selectedProof.payment_method === 'pix'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-indigo-100 text-indigo-700'
-                    }`}>
-                      {selectedProof.payment_method.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="text-lg font-bold mt-1">
-                    {selectedProof.currency === 'BRL' ? 'R$' : '$'} {selectedProof.amount.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              {selectedProof.order_number && (
-                <div className="mb-4 p-2 bg-blue-50 rounded text-sm">
-                  <strong>Pedido vinculado:</strong> {selectedProof.order_number}
-                </div>
-              )}
-
-              {/* Proof Image/PDF */}
-              <div className="mb-4">
-                <label className="text-xs text-gray-500 block mb-2">Proof ({selectedProof.proof_filename})</label>
-                <div className="border rounded-lg overflow-hidden bg-gray-100">
-                  {selectedProof.proof_file_type?.startsWith('image/') ? (
-                    <img
-                      src={`data:${selectedProof.proof_file_type};base64,${selectedProof.proof_file_data}`}
-                      alt="Payment proof"
-                      className="max-w-full h-auto mx-auto"
-                      style={{ maxHeight: '400px' }}
-                    />
-                  ) : selectedProof.proof_file_type === 'application/pdf' ? (
-                    <div className="p-4 text-center">
-                      <p className="text-gray-600 mb-2">Arquivo PDF</p>
-                      <a
-                        href={`data:application/pdf;base64,${selectedProof.proof_file_data}`}
-                        download={selectedProof.proof_filename}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Baixar PDF
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      Formato não suportado to visualização
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Info */}
-              {selectedProof.status !== 'pending' && (
-                <div className={`p-3 rounded mb-4 ${
-                  selectedProof.status === 'approved' ? 'bg-green-50' : 'bg-red-50'
-                }`}>
-                  <div className="font-medium">
-                    {selectedProof.status === 'approved' ? 'Aprovado' : 'Rejeitado'} por {selectedProof.reviewed_by_name}
-                  </div>
-                  {selectedProof.reviewed_at && (
-                    <div className="text-sm text-gray-600">
-                      {new Date(selectedProof.reviewed_at).toLocaleString('pt-BR')}
-                    </div>
-                  )}
-                  {selectedProof.admin_notes && (
-                    <div className="text-sm mt-1">Notas: {selectedProof.admin_notes}</div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            {selectedProof.status === 'pending' && (
-              <div className="p-4 border-t bg-gray-50 flex justify-end space-x-2">
-                <button
-                  onClick={() => {
-                    const notes = prompt('Motivo da rejeição (opcional):');
-                    reviewProof(selectedProof.id, 'rejected', notes || '');
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                >
-                  Rejeitar
-                </button>
-                <button
-                  onClick={() => reviewProof(selectedProof.id, 'approved')}
-                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  Approve Payment
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Pay Vendors View */}
       {activeView === 'pay-vendors' && (
         <div className="space-y-6">
@@ -18200,6 +18212,47 @@ const FinancesPage = ({ adminKey }) => {
                         placeholder="Payment reference, period, order numbers..."
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Receipt/Proof (optional)</label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={handleReceiptFileChange}
+                          className="hidden"
+                          id="receipt-file-input"
+                        />
+                        <label htmlFor="receipt-file-input" className="cursor-pointer">
+                          {receiptFile ? (
+                            <div className="space-y-2">
+                              {receiptPreview ? (
+                                <img src={receiptPreview} alt="Receipt preview" className="max-h-32 mx-auto rounded" />
+                              ) : (
+                                <div className="text-3xl">📄</div>
+                              )}
+                              <div className="text-sm text-gray-700">{receiptFile.name}</div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setReceiptFile(null);
+                                  setReceiptPreview(null);
+                                }}
+                                className="text-xs text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="text-2xl text-gray-400">📎</div>
+                              <div className="text-xs text-gray-500">Click to upload receipt</div>
+                              <div className="text-xs text-gray-400">PNG, JPG, GIF or PDF (max 10MB)</div>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    </div>
                     <button
                       onClick={handleRegisterPayment}
                       disabled={!paymentAmount || !paymentMethod}
@@ -18246,6 +18299,11 @@ const FinancesPage = ({ adminKey }) => {
                                   {payment.payment_type === 'sales_commission' ? 'Commission' : payment.payment_type}
                                 </span>
                               )}
+                              {payment.receipt_filename && (
+                                <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+                                  📎 Receipt
+                                </span>
+                              )}
                             </div>
                             <span className="text-xs text-gray-500">
                               {new Date(payment.paid_at).toLocaleDateString('en-US')}
@@ -18253,6 +18311,26 @@ const FinancesPage = ({ adminKey }) => {
                           </div>
                           {payment.note && (
                             <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
+                          )}
+                          {payment.receipt_file_data && (
+                            <div className="mt-2">
+                              {payment.receipt_file_type?.startsWith('image/') ? (
+                                <img
+                                  src={`data:${payment.receipt_file_type};base64,${payment.receipt_file_data}`}
+                                  alt="Receipt"
+                                  className="max-h-24 rounded cursor-pointer hover:opacity-80"
+                                  onClick={() => window.open(`data:${payment.receipt_file_type};base64,${payment.receipt_file_data}`, '_blank')}
+                                />
+                              ) : payment.receipt_file_type === 'application/pdf' && (
+                                <a
+                                  href={`data:application/pdf;base64,${payment.receipt_file_data}`}
+                                  download={payment.receipt_filename}
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Download PDF Receipt
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                       ))
