@@ -4540,6 +4540,8 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
                 payment["payment_date"] = payment["payment_date"].isoformat()
             if payment.get("created_at"):
                 payment["created_at"] = payment["created_at"].isoformat()
+            if payment.get("paid_at"):
+                payment["paid_at"] = payment["paid_at"].isoformat()
         return {
             "translator": {
                 "id": translator["id"],
@@ -4569,15 +4571,16 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
 @api_router.post("/admin/payments/register")
 async def register_payment(
     admin_key: str,
-    translator_id: str = Body(...),
-    amount: float = Body(...),
-    pages_paid: int = Body(0),
-    payment_method: str = Body(""),
-    reference: str = Body(""),
-    notes: str = Body(""),
-    note: str = Body(""),  # Alternative field name
-    payment_type: str = Body("translation"),  # translation, sales_commission, bonus, reimbursement, other
-    commission_rate: float = Body(None)
+    translator_id: str = Form(...),
+    amount: float = Form(...),
+    pages_paid: int = Form(0),
+    payment_method: str = Form(""),
+    reference: str = Form(""),
+    notes: str = Form(""),
+    note: str = Form(""),  # Alternative field name
+    payment_type: str = Form("translation"),  # translation, sales_commission, bonus, reimbursement, other
+    commission_rate: float = Form(None),
+    receipt_file: UploadFile = File(None)
 ):
     """Register a payment made to a vendor/contractor (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
@@ -4614,6 +4617,19 @@ async def register_payment(
             "created_at": datetime.utcnow(),
             "status": "completed"
         }
+
+        # Handle receipt file upload
+        if receipt_file and receipt_file.filename:
+            allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+            if receipt_file.content_type not in allowed_types:
+                raise HTTPException(status_code=400, detail="Invalid file type. Only images and PDFs are allowed.")
+            file_content = await receipt_file.read()
+            if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+                raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+            payment["receipt_filename"] = receipt_file.filename
+            payment["receipt_file_data"] = base64.b64encode(file_content).decode('utf-8')
+            payment["receipt_file_type"] = receipt_file.content_type
+
         await db.translator_payments.insert_one(payment)
 
         # Only update pending pages for translation payments
