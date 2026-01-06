@@ -490,13 +490,13 @@ Message: ${formData.message}
           <div className="text-center mb-10">
             <p className="text-gray-500 text-sm uppercase tracking-wide font-medium">Professional Certifications & Accreditations</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20">
-            {/* ATA Member Logo - New logo with member number included */}
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+            {/* ATA Member Logo */}
             <div className="text-center">
-              <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
+              <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
                 <img
                   src="/images/ata-member-logo.png"
-                  alt="ATA Member - American Translators Association - Member #275993"
+                  alt="ATA Member - American Translators Association"
                   className="h-full object-contain"
                 />
               </div>
@@ -512,15 +512,28 @@ Message: ${formData.message}
                 />
               </div>
             </div>
-          </div>
 
-          {/* Additional Certification Image */}
-          <div className="mt-10 flex justify-center">
-            <img
-              src="/images/professional-certification.png"
-              alt="Professional Certification"
-              className="max-w-full h-auto max-h-32 object-contain"
-            />
+            {/* NETA Logo */}
+            <div className="text-center">
+              <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
+                <img
+                  src="/images/neta-logo.png"
+                  alt="NETA - New England Translators Association"
+                  className="h-full object-contain"
+                />
+              </div>
+            </div>
+
+            {/* USCIS Logo */}
+            <div className="text-center">
+              <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
+                <img
+                  src="/images/uscis-logo.png"
+                  alt="USCIS - U.S. Citizenship and Immigration Services"
+                  className="h-full object-contain"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
