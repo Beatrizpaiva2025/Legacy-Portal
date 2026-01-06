@@ -495,7 +495,7 @@ Message: ${formData.message}
             <div className="text-center">
               <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
                 <img
-                  src="/images/ata-member-logo.png"
+                  src="/images/ata-member-logo.jpg"
                   alt="ATA Member - American Translators Association"
                   className="h-full object-contain"
                 />
@@ -517,7 +517,7 @@ Message: ${formData.message}
             <div className="text-center">
               <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="/images/neta-logo.png"
+                  src="/images/neta-logo.jpg"
                   alt="NETA - New England Translators Association"
                   className="h-full object-contain"
                 />
