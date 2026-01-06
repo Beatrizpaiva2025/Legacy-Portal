@@ -5344,15 +5344,15 @@ async def admin_get_all_orders(
     # Build query filter
     query = {}
     if status and status != "all":
-        # Map status groups for filtering
+        # Map status groups for filtering (include all case variations)
         status_mappings = {
-            'in_translation': ['in_translation', 'pending', 'In Progress'],
-            'review': ['review', 'pending_pm_review', 'pending_review', 'PM Review'],
-            'ready': ['ready', 'pending_admin_approval', 'Ready'],
-            'received': ['received', 'Quote'],
-            'client_review': ['client_review', 'Client Review'],
-            'delivered': ['delivered', 'Delivered'],
-            'final': ['final', 'Final']
+            'in_translation': ['in_translation', 'In Translation', 'IN_TRANSLATION', 'pending', 'Pending', 'PENDING', 'In Progress', 'in progress', 'IN PROGRESS', 'in_progress', 'In_Progress'],
+            'review': ['review', 'Review', 'REVIEW', 'pending_pm_review', 'Pending PM Review', 'pending_review', 'PM Review', 'pm review', 'PM_Review'],
+            'ready': ['ready', 'Ready', 'READY', 'pending_admin_approval', 'Pending Admin Approval'],
+            'received': ['received', 'Received', 'RECEIVED', 'Quote', 'quote', 'QUOTE'],
+            'client_review': ['client_review', 'Client Review', 'CLIENT_REVIEW', 'client review'],
+            'delivered': ['delivered', 'Delivered', 'DELIVERED'],
+            'final': ['final', 'Final', 'FINAL']
         }
         if status in status_mappings:
             query["translation_status"] = {"$in": status_mappings[status]}
