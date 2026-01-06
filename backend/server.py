@@ -4124,6 +4124,52 @@ async def delete_admin_user(user_id: str, admin_key: str):
         logger.error(f"Error deleting user: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete user")
 
+class QuickVendorCreate(BaseModel):
+    name: str
+    email: str
+    role: str = "translator"
+    rate_per_page: Optional[float] = 0
+
+@api_router.post("/admin/users/create")
+async def quick_create_vendor(vendor_data: QuickVendorCreate, admin_key: str):
+    """Quick create a vendor without email invitation (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Check if email already exists
+        existing = await db.admin_users.find_one({"email": vendor_data.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Create vendor directly as active
+        vendor = {
+            "id": str(uuid.uuid4()),
+            "email": vendor_data.email,
+            "name": vendor_data.name,
+            "role": vendor_data.role.lower(),
+            "is_active": True,
+            "password_hash": "",  # No password - vendor only
+            "rate_per_page": vendor_data.rate_per_page or 0,
+            "pages_pending_payment": 0,
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        await db.admin_users.insert_one(vendor)
+        logger.info(f"Quick vendor created: {vendor_data.email} as {vendor_data.role}")
+
+        return {"success": True, "id": vendor["id"], "message": "Vendor created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating vendor: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create vendor")
+
 # ==================== SHARED ASSETS (Logos, Stamp, Signature - Global for all users) ====================
 
 class SharedAssets(BaseModel):
@@ -4615,14 +4661,15 @@ async def get_translators_payment_summary(admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        # Include all vendor roles: translator, admin, pm, sales (case-insensitive)
-        # Show active users or users where is_active is not set (defaults to active)
-        translators = await db.admin_users.find({
-            "role": {"$in": ["translator", "admin", "pm", "sales", "Translator", "Admin", "PM", "Sales", "TRANSLATOR", "ADMIN", "PM", "SALES"]},
-            "$or": [{"is_active": True}, {"is_active": {"$exists": False}}]
-        }).to_list(100)
+        # Get ALL users - don't filter by role or is_active to ensure we show everyone
+        # The frontend can filter if needed
+        all_users = await db.admin_users.find({}).to_list(200)
 
-        logger.info(f"Found {len(translators)} active vendors/contractors")
+        # Filter out only truly inactive users (is_active explicitly set to False)
+        # Keep users where is_active is True, not set, or any other value
+        translators = [u for u in all_users if u.get("is_active") != False]
+
+        logger.info(f"Found {len(translators)} vendors/contractors (from {len(all_users)} total users)")
 
         result = []
         for translator in translators:
