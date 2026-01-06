@@ -4616,7 +4616,14 @@ async def get_translators_payment_summary(admin_key: str):
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
-        translators = await db.admin_users.find({"role": {"$in": ["translator", "admin", "pm", "sales"]}}).to_list(100)
+        # Show active users or users where is_active is not set (defaults to active)
+        translators = await db.admin_users.find({
+            "role": {"$in": ["translator", "admin", "pm", "sales"]},
+            "$or": [{"is_active": True}, {"is_active": {"$exists": False}}]
+        }).to_list(100)
+
+        logger.info(f"Found {len(translators)} active vendors/contractors")
+
         result = []
         for translator in translators:
             payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
