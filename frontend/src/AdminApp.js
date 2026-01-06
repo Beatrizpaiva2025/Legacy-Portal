@@ -10876,20 +10876,41 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       o.document_type?.toLowerCase().includes(search.toLowerCase());
     // Map similar statuses together for filtering
     let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    // "In Progress" filter should include all early stage orders (received, Quote, pending, in_translation)
+
+    // "In Progress" filter should include all early stage orders
     if (statusFilter === 'in_translation') {
       const inProgressStatuses = ['in_translation', 'pending', 'received', 'Quote', 'quote'];
       matchStatus = inProgressStatuses.includes(o.translation_status) ||
                     (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
     }
-    // "PM Review" filter should include both 'review' and 'pending_pm_review'
-    if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
-      matchStatus = true;
+
+    // "PM Review" filter should include 'review', 'pending_pm_review', 'pending_review'
+    if (statusFilter === 'review') {
+      const pmReviewStatuses = ['review', 'pending_pm_review', 'pending_review'];
+      matchStatus = pmReviewStatuses.includes(o.translation_status);
     }
-    // "Ready" filter should include 'pending_admin_approval' (waiting for admin to send)
-    if (statusFilter === 'ready' && o.translation_status === 'pending_admin_approval') {
-      matchStatus = true;
+
+    // "Client Review" filter
+    if (statusFilter === 'client_review') {
+      matchStatus = o.translation_status === 'client_review';
     }
+
+    // "Ready" filter should include 'ready' and 'pending_admin_approval'
+    if (statusFilter === 'ready') {
+      const readyStatuses = ['ready', 'pending_admin_approval'];
+      matchStatus = readyStatuses.includes(o.translation_status);
+    }
+
+    // "Delivered" filter
+    if (statusFilter === 'delivered') {
+      matchStatus = o.translation_status === 'delivered';
+    }
+
+    // "Final" filter
+    if (statusFilter === 'final') {
+      matchStatus = o.translation_status === 'final';
+    }
+
     const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
     return matchSearch && matchStatus && matchDocType;
   });
