@@ -480,10 +480,10 @@ Message: ${formData.message}
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
             {/* ATA Member Logo */}
             <div className="text-center">
-              <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
+              <div className="h-24 md:h-28 mx-auto flex items-center justify-center">
                 <img
-                  src="/images/ata-member-logo.jpg"
-                  alt="ATA Member - American Translators Association"
+                  src="/images/ata_member_hq.png"
+                  alt="ATA Member - American Translators Association - Member #275993"
                   className="h-full object-contain"
                 />
               </div>
@@ -506,6 +506,17 @@ Message: ${formData.message}
                 <img
                   src="/images/neta-logo.jpg"
                   alt="NETA - New England Translators Association"
+                  className="h-full object-contain"
+                />
+              </div>
+            </div>
+
+            {/* USCIS Logo */}
+            <div className="text-center">
+              <div className="h-16 md:h-20 mx-auto flex items-center justify-center">
+                <img
+                  src="/images/uscis-logo.png"
+                  alt="USCIS - U.S. Citizenship and Immigration Services"
                   className="h-full object-contain"
                 />
               </div>
