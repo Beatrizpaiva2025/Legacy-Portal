@@ -894,6 +894,8 @@ class AdminUser(BaseModel):
     pages_pending_payment: int = 0
     # For PM: list of project IDs they manage
     assigned_projects: List[str] = []
+    # Translator type: 'in_house' (full access) or 'contractor' (limited access)
+    translator_type: Optional[str] = 'contractor'  # Default to contractor for safety
 
 class AdminUserCreate(BaseModel):
     email: EmailStr
@@ -904,6 +906,7 @@ class AdminUserCreate(BaseModel):
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 class AdminInvitationAccept(BaseModel):
     token: str
@@ -937,6 +940,7 @@ class AdminUserUpdate(BaseModel):
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
     is_active: Optional[bool] = None
+    translator_type: Optional[str] = None  # 'in_house' or 'contractor'
 
 class AdminUserLogin(BaseModel):
     email: EmailStr
@@ -951,6 +955,7 @@ class AdminUserResponse(BaseModel):
     token: str
     pages_translated: Optional[int] = 0
     pages_pending_payment: Optional[int] = 0
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 class AdminUserPublic(BaseModel):
     id: str
@@ -958,6 +963,7 @@ class AdminUserPublic(BaseModel):
     name: str
     role: str
     is_active: bool
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
@@ -3462,6 +3468,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
             user_dict['rate_per_page'] = user_data.rate_per_page
             user_dict['rate_per_word'] = user_data.rate_per_word
             user_dict['language_pairs'] = user_data.language_pairs
+            user_dict['translator_type'] = user_data.translator_type or 'contractor'  # 'in_house' or 'contractor'
 
         await db.admin_users.insert_one(user_dict)
         logger.info(f"Admin user created: {user.email} with role {user.role} by {creator_role}")
@@ -3618,7 +3625,8 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
             is_active=user.get("is_active", True),
             token=token,
             pages_translated=user.get("pages_translated", 0),
-            pages_pending_payment=user.get("pages_pending_payment", 0)
+            pages_pending_payment=user.get("pages_pending_payment", 0),
+            translator_type=user.get("translator_type", "contractor")
         )
 
     except HTTPException:
@@ -4071,6 +4079,8 @@ async def update_admin_user(user_id: str, user_data: AdminUserUpdate, admin_key:
             update_data["language_pairs"] = user_data.language_pairs
         if user_data.is_active is not None:
             update_data["is_active"] = user_data.is_active
+        if user_data.translator_type is not None:
+            update_data["translator_type"] = user_data.translator_type
 
         if not update_data:
             return {"status": "success", "message": "No changes to update"}
@@ -4092,7 +4102,8 @@ async def update_admin_user(user_id: str, user_data: AdminUserUpdate, admin_key:
                 "is_active": updated_user.get("is_active", True),
                 "rate_per_page": updated_user.get("rate_per_page"),
                 "rate_per_word": updated_user.get("rate_per_word"),
-                "language_pairs": updated_user.get("language_pairs")
+                "language_pairs": updated_user.get("language_pairs"),
+                "translator_type": updated_user.get("translator_type", "contractor")
             }
         }
     except HTTPException:

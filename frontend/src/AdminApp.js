@@ -722,6 +722,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // User role checks
   const isAdmin = user?.role === 'admin';
   const isPM = user?.role === 'pm';
+  const isTranslator = user?.role === 'translator';
+  const isInHouseTranslator = isTranslator && user?.translator_type === 'in_house';
+  const isContractor = isTranslator && user?.translator_type !== 'in_house';  // Contractors have limited DELIVER tab access
 
   // State
   const [activeSubTab, setActiveSubTab] = useState('start');
@@ -5142,17 +5145,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
+      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm'] },
+          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
           { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
-        ].filter(tab => tab.roles.includes(user?.role || 'translator')).map(tab => (
+        ].filter(tab => {
+          const userRole = user?.role || 'translator';
+          // For translators, check translator_type for extended access
+          if (userRole === 'translator' && user?.translator_type === 'in_house') {
+            // In-house translators get access to tabs marked with 'translator_inhouse'
+            return tab.roles.includes('translator') || tab.roles.includes('translator_inhouse');
+          }
+          return tab.roles.includes(userRole);
+        }).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
@@ -8331,12 +8343,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       )}
 
       {/* APPROVAL TAB - Admin, PM and Translator */}
-      {activeSubTab === 'deliver' && (isAdmin || isPM || user?.role === 'translator') && (
+      {activeSubTab === 'deliver' && (isAdmin || isPM || isTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
-          {/* Mode Switch: Normal vs Quick Package - Hidden for translators */}
-          {(isAdmin || isPM) && (
+          {/* Mode Switch: Normal vs Quick Package - Hidden for contractors only */}
+          {(isAdmin || isPM || isInHouseTranslator) && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg">
               <div className="flex items-center justify-center gap-3">
                 <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
@@ -8367,8 +8379,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           )}
 
           {/* ============ QUICK PACKAGE MODE ============ */}
-          {/* Translators always use Quick Package mode */}
-          {(quickPackageMode || user?.role === 'translator') && (
+          {/* Contractors always use Quick Package mode, In-house translators can choose */}
+          {(quickPackageMode || isContractor) && (
             <>
               {/* Certificate Fields */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
@@ -8572,8 +8584,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Options - Hidden for translators */}
-              {(isAdmin || isPM) && (
+              {/* Options - Hidden for contractors only */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded mb-4">
                   <h3 className="text-sm font-bold text-gray-700 mb-2">⚙️ Options</h3>
                   <div className="space-y-2">
@@ -8617,8 +8629,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* Document Order Preview - Hidden for translators */}
-              {(isAdmin || isPM) && (
+              {/* Document Order Preview - Hidden for contractors only */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                   <h3 className="text-sm font-bold text-blue-700 mb-2">📋 Final Document Order</h3>
                   <div className="flex items-center gap-2 text-xs flex-wrap">
@@ -8719,8 +8731,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* ============ TRANSLATOR SECTION: Send to PM ============ */}
-              {user?.role === 'translator' && (
+              {/* ============ CONTRACTOR SECTION: Send to PM ============ */}
+              {/* Only contractors see this - In-house translators use the full Admin/PM section below */}
+              {isContractor && (
                 <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
                   <h3 className="text-sm font-bold text-purple-700 mb-2">
                     📤 Send to Project Manager
@@ -8778,8 +8791,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* ============ ADMIN/PM SECTION: Submit & Notify Team ============ */}
-              {(isAdmin || isPM) && (
+              {/* ============ ADMIN/PM/IN-HOUSE SECTION: Submit & Notify Team ============ */}
+              {(isAdmin || isPM || isInHouseTranslator) && (
                 <>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                     <h3 className="text-sm font-bold text-blue-700 mb-2">
@@ -8931,8 +8944,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           )}
 
           {/* ============ NORMAL FLOW ============ */}
-          {/* Normal Flow hidden for translators - they always use Quick Package mode */}
-          {!quickPackageMode && translationResults.length > 0 && user?.role !== 'translator' && (
+          {/* Normal Flow hidden for contractors only - In-house translators can use it */}
+          {!quickPackageMode && translationResults.length > 0 && !isContractor && (
             <>
               {/* Approval Checklist - ALL REQUIRED */}
               <div className={`p-4 rounded mb-4 ${
@@ -16799,7 +16812,7 @@ const UsersPage = ({ adminKey, user }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '', translator_type: 'contractor' });
   const [creating, setCreating] = useState(false);
   const [expandedUser, setExpandedUser] = useState(null);
   const [userDocuments, setUserDocuments] = useState({});
@@ -16962,7 +16975,8 @@ const UsersPage = ({ adminKey, user }) => {
         role: newUser.role,
         rate_per_page: newUser.rate_per_page ? parseFloat(newUser.rate_per_page) : null,
         rate_per_word: newUser.rate_per_word ? parseFloat(newUser.rate_per_word) : null,
-        language_pairs: newUser.language_pairs || null
+        language_pairs: newUser.language_pairs || null,
+        translator_type: newUser.translator_type || 'contractor'
       };
       const response = await axios.post(`${API}/admin/auth/register?admin_key=${adminKey}`, userData);
 
@@ -16981,7 +16995,7 @@ const UsersPage = ({ adminKey, user }) => {
         alert(response.data?.message || 'User created!');
       }
 
-      setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '' });
+      setNewUser({ name: '', email: '', role: 'translator', rate_per_page: '', rate_per_word: '', language_pairs: '', translator_type: 'contractor' });
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
@@ -17124,40 +17138,57 @@ const UsersPage = ({ adminKey, user }) => {
 
             {/* Translator Pricing - always show for translators */}
             {(newUser.role === 'translator' || isPM) && (
-              <div className="grid grid-cols-3 gap-3 pt-2 border-t">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 15.00"
-                    value={newUser.rate_per_page}
-                    onChange={(e) => setNewUser({...newUser, rate_per_page: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
+              <>
+                <div className="grid grid-cols-4 gap-3 pt-2 border-t">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Translator Type</label>
+                    <select
+                      value={newUser.translator_type || 'contractor'}
+                      onChange={(e) => setNewUser({...newUser, translator_type: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      <option value="contractor">Contractor (Limited)</option>
+                      <option value="in_house">In-House (Full Access)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g. 15.00"
+                      value={newUser.rate_per_page}
+                      onChange={(e) => setNewUser({...newUser, rate_per_page: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Rate per Word ($)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      placeholder="e.g. 0.08"
+                      value={newUser.rate_per_word}
+                      onChange={(e) => setNewUser({...newUser, rate_per_word: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Language Pairs</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. EN-PT, ES-EN"
+                      value={newUser.language_pairs}
+                      onChange={(e) => setNewUser({...newUser, language_pairs: e.target.value})}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Rate per Word ($)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    placeholder="e.g. 0.08"
-                    value={newUser.rate_per_word}
-                    onChange={(e) => setNewUser({...newUser, rate_per_word: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Language Pairs</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. EN-PT, ES-EN"
-                    value={newUser.language_pairs}
-                    onChange={(e) => setNewUser({...newUser, language_pairs: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border rounded"
-                  />
-                </div>
-              </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  <strong>Contractor:</strong> Limited access (START + DELIVER tabs only) |
+                  <strong> In-House:</strong> Full access (START, TRANSLATION, REVIEW, DELIVER tabs)
+                </p>
+              </>
             )}
 
             <div className="flex justify-end gap-2">
@@ -17178,6 +17209,7 @@ const UsersPage = ({ adminKey, user }) => {
               <th className="px-4 py-3 text-left font-medium text-gray-700">Name</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Email</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left font-medium text-gray-700">Type</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Rate/Page</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Languages</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
@@ -17204,6 +17236,19 @@ const UsersPage = ({ adminKey, user }) => {
                     <span className={`px-2 py-1 rounded text-xs font-medium ${roleColors[u.role]}`}>
                       {u.role.toUpperCase()}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role === 'translator' ? (
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        u.translator_type === 'in_house'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-orange-100 text-orange-800'
+                      }`}>
+                        {u.translator_type === 'in_house' ? 'In-House' : 'Contractor'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {u.rate_per_page ? `$${u.rate_per_page}` : '-'}
