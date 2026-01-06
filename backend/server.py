@@ -2034,26 +2034,117 @@ def get_estimated_delivery(urgency: str) -> str:
     formatted_date = delivery_date.strftime("%A, %B %d")
     return f"{formatted_date} ({days_text})"
 
-def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120) -> str:
+def extract_tables_from_textract(blocks: list) -> list:
+    """
+    Extract tables from Textract blocks and convert to HTML format.
+    Returns a list of HTML table strings with their positions.
+    """
+    tables = []
+    block_map = {block['Id']: block for block in blocks if 'Id' in block}
+
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            table_id = block['Id']
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+
+            # Find all cells for this table
+            cells = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child_block = block_map.get(child_id)
+                            if child_block and child_block['BlockType'] == 'CELL':
+                                cells.append(child_block)
+
+            if not cells:
+                continue
+
+            # Determine table dimensions
+            max_row = max(cell.get('RowIndex', 1) for cell in cells)
+            max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+            # Create table grid
+            table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
+
+            for cell in cells:
+                row_idx = cell.get('RowIndex', 1) - 1
+                col_idx = cell.get('ColumnIndex', 1) - 1
+
+                # Get cell text
+                cell_text = ''
+                if 'Relationships' in cell:
+                    for rel in cell['Relationships']:
+                        if rel['Type'] == 'CHILD':
+                            for child_id in rel['Ids']:
+                                child_block = block_map.get(child_id)
+                                if child_block and child_block['BlockType'] == 'WORD':
+                                    cell_text += child_block.get('Text', '') + ' '
+
+                if row_idx < max_row and col_idx < max_col:
+                    table_grid[row_idx][col_idx] = cell_text.strip()
+
+            # Build HTML table
+            html = '<table style="border-collapse: collapse; width: 100%; margin: 10px 0;">\n'
+            for row_idx, row in enumerate(table_grid):
+                html += '  <tr>\n'
+                for col_idx, cell_text in enumerate(row):
+                    tag = 'th' if row_idx == 0 else 'td'
+                    style = 'border: 1px solid #333; padding: 8px; text-align: left;'
+                    if row_idx == 0:
+                        style += ' background-color: #f0f0f0; font-weight: bold;'
+                    html += f'    <{tag} style="{style}">{cell_text}</{tag}>\n'
+                html += '  </tr>\n'
+            html += '</table>\n'
+
+            tables.append({
+                'html': html,
+                'top': bbox.get('Top', 0),
+                'left': bbox.get('Left', 0)
+            })
+
+    return tables
+
+
+def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120, include_tables: bool = True) -> str:
     """
     Reconstruct the original page layout from Textract blocks using geometry.
     Uses bounding box coordinates to preserve spatial positioning.
+    Now also supports tables when include_tables is True.
     """
-    # Extract LINE blocks with their geometry
+    # Extract tables first if enabled
+    tables_html = []
+    table_positions = set()
+    if include_tables:
+        tables = extract_tables_from_textract(blocks)
+        for table in tables:
+            tables_html.append(table)
+            # Mark the vertical position of tables to avoid duplicating text
+            table_positions.add(round(table['top'], 2))
+
+    # Extract LINE blocks with their geometry (excluding lines inside tables)
     lines = []
     for block in blocks:
         if block['BlockType'] == 'LINE' and 'Geometry' in block:
             bbox = block['Geometry']['BoundingBox']
-            lines.append({
-                'text': block['Text'],
-                'left': bbox['Left'],
-                'top': bbox['Top'],
-                'width': bbox['Width'],
-                'height': bbox['Height']
-            })
+            line_top = round(bbox['Top'], 2)
 
-    if not lines:
-        return ""
+            # Skip lines that are inside table regions
+            is_in_table = False
+            for table in tables_html:
+                table_top = table['top']
+                if abs(line_top - round(table_top, 2)) < 0.1:  # Within table region
+                    is_in_table = True
+                    break
+
+            if not is_in_table:
+                lines.append({
+                    'text': block['Text'],
+                    'left': bbox['Left'],
+                    'top': bbox['Top'],
+                    'width': bbox['Width'],
+                    'height': bbox['Height']
+                })
 
     # Sort lines by vertical position (top), then by horizontal position (left)
     lines.sort(key=lambda x: (round(x['top'], 2), x['left']))
@@ -2073,32 +2164,42 @@ def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120) 
             current_row.append(line)
         else:
             if current_row:
-                rows.append(current_row)
+                rows.append({'lines': current_row, 'top': current_top})
             current_row = [line]
             current_top = line['top']
 
     if current_row:
-        rows.append(current_row)
+        rows.append({'lines': current_row, 'top': current_top})
 
-    # Build the output with proper spacing
-    output_lines = []
+    # Build the output with proper spacing, inserting tables at their positions
+    output_parts = []
+    table_idx = 0
+    sorted_tables = sorted(tables_html, key=lambda x: x['top'])
 
     for row in rows:
-        # Sort items in row by horizontal position
-        row.sort(key=lambda x: x['left'])
+        row_top = row['top']
 
-        if len(row) == 1:
+        # Insert any tables that come before this row
+        while table_idx < len(sorted_tables) and sorted_tables[table_idx]['top'] < row_top:
+            output_parts.append('\n' + sorted_tables[table_idx]['html'] + '\n')
+            table_idx += 1
+
+        # Process the text row
+        row_lines = row['lines']
+        row_lines.sort(key=lambda x: x['left'])
+
+        if len(row_lines) == 1:
             # Single item in row - add indentation based on left position
-            item = row[0]
+            item = row_lines[0]
             indent = int(item['left'] * page_width_chars)
             # Cap indent at reasonable value
             indent = min(indent, 60)
-            output_lines.append(' ' * indent + item['text'])
+            output_parts.append(' ' * indent + item['text'])
         else:
             # Multiple items in row - space them according to position
             line_chars = [' '] * page_width_chars
 
-            for item in row:
+            for item in row_lines:
                 start_pos = int(item['left'] * page_width_chars)
                 text = item['text']
 
@@ -2109,27 +2210,49 @@ def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120) 
                         line_chars[pos] = char
 
             # Convert to string and strip trailing spaces
-            output_lines.append(''.join(line_chars).rstrip())
+            output_parts.append(''.join(line_chars).rstrip())
 
-    return '\n'.join(output_lines)
+    # Add any remaining tables at the end
+    while table_idx < len(sorted_tables):
+        output_parts.append('\n' + sorted_tables[table_idx]['html'] + '\n')
+        table_idx += 1
+
+    return '\n'.join(output_parts)
 
 
-def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True) -> str:
-    """Extract text using AWS Textract (best quality OCR) with layout preservation"""
+def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True, detect_tables: bool = True) -> str:
+    """
+    Extract text using AWS Textract (best quality OCR) with layout preservation and table support.
+
+    Args:
+        content: File content as bytes
+        file_extension: File extension (jpg, png, pdf, etc.)
+        preserve_layout: Whether to preserve document layout
+        detect_tables: Whether to detect and format tables (uses analyze_document instead of detect_document_text)
+    """
     if not textract_client:
         return None
 
     try:
-        # For images, use detect_document_text directly
+        # For images, use analyze_document with TABLES feature for table detection
         if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff']:
-            response = textract_client.detect_document_text(
-                Document={'Bytes': content}
-            )
+            if detect_tables:
+                # Use analyze_document for table detection
+                response = textract_client.analyze_document(
+                    Document={'Bytes': content},
+                    FeatureTypes=['TABLES', 'LAYOUT']
+                )
+                logger.info("AWS Textract: Using analyze_document with TABLES feature")
+            else:
+                # Use detect_document_text for faster text-only extraction
+                response = textract_client.detect_document_text(
+                    Document={'Bytes': content}
+                )
 
             # Extract text - try layout preservation first, fallback to simple extraction
             text = ""
             if preserve_layout:
-                text = reconstruct_layout_from_textract(response.get('Blocks', []))
+                text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
 
             # Fallback to simple extraction if layout reconstruction returned empty
             if not text or len(text.strip()) < 10:
@@ -2140,7 +2263,7 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 text = '\n'.join(text_parts)
                 logger.info(f"AWS Textract: layout reconstruction empty, using simple extraction")
 
-            logger.info(f"AWS Textract extracted {len(text)} characters from image")
+            logger.info(f"AWS Textract extracted {len(text)} characters from image (tables: {detect_tables})")
             return text
 
         # For PDFs, convert pages to images first
@@ -2174,15 +2297,21 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                         logger.warning(f"Page {page_num + 1} image too large ({len(img_data)} bytes), skipping")
                         continue
 
-                    # Send to Textract
-                    response = textract_client.detect_document_text(
-                        Document={'Bytes': img_data}
-                    )
+                    # Send to Textract - use analyze_document for table detection
+                    if detect_tables:
+                        response = textract_client.analyze_document(
+                            Document={'Bytes': img_data},
+                            FeatureTypes=['TABLES', 'LAYOUT']
+                        )
+                    else:
+                        response = textract_client.detect_document_text(
+                            Document={'Bytes': img_data}
+                        )
 
                     # Extract text - try layout preservation first, fallback to simple extraction
                     page_text = ""
                     if preserve_layout:
-                        page_text = reconstruct_layout_from_textract(response.get('Blocks', []))
+                        page_text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
 
                     # Fallback to simple extraction if layout reconstruction returned empty
                     if not page_text or len(page_text.strip()) < 5:
@@ -2198,7 +2327,7 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 pdf_document.close()
 
                 text = '\n\n'.join(all_pages_text)
-                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages, layout preserved: {preserve_layout})")
+                logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages, layout: {preserve_layout}, tables: {detect_tables})")
                 return text
 
             except Exception as e:
