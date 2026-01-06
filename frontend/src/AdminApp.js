@@ -4527,7 +4527,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="font-size: 9px; color: #666;">867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116</div>
             <div style="font-size: 9px; color: #666;">(857) 316-7770 · contact@legacytranslations.com</div>
           </div>
-          <div style="width: 80px; text-align: right;">
+          <div style="width: 80px; text-align: left;">
             ${logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>'}
           </div>
         </div>
@@ -4559,12 +4559,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div style="margin-top: 32px; display: flex; justify-content: space-between; align-items: flex-end;">
           <div>
             ${signatureImage
-              ? `<img src="${signatureImage}" alt="Signature" style="height: 32px; max-width: 150px; margin-bottom: 4px;" />`
-              : `<div style="font-family: cursive; font-size: 20px; color: #1a365d; margin-bottom: 4px;">Beatriz Paiva</div>`}
-            <div style="font-size: 12px;">${translator?.name || 'Beatriz Paiva'}</div>
-            <div style="font-size: 12px;">Authorized Representative</div>
-            <div style="font-size: 12px;">Legacy Translations Inc.</div>
-            <div style="font-size: 12px; margin-top: 8px;">Dated: ${translationDate}</div>
+              ? `<img src="${signatureImage}" alt="Signature" style="height: 60px; max-width: 200px; margin-bottom: 8px;" />`
+              : `<div style="font-family: cursive; font-size: 28px; color: #1a365d; margin-bottom: 8px;">Beatriz Paiva</div>`}
+            <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
+            <div style="font-size: 14px; font-weight: bold; color: #1a365d;">Managing Director</div>
+            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US')}</div>
           </div>
           <div style="text-align: center;">
             ${logoStamp
