@@ -894,6 +894,8 @@ class AdminUser(BaseModel):
     pages_pending_payment: int = 0
     # For PM: list of project IDs they manage
     assigned_projects: List[str] = []
+    # Translator type: 'in_house' (full access) or 'contractor' (limited access)
+    translator_type: Optional[str] = 'contractor'  # Default to contractor for safety
 
 class AdminUserCreate(BaseModel):
     email: EmailStr
@@ -904,6 +906,7 @@ class AdminUserCreate(BaseModel):
     rate_per_page: Optional[float] = None
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 class AdminInvitationAccept(BaseModel):
     token: str
@@ -937,6 +940,7 @@ class AdminUserUpdate(BaseModel):
     rate_per_word: Optional[float] = None
     language_pairs: Optional[str] = None
     is_active: Optional[bool] = None
+    translator_type: Optional[str] = None  # 'in_house' or 'contractor'
 
 class AdminUserLogin(BaseModel):
     email: EmailStr
@@ -951,6 +955,7 @@ class AdminUserResponse(BaseModel):
     token: str
     pages_translated: Optional[int] = 0
     pages_pending_payment: Optional[int] = 0
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 class AdminUserPublic(BaseModel):
     id: str
@@ -958,6 +963,7 @@ class AdminUserPublic(BaseModel):
     name: str
     role: str
     is_active: bool
+    translator_type: Optional[str] = 'contractor'  # 'in_house' or 'contractor'
 
 # Translation Order Models (with invoice tracking)
 class TranslationOrder(BaseModel):
@@ -3462,6 +3468,7 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
             user_dict['rate_per_page'] = user_data.rate_per_page
             user_dict['rate_per_word'] = user_data.rate_per_word
             user_dict['language_pairs'] = user_data.language_pairs
+            user_dict['translator_type'] = user_data.translator_type or 'contractor'  # 'in_house' or 'contractor'
 
         await db.admin_users.insert_one(user_dict)
         logger.info(f"Admin user created: {user.email} with role {user.role} by {creator_role}")
@@ -3618,7 +3625,8 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
             is_active=user.get("is_active", True),
             token=token,
             pages_translated=user.get("pages_translated", 0),
-            pages_pending_payment=user.get("pages_pending_payment", 0)
+            pages_pending_payment=user.get("pages_pending_payment", 0),
+            translator_type=user.get("translator_type", "contractor")
         )
 
     except HTTPException:
@@ -4071,6 +4079,8 @@ async def update_admin_user(user_id: str, user_data: AdminUserUpdate, admin_key:
             update_data["language_pairs"] = user_data.language_pairs
         if user_data.is_active is not None:
             update_data["is_active"] = user_data.is_active
+        if user_data.translator_type is not None:
+            update_data["translator_type"] = user_data.translator_type
 
         if not update_data:
             return {"status": "success", "message": "No changes to update"}
@@ -4092,7 +4102,8 @@ async def update_admin_user(user_id: str, user_data: AdminUserUpdate, admin_key:
                 "is_active": updated_user.get("is_active", True),
                 "rate_per_page": updated_user.get("rate_per_page"),
                 "rate_per_word": updated_user.get("rate_per_word"),
-                "language_pairs": updated_user.get("language_pairs")
+                "language_pairs": updated_user.get("language_pairs"),
+                "translator_type": updated_user.get("translator_type", "contractor")
             }
         }
     except HTTPException:
@@ -7475,6 +7486,45 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     )
 
     logger.info(f"Translation saved for order {order_id}, sent to {destination}, status: {new_status}")
+
+    # Send notification to PM when translator sends translation for PM review
+    if destination == "pm":
+        # Get the assigned PM for this order
+        assigned_pm_id = order.get("assigned_pm_id")
+        if assigned_pm_id:
+            # Create notification for the PM
+            translator_name = data.submitted_by or (current_user.get("name") if current_user else "Translator")
+            order_number = order.get("order_number", order_id)
+            await create_notification(
+                user_id=assigned_pm_id,
+                notif_type="translation_submitted",
+                title="Translation Ready for Review",
+                message=f"Translator {translator_name} has submitted a translation for order {order_number}. Please review and approve.",
+                order_id=order_id,
+                order_number=order_number
+            )
+            logger.info(f"Notification sent to PM {assigned_pm_id} for order {order_id}")
+        else:
+            # No PM assigned - notify all admins/PMs
+            logger.info(f"No PM assigned to order {order_id}, skipping PM notification")
+
+    # Send notification to Admin when PM approves and sends translation
+    if destination == "pending_admin_approval":
+        # Get all admin users and notify them
+        admin_users = await db.admin_users.find({"role": "admin"}).to_list(length=100)
+        pm_name = data.submitted_by or (current_user.get("name") if current_user else "PM")
+        order_number = order.get("order_number", order_id)
+        for admin_user in admin_users:
+            await create_notification(
+                user_id=admin_user.get("id"),
+                notif_type="translation_approved",
+                title="Translation Approved by PM",
+                message=f"PM {pm_name} has approved the translation for order {order_number}. Ready for client delivery.",
+                order_id=order_id,
+                order_number=order_number
+            )
+        logger.info(f"Notification sent to admins for PM-approved order {order_id}")
+
     return {"success": True, "message": status_message}
 
 class AttachmentsSelection(BaseModel):
