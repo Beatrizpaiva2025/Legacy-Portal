@@ -7074,18 +7074,57 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           // Get the filled template content
                           const container = document.getElementById('fillable-template-container');
-                          if (container) {
+                          if (container && selectedOrderId) {
                             const filledContent = container.innerHTML;
-                            // Store as translation
-                            setTranslatedText(filledContent);
-                            setProcessingStatus('✅ Template saved! Go to Review tab to finalize.');
-                            setActiveSubTab('review');
+
+                            try {
+                              setProcessingStatus('Saving translation...');
+
+                              // Save directly to backend
+                              const response = await axios.post(`${API}/admin/orders/${selectedOrderId}/translation?admin_key=${adminKey}`, {
+                                translation_html: filledContent,
+                                translation_original_text: '',
+                                source_language: sourceLanguage || 'Portuguese',
+                                target_language: targetLanguage || 'English',
+                                document_type: documentType || 'Document',
+                                translator_name: user?.name || 'Translator',
+                                translation_date: new Date().toISOString().split('T')[0],
+                                include_cover: false,
+                                page_format: 'letter',
+                                translation_type: translationType || 'certified',
+                                original_images: uploadedImagePreview ? [{ filename: 'original.jpg', data: uploadedImagePreview }] : [],
+                                logo_left: logoLeft,
+                                logo_right: logoRight,
+                                logo_stamp: logoStamp,
+                                signature_image: signatureImage,
+                                send_to: 'save',
+                                submitted_by: user?.name || 'Unknown',
+                                submitted_by_role: user?.role || 'unknown'
+                              });
+
+                              if (response.data.status === 'success' || response.data.success) {
+                                setTranslatedText(filledContent);
+                                setProcessingStatus('✅ Translation saved successfully to the system!');
+                                setTimeout(() => {
+                                  setProcessingStatus('');
+                                  setActiveSubTab('review');
+                                }, 2000);
+                              } else {
+                                setProcessingStatus('❌ Error saving translation. Please try again.');
+                              }
+                            } catch (error) {
+                              console.error('Error saving translation:', error);
+                              setProcessingStatus('❌ Error saving translation: ' + (error.response?.data?.error || error.message));
+                            }
+                          } else if (!selectedOrderId) {
+                            setProcessingStatus('⚠️ Please select an order first from the START tab.');
                           }
                         }}
-                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 flex items-center gap-2"
+                        disabled={!selectedOrderId}
+                        className={`px-4 py-2 text-white text-sm font-medium rounded flex items-center gap-2 ${selectedOrderId ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'}`}
                       >
                         💾 Save as Translation
                       </button>
