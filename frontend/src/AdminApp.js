@@ -14235,7 +14235,11 @@ const FollowupsPage = ({ adminKey }) => {
 
 // ==================== SETTINGS PAGE ====================
 const SettingsPage = ({ adminKey }) => {
-  const [exporting, setExporting] = useState(false);
+  const [exportingProjects, setExportingProjects] = useState(false);
+  const [exportingClients, setExportingClients] = useState(false);
+  const [exportingTranslators, setExportingTranslators] = useState(false);
+  const [exportingFinancial, setExportingFinancial] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
 
   // QuickBooks Integration State
@@ -14335,7 +14339,7 @@ const SettingsPage = ({ adminKey }) => {
   };
 
   const exportProjects = async (format = 'csv') => {
-    setExporting(true);
+    setExportingProjects(true);
     setExportProgress('Fetching projects...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14357,18 +14361,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(exportData, 'projects');
       else exportToJSON(exportData, 'projects');
-      setExportProgress('✅ Projects exported!');
+      setExportProgress('✅ Projects exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting projects');
+      setExportProgress('❌ Error exporting projects');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingProjects(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportClients = async (format = 'csv') => {
-    setExporting(true);
+    setExportingClients(true);
     setExportProgress('Fetching client data...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14394,18 +14398,18 @@ const SettingsPage = ({ adminKey }) => {
       const clients = Array.from(clientsMap.values());
       if (format === 'csv') exportToCSV(clients, 'clients');
       else exportToJSON(clients, 'clients');
-      setExportProgress('✅ Clients exported!');
+      setExportProgress('✅ Clients exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting clients');
+      setExportProgress('❌ Error exporting clients');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingClients(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportTranslators = async (format = 'csv') => {
-    setExporting(true);
+    setExportingTranslators(true);
     setExportProgress('Fetching translators...');
     try {
       const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
@@ -14420,18 +14424,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(exportData, 'translators');
       else exportToJSON(exportData, 'translators');
-      setExportProgress('✅ Translators exported!');
+      setExportProgress('✅ Translators exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting translators');
+      setExportProgress('❌ Error exporting translators');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingTranslators(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const exportFinancialReport = async (format = 'csv') => {
-    setExporting(true);
+    setExportingFinancial(true);
     setExportProgress('Generating financial report...');
     try {
       const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
@@ -14450,18 +14454,18 @@ const SettingsPage = ({ adminKey }) => {
       }));
       if (format === 'csv') exportToCSV(reportData, 'financial_report');
       else exportToJSON(reportData, 'financial_report');
-      setExportProgress('✅ Financial report exported!');
+      setExportProgress('✅ Financial report exported! Check your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr exporting report');
+      setExportProgress('❌ Error exporting report');
       console.error(err);
     } finally {
-      setExporting(false);
+      setExportingFinancial(false);
       setTimeout(() => setExportProgress(''), 3000);
     }
   };
 
   const createFullBackup = async () => {
-    setExporting(true);
+    setCreatingBackup(true);
     setExportProgress('Creating full backup...');
     try {
       // Fetch all data
@@ -14490,13 +14494,13 @@ const SettingsPage = ({ adminKey }) => {
       };
 
       exportToJSON(backupData, 'full_backup');
-      setExportProgress('✅ Full backup created!');
+      setExportProgress('✅ Full backup created! The file was saved to your Downloads folder.');
     } catch (err) {
-      setExportProgress('❌ Errorr creating backup');
+      setExportProgress('❌ Error creating backup');
       console.error(err);
     } finally {
-      setExporting(false);
-      setTimeout(() => setExportProgress(''), 3000);
+      setCreatingBackup(false);
+      setTimeout(() => setExportProgress(''), 5000);
     }
   };
 
@@ -14722,17 +14726,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportProjects('csv')}
-                  disabled={exporting}
+                  disabled={exportingProjects}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingProjects ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportProjects('json')}
-                  disabled={exporting}
+                  disabled={exportingProjects}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingProjects ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14744,17 +14748,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportClients('csv')}
-                  disabled={exporting}
+                  disabled={exportingClients}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingClients ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportClients('json')}
-                  disabled={exporting}
+                  disabled={exportingClients}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingClients ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14766,17 +14770,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportTranslators('csv')}
-                  disabled={exporting}
+                  disabled={exportingTranslators}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingTranslators ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportTranslators('json')}
-                  disabled={exporting}
+                  disabled={exportingTranslators}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingTranslators ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14788,17 +14792,17 @@ const SettingsPage = ({ adminKey }) => {
               <div className="flex space-x-2">
                 <button
                   onClick={() => exportFinancialReport('csv')}
-                  disabled={exporting}
+                  disabled={exportingFinancial}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  CSV
+                  {exportingFinancial ? 'Exporting...' : 'CSV'}
                 </button>
                 <button
                   onClick={() => exportFinancialReport('json')}
-                  disabled={exporting}
+                  disabled={exportingFinancial}
                   className="flex-1 px-2 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300"
                 >
-                  JSON
+                  {exportingFinancial ? 'Exporting...' : 'JSON'}
                 </button>
               </div>
             </div>
@@ -14811,16 +14815,29 @@ const SettingsPage = ({ adminKey }) => {
                 <div>
                   <h3 className="text-xs font-semibold text-gray-700">Full System Backup</h3>
                   <p className="text-[10px] text-gray-500 mt-1">Create a complete backup of all projects, users, and translators in JSON format</p>
+                  <p className="text-[10px] text-blue-600 mt-1">Files are saved to your browser's Downloads folder</p>
                 </div>
                 <button
                   onClick={createFullBackup}
-                  disabled={exporting}
+                  disabled={creatingBackup}
                   className="px-4 py-2 bg-slate-700 text-white text-xs rounded hover:bg-slate-800 disabled:bg-gray-300 flex items-center"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  Create Backup
+                  {creatingBackup ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      Create Backup
+                    </>
+                  )}
                 </button>
               </div>
             </div>
