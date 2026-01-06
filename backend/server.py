@@ -4661,18 +4661,14 @@ async def get_translators_payment_summary(admin_key: str):
         raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
-        # Get ALL users - don't filter by role or is_active to ensure we show everyone
-        # The frontend can filter if needed
+        # Get ALL users - show everyone regardless of is_active status
+        # This ensures vendors registered via Translators tab appear in Pay Vendors
         all_users = await db.admin_users.find({}).to_list(200)
 
-        # Filter out only truly inactive users (is_active explicitly set to False)
-        # Keep users where is_active is True, not set, or any other value
-        translators = [u for u in all_users if u.get("is_active") != False]
-
-        logger.info(f"Found {len(translators)} vendors/contractors (from {len(all_users)} total users)")
+        logger.info(f"Found {len(all_users)} total users/vendors")
 
         result = []
-        for translator in translators:
+        for translator in all_users:
             payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
             total_paid = sum(p.get("amount", 0) for p in payments)
             rate_per_page = translator.get("rate_per_page", 0) or 0
