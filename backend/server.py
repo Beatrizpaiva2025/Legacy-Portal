@@ -5036,7 +5036,20 @@ async def admin_get_all_orders(
     # Build query filter
     query = {}
     if status and status != "all":
-        query["translation_status"] = status
+        # Map status groups for filtering
+        status_mappings = {
+            'in_translation': ['in_translation', 'pending', 'In Progress'],
+            'review': ['review', 'pending_pm_review', 'pending_review', 'PM Review'],
+            'ready': ['ready', 'pending_admin_approval', 'Ready'],
+            'received': ['received', 'Quote'],
+            'client_review': ['client_review', 'Client Review'],
+            'delivered': ['delivered', 'Delivered'],
+            'final': ['final', 'Final']
+        }
+        if status in status_mappings:
+            query["translation_status"] = {"$in": status_mappings[status]}
+        else:
+            query["translation_status"] = status
     if search:
         query["$or"] = [
             {"order_number": {"$regex": search, "$options": "i"}},

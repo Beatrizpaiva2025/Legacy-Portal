@@ -9511,15 +9511,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     'Ukrainian', 'Urdu', 'Uzbek', 'Vietnamese', 'Welsh', 'Yoruba', 'Zulu'
   ];
 
-  useEffect(() => {
-    fetchOrders();
-    fetchUsers();
-    if (isPM) fetchTranslatorStats();
-  }, []);
+  // Track if initial load is done
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  // Re-fetch orders when status filter changes
+  // Initial load - fetch users and orders
   useEffect(() => {
-    fetchOrders(1); // Reset to first page when filter changes
+    const loadInitialData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchOrders(1),
+          fetchUsers(),
+          isPM ? fetchTranslatorStats() : Promise.resolve()
+        ]);
+      } finally {
+        setInitialLoadDone(true);
+      }
+    };
+    loadInitialData();
+  }, [adminKey]);
+
+  // Re-fetch orders when status filter changes (but not on initial load)
+  useEffect(() => {
+    if (initialLoadDone) {
+      fetchOrders(1); // Reset to first page when filter changes
+    }
   }, [statusFilter]);
 
   const fetchUsers = async () => {
@@ -10645,34 +10661,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Client-side filtering for search and document type only (status is filtered server-side)
   const filtered = orders.filter(o => {
-    const matchSearch =
+    const matchSearch = !search ||
       o.client_name?.toLowerCase().includes(search.toLowerCase()) ||
       o.client_email?.toLowerCase().includes(search.toLowerCase()) ||
       o.order_number?.toLowerCase().includes(search.toLowerCase()) ||
       o.document_type?.toLowerCase().includes(search.toLowerCase());
-    // Map similar statuses together for filtering
-    let matchStatus = statusFilter === 'all' || o.translation_status === statusFilter;
-    // "Quote" filter should include both 'received' and 'Quote' (from MIA bot)
-    if (statusFilter === 'received' && o.translation_status === 'Quote') {
-      matchStatus = true;
-    }
-    // "In Progress" filter should include orders being translated or pending translation
-    if (statusFilter === 'in_translation') {
-      matchStatus = o.translation_status === 'in_translation' ||
-                    o.translation_status === 'pending' ||
-                    (o.assigned_translator && !['review', 'pending_pm_review', 'pending_review', 'client_review', 'ready', 'delivered', 'final'].includes(o.translation_status));
-    }
-    // "PM Review" filter should include both 'review' and 'pending_pm_review'
-    if (statusFilter === 'review' && (o.translation_status === 'pending_pm_review' || o.translation_status === 'pending_review')) {
-      matchStatus = true;
-    }
-    // "Ready" filter should include 'pending_admin_approval' (waiting for admin to send)
-    if (statusFilter === 'ready' && o.translation_status === 'pending_admin_approval') {
-      matchStatus = true;
-    }
     const matchDocType = !documentTypeFilter || o.document_type === documentTypeFilter;
-    return matchSearch && matchStatus && matchDocType;
+    return matchSearch && matchDocType;
   });
 
   const totalReceive = filtered.reduce((sum, o) => sum + (o.total_price || 0), 0);
