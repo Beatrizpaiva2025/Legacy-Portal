@@ -2170,6 +2170,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           if (orderData.translation_page_format) setPageFormat(orderData.translation_page_format);
           if (orderData.translation_include_cover !== undefined) setIncludeCover(orderData.translation_include_cover);
 
+          // Preserve logos and signature from when the translation was saved
+          // This ensures PM/Admin sees the same certificate as the translator created
+          if (orderData.translation_logo_left) setLogoLeft(orderData.translation_logo_left);
+          if (orderData.translation_logo_right) setLogoRight(orderData.translation_logo_right);
+          if (orderData.translation_logo_stamp) setLogoStamp(orderData.translation_logo_stamp);
+          if (orderData.translation_signature_image) setSignatureImage(orderData.translation_signature_image);
+
           setProcessingStatus(`✅ Translation loaded: ${orderData.translation_document_type || 'Document'}`);
           return true;
         }
@@ -2305,6 +2312,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         logo_left: logoLeft,
         logo_right: logoRight,
         logo_stamp: logoStamp,
+        signature_image: signatureImage,  // Preserve signature with order
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
         submitted_by_role: user?.role || 'unknown'

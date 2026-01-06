@@ -6951,6 +6951,7 @@ class TranslationData(BaseModel):
     logo_left: Optional[str] = None
     logo_right: Optional[str] = None
     logo_stamp: Optional[str] = None
+    signature_image: Optional[str] = None  # Preserve signature image with order
     send_to: str = "admin"  # 'pm', 'admin', or 'review'
     submitted_by: Optional[str] = None
     submitted_by_role: Optional[str] = None
@@ -7017,6 +7018,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_logo_left": data.logo_left,
             "translation_logo_right": data.logo_right,
             "translation_logo_stamp": data.logo_stamp,
+            "translation_signature_image": data.signature_image,
             "translation_status": new_status,
             "translation_sent_to": destination,
             "translation_ready": translation_ready,
