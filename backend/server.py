@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks, Depends, Body
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -28,6 +28,8 @@ import stripe
 import json
 import hashlib
 import secrets
+import zipfile
+import shutil
 
 # Set Tesseract path
 pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
@@ -14811,6 +14813,311 @@ async def revoke_certification(certification_id: str, admin_key: str, reason: st
     except Exception as e:
         logger.error(f"Error revoking certification: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== BACKUP & RESTORE SYSTEM ====================
+
+@api_router.get("/admin/backup/source-code")
+async def download_source_code(admin_key: str):
+    """Download the application source code as a ZIP file (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Create a ZIP file in memory
+        zip_buffer = io.BytesIO()
+
+        # Get the project root directory
+        backend_dir = Path(__file__).parent
+        project_root = backend_dir.parent
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add backend files
+            backend_path = project_root / 'backend'
+            if backend_path.exists():
+                for file_path in backend_path.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.') and '__pycache__' not in str(file_path):
+                        arcname = f"backend/{file_path.relative_to(backend_path)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add frontend src files
+            frontend_src = project_root / 'frontend' / 'src'
+            if frontend_src.exists():
+                for file_path in frontend_src.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.'):
+                        arcname = f"frontend/src/{file_path.relative_to(frontend_src)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add frontend public files
+            frontend_public = project_root / 'frontend' / 'public'
+            if frontend_public.exists():
+                for file_path in frontend_public.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.'):
+                        arcname = f"frontend/public/{file_path.relative_to(frontend_public)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add package.json
+            package_json = project_root / 'frontend' / 'package.json'
+            if package_json.exists():
+                zip_file.write(package_json, "frontend/package.json")
+
+            # Add requirements.txt
+            requirements = project_root / 'backend' / 'requirements.txt'
+            if requirements.exists():
+                zip_file.write(requirements, "backend/requirements.txt")
+
+        zip_buffer.seek(0)
+
+        # Generate filename with timestamp
+        timestamp = datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = f"legacy_portal_source_{timestamp}.zip"
+
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error creating source code backup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
+
+
+@api_router.post("/admin/backup/restore-point")
+async def create_restore_point(admin_key: str, name: str = Body(""), description: str = Body("")):
+    """Create a restore point with all database data (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        restore_point_id = str(uuid.uuid4())
+        timestamp = datetime.utcnow()
+
+        # Collect all data from main collections
+        orders = await db.orders.find({}).to_list(10000)
+        admin_users = await db.admin_users.find({}).to_list(1000)
+        translator_payments = await db.translator_payments.find({}).to_list(10000)
+        expenses = await db.expenses.find({}).to_list(10000)
+        partners = await db.partners.find({}).to_list(1000)
+        certifications = await db.certifications.find({}).to_list(10000)
+
+        # Convert ObjectIds to strings
+        def serialize_docs(docs):
+            for doc in docs:
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                for key, value in doc.items():
+                    if isinstance(value, datetime):
+                        doc[key] = value.isoformat()
+            return docs
+
+        restore_point = {
+            "id": restore_point_id,
+            "name": name or f"Restore Point {timestamp.strftime('%Y-%m-%d %H:%M')}",
+            "description": description,
+            "created_at": timestamp,
+            "data": {
+                "orders": serialize_docs(orders),
+                "admin_users": serialize_docs(admin_users),
+                "translator_payments": serialize_docs(translator_payments),
+                "expenses": serialize_docs(expenses),
+                "partners": serialize_docs(partners),
+                "certifications": serialize_docs(certifications)
+            },
+            "stats": {
+                "orders_count": len(orders),
+                "users_count": len(admin_users),
+                "payments_count": len(translator_payments),
+                "expenses_count": len(expenses),
+                "partners_count": len(partners),
+                "certifications_count": len(certifications)
+            }
+        }
+
+        # Save to restore_points collection
+        await db.restore_points.insert_one(restore_point)
+
+        logger.info(f"Restore point created: {restore_point_id} with {len(orders)} orders")
+
+        return {
+            "success": True,
+            "restore_point_id": restore_point_id,
+            "name": restore_point["name"],
+            "created_at": timestamp.isoformat(),
+            "stats": restore_point["stats"]
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create restore point: {str(e)}")
+
+
+@api_router.get("/admin/backup/restore-points")
+async def list_restore_points(admin_key: str):
+    """List all available restore points (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get restore points without the full data (for performance)
+        restore_points = await db.restore_points.find(
+            {},
+            {"data": 0}  # Exclude the data field for listing
+        ).sort("created_at", -1).to_list(100)
+
+        for rp in restore_points:
+            if '_id' in rp:
+                rp['_id'] = str(rp['_id'])
+            if rp.get('created_at'):
+                rp['created_at'] = rp['created_at'].isoformat()
+
+        return {"restore_points": restore_points}
+
+    except Exception as e:
+        logger.error(f"Error listing restore points: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list restore points")
+
+
+@api_router.post("/admin/backup/restore/{restore_point_id}")
+async def restore_from_point(restore_point_id: str, admin_key: str, confirm: bool = Body(False)):
+    """Restore database from a restore point (admin only) - DESTRUCTIVE OPERATION"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Please confirm the restore operation. This will overwrite all current data!")
+
+    try:
+        # Get the restore point
+        restore_point = await db.restore_points.find_one({"id": restore_point_id})
+        if not restore_point:
+            raise HTTPException(status_code=404, detail="Restore point not found")
+
+        # Create an automatic backup before restore
+        auto_backup_id = str(uuid.uuid4())
+        current_orders = await db.orders.find({}).to_list(10000)
+        current_users = await db.admin_users.find({}).to_list(1000)
+
+        def serialize_docs(docs):
+            for doc in docs:
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                for key, value in doc.items():
+                    if isinstance(value, datetime):
+                        doc[key] = value.isoformat()
+            return docs
+
+        auto_backup = {
+            "id": auto_backup_id,
+            "name": f"Auto-backup before restore {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
+            "description": f"Automatic backup created before restoring from {restore_point.get('name', restore_point_id)}",
+            "created_at": datetime.utcnow(),
+            "data": {
+                "orders": serialize_docs(current_orders),
+                "admin_users": serialize_docs(current_users)
+            },
+            "stats": {
+                "orders_count": len(current_orders),
+                "users_count": len(current_users)
+            },
+            "is_auto_backup": True
+        }
+        await db.restore_points.insert_one(auto_backup)
+
+        # Restore data
+        data = restore_point.get("data", {})
+
+        # Restore orders
+        if "orders" in data and data["orders"]:
+            await db.orders.delete_many({})
+            for order in data["orders"]:
+                if '_id' in order:
+                    del order['_id']
+            await db.orders.insert_many(data["orders"])
+
+        # Restore admin_users
+        if "admin_users" in data and data["admin_users"]:
+            await db.admin_users.delete_many({})
+            for user in data["admin_users"]:
+                if '_id' in user:
+                    del user['_id']
+            await db.admin_users.insert_many(data["admin_users"])
+
+        # Restore translator_payments
+        if "translator_payments" in data and data["translator_payments"]:
+            await db.translator_payments.delete_many({})
+            for payment in data["translator_payments"]:
+                if '_id' in payment:
+                    del payment['_id']
+            await db.translator_payments.insert_many(data["translator_payments"])
+
+        # Restore expenses
+        if "expenses" in data and data["expenses"]:
+            await db.expenses.delete_many({})
+            for expense in data["expenses"]:
+                if '_id' in expense:
+                    del expense['_id']
+            await db.expenses.insert_many(data["expenses"])
+
+        # Restore partners
+        if "partners" in data and data["partners"]:
+            await db.partners.delete_many({})
+            for partner in data["partners"]:
+                if '_id' in partner:
+                    del partner['_id']
+            await db.partners.insert_many(data["partners"])
+
+        logger.info(f"Database restored from restore point: {restore_point_id}")
+
+        return {
+            "success": True,
+            "message": "Database restored successfully",
+            "restored_from": restore_point.get("name", restore_point_id),
+            "auto_backup_id": auto_backup_id,
+            "stats": restore_point.get("stats", {})
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring from restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore: {str(e)}")
+
+
+@api_router.delete("/admin/backup/restore-point/{restore_point_id}")
+async def delete_restore_point(restore_point_id: str, admin_key: str):
+    """Delete a restore point (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        result = await db.restore_points.delete_one({"id": restore_point_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Restore point not found")
+
+        logger.info(f"Deleted restore point: {restore_point_id}")
+        return {"success": True, "message": "Restore point deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete restore point")
 
 
 # Include the router in the main app

@@ -14242,6 +14242,15 @@ const SettingsPage = ({ adminKey }) => {
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
 
+  // Restore Points State
+  const [restorePoints, setRestorePoints] = useState([]);
+  const [loadingRestorePoints, setLoadingRestorePoints] = useState(false);
+  const [creatingRestorePoint, setCreatingRestorePoint] = useState(false);
+  const [restoringFrom, setRestoringFrom] = useState(null);
+  const [downloadingSource, setDownloadingSource] = useState(false);
+  const [restorePointName, setRestorePointName] = useState('');
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(null);
+
   // QuickBooks Integration State
   const [qbStatus, setQbStatus] = useState({ connected: false, company_name: null, loading: true });
   const [qbConnecting, setQbConnecting] = useState(false);
@@ -14503,6 +14512,102 @@ const SettingsPage = ({ adminKey }) => {
       setTimeout(() => setExportProgress(''), 5000);
     }
   };
+
+  // Download source code as ZIP
+  const downloadSourceCode = async () => {
+    setDownloadingSource(true);
+    setExportProgress('Downloading source code...');
+    try {
+      const response = await axios.get(`${API}/admin/backup/source-code?admin_key=${adminKey}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `legacy_portal_source_${new Date().toISOString().split('T')[0]}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setExportProgress('✅ Source code downloaded! Check your Downloads folder.');
+    } catch (err) {
+      setExportProgress('❌ Error downloading source code');
+      console.error(err);
+    } finally {
+      setDownloadingSource(false);
+      setTimeout(() => setExportProgress(''), 5000);
+    }
+  };
+
+  // Fetch restore points
+  const fetchRestorePoints = async () => {
+    setLoadingRestorePoints(true);
+    try {
+      const response = await axios.get(`${API}/admin/backup/restore-points?admin_key=${adminKey}`);
+      setRestorePoints(response.data.restore_points || []);
+    } catch (err) {
+      console.error('Error fetching restore points:', err);
+    } finally {
+      setLoadingRestorePoints(false);
+    }
+  };
+
+  // Create restore point
+  const createRestorePoint = async () => {
+    setCreatingRestorePoint(true);
+    setExportProgress('Creating restore point...');
+    try {
+      const response = await axios.post(`${API}/admin/backup/restore-point?admin_key=${adminKey}`, {
+        name: restorePointName || '',
+        description: ''
+      });
+      setExportProgress(`✅ Restore point created: ${response.data.name}`);
+      setRestorePointName('');
+      fetchRestorePoints();
+    } catch (err) {
+      setExportProgress('❌ Error creating restore point');
+      console.error(err);
+    } finally {
+      setCreatingRestorePoint(false);
+      setTimeout(() => setExportProgress(''), 5000);
+    }
+  };
+
+  // Restore from a restore point
+  const restoreFromPoint = async (restorePointId) => {
+    setRestoringFrom(restorePointId);
+    setExportProgress('Restoring database...');
+    try {
+      const response = await axios.post(`${API}/admin/backup/restore/${restorePointId}?admin_key=${adminKey}`, {
+        confirm: true
+      });
+      setExportProgress(`✅ ${response.data.message}. Auto-backup created.`);
+      setShowRestoreConfirm(null);
+      fetchRestorePoints();
+    } catch (err) {
+      setExportProgress('❌ Error restoring: ' + (err.response?.data?.detail || err.message));
+      console.error(err);
+    } finally {
+      setRestoringFrom(null);
+      setTimeout(() => setExportProgress(''), 8000);
+    }
+  };
+
+  // Delete restore point
+  const deleteRestorePoint = async (restorePointId) => {
+    if (!window.confirm('Delete this restore point?')) return;
+    try {
+      await axios.delete(`${API}/admin/backup/restore-point/${restorePointId}?admin_key=${adminKey}`);
+      fetchRestorePoints();
+    } catch (err) {
+      alert('Error deleting restore point');
+      console.error(err);
+    }
+  };
+
+  // Load restore points on mount
+  useEffect(() => {
+    fetchRestorePoints();
+  }, [adminKey]);
 
   // Permissions matrix data
   const PERMISSIONS = {
@@ -14840,6 +14945,141 @@ const SettingsPage = ({ adminKey }) => {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Download Source Code */}
+            <div className="border rounded p-4 bg-blue-50 mt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-semibold text-gray-700">Download Source Code</h3>
+                  <p className="text-[10px] text-gray-500 mt-1">Download Python backend and React frontend as ZIP file</p>
+                </div>
+                <button
+                  onClick={downloadSourceCode}
+                  disabled={downloadingSource}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center"
+                >
+                  {downloadingSource ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Download ZIP
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Restore Points Section */}
+          <div className="mt-6 border-t pt-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Restore Points</h3>
+            <p className="text-xs text-gray-500 mb-4">Create restore points to save the current state of your database. You can restore to any previous point if needed.</p>
+
+            {/* Create Restore Point */}
+            <div className="flex items-center space-x-2 mb-4">
+              <input
+                type="text"
+                placeholder="Restore point name (optional)"
+                value={restorePointName}
+                onChange={(e) => setRestorePointName(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded text-xs"
+              />
+              <button
+                onClick={createRestorePoint}
+                disabled={creatingRestorePoint}
+                className="px-4 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-300 flex items-center whitespace-nowrap"
+              >
+                {creatingRestorePoint ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  <>+ Create Restore Point</>
+                )}
+              </button>
+            </div>
+
+            {/* Restore Points List */}
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {loadingRestorePoints ? (
+                <p className="text-xs text-gray-500 text-center py-4">Loading restore points...</p>
+              ) : restorePoints.length === 0 ? (
+                <p className="text-xs text-gray-500 text-center py-4">No restore points created yet.</p>
+              ) : (
+                restorePoints.map((rp) => (
+                  <div key={rp.id} className={`border rounded p-3 ${rp.is_auto_backup ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center">
+                          <span className="text-xs font-medium text-gray-800">{rp.name}</span>
+                          {rp.is_auto_backup && (
+                            <span className="ml-2 px-1.5 py-0.5 bg-yellow-200 text-yellow-800 text-[10px] rounded">Auto</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-1">
+                          {new Date(rp.created_at).toLocaleString()} |
+                          {rp.stats?.orders_count || 0} orders, {rp.stats?.users_count || 0} users
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {showRestoreConfirm === rp.id ? (
+                          <>
+                            <span className="text-[10px] text-red-600 mr-2">Are you sure?</span>
+                            <button
+                              onClick={() => restoreFromPoint(rp.id)}
+                              disabled={restoringFrom === rp.id}
+                              className="px-2 py-1 bg-red-600 text-white text-[10px] rounded hover:bg-red-700 disabled:bg-gray-300"
+                            >
+                              {restoringFrom === rp.id ? 'Restoring...' : 'Yes, Restore'}
+                            </button>
+                            <button
+                              onClick={() => setShowRestoreConfirm(null)}
+                              className="px-2 py-1 bg-gray-300 text-gray-700 text-[10px] rounded hover:bg-gray-400"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => setShowRestoreConfirm(rp.id)}
+                              className="px-2 py-1 bg-blue-600 text-white text-[10px] rounded hover:bg-blue-700"
+                            >
+                              Restore
+                            </button>
+                            <button
+                              onClick={() => deleteRestorePoint(rp.id)}
+                              className="px-2 py-1 bg-red-100 text-red-600 text-[10px] rounded hover:bg-red-200"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="text-[10px] text-yellow-800">
+                <strong>Warning:</strong> Restoring from a point will overwrite all current data. An automatic backup is created before each restore.
+              </p>
             </div>
           </div>
         </div>
