@@ -4938,7 +4938,7 @@ class PagesLogCreate(BaseModel):
 @api_router.get("/admin/translator-pages")
 async def get_translator_pages(admin_key: str, period: str = "month"):
     """Get translator pages logs"""
-    if admin_key != ADMIN_SECRET_KEY:
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
     try:
         # Calculate date range based on period
@@ -4971,18 +4971,18 @@ async def get_translator_pages(admin_key: str, period: str = "month"):
 @api_router.post("/admin/translator-pages")
 async def add_translator_pages(pages_data: PagesLogCreate, admin_key: str):
     """Add translator pages log"""
-    if admin_key != ADMIN_SECRET_KEY:
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
     try:
         # Get translator name
+        from bson import ObjectId
         translator = await db.admin_users.find_one({"_id": pages_data.translator_id})
         if not translator:
             # Try with ObjectId
-            from bson import ObjectId
             try:
                 translator = await db.admin_users.find_one({"_id": ObjectId(pages_data.translator_id)})
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not find translator by ObjectId: {str(e)}")
 
         translator_name = translator.get("name", "Unknown") if translator else "Unknown"
 
@@ -5014,7 +5014,7 @@ async def add_translator_pages(pages_data: PagesLogCreate, admin_key: str):
 @api_router.delete("/admin/translator-pages/{log_id}")
 async def delete_translator_pages(log_id: str, admin_key: str):
     """Delete a translator pages log entry"""
-    if admin_key != ADMIN_SECRET_KEY:
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
     try:
         from bson import ObjectId
@@ -5034,8 +5034,8 @@ async def delete_translator_pages(log_id: str, admin_key: str):
             if not translator:
                 try:
                     translator = await db.admin_users.find_one({"_id": ObjectId(translator_id)})
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Could not find translator by ObjectId for delete: {str(e)}")
 
             if translator:
                 current_pending = translator.get("pages_pending_payment", 0) or 0
@@ -5060,7 +5060,7 @@ class PagesLogUpdate(BaseModel):
 @api_router.put("/admin/translator-pages/{log_id}")
 async def update_translator_pages(log_id: str, update_data: PagesLogUpdate, admin_key: str):
     """Update a translator pages log entry"""
-    if admin_key != ADMIN_SECRET_KEY:
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
     try:
         from bson import ObjectId
@@ -5092,8 +5092,8 @@ async def update_translator_pages(log_id: str, update_data: PagesLogUpdate, admi
                 if not translator:
                     try:
                         translator = await db.admin_users.find_one({"_id": ObjectId(translator_id)})
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Could not find translator by ObjectId for update: {str(e)}")
 
                 if translator:
                     current_pending = translator.get("pages_pending_payment", 0) or 0
@@ -6388,43 +6388,57 @@ async def update_payment(payment_id: str, update_data: PaymentUpdate, admin_key:
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    update_dict = {}
-    if update_data.status:
-        update_dict["status"] = update_data.status
-        if update_data.status == "paid" and not update_data.payment_date:
-            update_dict["payment_date"] = datetime.utcnow()
-    if update_data.payment_date:
-        update_dict["payment_date"] = datetime.fromisoformat(update_data.payment_date.replace('Z', '+00:00'))
-    if update_data.payment_method:
-        update_dict["payment_method"] = update_data.payment_method
-    if update_data.payment_reference:
-        update_dict["payment_reference"] = update_data.payment_reference
-    if update_data.notes is not None:
-        update_dict["notes"] = update_data.notes
+    try:
+        update_dict = {}
+        if update_data.status:
+            update_dict["status"] = update_data.status
+            if update_data.status == "paid" and not update_data.payment_date:
+                update_dict["payment_date"] = datetime.utcnow()
+        if update_data.payment_date:
+            update_dict["payment_date"] = datetime.fromisoformat(update_data.payment_date.replace('Z', '+00:00'))
+        if update_data.payment_method:
+            update_dict["payment_method"] = update_data.payment_method
+        if update_data.payment_reference:
+            update_dict["payment_reference"] = update_data.payment_reference
+        if update_data.notes is not None:
+            update_dict["notes"] = update_data.notes
 
-    result = await db.translator_payments.update_one(
-        {"id": payment_id},
-        {"$set": update_dict}
-    )
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No fields to update")
 
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    # Get updated payment
-    payment = await db.translator_payments.find_one({"id": payment_id})
-    if '_id' in payment:
-        del payment['_id']
-
-    # Notify translator if marked as paid
-    if update_data.status == "paid":
-        await create_notification(
-            user_id=payment["translator_id"],
-            notif_type="payment_completed",
-            title="Pagamento Confirmado",
-            message=f"Seu pagamento de ${payment['total_amount']:.2f} foi confirmado."
+        result = await db.translator_payments.update_one(
+            {"id": payment_id},
+            {"$set": update_dict}
         )
 
-    return {"status": "success", "payment": payment}
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Payment not found")
+
+        # Get updated payment
+        payment = await db.translator_payments.find_one({"id": payment_id})
+        if not payment:
+            raise HTTPException(status_code=404, detail="Payment not found after update")
+        if '_id' in payment:
+            del payment['_id']
+
+        # Notify translator if marked as paid (don't fail the request if notification fails)
+        if update_data.status == "paid":
+            try:
+                await create_notification(
+                    user_id=payment["translator_id"],
+                    notif_type="payment_completed",
+                    title="Pagamento Confirmado",
+                    message=f"Seu pagamento de ${payment['total_amount']:.2f} foi confirmado."
+                )
+            except Exception as notif_error:
+                logger.warning(f"Failed to send payment notification: {str(notif_error)}")
+
+        return {"status": "success", "payment": payment}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating payment {payment_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update payment: {str(e)}")
 
 @api_router.delete("/admin/payments/{payment_id}")
 async def delete_payment(payment_id: str, admin_key: str):
@@ -6499,36 +6513,47 @@ async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key:
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    update_dict = {}
-    if update_data.category:
-        update_dict["category"] = update_data.category
-    if update_data.subcategory is not None:
-        update_dict["subcategory"] = update_data.subcategory
-    if update_data.description:
-        update_dict["description"] = update_data.description
-    if update_data.amount is not None:
-        update_dict["amount"] = update_data.amount
-    if update_data.date:
-        update_dict["date"] = datetime.fromisoformat(update_data.date.replace('Z', '+00:00'))
-    if update_data.is_recurring is not None:
-        update_dict["is_recurring"] = update_data.is_recurring
-    if update_data.recurring_period is not None:
-        update_dict["recurring_period"] = update_data.recurring_period
-    if update_data.vendor is not None:
-        update_dict["vendor"] = update_data.vendor
-    if update_data.notes is not None:
-        update_dict["notes"] = update_data.notes
+    try:
+        update_dict = {}
+        if update_data.category:
+            update_dict["category"] = update_data.category
+        if update_data.subcategory is not None:
+            update_dict["subcategory"] = update_data.subcategory
+        if update_data.description:
+            update_dict["description"] = update_data.description
+        if update_data.amount is not None:
+            update_dict["amount"] = update_data.amount
+        if update_data.date:
+            update_dict["date"] = datetime.fromisoformat(update_data.date.replace('Z', '+00:00'))
+        if update_data.is_recurring is not None:
+            update_dict["is_recurring"] = update_data.is_recurring
+        if update_data.recurring_period is not None:
+            update_dict["recurring_period"] = update_data.recurring_period
+        if update_data.vendor is not None:
+            update_dict["vendor"] = update_data.vendor
+        if update_data.notes is not None:
+            update_dict["notes"] = update_data.notes
 
-    result = await db.expenses.update_one({"id": expense_id}, {"$set": update_dict})
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No fields to update")
 
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Expense not found")
+        result = await db.expenses.update_one({"id": expense_id}, {"$set": update_dict})
 
-    expense = await db.expenses.find_one({"id": expense_id})
-    if '_id' in expense:
-        del expense['_id']
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Expense not found")
 
-    return {"status": "success", "expense": expense}
+        expense = await db.expenses.find_one({"id": expense_id})
+        if not expense:
+            raise HTTPException(status_code=404, detail="Expense not found after update")
+        if '_id' in expense:
+            del expense['_id']
+
+        return {"status": "success", "expense": expense}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating expense {expense_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update expense: {str(e)}")
 
 @api_router.delete("/admin/expenses/{expense_id}")
 async def delete_expense(expense_id: str, admin_key: str):
