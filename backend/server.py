@@ -9016,10 +9016,6 @@ async def admin_ocr(request: OCRRequest, admin_key: str):
                 import anthropic
                 client = anthropic.Anthropic(api_key=request.claude_api_key)
 
-                # Prepare the image for Claude
-                image_data = base64.b64encode(file_content).decode('utf-8')
-                media_type = request.file_type if request.file_type.startswith('image/') else 'image/jpeg'
-
                 # Build the OCR prompt
                 ocr_prompt = """Extract ALL text from this document image.
 
@@ -9038,35 +9034,91 @@ CRITICAL INSTRUCTIONS:
 
                 ocr_prompt += "\nExtract the complete text now, preserving the original layout:"
 
-                message = client.messages.create(
-                    model="claude-sonnet-4-5-20250929",
-                    max_tokens=4096,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image",
-                                    "source": {
-                                        "type": "base64",
-                                        "media_type": media_type,
-                                        "data": image_data,
+                # Handle PDFs by converting to images first
+                if is_pdf:
+                    logger.info("Converting PDF to images for Claude OCR...")
+                    try:
+                        pdf_document = fitz.open(stream=file_content, filetype="pdf")
+                        all_text = []
+
+                        for page_num in range(min(pdf_document.page_count, 15)):
+                            page = pdf_document[page_num]
+                            # Convert page to PNG image at 2x resolution
+                            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                            img_data = pix.tobytes("png")
+                            image_data = base64.b64encode(img_data).decode('utf-8')
+
+                            message = client.messages.create(
+                                model="claude-sonnet-4-5-20250929",
+                                max_tokens=4096,
+                                messages=[
+                                    {
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "image",
+                                                "source": {
+                                                    "type": "base64",
+                                                    "media_type": "image/png",
+                                                    "data": image_data,
+                                                },
+                                            },
+                                            {
+                                                "type": "text",
+                                                "text": ocr_prompt
+                                            }
+                                        ],
+                                    }
+                                ],
+                            )
+
+                            page_text = message.content[0].text
+                            if page_text and page_text.strip():
+                                all_text.append(f"--- Page {page_num + 1} ---\n{page_text}")
+
+                        num_pages = pdf_document.page_count
+                        pdf_document.close()
+                        text = "\n\n".join(all_text)
+                        logger.info(f"Claude OCR extracted {len(text)} characters from {num_pages} PDF pages")
+
+                        if text and len(text.strip()) > 10:
+                            return {"status": "success", "text": text, "method": "claude"}
+                    except Exception as pdf_err:
+                        logger.error(f"Claude PDF OCR failed: {str(pdf_err)}, falling back to standard OCR")
+                else:
+                    # For images, send directly to Claude
+                    image_data = base64.b64encode(file_content).decode('utf-8')
+                    media_type = request.file_type if request.file_type.startswith('image/') else 'image/png'
+
+                    message = client.messages.create(
+                        model="claude-sonnet-4-5-20250929",
+                        max_tokens=4096,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "image",
+                                        "source": {
+                                            "type": "base64",
+                                            "media_type": media_type,
+                                            "data": image_data,
+                                        },
                                     },
-                                },
-                                {
-                                    "type": "text",
-                                    "text": ocr_prompt
-                                }
-                            ],
-                        }
-                    ],
-                )
+                                    {
+                                        "type": "text",
+                                        "text": ocr_prompt
+                                    }
+                                ],
+                            }
+                        ],
+                    )
 
-                text = message.content[0].text
-                logger.info(f"Claude OCR extracted {len(text)} characters with layout preservation")
+                    text = message.content[0].text
+                    logger.info(f"Claude OCR extracted {len(text)} characters with layout preservation")
 
-                if text and len(text.strip()) > 10:
-                    return {"status": "success", "text": text, "method": "claude"}
+                    if text and len(text.strip()) > 10:
+                        return {"status": "success", "text": text, "method": "claude"}
 
             except Exception as e:
                 logger.error(f"Claude OCR failed: {str(e)}, falling back to standard OCR")
