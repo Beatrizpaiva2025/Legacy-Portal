@@ -1,9 +1,10 @@
 # Dockerfile for Legacy Portal Backend
 FROM python:3.11-slim
 
-# Install system dependencies including Tesseract OCR
+# Install system dependencies including Tesseract OCR with language packs
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
+    tesseract-ocr-eng \
     tesseract-ocr-por \
     tesseract-ocr-spa \
     tesseract-ocr-fra \
