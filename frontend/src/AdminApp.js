@@ -5353,6 +5353,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {selectedFileId === file.id && (
                           <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
                         )}
+                        {/* Download button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadProjectDocument(file.id, file.filename);
+                          }}
+                          className="mt-2 w-full px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                          title={`Download ${file.filename}`}
+                        >
+                          ⬇️ Download Original
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -5433,6 +5444,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Project Files Download Section - Show when project is selected */}
+          {selectedOrderId && viewMode === 'projects' && (
+            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                📂 Project Files
+              </h3>
+              {allProjectFiles.filter(f => f.order_id === selectedOrderId).length > 0 ? (
+                <div className="space-y-2">
+                  {allProjectFiles.filter(f => f.order_id === selectedOrderId).map((file, idx) => (
+                    <div key={file.id || idx} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-700 truncate block" title={file.filename}>
+                          {file.filename || 'Document'}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          file.file_status === 'pending' || file.file_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                          file.file_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                          file.file_status === 'completed' || file.file_status === 'ready' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {file.file_status}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => downloadProjectDocument(file.id, file.filename)}
+                        className="ml-3 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
+                        title={`Download ${file.filename}`}
+                      >
+                        ⬇️ Download
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No files found for this project.</p>
+              )}
             </div>
           )}
 
