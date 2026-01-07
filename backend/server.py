@@ -2416,6 +2416,8 @@ async def extract_text_from_file(file: UploadFile) -> str:
     try:
         # For images - try Textract first, then Tesseract
         if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'gif']:
+            logger.info(f"Processing image file: {file_extension}, size: {len(content)} bytes")
+
             # Try AWS Textract first (best quality)
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
@@ -2423,19 +2425,28 @@ async def extract_text_from_file(file: UploadFile) -> str:
                 if text and len(text.strip()) > 10:
                     return text
                 logger.info("Textract returned insufficient text, trying Tesseract...")
+            else:
+                logger.info("AWS Textract not configured, using Tesseract directly...")
 
             # Fallback to Tesseract with multiple configs
             try:
+                logger.info("Opening image with PIL...")
                 image = Image.open(io.BytesIO(content))
+                logger.info(f"Image opened: mode={image.mode}, size={image.size}")
                 image = preprocess_image_for_ocr(image)
+                logger.info(f"Image preprocessed: mode={image.mode}, size={image.size}")
 
                 # Try multiple OCR configurations and pick best result
                 text = tesseract_ocr_multi_config(image)
                 logger.info(f"Tesseract extracted {len(text)} characters from image (best result)")
+
+                if not text or len(text.strip()) == 0:
+                    logger.warning("Tesseract returned empty text - OCR may have failed")
+
                 return text
 
             except Exception as e:
-                logger.error(f"Image OCR failed: {str(e)}")
+                logger.error(f"Image OCR failed: {str(e)}", exc_info=True)
                 return ""
 
         elif file_extension == 'pdf':
