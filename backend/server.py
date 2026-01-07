@@ -2366,6 +2366,53 @@ async def extract_text_from_file(file: UploadFile) -> str:
     content = await file.read()
     file_extension = file.filename.split('.')[-1].lower()
 
+    def tesseract_ocr_multi_config(image):
+        """Try multiple Tesseract configurations and return best result"""
+        configs = [
+            r'--oem 3 --psm 6',   # Uniform text block (default)
+            r'--oem 3 --psm 3',   # Fully automatic
+            r'--oem 3 --psm 4',   # Single column
+            r'--oem 3 --psm 1',   # Auto with OSD
+            r'--oem 3 --psm 12',  # Sparse text
+        ]
+
+        best_text = ""
+        for config in configs:
+            try:
+                text = pytesseract.image_to_string(image, config=config)
+                if len(text.strip()) > len(best_text.strip()):
+                    best_text = text
+                    logger.info(f"Tesseract config {config} extracted {len(text)} chars")
+            except Exception as e:
+                logger.warning(f"Tesseract config {config} failed: {str(e)}")
+                continue
+
+        return best_text
+
+    def preprocess_image_for_ocr(image):
+        """Preprocess image for better OCR results"""
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        from PIL import ImageEnhance, ImageFilter
+
+        # Enhance contrast
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.0)
+
+        # Sharpen
+        image = image.filter(ImageFilter.SHARPEN)
+
+        # Resize if too small
+        width, height = image.size
+        if width < 1000 or height < 1000:
+            scale_factor = max(1000/width, 1000/height)
+            new_width = int(width * scale_factor)
+            new_height = int(height * scale_factor)
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        return image
+
     try:
         # For images - try Textract first, then Tesseract
         if file_extension in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp', 'gif']:
@@ -2377,26 +2424,14 @@ async def extract_text_from_file(file: UploadFile) -> str:
                     return text
                 logger.info("Textract returned insufficient text, trying Tesseract...")
 
-            # Fallback to Tesseract
+            # Fallback to Tesseract with multiple configs
             try:
                 image = Image.open(io.BytesIO(content))
-                if image.mode != 'RGB':
-                    image = image.convert('RGB')
+                image = preprocess_image_for_ocr(image)
 
-                from PIL import ImageEnhance, ImageFilter
-                enhancer = ImageEnhance.Contrast(image)
-                image = enhancer.enhance(2.0)
-                image = image.filter(ImageFilter.SHARPEN)
-
-                width, height = image.size
-                if width < 1000 or height < 1000:
-                    scale_factor = max(1000/width, 1000/height)
-                    new_width = int(width * scale_factor)
-                    new_height = int(height * scale_factor)
-                    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-                text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
-                logger.info(f"Tesseract extracted {len(text)} characters from image")
+                # Try multiple OCR configurations and pick best result
+                text = tesseract_ocr_multi_config(image)
+                logger.info(f"Tesseract extracted {len(text)} characters from image (best result)")
                 return text
 
             except Exception as e:
@@ -2444,18 +2479,22 @@ async def extract_text_from_file(file: UploadFile) -> str:
                     return textract_text
                 logger.info("Textract returned insufficient text, trying Tesseract...")
 
-            # Method 4: Fallback to Tesseract OCR
+            # Method 4: Fallback to Tesseract OCR with multi-config
             logger.info("Using Tesseract OCR for image-based PDF...")
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
 
                 for page_num in range(min(pdf_document.page_count, 10)):
                     page = pdf_document[page_num]
+                    # Higher resolution for better OCR (2x zoom)
                     pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
                     img_data = pix.tobytes("png")
 
                     image = Image.open(io.BytesIO(img_data))
-                    page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
+                    # Preprocess image for better OCR
+                    image = preprocess_image_for_ocr(image)
+                    # Try multiple configs and get best result
+                    page_text = tesseract_ocr_multi_config(image)
 
                     if page_text.strip():
                         text += page_text + "\n"
@@ -9093,7 +9132,7 @@ CRITICAL INSTRUCTIONS:
 
             # Fallback to Tesseract if Textract didn't work
             if not text:
-                logger.info("Using Tesseract for image OCR...")
+                logger.info("Using Tesseract for image OCR with multiple configs...")
                 try:
                     image = Image.open(io.BytesIO(file_content))
                     if image.mode != 'RGB':
@@ -9113,8 +9152,28 @@ CRITICAL INSTRUCTIONS:
                         new_height = int(height * scale_factor)
                         image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-                    text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
-                    logger.info(f"Tesseract extracted {len(text)} characters")
+                    # Try multiple Tesseract configurations for best result
+                    configs = [
+                        r'--oem 3 --psm 6',   # Uniform text block
+                        r'--oem 3 --psm 3',   # Fully automatic
+                        r'--oem 3 --psm 4',   # Single column
+                        r'--oem 3 --psm 1',   # Auto with OSD
+                        r'--oem 3 --psm 12',  # Sparse text
+                    ]
+
+                    best_text = ""
+                    for config in configs:
+                        try:
+                            result = pytesseract.image_to_string(image, config=config)
+                            if len(result.strip()) > len(best_text.strip()):
+                                best_text = result
+                                logger.info(f"Tesseract config {config} extracted {len(result)} chars")
+                        except Exception as cfg_error:
+                            logger.warning(f"Tesseract config {config} failed: {str(cfg_error)}")
+                            continue
+
+                    text = best_text
+                    logger.info(f"Tesseract extracted {len(text)} characters (best result)")
                 except Exception as e:
                     logger.error(f"Tesseract OCR failed: {str(e)}")
                     raise HTTPException(status_code=500, detail=f"OCR failed: {str(e)}")
@@ -9144,12 +9203,21 @@ CRITICAL INSTRUCTIONS:
                     if text and len(text.strip()) > 10:
                         logger.info(f"Textract extracted {len(text)} characters from PDF")
 
-                # Fallback to Tesseract
+                # Fallback to Tesseract with multiple configs
                 if not text or len(text.strip()) < 10:
-                    logger.info("Using Tesseract for PDF OCR...")
+                    logger.info("Using Tesseract for PDF OCR with multiple configs...")
                     try:
                         pdf_document = fitz.open(stream=file_content, filetype="pdf")
                         text = ""
+
+                        # OCR configurations to try
+                        configs = [
+                            r'--oem 3 --psm 6',   # Uniform text block
+                            r'--oem 3 --psm 3',   # Fully automatic
+                            r'--oem 3 --psm 4',   # Single column
+                            r'--oem 3 --psm 1',   # Auto with OSD
+                            r'--oem 3 --psm 12',  # Sparse text
+                        ]
 
                         for page_num in range(min(pdf_document.page_count, 15)):
                             page = pdf_document[page_num]
@@ -9157,13 +9225,30 @@ CRITICAL INSTRUCTIONS:
                             img_data = pix.tobytes("png")
 
                             image = Image.open(io.BytesIO(img_data))
-                            page_text = pytesseract.image_to_string(image, config=r'--oem 3 --psm 6')
 
-                            if page_text.strip():
-                                text += page_text + "\n"
+                            # Preprocess image
+                            if image.mode != 'RGB':
+                                image = image.convert('RGB')
+                            from PIL import ImageEnhance, ImageFilter
+                            enhancer = ImageEnhance.Contrast(image)
+                            image = enhancer.enhance(2.0)
+                            image = image.filter(ImageFilter.SHARPEN)
+
+                            # Try multiple configs for best result
+                            best_page_text = ""
+                            for config in configs:
+                                try:
+                                    result = pytesseract.image_to_string(image, config=config)
+                                    if len(result.strip()) > len(best_page_text.strip()):
+                                        best_page_text = result
+                                except:
+                                    continue
+
+                            if best_page_text.strip():
+                                text += best_page_text + "\n"
 
                         pdf_document.close()
-                        logger.info(f"Tesseract extracted {len(text)} characters from PDF")
+                        logger.info(f"Tesseract extracted {len(text)} characters from PDF (multi-config)")
                     except Exception as e:
                         logger.error(f"PDF OCR failed: {str(e)}")
         else:
