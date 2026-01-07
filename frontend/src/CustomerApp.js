@@ -2451,15 +2451,13 @@ function CustomerApp() {
               className="h-12"
             />
             {/* Language Selector */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               {UI_LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}
                   onClick={() => changeUILanguage(lang.code)}
-                  className={`px-2 py-1 text-sm font-semibold rounded transition-all ${
-                    uiLang === lang.code
-                      ? 'bg-teal-600 text-white'
-                      : 'text-gray-500 hover:text-teal-600 hover:bg-teal-50'
+                  className={`text-xl hover:scale-110 transition-transform ${
+                    uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
                   title={lang.name}
                 >
@@ -2501,15 +2499,13 @@ function CustomerApp() {
             </h1>
             <div className="flex items-center gap-4">
               {/* Language Selector */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 {UI_LANGUAGES.map((lang) => (
                   <button
                     key={lang.code}
                     onClick={() => changeUILanguage(lang.code)}
-                    className={`px-2 py-1 text-sm font-semibold rounded transition-all ${
-                      uiLang === lang.code
-                        ? 'bg-teal-600 text-white'
-                        : 'text-gray-500 hover:text-teal-600 hover:bg-teal-50'
+                    className={`text-xl hover:scale-110 transition-transform ${
+                      uiLang === lang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                     }`}
                     title={lang.name}
                   >
