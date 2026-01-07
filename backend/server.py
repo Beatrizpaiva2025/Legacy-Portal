@@ -659,16 +659,6 @@ def get_order_confirmation_email_template(client_name: str, order_details: dict)
                                 </tr>
                             </table>
 
-                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%); border-radius: 8px; margin: 25px 0;">
-                                <tr>
-                                    <td style="padding: 25px;">
-                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 10px 0;">
-                                            💰 Total: ${order_details.get('total_price', 0):.2f}
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-
                             <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
                                 If you have any questions about your order, please feel free to respond to this email.
                             </p>
