@@ -39,9 +39,9 @@ const LANGUAGES = [
 
 // UI Languages (for interface translation)
 const UI_LANGUAGES = [
-  { code: 'en', flag: 'EN', name: 'English' },
-  { code: 'es', flag: 'ES', name: 'Español' },
-  { code: 'pt', flag: 'PT', name: 'Português' }
+  { code: 'en', flag: '🇺🇸', name: 'English' },
+  { code: 'es', flag: '🇪🇸', name: 'Español' },
+  { code: 'pt', flag: '🇧🇷', name: 'Português' }
 ];
 
 // Customer Portal Translations
