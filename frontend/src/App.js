@@ -2294,6 +2294,26 @@ const MessagesPage = ({ token }) => {
     fetchAllMessages();
   }, []);
 
+  // Auto-mark unread conversations as read when viewing conversation tab
+  useEffect(() => {
+    if (activeTab === 'conversations' && conversations.length > 0) {
+      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
+      unreadConvs.forEach(conv => {
+        markConversationAsRead(conv.id);
+      });
+    }
+  }, [activeTab, conversations.length]);
+
+  // Auto-mark unread system messages as read when viewing notifications tab
+  useEffect(() => {
+    if (activeTab === 'notifications' && systemMessages.length > 0) {
+      const unreadMsgs = systemMessages.filter(m => !m.read);
+      unreadMsgs.forEach(msg => {
+        markSystemMessageAsRead(msg.id);
+      });
+    }
+  }, [activeTab, systemMessages.length]);
+
   const fetchAllMessages = async () => {
     try {
       // Fetch conversations (sent messages + admin replies)
@@ -2313,7 +2333,7 @@ const MessagesPage = ({ token }) => {
   const markConversationAsRead = async (conversationId) => {
     try {
       await axios.put(`${API}/partner/conversations/${conversationId}/read?token=${token}`);
-      setConversations(conversations.map(conv =>
+      setConversations(prev => prev.map(conv =>
         conv.id === conversationId ? { ...conv, read: true } : conv
       ));
     } catch (err) {
@@ -2324,7 +2344,7 @@ const MessagesPage = ({ token }) => {
   const markSystemMessageAsRead = async (messageId) => {
     try {
       await axios.put(`${API}/messages/${messageId}/read?token=${token}`);
-      setSystemMessages(systemMessages.map(msg =>
+      setSystemMessages(prev => prev.map(msg =>
         msg.id === messageId ? { ...msg, read: true } : msg
       ));
     } catch (err) {
@@ -2476,14 +2496,6 @@ const MessagesPage = ({ token }) => {
                         <p className="text-sm text-gray-400 mt-2">{formatDate(conv.created_at)}</p>
                       </div>
                     </div>
-                    {conv.direction === 'received' && !conv.read && (
-                      <button
-                        onClick={() => markConversationAsRead(conv.id)}
-                        className="text-sm text-teal-600 hover:text-teal-800 whitespace-nowrap ml-4"
-                      >
-                        Mark as read
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -2506,34 +2518,21 @@ const MessagesPage = ({ token }) => {
               {systemMessages.map((message) => (
                 <div
                   key={message.id}
-                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
-                    message.read ? 'border-gray-300' : 'border-teal-500'
-                  }`}
+                  className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-gray-300"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start">
                     <div className="flex items-start space-x-4">
                       <div className="text-2xl">{getMessageIcon(message.type)}</div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <h3 className={`font-semibold ${message.read ? 'text-gray-600' : 'text-gray-800'}`}>
+                          <h3 className="font-semibold text-gray-800">
                             {message.title}
                           </h3>
-                          {!message.read && (
-                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
-                          )}
                         </div>
                         <p className="text-gray-600 mt-1">{message.content}</p>
                         <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
                       </div>
                     </div>
-                    {!message.read && (
-                      <button
-                        onClick={() => markSystemMessageAsRead(message.id)}
-                        className="text-sm text-teal-600 hover:text-teal-800"
-                      >
-                        Mark as read
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -2798,6 +2797,16 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
     }
   }, [token]);
 
+  // Auto-mark messages as read when opening inbox
+  useEffect(() => {
+    if (showNotifications && isOpen) {
+      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
+      unreadConvs.forEach(conv => {
+        markAsRead(conv.id);
+      });
+    }
+  }, [showNotifications, isOpen]);
+
   const fetchConversations = async () => {
     try {
       const response = await axios.get(`${API}/partner/conversations?token=${token}`);
@@ -2810,7 +2819,9 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
   const markAsRead = async (conversationId) => {
     try {
       await axios.put(`${API}/partner/conversations/${conversationId}/read?token=${token}`);
-      fetchConversations();
+      setConversations(prev => prev.map(conv =>
+        conv.id === conversationId ? { ...conv, read: true } : conv
+      ));
     } catch (err) {
       console.error('Failed to mark as read:', err);
     }
@@ -2957,18 +2968,10 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                   conversations.filter(c => c.direction === 'received').slice(0, 5).map((conv) => (
                     <div
                       key={conv.id}
-                      className={`p-3 rounded-lg border ${conv.read ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'}`}
+                      className="p-3 rounded-lg border bg-gray-50 border-gray-200"
                     >
-                      <div className="flex justify-between items-start mb-1">
+                      <div className="mb-1">
                         <span className="text-xs font-medium text-blue-700">{conv.from_admin_name || 'Admin'}</span>
-                        {!conv.read && (
-                          <button
-                            onClick={() => markAsRead(conv.id)}
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            Mark read
-                          </button>
-                        )}
                       </div>
                       {conv.original_message_content && (
                         <p className="text-[10px] text-gray-500 italic mb-1">Re: {conv.original_message_content.substring(0, 50)}...</p>
