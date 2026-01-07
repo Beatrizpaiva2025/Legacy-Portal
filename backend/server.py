@@ -4048,7 +4048,8 @@ async def list_admin_users(token: str, admin_key: str):
             "language_pairs": u.get("language_pairs"),
             "pages_translated": u.get("pages_translated", 0),
             "pages_pending_payment": u.get("pages_pending_payment", 0),
-            "created_at": u.get("created_at")
+            "created_at": u.get("created_at"),
+            "translator_type": u.get("translator_type", "contractor")
         } for u in users]
     except Exception as e:
         logger.error(f"Error listing admin users: {str(e)}")
