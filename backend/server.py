@@ -65,6 +65,15 @@ STRIPE_TEST_MODE = stripe.api_key.startswith('sk_test_') if stripe.api_key else 
 # Create the main app without a prefix
 app = FastAPI()
 
+# CORS must be added immediately after app creation
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
@@ -15656,14 +15665,6 @@ app.include_router(api_router)
 @app.get("/")
 async def root():
     return {"message": "Legacy Translations API", "status": "online", "api_docs": "/docs"}
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.on_event("startup")
 async def create_default_partner():
