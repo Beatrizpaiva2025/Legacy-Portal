@@ -1634,7 +1634,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           rateDate: data.date || new Date().toISOString().split('T')[0]
         }));
       } else {
-        throw new Errorr('Rate not found');
+        throw new Error('Rate not found');
       }
     } catch (error) {
       // Fallback to Frankfurter API (ECB rates)
@@ -2404,7 +2404,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         fetchAvailableOrders();
         fetchAssignedOrders();
       } else {
-        throw new Errorr(response.data.error || response.data.detail || 'Failed to send');
+        throw new Error(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
       console.error('Errorr sending to projects:', error);
@@ -3147,7 +3147,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Errorr(data.detail || 'Proofreading failed');
+        throw new Error(data.detail || 'Proofreading failed');
       }
 
       if (data.proofreading_result) {
@@ -3438,7 +3438,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             text: response.data.text
           }]);
         } else {
-          throw new Errorr(response.data.error || response.data.detail || 'OCR failed');
+          throw new Error(response.data.error || response.data.detail || 'OCR failed');
         }
       }
       setProcessingStatus('✅ OCR completed!');
@@ -3533,7 +3533,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             translatedText: finalTranslation
           }]);
         } else {
-          throw new Errorr(response.data.error || response.data.detail || 'Translation failed');
+          throw new Error(response.data.error || response.data.detail || 'Translation failed');
         }
       }
       setProcessingStatus('✅ Translation completed!');
@@ -3596,7 +3596,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             translatedText: response.data.translation
           }]);
         } else {
-          throw new Errorr(response.data.error || response.data.detail || 'Translation failed');
+          throw new Error(response.data.error || response.data.detail || 'Translation failed');
         }
       }
       setProcessingStatus(`✅ Translation completed! ${totalPages} page(s) translated.`);
@@ -3683,7 +3683,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setCorrectionCommand('');
         setProcessingStatus('✅ Correction applied!');
       } else {
-        throw new Errorr(response.data.error || response.data.detail || 'Correction failed');
+        throw new Error(response.data.error || response.data.detail || 'Correction failed');
       }
     } catch (error) {
       console.error('Correction error:', error);
@@ -14605,7 +14605,7 @@ const NewQuotePage = ({ adminKey, user }) => {
         setUploadedFiles([]);
         setQuote(null);
       } else {
-        throw new Errorr(response.data.error || 'Failed to create quote');
+        throw new Error(response.data.error || 'Failed to create quote');
       }
     } catch (err) {
       console.error('Failed to send quote:', err);
