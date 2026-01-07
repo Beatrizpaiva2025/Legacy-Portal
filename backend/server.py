@@ -92,19 +92,32 @@ logger = logging.getLogger(__name__)
 
 # Initialize AWS Textract client (if credentials are available)
 textract_client = None
+aws_credentials_status = "not_configured"
 try:
-    if os.environ.get('AWS_ACCESS_KEY_ID') and os.environ.get('AWS_SECRET_ACCESS_KEY'):
+    aws_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+    aws_secret = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    aws_region = os.environ.get('AWS_REGION', 'us-east-1')
+
+    if aws_key_id and aws_secret:
+        # Log masked credentials for debugging
+        masked_key = f"{aws_key_id[:4]}...{aws_key_id[-4:]}" if len(aws_key_id) > 8 else "***"
+        masked_secret = f"{aws_secret[:4]}...{aws_secret[-4:]}" if len(aws_secret) > 8 else "***"
+        logger.info(f"AWS credentials found: KEY_ID={masked_key}, SECRET={masked_secret}, REGION={aws_region}")
+
         textract_client = boto3.client(
             'textract',
-            region_name=os.environ.get('AWS_REGION', 'us-east-1'),
-            aws_access_key_id=os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
+            region_name=aws_region,
+            aws_access_key_id=aws_key_id,
+            aws_secret_access_key=aws_secret
         )
-        logger.info("AWS Textract initialized successfully")
+        aws_credentials_status = "configured"
+        logger.info("AWS Textract client initialized successfully")
     else:
-        logger.info("AWS credentials not found, using Tesseract OCR as fallback")
+        logger.info(f"AWS credentials missing: KEY_ID={'found' if aws_key_id else 'missing'}, SECRET={'found' if aws_secret else 'missing'}")
+        aws_credentials_status = "missing_credentials"
 except Exception as e:
     logger.warning(f"Failed to initialize AWS Textract: {e}, using Tesseract as fallback")
+    aws_credentials_status = f"init_error: {str(e)}"
 
 # Email Service Class
 class EmailDeliveryError(Exception):
@@ -2352,10 +2365,12 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 return None
 
     except ClientError as e:
-        logger.warning(f"AWS Textract error: {e}")
+        error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+        error_msg = e.response.get('Error', {}).get('Message', str(e))
+        logger.error(f"AWS Textract ClientError: Code={error_code}, Message={error_msg}")
         return None
     except Exception as e:
-        logger.warning(f"Textract extraction failed: {e}")
+        logger.error(f"Textract extraction failed: {type(e).__name__}: {e}")
         return None
 
     return None
@@ -15761,6 +15776,37 @@ app.include_router(api_router)
 @app.get("/")
 async def root():
     return {"message": "Legacy Translations API", "status": "online", "api_docs": "/docs"}
+
+# AWS Diagnostic endpoint
+@app.get("/api/admin/aws-diagnostic")
+async def aws_diagnostic():
+    """Diagnose AWS Textract configuration"""
+    result = {
+        "aws_credentials_status": aws_credentials_status,
+        "textract_client_initialized": textract_client is not None,
+        "aws_region": os.environ.get('AWS_REGION', 'us-east-1'),
+        "aws_key_id_present": bool(os.environ.get('AWS_ACCESS_KEY_ID')),
+        "aws_secret_present": bool(os.environ.get('AWS_SECRET_ACCESS_KEY')),
+    }
+
+    # Try a simple test call if client is initialized
+    if textract_client:
+        try:
+            # Create a simple test image (1x1 white pixel PNG)
+            import base64
+            # Minimal valid PNG (1x1 white pixel)
+            test_png = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
+            response = textract_client.detect_document_text(Document={'Bytes': test_png})
+            result["textract_test"] = "SUCCESS"
+            result["textract_response_blocks"] = len(response.get('Blocks', []))
+        except Exception as e:
+            result["textract_test"] = "FAILED"
+            result["textract_error"] = str(e)
+            result["textract_error_type"] = type(e).__name__
+
+    return result
 
 @app.on_event("startup")
 async def create_default_partner():
