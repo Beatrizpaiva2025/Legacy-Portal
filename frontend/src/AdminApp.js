@@ -5170,17 +5170,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
+      {/* Translator access: IN_HOUSE = ALL TABS | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
-          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'translator_inhouse'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
@@ -8143,8 +8143,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* PROOFREADING TAB - Admin and PM Only */}
-      {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
+      {/* PROOFREADING TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'proofreading' && (isAdmin || isPM || isInHouseTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
@@ -8474,24 +8474,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="mr-2">←</span> Back: Review
                   </button>
                   <div className="flex gap-3">
-                    {/* Reject Button */}
-                    <button
-                      onClick={rejectTranslation}
-                      disabled={sendingToProjects}
-                      className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
-                    >
-                      ❌ Reject
-                    </button>
+                    {/* Reject Button - Only for Admin and PM */}
+                    {(isAdmin || isPM) && (
+                      <button
+                        onClick={rejectTranslation}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
+                      >
+                        ❌ Reject
+                      </button>
+                    )}
 
-                    {/* Approve Button - Different behavior for PM vs Admin */}
+                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
                     <button
                       onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        isPM && !isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
+                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
-                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
+                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -8506,7 +8508,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isPM && !isAdmin ? (
+                  {isInHouseTranslator ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                    </>
+                  ) : isPM && !isAdmin ? (
                     <>
                       📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
                       <br/>
@@ -8603,6 +8609,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       try {
                         if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
                           const text = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(text)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           const html = `<div style="white-space: pre-wrap;">${text}</div>`;
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
@@ -8614,6 +8625,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setProcessingStatus('✅ Translation loaded!');
                         } else if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
                           const html = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
@@ -8626,6 +8642,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           // Word document - convert to HTML using mammoth
                           setProcessingStatus('🔄 Converting Word document...');
                           const html = await convertWordToHtml(file);
+                          // Check for binary content (corrupted conversion)
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ Word document appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
@@ -10004,8 +10025,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* TRANSLATION MEMORY TAB - Admin Only */}
-      {activeSubTab === 'tm' && isAdmin && (
+      {/* TRANSLATION MEMORY TAB - Admin and In-House Translators */}
+      {activeSubTab === 'tm' && (isAdmin || isInHouseTranslator) && (
         <div className="bg-white rounded shadow">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -12636,7 +12657,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -13177,15 +13198,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => assignTranslator(order.id, 'Admin (Self)')}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
-                            title="Assign to yourself as Admin"
-                          >
-                            👑 Assign to Me
-                          </button>
-                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -21804,29 +21816,35 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
         .signature-title { font-size: 11px; color: #666; }
         .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
-        .stamp-container { text-align: right; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #1a365d; border-radius: 50%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-family: Arial, sans-serif; color: #1a365d;
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
-        .stamp-text-top { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-        .stamp-center { text-align: center; margin: 5px 0; }
-        .stamp-company { font-size: 9px; font-weight: bold; }
-        .stamp-ata { font-size: 8px; }
+        .stamp::before {
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
+        }
+        .stamp-text-top {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
         .translation-content { margin-top: 10px; }
-        .translation-image { max-width: 100%; height: auto; }
+        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
         .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
-        .page-title { font-size: 18px; font-weight: bold; color: #1a365d; margin-bottom: 15px; text-align: center; }
-        .original-image-container { text-align: center; }
-        .original-image { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
         @page { @top-center { content: element(header); } }
