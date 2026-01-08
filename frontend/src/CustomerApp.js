@@ -1264,11 +1264,12 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       const quoteId = quoteResponse.data.id;
 
       // Step 2: Create Stripe checkout session
+      // Note: origin_url should NOT include hash - backend will append query params before hash
       const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
         quote_id: quoteId,
         customer_email: guestEmail,
         customer_name: guestName,
-        origin_url: window.location.origin + '/#/customer'
+        origin_url: window.location.origin
       });
 
       // Step 3: Save form data before redirecting to Stripe
