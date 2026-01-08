@@ -12781,7 +12781,7 @@ Output CLEAN, PROFESSIONAL HTML:
    - Margins: 20mm all sides
    - Line-height: 1.5
 
-3. Page size: {"US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"}
+3. Page size: {'US Letter (8.5" × 11")' if page_format == "letter" else 'A4 (210mm × 297mm)'}
 
 4. Structure:
    - Center main titles
