@@ -5182,6 +5182,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Processing Status Indicator */}
+          {processingStatus && (
+            <div className={`p-3 rounded-lg text-sm font-medium animate-pulse ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
+              'bg-blue-100 text-blue-700 border border-blue-300'
+            }`}>
+              {processingStatus}
+            </div>
+          )}
+
           {/* Translator Messages Panel */}
           {user?.role === 'translator' && (
             <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
@@ -5353,17 +5364,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {selectedFileId === file.id && (
                           <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
                         )}
-                        {/* Download button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadProjectDocument(file.id, file.filename);
-                          }}
-                          className="mt-2 w-full px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
-                          title={`Download ${file.filename}`}
-                        >
-                          ⬇️ Download Original
-                        </button>
+                        {/* Action buttons */}
+                        <div className="mt-2 flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              loadFileToWorkspace(file.id, file.filename);
+                            }}
+                            className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                            title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                          >
+                            📥 Load to Workspace
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadProjectDocument(file.id, file.filename);
+                            }}
+                            className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
+                            title={`Download ${file.filename}`}
+                          >
+                            ⬇️
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -5470,13 +5493,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           {file.file_status}
                         </span>
                       </div>
-                      <button
-                        onClick={() => downloadProjectDocument(file.id, file.filename)}
-                        className="ml-3 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
-                        title={`Download ${file.filename}`}
-                      >
-                        ⬇️ Download
-                      </button>
+                      <div className="flex gap-1 ml-3">
+                        <button
+                          onClick={() => loadFileToWorkspace(file.id, file.filename)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
+                          title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                        >
+                          📥 Load to Workspace
+                        </button>
+                        <button
+                          onClick={() => downloadProjectDocument(file.id, file.filename)}
+                          className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
+                          title={`Download ${file.filename}`}
+                        >
+                          ⬇️
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -21129,6 +21161,76 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     } catch (err) {
       console.error('Failed to download:', err);
       alert('Errorr downloading document');
+    }
+  };
+
+  // Load file to workspace (download and convert PDF to images automatically)
+  const loadFileToWorkspace = async (docId, filename) => {
+    try {
+      setProcessingStatus('Downloading file...');
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+
+      if (response.data.file_data) {
+        const contentType = response.data.content_type || 'application/pdf';
+        const base64Data = response.data.file_data;
+        const fileNameLower = (filename || '').toLowerCase();
+
+        // Check if it's a PDF - needs conversion to images
+        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
+          setProcessingStatus('Converting PDF to images...');
+
+          // Convert base64 to blob/file for processing
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
+
+          // Convert PDF to images using existing function
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
+          });
+
+          // Load images into workspace
+          const loadedDocs = images.map(img => ({
+            filename: img.filename,
+            data: `data:${img.type};base64,${img.data}`,
+            contentType: img.type
+          }));
+
+          setOriginalContents(loadedDocs);
+          setCurrentDocIndex(0);
+          setProcessingStatus('');
+          alert(`✅ PDF converted! ${loadedDocs.length} page(s) loaded to workspace.`);
+
+        } else if (contentType.startsWith('image/')) {
+          // Image file - load directly
+          setOriginalContents([{
+            filename: filename || 'image',
+            data: `data:${contentType};base64,${base64Data}`,
+            contentType: contentType
+          }]);
+          setCurrentDocIndex(0);
+          setProcessingStatus('');
+          alert('✅ Image loaded to workspace!');
+
+        } else {
+          // Other file types - just download
+          setProcessingStatus('');
+          const link = document.createElement('a');
+          link.href = `data:${contentType};base64,${base64Data}`;
+          link.download = filename || 'document';
+          link.click();
+          alert('File downloaded. This file type cannot be loaded to workspace directly.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load file to workspace:', err);
+      setProcessingStatus('');
+      alert('Error loading file to workspace');
     }
   };
 
