@@ -85,7 +85,17 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register'
+    register: 'Register',
+    // Partner Terms
+    agreeToTerms: 'I agree to the',
+    partnerTerms: 'Partner Terms and Conditions',
+    andAcknowledge: 'and acknowledge that I have read and understood the partnership agreement.',
+    mustAgreeToTerms: 'You must agree to the Partner Terms and Conditions to create an account.',
+    partnerBenefits: 'Partner Benefits',
+    net30Terms: 'Net 30 payment terms',
+    volumeDiscounts: 'Volume discounts on translations',
+    dedicatedSupport: 'Dedicated account support',
+    priorityProcessing: 'Priority order processing'
   },
   es: {
     // Login
@@ -163,7 +173,17 @@ const TRANSLATIONS = {
     email: 'Correo Electrónico',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Partner Terms
+    agreeToTerms: 'Acepto los',
+    partnerTerms: 'Términos y Condiciones de Asociación',
+    andAcknowledge: 'y reconozco que he leído y comprendido el acuerdo de asociación.',
+    mustAgreeToTerms: 'Debe aceptar los Términos y Condiciones de Asociación para crear una cuenta.',
+    partnerBenefits: 'Beneficios de Socio',
+    net30Terms: 'Términos de pago Net 30',
+    volumeDiscounts: 'Descuentos por volumen en traducciones',
+    dedicatedSupport: 'Soporte de cuenta dedicado',
+    priorityProcessing: 'Procesamiento prioritario de pedidos'
   },
   pt: {
     // Login
@@ -241,7 +261,17 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Partner Terms
+    agreeToTerms: 'Eu concordo com os',
+    partnerTerms: 'Termos e Condições de Parceria',
+    andAcknowledge: 'e reconheço que li e compreendi o acordo de parceria.',
+    mustAgreeToTerms: 'Você deve concordar com os Termos e Condições de Parceria para criar uma conta.',
+    partnerBenefits: 'Benefícios de Parceiro',
+    net30Terms: 'Condições de pagamento Net 30',
+    volumeDiscounts: 'Descontos por volume em traduções',
+    dedicatedSupport: 'Suporte de conta dedicado',
+    priorityProcessing: 'Processamento prioritário de pedidos'
   }
 };
 
@@ -337,6 +367,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [formData, setFormData] = useState({
     email: initialState.email,
     password: '',
@@ -364,6 +395,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Check terms agreement for registration
+    if (!isLogin && !agreedToTerms) {
+      setError(t.mustAgreeToTerms || 'You must agree to the Partner Terms and Conditions to create an account.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -379,7 +417,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           password: formData.password,
           company_name: formData.company_name,
           contact_name: formData.contact_name,
-          phone: formData.phone
+          phone: formData.phone,
+          agreed_to_terms: true
         });
         onLogin(response.data);
       }
@@ -562,10 +601,53 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
             )}
 
+            {/* Partner Terms Agreement - Only show on registration */}
+            {!isLogin && (
+              <div className="p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-yellow-400 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="text-sm">
+                    <span className="text-gray-700">
+                      {t.agreeToTerms || 'I agree to the'}{' '}
+                    </span>
+                    <a
+                      href="https://legacytranslations.com/partner-terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 font-semibold underline"
+                    >
+                      {t.partnerTerms || 'Partner Terms and Conditions'}
+                    </a>
+                    <span className="text-gray-700">
+                      {' '}{t.andAcknowledge || 'and acknowledge that I have read and understood the partnership agreement.'}
+                    </span>
+                  </div>
+                </label>
+                <div className="mt-3 text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
+                  <strong>📋 {t.partnerBenefits || 'Partner Benefits'}:</strong>
+                  <ul className="mt-1 ml-4 list-disc">
+                    <li>{t.net30Terms || 'Net 30 payment terms'}</li>
+                    <li>{t.volumeDiscounts || 'Volume discounts on translations'}</li>
+                    <li>{t.dedicatedSupport || 'Dedicated account support'}</li>
+                    <li>{t.priorityProcessing || 'Priority order processing'}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+              disabled={loading || (!isLogin && !agreedToTerms)}
+              className={`w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 ${
+                !isLogin && !agreedToTerms
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+              } disabled:from-gray-400 disabled:to-gray-500`}
             >
               {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
             </button>
