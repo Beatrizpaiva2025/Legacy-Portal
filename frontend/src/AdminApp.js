@@ -3834,8 +3834,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        // Word document (.docx)
-        if (fileName.endsWith('.docx')) {
+        // Word document (.docx or .doc)
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
           setQuickPackageProgress(`Converting Word document: ${file.name}`);
           const html = await convertWordToHtml(file);
           setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
@@ -7482,7 +7482,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     for (const file of files) {
                       const fileName = file.name.toLowerCase();
                       try {
-                        if (fileName.endsWith('.docx')) {
+                        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                           const html = await convertWordToHtml(file);
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                         } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -7492,7 +7492,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           const text = await readTxtFile(file);
                           const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                        } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                        } else if (fileName.endsWith('.pdf')) {
+                          // Convert PDF to individual page images
+                          setProcessingStatus(`Converting PDF: ${file.name}...`);
+                          const images = await convertPdfToImages(file, (page, total) => {
+                            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                          });
+                          images.forEach((img, idx) => {
+                            const imgHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
+                            setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
+                          });
+                        } else if (file.type.startsWith('image/')) {
                           const dataUrl = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onload = () => resolve(reader.result);
@@ -7503,7 +7513,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         }
                       } catch (err) {
                         console.error('Upload error:', err);
-                        setProcessingStatus(`⚠️ Errorr: ${file.name}`);
+                        setProcessingStatus(`⚠️ Error: ${file.name}`);
                       }
                     }
                     setProcessingStatus('✅ Translation uploaded!');
@@ -7781,7 +7791,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setProcessingStatus(`Processing page ${idx + 1}...`);
                             try {
                               let html = '';
-                              if (fileName.endsWith('.docx')) {
+                              if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                                 html = await convertWordToHtml(file);
                               } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
                                 html = await readHtmlFile(file);
@@ -7853,7 +7863,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         for (const file of files) {
                           const fileName = file.name.toLowerCase();
                           try {
-                            if (fileName.endsWith('.docx')) {
+                            if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                               const html = await convertWordToHtml(file);
                               setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
                             } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -9057,6 +9067,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       '📤 Send to PM for Review'
                     )}
                   </button>
+
+                  {/* Download Button for Contractors */}
+                  <button
+                    onClick={handleQuickPackageDownload}
+                    disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                    className="w-full mt-3 py-2 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {quickPackageLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      '📥 Download Package (Print/PDF)'
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-1 text-center">
+                    Opens print window - save as PDF
+                  </p>
 
                   {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
                     <p className="text-[10px] text-purple-600 mt-2">
@@ -21228,7 +21257,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         htmlContent = content;
       }
       // Word document
-      else if (fileName.endsWith('.docx')) {
+      else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
         try {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
