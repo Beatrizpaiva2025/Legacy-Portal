@@ -8474,24 +8474,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="mr-2">←</span> Back: Review
                   </button>
                   <div className="flex gap-3">
-                    {/* Reject Button */}
-                    <button
-                      onClick={rejectTranslation}
-                      disabled={sendingToProjects}
-                      className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
-                    >
-                      ❌ Reject
-                    </button>
+                    {/* Reject Button - Only for Admin and PM */}
+                    {(isAdmin || isPM) && (
+                      <button
+                        onClick={rejectTranslation}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
+                      >
+                        ❌ Reject
+                      </button>
+                    )}
 
-                    {/* Approve Button - Different behavior for PM vs Admin */}
+                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
                     <button
                       onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        isPM && !isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
+                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
-                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
+                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -8506,7 +8508,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isPM && !isAdmin ? (
+                  {isInHouseTranslator ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                    </>
+                  ) : isPM && !isAdmin ? (
                     <>
                       📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
                       <br/>
