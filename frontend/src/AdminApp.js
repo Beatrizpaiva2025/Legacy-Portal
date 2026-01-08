@@ -2041,13 +2041,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               const response = await axios.get(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`);
               const orderData = response.data.order || response.data;
               if (orderData.translation_html) {
-                setTranslationResults([{
-                  translatedText: orderData.translation_html,
-                  filename: 'Translation',
-                  originalText: ''
-                }]);
-                setActiveSubTab('review');
-                setProcessingStatus(`✅ Translation loaded!`);
+                // Check for corrupted binary content
+                if (isBinaryContent(orderData.translation_html)) {
+                  setProcessingStatus('⚠️ Translation data is corrupted. Please re-upload the translation.');
+                } else {
+                  setTranslationResults([{
+                    translatedText: orderData.translation_html,
+                    filename: 'Translation',
+                    originalText: ''
+                  }]);
+                  setActiveSubTab('review');
+                  setProcessingStatus(`✅ Translation loaded!`);
+                }
               }
             } catch (err) {
               console.error('Failed to load translation:', err);
@@ -2179,6 +2184,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const orderData = response.data.order || response.data;
 
         if (orderData.translation_html) {
+          // Check for corrupted binary content (Word file that wasn't converted)
+          if (isBinaryContent(orderData.translation_html)) {
+            console.warn('Binary content detected in translation_html - this appears to be a corrupted Word file');
+            setProcessingStatus('⚠️ Translation data is corrupted (binary Word file). Please re-upload the translation.');
+            return false;
+          }
           // Set translation results with original text for proofreading
           setTranslationResults([{
             translatedText: orderData.translation_html,
@@ -3316,6 +3327,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  };
+
+  // Helper function to detect if content is binary (corrupted Word file data)
+  const isBinaryContent = (content) => {
+    if (!content || typeof content !== 'string') return false;
+    // Check for common binary signatures
+    // PK = ZIP/DOCX header, starts with lots of null or control chars
+    if (content.startsWith('PK')) return true;
+    // Check for high ratio of non-printable characters
+    const nonPrintable = content.slice(0, 500).split('').filter(c => {
+      const code = c.charCodeAt(0);
+      return code < 32 && code !== 9 && code !== 10 && code !== 13;
+    }).length;
+    return nonPrintable > 50; // More than 10% non-printable in first 500 chars
   };
 
   // Convert Word document (.docx) to HTML
@@ -21930,22 +21955,34 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         });
       } else if (order.translation_html) {
         // Load translation from order's translation_html field
-        setTranslatedContent({
-          filename: 'Translation',
-          html: order.translation_html,
-          contentType: 'text/html'
-        });
+        // Check for corrupted binary content
+        if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+          console.warn('Binary content detected in translation_html');
+          alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+        } else {
+          setTranslatedContent({
+            filename: 'Translation',
+            html: order.translation_html,
+            contentType: 'text/html'
+          });
+        }
       } else {
         // Try to fetch order details to get translation_html
         try {
           const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
           const orderData = orderRes.data.order || orderRes.data;
           if (orderData.translation_html) {
-            setTranslatedContent({
-              filename: 'Translation',
-              html: orderData.translation_html,
-              contentType: 'text/html'
-            });
+            // Check for corrupted binary content
+            if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+              console.warn('Binary content detected in translation_html');
+              alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+            } else {
+              setTranslatedContent({
+                filename: 'Translation',
+                html: orderData.translation_html,
+                contentType: 'text/html'
+              });
+            }
           }
         } catch (orderErr) {
           console.error('Failed to fetch order details:', orderErr);
