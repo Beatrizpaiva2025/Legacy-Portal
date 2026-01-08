@@ -7028,7 +7028,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <button
                             onClick={() => {
-                              const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                              const text = ocrResults.map(r => r.text).join('\n\n<hr style="border: 2px dashed #ccc; margin: 20px 0;">\n\n');
                               const htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -7036,13 +7036,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   <title>OCR Extracted Text</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-    .page-break { border-top: 2px dashed #ccc; margin: 20px 0; padding-top: 20px; }
-    pre { white-space: pre-wrap; word-wrap: break-word; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
   </style>
 </head>
 <body>
   <h1>OCR Extracted Text</h1>
-  <pre>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/---/g, '</pre><div class="page-break"></div><pre>')}</pre>
+  <div>${text}</div>
 </body>
 </html>`;
                               const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -7060,7 +7062,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                           <button
                             onClick={() => {
-                              const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                              const text = ocrResults.map(r => r.text).join('\n\n<br style="page-break-before: always;">\n\n');
                               const docContent = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -7076,12 +7078,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   <![endif]-->
   <style>
     body { font-family: Arial, sans-serif; margin: 1in; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
     pre { white-space: pre-wrap; word-wrap: break-word; font-family: Courier New, monospace; }
-    .page-break { page-break-before: always; }
   </style>
 </head>
 <body>
-  <pre>${text.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/---/g, '</pre><div class="page-break"></div><pre>')}</pre>
+  <div>${text}</div>
 </body>
 </html>`;
                               const blob = new Blob([docContent], { type: 'application/msword' });
