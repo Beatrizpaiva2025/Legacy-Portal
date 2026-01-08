@@ -1056,8 +1056,33 @@ class Partner(BaseModel):
     password_hash: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None  # EIN/CNPJ
+    # Payment & Billing
+    payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
+    default_payment_method: str = "zelle"  # zelle, card, invoice
+    credit_limit: float = 0.0  # Maximum outstanding balance allowed
+    current_balance: float = 0.0  # Current outstanding balance
+    # Statistics for eligibility
+    total_orders: int = 0
+    total_paid_orders: int = 0
+    total_revenue: float = 0.0
+    # Status
     is_active: bool = True
+    is_approved: bool = True  # Admin can approve/suspend partners
+    payment_plan_approved: bool = False  # For invoice plans, needs admin approval
+    # Agreement
+    agreed_to_terms: bool = False
+    agreed_at: Optional[datetime] = None
+    # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_order_at: Optional[datetime] = None
+    last_payment_at: Optional[datetime] = None
 
 class PartnerCreate(BaseModel):
     company_name: str
@@ -1065,6 +1090,18 @@ class PartnerCreate(BaseModel):
     password: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None
+    # Payment preferences
+    payment_plan: str = "pay_per_order"
+    default_payment_method: str = "zelle"
+    # Agreement
+    agreed_to_terms: bool = False
 
 class PartnerLogin(BaseModel):
     email: EmailStr
@@ -3652,13 +3689,31 @@ async def register_partner(partner_data: PartnerCreate):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Create partner
+        # Determine if invoice plan needs approval
+        needs_approval = partner_data.payment_plan in ['biweekly', 'monthly']
+
+        # Create partner with all fields
         partner = Partner(
             company_name=partner_data.company_name,
             email=partner_data.email,
             password_hash=hash_password(partner_data.password),
             contact_name=partner_data.contact_name,
-            phone=partner_data.phone
+            phone=partner_data.phone,
+            # Address
+            address_street=partner_data.address_street,
+            address_city=partner_data.address_city,
+            address_state=partner_data.address_state,
+            address_zip=partner_data.address_zip,
+            address_country=partner_data.address_country,
+            tax_id=partner_data.tax_id,
+            # Payment settings
+            payment_plan=partner_data.payment_plan,
+            default_payment_method=partner_data.default_payment_method,
+            # For invoice plans, start with approval pending
+            payment_plan_approved=not needs_approval,  # Auto-approve pay_per_order
+            # Agreement
+            agreed_to_terms=partner_data.agreed_to_terms,
+            agreed_at=datetime.utcnow() if partner_data.agreed_to_terms else None
         )
 
         await db.partners.insert_one(partner.dict())
@@ -3666,6 +3721,32 @@ async def register_partner(partner_data: PartnerCreate):
         # Generate token
         token = generate_token()
         active_tokens[token] = partner.id
+
+        # Send notification email to admin if invoice plan requested
+        if needs_approval:
+            try:
+                admin_subject = f"New Partner Registration - Invoice Plan Approval Needed: {partner.company_name}"
+                admin_content = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #1e40af;">New Partner Registration - Approval Required</h2>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 10px;">
+                        <p><strong>Company:</strong> {partner.company_name}</p>
+                        <p><strong>Contact:</strong> {partner.contact_name}</p>
+                        <p><strong>Email:</strong> {partner.email}</p>
+                        <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
+                        <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
+                        {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
+                        {f'<p><strong>Tax ID:</strong> {partner.tax_id}</p>' if partner.tax_id else ''}
+                    </div>
+                    <p style="margin-top: 20px; color: #6b7280;">
+                        This partner has requested an invoice-based payment plan. Please review and approve/deny in the admin panel.
+                    </p>
+                </div>
+                """
+                await send_email("contact@legacytranslations.com", admin_subject, admin_content)
+            except Exception as email_error:
+                logger.error(f"Failed to send admin notification: {email_error}")
 
         return PartnerResponse(
             id=partner.id,

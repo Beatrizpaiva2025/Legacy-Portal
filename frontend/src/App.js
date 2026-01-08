@@ -85,7 +85,41 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register'
+    register: 'Register',
+    // Registration - Address
+    companyAddress: 'Company Address',
+    street: 'Street Address',
+    city: 'City',
+    state: 'State',
+    zipCode: 'ZIP Code',
+    country: 'Country',
+    taxId: 'Tax ID (EIN/CNPJ) - Optional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: 'Payment Plan',
+    payPerOrder: 'Pay Per Order',
+    payPerOrderDesc: 'Pay for each order via Zelle or card',
+    biweeklyInvoice: 'Biweekly Invoice',
+    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks (requires approval)',
+    monthlyInvoice: 'Monthly Invoice',
+    monthlyInvoiceDesc: 'Receive monthly invoice (requires approval)',
+    invoiceRequiresApproval: 'Invoice plans require account approval after registration',
+    paymentMethod: 'Preferred Payment Method',
+    zelle: 'Zelle',
+    creditCard: 'Credit Card',
+    invoice: 'Invoice',
+    // Agreement
+    partnerAgreement: 'Partner Agreement',
+    agreementTerms: 'Terms and Conditions',
+    termsIntro: 'By registering as a Partner, you agree to the following terms:',
+    term1: 'No fees or commitments to cancel at any time',
+    term2: 'Pay Per Order: Payment required before delivery',
+    term3: 'Invoice Plans: Payment due within 15 days of invoice',
+    term4: 'Late payments may result in service suspension',
+    term5: 'All translations are for your company\'s use only',
+    term6: 'Prices may be updated with 30 days notice',
+    iAgreeToTerms: 'I agree to the Partner Agreement terms',
+    mustAgreeToTerms: 'You must agree to the terms to register'
   },
   es: {
     // Login
@@ -163,7 +197,41 @@ const TRANSLATIONS = {
     email: 'Correo Electrónico',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Registration - Address
+    companyAddress: 'Dirección de la Empresa',
+    street: 'Dirección',
+    city: 'Ciudad',
+    state: 'Estado',
+    zipCode: 'Código Postal',
+    country: 'País',
+    taxId: 'ID Fiscal (EIN/RFC) - Opcional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: 'Plan de Pago',
+    payPerOrder: 'Pago Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
+    biweeklyInvoice: 'Factura Quincenal',
+    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas (requiere aprobación)',
+    monthlyInvoice: 'Factura Mensual',
+    monthlyInvoiceDesc: 'Reciba factura mensual (requiere aprobación)',
+    invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
+    paymentMethod: 'Método de Pago Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Tarjeta de Crédito',
+    invoice: 'Factura',
+    // Agreement
+    partnerAgreement: 'Acuerdo de Partner',
+    agreementTerms: 'Términos y Condiciones',
+    termsIntro: 'Al registrarse como Partner, acepta los siguientes términos:',
+    term1: 'Sin tarifas ni compromisos para cancelar en cualquier momento',
+    term2: 'Pago Por Pedido: Pago requerido antes de la entrega',
+    term3: 'Planes de Factura: Pago debido dentro de 15 días',
+    term4: 'Pagos atrasados pueden resultar en suspensión del servicio',
+    term5: 'Todas las traducciones son para uso de su empresa únicamente',
+    term6: 'Los precios pueden actualizarse con 30 días de aviso',
+    iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
+    mustAgreeToTerms: 'Debe aceptar los términos para registrarse'
   },
   pt: {
     // Login
@@ -241,7 +309,41 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Registration - Address
+    companyAddress: 'Endereço da Empresa',
+    street: 'Endereço',
+    city: 'Cidade',
+    state: 'Estado',
+    zipCode: 'CEP',
+    country: 'País',
+    taxId: 'CNPJ/CPF - Opcional',
+    taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
+    // Payment Plan
+    paymentPlan: 'Plano de Pagamento',
+    payPerOrder: 'Pagar Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
+    biweeklyInvoice: 'Fatura Quinzenal',
+    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas (requer aprovação)',
+    monthlyInvoice: 'Fatura Mensal',
+    monthlyInvoiceDesc: 'Receba fatura mensal (requer aprovação)',
+    invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
+    paymentMethod: 'Método de Pagamento Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Cartão de Crédito',
+    invoice: 'Fatura',
+    // Agreement
+    partnerAgreement: 'Acordo de Partner',
+    agreementTerms: 'Termos e Condições',
+    termsIntro: 'Ao se cadastrar como Partner, você concorda com os seguintes termos:',
+    term1: 'Sem taxas ou compromissos para cancelar a qualquer momento',
+    term2: 'Pagar Por Pedido: Pagamento necessário antes da entrega',
+    term3: 'Planos de Fatura: Pagamento em até 15 dias',
+    term4: 'Pagamentos atrasados podem resultar em suspensão do serviço',
+    term5: 'Todas as traduções são para uso exclusivo da sua empresa',
+    term6: 'Preços podem ser atualizados com 30 dias de aviso',
+    iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
+    mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar'
   }
 };
 
@@ -406,8 +508,21 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     password: '',
     company_name: initialState.company,
     contact_name: initialState.name,
-    phone: initialState.phone
+    phone: initialState.phone,
+    // Address
+    address_street: '',
+    address_city: '',
+    address_state: '',
+    address_zip: '',
+    address_country: 'USA',
+    tax_id: '',
+    // Payment
+    payment_plan: 'pay_per_order',
+    default_payment_method: 'zelle',
+    // Agreement
+    agreed_to_terms: false
   });
+  const [showAgreement, setShowAgreement] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -428,6 +543,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Validate agreement for registration
+    if (!isLogin && !formData.agreed_to_terms) {
+      setError(t.mustAgreeToTerms);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -443,7 +565,19 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           password: formData.password,
           company_name: formData.company_name,
           contact_name: formData.contact_name,
-          phone: formData.phone
+          phone: formData.phone,
+          // Address
+          address_street: formData.address_street || null,
+          address_city: formData.address_city || null,
+          address_state: formData.address_state || null,
+          address_zip: formData.address_zip || null,
+          address_country: formData.address_country || 'USA',
+          tax_id: formData.tax_id || null,
+          // Payment
+          payment_plan: formData.payment_plan,
+          default_payment_method: formData.default_payment_method,
+          // Agreement
+          agreed_to_terms: formData.agreed_to_terms
         });
         onLogin(response.data);
       }
@@ -588,6 +722,202 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                     placeholder="+1 (555) 123-4567"
                   />
                 </div>
+
+                {/* Company Address (Optional) */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">{t.companyAddress} (Optional)</h3>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                      value={formData.address_street}
+                      onChange={(e) => setFormData({...formData, address_street: e.target.value})}
+                      placeholder={t.street}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_city}
+                        onChange={(e) => setFormData({...formData, address_city: e.target.value})}
+                        placeholder={t.city}
+                      />
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_state}
+                        onChange={(e) => setFormData({...formData, address_state: e.target.value})}
+                        placeholder={t.state}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_zip}
+                        onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
+                        placeholder={t.zipCode}
+                      />
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_country}
+                        onChange={(e) => setFormData({...formData, address_country: e.target.value})}
+                      >
+                        <option value="USA">USA</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                      value={formData.tax_id}
+                      onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
+                      placeholder={t.taxId}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Plan Selection */}
+                <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.paymentPlan}</h3>
+                  <div className="space-y-2">
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="pay_per_order"
+                        checked={formData.payment_plan === 'pay_per_order'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.payPerOrder}</span>
+                        <p className="text-xs text-gray-500">{t.payPerOrderDesc}</p>
+                      </div>
+                    </label>
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="biweekly"
+                        checked={formData.payment_plan === 'biweekly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.biweeklyInvoice}</span>
+                        <p className="text-xs text-gray-500">{t.biweeklyInvoiceDesc}</p>
+                      </div>
+                    </label>
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="monthly"
+                        checked={formData.payment_plan === 'monthly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.monthlyInvoice}</span>
+                        <p className="text-xs text-gray-500">{t.monthlyInvoiceDesc}</p>
+                      </div>
+                    </label>
+                  </div>
+                  {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                    <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      {t.invoiceRequiresApproval}
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment Method Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'zelle'})}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'zelle' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.zelle}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'card'})}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.creditCard}
+                    </button>
+                    {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, default_payment_method: 'invoice'})}
+                        className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'invoice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                      >
+                        {t.invoice}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Partner Agreement */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAgreement(!showAgreement)}
+                    className="w-full px-4 py-3 bg-gray-50 text-left flex justify-between items-center hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-gray-800">{t.partnerAgreement}</span>
+                    <span className="text-gray-500">{showAgreement ? '▲' : '▼'}</span>
+                  </button>
+                  {showAgreement && (
+                    <div className="p-4 bg-white border-t border-gray-200">
+                      <h4 className="font-semibold text-gray-800 mb-2">{t.agreementTerms}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{t.termsIntro}</p>
+                      <ul className="space-y-2 text-sm text-gray-600">
+                        <li className="flex items-start">
+                          <span className="text-green-500 mr-2">✓</span>
+                          <span>{t.term1}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term2}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term3}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-amber-500 mr-2">!</span>
+                          <span>{t.term4}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term5}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term6}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Agreement Checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.agreed_to_terms}
+                    onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
+                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{t.iAgreeToTerms}</span>
+                </label>
               </>
             )}
 
