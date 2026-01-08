@@ -7293,6 +7293,69 @@ async def upload_payment_proof(
             )
             await db.notifications.insert_one(notification.dict())
 
+        # Send email notification to contact with View Receipt link
+        try:
+            api_url = os.environ.get("API_URL", "https://legacy-portal-backend.onrender.com")
+            admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+            view_receipt_url = f"{api_url}/api/payment-proofs/view/{payment_proof.id}"
+
+            email_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #1a365d 0%, #2d4a7c 100%); padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🔔 New {payment_method.upper()} Payment Received</h1>
+                </div>
+                <div style="padding: 30px; background: #f9fafb;">
+                    <p style="color: #374151;">A new order has been submitted with {payment_method.upper()} payment. Please verify the payment and confirm it in the admin panel.</p>
+
+                    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <p style="color: #92400e; font-weight: bold; font-size: 18px; margin: 0 0 15px 0;">
+                            💰 {payment_method.upper()} Payment Details
+                        </p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Order Number:</td>
+                                <td style="padding: 8px 0; color: #374151;">{order_number or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Name:</td>
+                                <td style="padding: 8px 0; color: #374151;">{customer_name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Email:</td>
+                                <td style="padding: 8px 0; color: #374151;"><a href="mailto:{customer_email}">{customer_email}</a></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Total Amount:</td>
+                                <td style="padding: 8px 0; color: #374151; font-size: 18px; font-weight: bold;">${amount:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Receipt:</td>
+                                <td style="padding: 8px 0;"><a href="{view_receipt_url}" style="color: #2563eb; font-weight: bold;">View Receipt</a></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 20px;">
+                        <a href="{admin_url}" style="display: inline-block; background: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                            Open Admin Panel
+                        </a>
+                    </div>
+                </div>
+                <div style="background: #1f2937; padding: 15px; text-align: center;">
+                    <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2025 Legacy Translations. All rights reserved.</p>
+                </div>
+            </div>
+            '''
+
+            await email_service.send_email(
+                "contact@legacytranslations.com",
+                f"🔔 New {payment_method.upper()} Payment - {customer_name} - ${amount:.2f}",
+                email_html
+            )
+            logger.info(f"Payment notification email sent to contact@legacytranslations.com")
+        except Exception as e:
+            logger.error(f"Failed to send payment notification email: {str(e)}")
+
         logger.info(f"Payment proof uploaded: {payment_proof.id} from {customer_email}")
 
         return {
@@ -7375,6 +7438,60 @@ async def get_payment_proof_detail(proof_id: str, admin_key: str, token: Optiona
         del proof['_id']
 
     return {"payment_proof": proof}
+
+
+@api_router.get("/payment-proofs/view/{proof_id}")
+async def view_payment_proof_file(proof_id: str):
+    """Public endpoint to view payment proof file (for email links)"""
+    from fastapi.responses import Response
+
+    proof = await db.payment_proofs.find_one({"id": proof_id})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found")
+
+    file_data = proof.get("proof_file_data")
+    file_type = proof.get("proof_file_type", "image/png")
+
+    if not file_data:
+        raise HTTPException(status_code=404, detail="No file data found")
+
+    # Decode base64 data
+    try:
+        file_bytes = base64.b64decode(file_data)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to decode file data")
+
+    return Response(content=file_bytes, media_type=file_type)
+
+
+@api_router.get("/receipt/view/{order_number}")
+async def view_receipt_by_order(order_number: str):
+    """View payment receipt by order number - redirects to admin panel or returns proof"""
+    from fastapi.responses import RedirectResponse
+
+    # Try to find payment proof by order number
+    proof = await db.payment_proofs.find_one({"order_number": order_number})
+    if proof:
+        # Return the file directly
+        file_data = proof.get("proof_file_data")
+        file_type = proof.get("proof_file_type", "image/png")
+
+        if file_data:
+            from fastapi.responses import Response
+            file_bytes = base64.b64decode(file_data)
+            return Response(content=file_bytes, media_type=file_type)
+
+    # Try to find in translation_orders or customer_orders
+    order = await db.translation_orders.find_one({"order_number": order_number})
+    if not order:
+        order = await db.customer_orders.find_one({"order_number": order_number})
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Redirect to admin panel
+    admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+    return RedirectResponse(url=f"{admin_url}?view_order={order_number}")
 
 @api_router.put("/admin/payment-proofs/{proof_id}/review")
 async def review_payment_proof(
