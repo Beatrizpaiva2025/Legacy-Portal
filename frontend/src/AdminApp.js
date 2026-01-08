@@ -5170,17 +5170,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
+      {/* Translator access: IN_HOUSE = ALL TABS | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
-          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'translator_inhouse'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
@@ -8143,8 +8143,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* PROOFREADING TAB - Admin and PM Only */}
-      {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
+      {/* PROOFREADING TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'proofreading' && (isAdmin || isPM || isInHouseTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
@@ -10004,8 +10004,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* TRANSLATION MEMORY TAB - Admin Only */}
-      {activeSubTab === 'tm' && isAdmin && (
+      {/* TRANSLATION MEMORY TAB - Admin and In-House Translators */}
+      {activeSubTab === 'tm' && (isAdmin || isInHouseTranslator) && (
         <div className="bg-white rounded shadow">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center space-x-2">
