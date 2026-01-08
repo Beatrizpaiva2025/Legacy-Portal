@@ -119,7 +119,13 @@ const TRANSLATIONS = {
     term5: 'All translations are for your company\'s use only',
     term6: 'Prices may be updated with 30 days notice',
     iAgreeToTerms: 'I agree to the Partner Agreement terms',
-    mustAgreeToTerms: 'You must agree to the terms to register'
+    mustAgreeToTerms: 'You must agree to the terms to register',
+    // Partner Benefits
+    partnerBenefits: 'Partner Benefits',
+    net30Terms: 'Net 30 payment terms',
+    volumeDiscounts: 'Volume discounts on translations',
+    dedicatedSupport: 'Dedicated account support',
+    priorityProcessing: 'Priority order processing'
   },
   es: {
     // Login
@@ -231,7 +237,13 @@ const TRANSLATIONS = {
     term5: 'Todas las traducciones son para uso de su empresa únicamente',
     term6: 'Los precios pueden actualizarse con 30 días de aviso',
     iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
-    mustAgreeToTerms: 'Debe aceptar los términos para registrarse'
+    mustAgreeToTerms: 'Debe aceptar los términos para registrarse',
+    // Partner Benefits
+    partnerBenefits: 'Beneficios de Socio',
+    net30Terms: 'Términos de pago Net 30',
+    volumeDiscounts: 'Descuentos por volumen en traducciones',
+    dedicatedSupport: 'Soporte de cuenta dedicado',
+    priorityProcessing: 'Procesamiento prioritario de pedidos'
   },
   pt: {
     // Login
@@ -343,7 +355,13 @@ const TRANSLATIONS = {
     term5: 'Todas as traduções são para uso exclusivo da sua empresa',
     term6: 'Preços podem ser atualizados com 30 dias de aviso',
     iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
-    mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar'
+    mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar',
+    // Partner Benefits
+    partnerBenefits: 'Benefícios de Parceiro',
+    net30Terms: 'Condições de pagamento Net 30',
+    volumeDiscounts: 'Descontos por volume em traduções',
+    dedicatedSupport: 'Suporte de conta dedicado',
+    priorityProcessing: 'Processamento prioritário de pedidos'
   }
 };
 
@@ -958,8 +976,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+              disabled={loading || (!isLogin && !formData.agreed_to_terms)}
+              className={`w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 ${
+                !isLogin && !formData.agreed_to_terms
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+              } disabled:from-gray-400 disabled:to-gray-500`}
             >
               {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
             </button>
