@@ -12636,7 +12636,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -13177,15 +13177,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => assignTranslator(order.id, 'Admin (Self)')}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
-                            title="Assign to yourself as Admin"
-                          >
-                            👑 Assign to Me
-                          </button>
-                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
