@@ -881,7 +881,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
     const sessionId = urlParams.get('session_id');
 
     if (paymentSuccess === 'true' && sessionId) {
-      setSuccess('Payment successful! Your order has been confirmed. Check your email for details.');
+      setSuccess(t.paymentSuccessful);
       // Clear saved form data on success
       sessionStorage.removeItem('pendingOrderData');
       // Clean URL
@@ -907,10 +907,10 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
           console.error('Error restoring form data:', e);
         }
       }
-      setError('Payment was canceled. Your order has been saved - you can complete payment later.');
+      setError(t.paymentCanceled);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, []);
+  }, [t]);
 
   // Calculate quote function (defined before useEffect that calls it)
   const calculateQuote = useCallback(() => {
