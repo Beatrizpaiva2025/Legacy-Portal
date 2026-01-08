@@ -913,6 +913,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Payment method options
   const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const zelleReceiptInputRef = useRef(null);
   const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
 
@@ -1162,20 +1164,33 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     setError('');
 
     try {
+      // If Zelle payment, upload receipt first
+      let zelleReceiptId = null;
+      if (paymentMethod === 'zelle' && zelleReceipt) {
+        const receiptFormData = new FormData();
+        receiptFormData.append('file', zelleReceipt);
+        const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+        zelleReceiptId = uploadResponse.data.document_id;
+      }
+
       const orderData = {
         ...formData,
         word_count: wordCount,
         document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
         payment_method: paymentMethod,
-        create_invoice: paymentMethod === 'invoice'
+        create_invoice: paymentMethod === 'invoice',
+        zelle_receipt_id: zelleReceiptId,
+        payment_status: paymentMethod === 'zelle' ? 'pending_zelle' : 'pending',
+        total_price: quote?.total || 0,
+        shipping_address: (needsPhysicalCopy || formData.service_type === 'rmv') ? shippingAddress : null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
 
       const invoiceMsg = paymentMethod === 'invoice'
         ? ' Invoice will be sent to your email shortly.'
-        : ` Please send payment via Zelle to ${ZELLE_EMAIL} (${ZELLE_NAME})`;
+        : ' We will verify your Zelle payment and send a confirmation email once confirmed.';
       setSuccess(`Order ${response.data.order.order_number} created successfully!${invoiceMsg}`);
 
       // Reset form
@@ -1193,6 +1208,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       setUploadedFiles([]);
       setQuote(null);
       setPaymentMethod('invoice');
+      setZelleReceipt(null);
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -1643,12 +1659,89 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
+            {/* Payment Method Selection */}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="invoice"
+                    checked={paymentMethod === 'invoice'}
+                    onChange={() => setPaymentMethod('invoice')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay by Invoice</span>
+                    <p className="text-sm text-gray-500 mt-1">Invoice sent to your email</p>
+                  </div>
+                </label>
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="zelle"
+                    checked={paymentMethod === 'zelle'}
+                    onChange={() => setPaymentMethod('zelle')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay with Zelle</span>
+                    <p className="text-sm text-gray-500 mt-1">Send to {ZELLE_EMAIL}</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Zelle Instructions & Receipt Upload */}
+              {paymentMethod === 'zelle' && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
+                  <h4 className="font-semibold text-purple-800">Zelle Payment Instructions</h4>
+                  <div className="space-y-2 text-sm text-purple-700">
+                    <p className="font-semibold">1. Open your bank app and select Zelle</p>
+                    <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
+                    <p className="font-semibold">3. Include your company name in the memo</p>
+                    <p className="font-semibold">4. Upload your payment receipt below</p>
+                  </div>
+
+                  {/* Receipt Upload */}
+                  <div>
+                    <input
+                      type="file"
+                      ref={zelleReceiptInputRef}
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => setZelleReceipt(e.target.files[0])}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => zelleReceiptInputRef.current?.click()}
+                      className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                    >
+                      {zelleReceipt ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          {zelleReceipt.name}
+                        </span>
+                      ) : (
+                        <span>Click to upload payment receipt</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {paymentMethod === 'zelle' && !zelleReceipt && (
+                    <p className="text-sm text-red-500">* Receipt is required for Zelle payments</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={submitting || wordCount === 0}
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+              disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? 'Creating Order...' : 'Create Order'}
+              {submitting ? 'Creating Order...' : (paymentMethod === 'zelle' ? 'Submit Order with Zelle' : 'Create Order')}
             </button>
           </form>
         </div>

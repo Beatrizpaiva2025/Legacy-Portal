@@ -1221,7 +1221,10 @@ class TranslationOrder(BaseModel):
     deadline: Optional[datetime] = None  # Translation deadline
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
-    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
+    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    shipping_address: Optional[Dict[str, str]] = None
     # Document classification
     document_type: Optional[str] = None  # birth_certificate, marriage_certificate, diploma, etc.
     document_category: Optional[str] = None  # financial, educational, personal, bank_statement, etc.
@@ -1239,6 +1242,12 @@ class TranslationOrderCreate(BaseModel):
     notes: Optional[str] = None
     document_filename: Optional[str] = None
     document_ids: Optional[List[str]] = None  # IDs of uploaded documents
+    payment_method: Optional[str] = "invoice"  # 'invoice' or 'zelle'
+    zelle_receipt_id: Optional[str] = None
+    payment_status: Optional[str] = "pending"
+    total_price: Optional[float] = None
+    shipping_address: Optional[Dict[str, str]] = None
+    create_invoice: Optional[bool] = True
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -5574,6 +5583,17 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Set due date (30 days from now for payment)
         due_date = datetime.utcnow() + timedelta(days=30)
 
+        # Determine payment status based on payment method
+        payment_status = "pending"
+        if order_data.payment_method == "zelle":
+            payment_status = "pending_zelle"
+
+        # Get Zelle receipt URL if available
+        zelle_receipt_url = None
+        if order_data.zelle_receipt_id:
+            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+            zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
+
         # Create order
         order = TranslationOrder(
             partner_id=partner["id"],
@@ -5594,7 +5614,12 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             urgency_fee=urgency_fee,
             total_price=total_price,
             due_date=due_date,
-            document_filename=order_data.document_filename
+            document_filename=order_data.document_filename,
+            payment_method=order_data.payment_method,
+            payment_status=payment_status,
+            zelle_receipt_id=order_data.zelle_receipt_id,
+            zelle_receipt_url=zelle_receipt_url,
+            shipping_address=order_data.shipping_address
         )
 
         await db.translation_orders.insert_one(order.dict())
@@ -5648,19 +5673,56 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "client_email": order.client_email
             }
 
-            # Notify partner
-            await email_service.send_order_confirmation_email(
-                partner["email"],
-                order_details,
-                is_partner=True
-            )
+            # If Zelle payment, send Zelle-specific emails
+            if order_data.payment_method == "zelle":
+                # Send Zelle pending email to partner
+                try:
+                    zelle_order_details = {
+                        **order_details,
+                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
+                        "customer_email": partner["email"]
+                    }
+                    email_html = get_zelle_pending_email_template(
+                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        zelle_order_details
+                    )
+                    await email_service.send_email(
+                        partner["email"],
+                        f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
+                        email_html,
+                        "html"
+                    )
+                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                except Exception as ze:
+                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
 
-            # Notify company
-            await email_service.send_order_confirmation_email(
-                "contact@legacytranslations.com",
-                order_details,
-                is_partner=False
-            )
+                # Send Zelle admin notification
+                try:
+                    admin_html = get_zelle_admin_notification_template(zelle_order_details, zelle_receipt_url)
+                    await email_service.send_email(
+                        "contact@legacytranslations.com",
+                        f"🔔 Partner Zelle Payment - {order.order_number} - ${order.total_price:.2f}",
+                        admin_html,
+                        "html"
+                    )
+                    logger.info("Zelle admin notification sent")
+                except Exception as ae:
+                    logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
+            else:
+                # Standard order confirmation emails
+                # Notify partner
+                await email_service.send_order_confirmation_email(
+                    partner["email"],
+                    order_details,
+                    is_partner=True
+                )
+
+                # Notify company
+                await email_service.send_order_confirmation_email(
+                    "contact@legacytranslations.com",
+                    order_details,
+                    is_partner=False
+                )
 
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
