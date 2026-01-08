@@ -697,6 +697,189 @@ def get_simple_client_email_template(client_name: str, message_content: str) -> 
                             </p>'''
     return get_email_header() + content + get_email_footer(include_review_button=False)
 
+def get_zelle_pending_email_template(client_name: str, order_details: dict) -> str:
+    """Generate email template for Zelle payment pending confirmation"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your order! We have received your Zelle payment submission and are currently verifying it.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            📋 Order Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Method:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">Zelle</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Status:</strong></td>
+                                                <td style="color: #f59e0b; font-size: 14px; padding: 5px 0; font-weight: 600;">⏳ Pending Verification</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Once we confirm your Zelle payment, you will receive another email confirming that your translation has begun.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions, please reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Best regards,<br>
+                                Legacy Translations Team
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_zelle_confirmed_email_template(client_name: str, order_details: dict) -> str:
+    """Generate email template for Zelle payment confirmed - translation started"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your Zelle payment has been confirmed and your translation is now in progress.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            ✅ Order Confirmed
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Status:</strong></td>
+                                                <td style="color: #10b981; font-size: 14px; padding: 5px 0; font-weight: 600;">✓ Confirmed</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Our team has started working on your translation. You will receive another email when your translation is complete and ready for download.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions, please reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Best regards,<br>
+                                Legacy Translations Team
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_zelle_admin_notification_template(order_details: dict, receipt_url: Optional[str] = None) -> str:
+    """Generate email template for admin notification of new Zelle payment"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
+    receipt_section = ""
+    if receipt_url:
+        receipt_section = f'''
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Receipt:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;"><a href="{receipt_url}" style="color: #3b82f6;">View Receipt</a></td>
+                                            </tr>'''
+
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                🔔 New Zelle Payment Received
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                A new order has been submitted with Zelle payment. Please verify the payment and confirm it in the admin panel.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-radius: 8px; margin: 25px 0; border: 1px solid #ffc107;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #856404; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            💰 Zelle Payment Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Customer Name:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('customer_name', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Customer Email:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('customer_email', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>{receipt_section}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 30px auto;">
+                                <tr>
+                                    <td style="border-radius: 6px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                        <a href="{portal_url}/#/admin/orders" style="display: inline-block; padding: 14px 30px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px;">
+                                            View in Admin Panel
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Please verify the Zelle payment in your bank account and confirm the order in the admin panel.
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
 def get_translator_assignment_email_template(translator_name: str, order_details: dict, accept_url: str, decline_url: str) -> str:
     """Generate email template for translator assignment with accept/decline buttons"""
     portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
@@ -842,6 +1025,16 @@ class PaymentCheckoutRequest(BaseModel):
     origin_url: str
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
+
+class ZelleOrderRequest(BaseModel):
+    quote_id: str
+    customer_email: str
+    customer_name: str
+    payment_method: str = "zelle"
+    zelle_receipt_id: Optional[str] = None
+    total_price: float
+    notes: Optional[str] = None
+    shipping_address: Optional[Dict[str, str]] = None
 
 class EmailNotificationRequest(BaseModel):
     quote_id: str
@@ -2765,6 +2958,187 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
     except Exception as e:
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+# Zelle Payment Integration
+@api_router.post("/create-zelle-order")
+async def create_zelle_order(request: ZelleOrderRequest, background_tasks: BackgroundTasks):
+    """Create an order with Zelle payment (pending verification)"""
+
+    try:
+        # Get quote
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Generate order number
+        order_count = await db.orders.count_documents({})
+        order_number = f"ORD-{datetime.utcnow().strftime('%Y%m%d')}-{order_count + 1:04d}"
+
+        # Get receipt URL if available
+        receipt_url = None
+        if request.zelle_receipt_id:
+            # Get the document/file URL
+            doc = await db.documents.find_one({"id": request.zelle_receipt_id})
+            if doc:
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
+
+        # Create order with pending_zelle status
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": request.quote_id,
+            "reference": quote.get("reference", "N/A"),
+            "customer_email": request.customer_email,
+            "customer_name": request.customer_name,
+            "client_name": request.customer_name,
+            "service_type": quote.get("service_type", "translation"),
+            "translate_from": quote.get("translate_from", ""),
+            "translate_to": quote.get("translate_to", ""),
+            "word_count": quote.get("word_count", 0),
+            "urgency": quote.get("urgency", "no"),
+            "total_price": request.total_price,
+            "payment_method": "zelle",
+            "payment_status": "pending_zelle",
+            "zelle_receipt_id": request.zelle_receipt_id,
+            "zelle_receipt_url": receipt_url,
+            "status": "pending_payment",
+            "notes": request.notes,
+            "shipping_address": request.shipping_address,
+            "document_ids": quote.get("document_ids", []),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "is_guest_order": True
+        }
+
+        await db.orders.insert_one(order)
+
+        # Update quote status
+        await db.translation_quotes.update_one(
+            {"id": request.quote_id},
+            {"$set": {"status": "pending_zelle", "order_id": order["id"], "updated_at": datetime.utcnow()}}
+        )
+
+        # Prepare order details for emails
+        order_details = {
+            "reference": order_number,
+            "service_type": order["service_type"],
+            "translate_from": order["translate_from"],
+            "translate_to": order["translate_to"],
+            "total_price": order["total_price"],
+            "customer_name": request.customer_name,
+            "customer_email": request.customer_email
+        }
+
+        # Send pending confirmation email to customer
+        try:
+            email_html = get_zelle_pending_email_template(request.customer_name, order_details)
+            await email_service.send_email(
+                request.customer_email,
+                f"Order Received - Zelle Payment Pending Verification - {order_number}",
+                email_html,
+                "html"
+            )
+            logger.info(f"Zelle pending email sent to customer: {request.customer_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle pending email to customer: {str(e)}")
+
+        # Send notification email to admin
+        try:
+            admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
+            admin_html = get_zelle_admin_notification_template(order_details, receipt_url)
+            await email_service.send_email(
+                admin_email,
+                f"🔔 New Zelle Payment - {order_number} - ${request.total_price:.2f}",
+                admin_html,
+                "html"
+            )
+            logger.info(f"Zelle admin notification sent to: {admin_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle admin notification: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Order submitted with Zelle payment pending verification",
+            "order_id": order["id"],
+            "order_number": order_number
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Zelle order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create Zelle order")
+
+@api_router.post("/confirm-zelle-payment/{order_id}")
+async def confirm_zelle_payment(order_id: str, background_tasks: BackgroundTasks):
+    """Admin endpoint to confirm a Zelle payment and start the translation"""
+
+    try:
+        # Get order
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.get("payment_status") != "pending_zelle":
+            raise HTTPException(status_code=400, detail="Order is not pending Zelle payment")
+
+        # Update order status
+        await db.orders.update_one(
+            {"id": order_id},
+            {
+                "$set": {
+                    "payment_status": "paid",
+                    "status": "in_progress",
+                    "payment_confirmed_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        # Update quote status
+        if order.get("quote_id"):
+            await db.translation_quotes.update_one(
+                {"id": order["quote_id"]},
+                {"$set": {"status": "paid", "updated_at": datetime.utcnow()}}
+            )
+
+        # Prepare order details for email
+        order_details = {
+            "reference": order.get("order_number", order.get("reference", "N/A")),
+            "service_type": order.get("service_type", "translation"),
+            "translate_from": order.get("translate_from", ""),
+            "translate_to": order.get("translate_to", ""),
+            "total_price": order.get("total_price", 0)
+        }
+
+        # Send confirmation email to customer
+        try:
+            customer_email = order.get("customer_email")
+            customer_name = order.get("customer_name", order.get("client_name", "Valued Customer"))
+            if customer_email:
+                email_html = get_zelle_confirmed_email_template(customer_name, order_details)
+                await email_service.send_email(
+                    customer_email,
+                    f"Payment Confirmed - Translation Started - {order_details['reference']}",
+                    email_html,
+                    "html"
+                )
+                logger.info(f"Zelle confirmation email sent to customer: {customer_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle confirmation email: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Zelle payment confirmed and translation started",
+            "order_id": order_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirming Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm Zelle payment")
 
 @api_router.get("/payment-status/{session_id}")
 async def get_payment_status(session_id: str):

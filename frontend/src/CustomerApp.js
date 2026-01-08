@@ -154,6 +154,23 @@ const CUSTOMER_TRANSLATIONS = {
     applied: 'applied!',
     paymentRequired: '* Payment required to start translation',
 
+    // Payment Method Selection
+    selectPaymentMethod: 'Select Payment Method',
+    payWithCard: 'Pay with Card',
+    payWithCardDesc: 'Secure payment via Stripe',
+    payWithZelle: 'Pay with Zelle',
+    payWithZelleDesc: 'Send payment to (857) 208-1139',
+    zelleInstructions: 'Zelle Payment Instructions',
+    zelleStep1: '1. Open your bank app and select Zelle',
+    zelleStep2: '2. Send payment to: (857) 208-1139',
+    zelleStep3: '3. Include your order number in the memo',
+    zelleStep4: '4. Upload your payment receipt below',
+    uploadReceipt: 'Upload Payment Receipt',
+    receiptRequired: 'Receipt is required for Zelle payments',
+    submitZelleOrder: 'Submit Order with Zelle',
+    zelleOrderSubmitted: 'Order submitted! We will verify your Zelle payment and send a confirmation email once your translation begins.',
+    zelleUsaOnly: '(USA only)',
+
     // Buttons
     continueToPayment: 'Continue to Payment',
     processingBtn: 'Processing...',
@@ -339,6 +356,23 @@ const CUSTOMER_TRANSLATIONS = {
     applied: '¡aplicado!',
     paymentRequired: '* Se requiere pago para iniciar la traducción',
 
+    // Payment Method Selection
+    selectPaymentMethod: 'Seleccionar Método de Pago',
+    payWithCard: 'Pagar con Tarjeta',
+    payWithCardDesc: 'Pago seguro vía Stripe',
+    payWithZelle: 'Pagar con Zelle',
+    payWithZelleDesc: 'Enviar pago a (857) 208-1139',
+    zelleInstructions: 'Instrucciones de Pago Zelle',
+    zelleStep1: '1. Abre tu app bancaria y selecciona Zelle',
+    zelleStep2: '2. Envía el pago a: (857) 208-1139',
+    zelleStep3: '3. Incluye tu número de orden en el memo',
+    zelleStep4: '4. Sube tu comprobante de pago abajo',
+    uploadReceipt: 'Subir Comprobante de Pago',
+    receiptRequired: 'El comprobante es requerido para pagos Zelle',
+    submitZelleOrder: 'Enviar Orden con Zelle',
+    zelleOrderSubmitted: '¡Orden enviada! Verificaremos tu pago Zelle y te enviaremos un email de confirmación cuando tu traducción comience.',
+    zelleUsaOnly: '(Solo USA)',
+
     // Buttons
     continueToPayment: 'Continuar al Pago',
     processingBtn: 'Procesando...',
@@ -523,6 +557,23 @@ const CUSTOMER_TRANSLATIONS = {
     off: 'de desconto',
     applied: 'aplicado!',
     paymentRequired: '* Pagamento necessário para iniciar a tradução',
+
+    // Payment Method Selection
+    selectPaymentMethod: 'Selecionar Método de Pagamento',
+    payWithCard: 'Pagar com Cartão',
+    payWithCardDesc: 'Pagamento seguro via Stripe',
+    payWithZelle: 'Pagar com Zelle',
+    payWithZelleDesc: 'Enviar pagamento para (857) 208-1139',
+    zelleInstructions: 'Instruções de Pagamento Zelle',
+    zelleStep1: '1. Abra seu app bancário e selecione Zelle',
+    zelleStep2: '2. Envie o pagamento para: (857) 208-1139',
+    zelleStep3: '3. Inclua seu número do pedido no memo',
+    zelleStep4: '4. Faça upload do comprovante abaixo',
+    uploadReceipt: 'Enviar Comprovante de Pagamento',
+    receiptRequired: 'Comprovante é obrigatório para pagamentos Zelle',
+    submitZelleOrder: 'Enviar Pedido com Zelle',
+    zelleOrderSubmitted: 'Pedido enviado! Verificaremos seu pagamento Zelle e enviaremos um email de confirmação quando sua tradução começar.',
+    zelleUsaOnly: '(Somente EUA)',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -836,6 +887,11 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   });
   const [showContactModal, setShowContactModal] = useState(false);
   const [formRestored, setFormRestored] = useState(false);
+
+  // Payment method states
+  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'zelle'
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const zelleReceiptInputRef = useRef(null);
 
   // Support form states
   const [supportIssueType, setSupportIssueType] = useState('');
@@ -1263,40 +1319,87 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       const quoteResponse = await axios.post(`${API}/calculate-quote`, quoteData);
       const quoteId = quoteResponse.data.id;
 
-      // Step 2: Create Stripe checkout session
-      // Note: origin_url should NOT include hash - backend will append query params before hash
-      const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
-        quote_id: quoteId,
-        customer_email: guestEmail,
-        customer_name: guestName,
-        origin_url: window.location.origin
-      });
+      // Handle different payment methods
+      if (paymentMethod === 'zelle') {
+        // ZELLE PAYMENT FLOW
+        // Step 2a: Upload Zelle receipt
+        let receiptUrl = null;
+        if (zelleReceipt) {
+          const receiptFormData = new FormData();
+          receiptFormData.append('file', zelleReceipt);
+          const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+          receiptUrl = uploadResponse.data.document_id;
+        }
 
-      // Step 3: Save form data before redirecting to Stripe
-      const pendingOrderData = {
-        formData,
-        guestName,
-        guestEmail,
-        certifications,
-        needsPhysicalCopy,
-        shippingAddress,
-        uploadedFiles,
-        wordCount,
-        discountCode,
-        appliedDiscount
-      };
-      sessionStorage.setItem('pendingOrderData', JSON.stringify(pendingOrderData));
+        // Step 2b: Create Zelle order
+        const zelleOrderData = {
+          quote_id: quoteId,
+          customer_email: guestEmail,
+          customer_name: guestName,
+          payment_method: 'zelle',
+          zelle_receipt_id: receiptUrl,
+          total_price: quote?.total || 0,
+          notes: formData.notes,
+          shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
+        };
 
-      // Step 4: Redirect to Stripe checkout
-      if (checkoutResponse.data.checkout_url) {
-        // Set flag to prevent beforeunload warning
-        setRedirectingToPayment(true);
-        // Small delay to ensure state is updated before redirect
-        setTimeout(() => {
-          window.location.href = checkoutResponse.data.checkout_url;
-        }, 100);
+        await axios.post(`${API}/create-zelle-order`, zelleOrderData);
+
+        // Step 3: Show success message
+        setSuccess(t.zelleOrderSubmitted);
+        setSubmitting(false);
+
+        // Clear form
+        setFormData({
+          service_type: 'standard',
+          translate_from: 'portuguese',
+          translate_to: 'english',
+          urgency: 'no',
+          reference: '',
+          notes: ''
+        });
+        setUploadedFiles([]);
+        setZelleReceipt(null);
+        setQuote(null);
+        setPaymentMethod('card');
+
       } else {
-        throw new Error('No checkout URL received');
+        // CARD PAYMENT FLOW (Stripe)
+        // Step 2: Create Stripe checkout session
+        // Note: origin_url should NOT include hash - backend will append query params before hash
+        const checkoutResponse = await axios.post(`${API}/create-payment-checkout`, {
+          quote_id: quoteId,
+          customer_email: guestEmail,
+          customer_name: guestName,
+          origin_url: window.location.origin
+        });
+
+        // Step 3: Save form data before redirecting to Stripe
+        const pendingOrderData = {
+          formData,
+          guestName,
+          guestEmail,
+          certifications,
+          needsPhysicalCopy,
+          shippingAddress,
+          uploadedFiles,
+          wordCount,
+          discountCode,
+          appliedDiscount
+        };
+        sessionStorage.setItem('pendingOrderData', JSON.stringify(pendingOrderData));
+
+        // Step 4: Redirect to Stripe checkout
+        if (checkoutResponse.data.checkout_url) {
+          // Set flag to prevent beforeunload warning
+          setRedirectingToPayment(true);
+          // Small delay to ensure state is updated before redirect
+          setTimeout(() => {
+            window.location.href = checkoutResponse.data.checkout_url;
+          }, 100);
+        } else {
+          throw new Error('No checkout URL received');
+        }
       }
 
     } catch (err) {
@@ -2009,13 +2112,112 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </button>
             </div>
 
-            {/* Continue to Payment Button */}
+            {/* Payment Method Selection */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-gray-800">{t.selectPaymentMethod}</h3>
+
+              {/* Pay with Card Option */}
+              <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="card"
+                  checked={paymentMethod === 'card'}
+                  onChange={() => setPaymentMethod('card')}
+                  className="w-5 h-5 text-teal-600"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <span className="font-medium">{t.payWithCard}</span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{t.payWithCardDesc}</p>
+                </div>
+              </label>
+
+              {/* Pay with Zelle Option */}
+              <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="zelle"
+                  checked={paymentMethod === 'zelle'}
+                  onChange={() => setPaymentMethod('zelle')}
+                  className="w-5 h-5 text-purple-600"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-6 h-6 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    <span className="font-medium">{t.payWithZelle}</span>
+                    <span className="text-xs text-purple-600 font-medium">{t.zelleUsaOnly}</span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{t.payWithZelleDesc}</p>
+                </div>
+              </label>
+
+              {/* Zelle Instructions - shown when Zelle is selected */}
+              {paymentMethod === 'zelle' && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
+                  <h4 className="font-semibold text-purple-800">{t.zelleInstructions}</h4>
+                  <div className="space-y-2 text-sm text-purple-700">
+                    <p>{t.zelleStep1}</p>
+                    <p className="font-semibold">{t.zelleStep2}</p>
+                    <p>{t.zelleStep3}</p>
+                    <p>{t.zelleStep4}</p>
+                  </div>
+
+                  {/* Zelle Receipt Upload */}
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-purple-800 mb-2">
+                      {t.uploadReceipt} *
+                    </label>
+                    <input
+                      type="file"
+                      ref={zelleReceiptInputRef}
+                      accept="image/*,.pdf"
+                      onChange={(e) => setZelleReceipt(e.target.files[0])}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => zelleReceiptInputRef.current?.click()}
+                      className="w-full p-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                    >
+                      {zelleReceipt ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {zelleReceipt.name}
+                        </span>
+                      ) : (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          {t.uploadReceipt}
+                        </span>
+                      )}
+                    </button>
+                    {paymentMethod === 'zelle' && !zelleReceipt && (
+                      <p className="text-xs text-purple-600 mt-1">{t.receiptRequired}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Continue to Payment / Submit Zelle Order Button */}
             <button
               type="submit"
-              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode))}
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+              disabled={submitting || uploadedFiles.length === 0 || !guestName || !guestEmail || ((needsPhysicalCopy || formData.service_type === 'rmv') && (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode)) || (paymentMethod === 'zelle' && !zelleReceipt)}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? t.processingBtn : t.continueToPayment}
+              {submitting ? t.processingBtn : (paymentMethod === 'zelle' ? t.submitZelleOrder : t.continueToPayment)}
             </button>
           </form>
         </div>
