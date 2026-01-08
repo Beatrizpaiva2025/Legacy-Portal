@@ -913,7 +913,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Payment method options
   const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
-  const ZELLE_PHONE = '(857) 208-1139';
+  const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
 
   // Calculate quote when relevant fields change
@@ -1175,7 +1175,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
       const invoiceMsg = paymentMethod === 'invoice'
         ? ' Invoice will be sent to your email shortly.'
-        : ` Please send payment via Zelle to ${ZELLE_PHONE} (${ZELLE_NAME})`;
+        : ` Please send payment via Zelle to ${ZELLE_EMAIL} (${ZELLE_NAME})`;
       setSuccess(`Order ${response.data.order.order_number} created successfully!${invoiceMsg}`);
 
       // Reset form
