@@ -21816,29 +21816,35 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
         .signature-title { font-size: 11px; color: #666; }
         .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
-        .stamp-container { text-align: right; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #1a365d; border-radius: 50%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-family: Arial, sans-serif; color: #1a365d;
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
-        .stamp-text-top { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-        .stamp-center { text-align: center; margin: 5px 0; }
-        .stamp-company { font-size: 9px; font-weight: bold; }
-        .stamp-ata { font-size: 8px; }
+        .stamp::before {
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
+        }
+        .stamp-text-top {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
         .translation-content { margin-top: 10px; }
-        .translation-image { max-width: 100%; height: auto; }
+        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
         .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
-        .page-title { font-size: 18px; font-weight: bold; color: #1a365d; margin-bottom: 15px; text-align: center; }
-        .original-image-container { text-align: center; }
-        .original-image { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
         @page { @top-center { content: element(header); } }
