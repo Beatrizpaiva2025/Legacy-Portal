@@ -8603,6 +8603,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       try {
                         if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
                           const text = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(text)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           const html = `<div style="white-space: pre-wrap;">${text}</div>`;
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
@@ -8614,6 +8619,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setProcessingStatus('✅ Translation loaded!');
                         } else if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
                           const html = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
@@ -8626,6 +8636,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           // Word document - convert to HTML using mammoth
                           setProcessingStatus('🔄 Converting Word document...');
                           const html = await convertWordToHtml(file);
+                          // Check for binary content (corrupted conversion)
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ Word document appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
