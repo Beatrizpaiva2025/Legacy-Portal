@@ -7667,6 +7667,69 @@ async def upload_payment_proof(
             )
             await db.notifications.insert_one(notification.dict())
 
+        # Send email notification to contact with View Receipt link
+        try:
+            api_url = os.environ.get("API_URL", "https://legacy-portal-backend.onrender.com")
+            admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+            view_receipt_url = f"{api_url}/api/payment-proofs/view/{payment_proof.id}"
+
+            email_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #1a365d 0%, #2d4a7c 100%); padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🔔 New {payment_method.upper()} Payment Received</h1>
+                </div>
+                <div style="padding: 30px; background: #f9fafb;">
+                    <p style="color: #374151;">A new order has been submitted with {payment_method.upper()} payment. Please verify the payment and confirm it in the admin panel.</p>
+
+                    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <p style="color: #92400e; font-weight: bold; font-size: 18px; margin: 0 0 15px 0;">
+                            💰 {payment_method.upper()} Payment Details
+                        </p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Order Number:</td>
+                                <td style="padding: 8px 0; color: #374151;">{order_number or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Name:</td>
+                                <td style="padding: 8px 0; color: #374151;">{customer_name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Email:</td>
+                                <td style="padding: 8px 0; color: #374151;"><a href="mailto:{customer_email}">{customer_email}</a></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Total Amount:</td>
+                                <td style="padding: 8px 0; color: #374151; font-size: 18px; font-weight: bold;">${amount:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Receipt:</td>
+                                <td style="padding: 8px 0;"><a href="{view_receipt_url}" style="color: #2563eb; font-weight: bold;">View Receipt</a></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 20px;">
+                        <a href="{admin_url}" style="display: inline-block; background: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                            Open Admin Panel
+                        </a>
+                    </div>
+                </div>
+                <div style="background: #1f2937; padding: 15px; text-align: center;">
+                    <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2025 Legacy Translations. All rights reserved.</p>
+                </div>
+            </div>
+            '''
+
+            await email_service.send_email(
+                "contact@legacytranslations.com",
+                f"🔔 New {payment_method.upper()} Payment - {customer_name} - ${amount:.2f}",
+                email_html
+            )
+            logger.info(f"Payment notification email sent to contact@legacytranslations.com")
+        except Exception as e:
+            logger.error(f"Failed to send payment notification email: {str(e)}")
+
         logger.info(f"Payment proof uploaded: {payment_proof.id} from {customer_email}")
 
         return {
@@ -7749,6 +7812,60 @@ async def get_payment_proof_detail(proof_id: str, admin_key: str, token: Optiona
         del proof['_id']
 
     return {"payment_proof": proof}
+
+
+@api_router.get("/payment-proofs/view/{proof_id}")
+async def view_payment_proof_file(proof_id: str):
+    """Public endpoint to view payment proof file (for email links)"""
+    from fastapi.responses import Response
+
+    proof = await db.payment_proofs.find_one({"id": proof_id})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found")
+
+    file_data = proof.get("proof_file_data")
+    file_type = proof.get("proof_file_type", "image/png")
+
+    if not file_data:
+        raise HTTPException(status_code=404, detail="No file data found")
+
+    # Decode base64 data
+    try:
+        file_bytes = base64.b64decode(file_data)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to decode file data")
+
+    return Response(content=file_bytes, media_type=file_type)
+
+
+@api_router.get("/receipt/view/{order_number}")
+async def view_receipt_by_order(order_number: str):
+    """View payment receipt by order number - redirects to admin panel or returns proof"""
+    from fastapi.responses import RedirectResponse
+
+    # Try to find payment proof by order number
+    proof = await db.payment_proofs.find_one({"order_number": order_number})
+    if proof:
+        # Return the file directly
+        file_data = proof.get("proof_file_data")
+        file_type = proof.get("proof_file_type", "image/png")
+
+        if file_data:
+            from fastapi.responses import Response
+            file_bytes = base64.b64decode(file_data)
+            return Response(content=file_bytes, media_type=file_type)
+
+    # Try to find in translation_orders or customer_orders
+    order = await db.translation_orders.find_one({"order_number": order_number})
+    if not order:
+        order = await db.customer_orders.find_one({"order_number": order_number})
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Redirect to admin panel
+    admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+    return RedirectResponse(url=f"{admin_url}?view_order={order_number}")
 
 @api_router.put("/admin/payment-proofs/{proof_id}/review")
 async def review_payment_proof(
@@ -8674,6 +8791,77 @@ async def send_partner_message(request: PartnerMessageRequest):
     return {"status": "success", "message_id": message_id}
 
 
+@api_router.get("/partner/conversations")
+async def get_partner_conversations(token: str):
+    """Get partner's message conversations with admin replies"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    partner_id = partner["id"]
+
+    # Get sent messages by partner
+    sent_messages = await db.partner_messages.find(
+        {"from_partner_id": partner_id}
+    ).sort("created_at", -1).to_list(100)
+
+    # Get admin replies to partner
+    admin_replies = await db.partner_conversations.find(
+        {"partner_id": partner_id}
+    ).sort("created_at", -1).to_list(100)
+
+    # Combine and organize into conversation threads
+    conversations = []
+
+    # Add sent messages
+    for msg in sent_messages:
+        msg["_id"] = str(msg["_id"])
+        msg["direction"] = "sent"
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+        if msg.get("read_at"):
+            msg["read_at"] = msg["read_at"].isoformat()
+        if msg.get("replied_at"):
+            msg["replied_at"] = msg["replied_at"].isoformat()
+        conversations.append(msg)
+
+    # Add admin replies
+    for reply in admin_replies:
+        reply["_id"] = str(reply["_id"])
+        reply["direction"] = "received"
+        if reply.get("created_at"):
+            reply["created_at"] = reply["created_at"].isoformat()
+        if reply.get("read_at"):
+            reply["read_at"] = reply["read_at"].isoformat()
+        conversations.append(reply)
+
+    # Sort by created_at descending
+    conversations.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+    return {"conversations": conversations}
+
+
+@api_router.put("/partner/conversations/{conversation_id}/read")
+async def mark_conversation_read(conversation_id: str, token: str):
+    """Mark a conversation item as read"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Try to update in partner_conversations collection
+    result = await db.partner_conversations.update_one(
+        {"id": conversation_id, "partner_id": partner["id"]},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    return {"status": "success"}
+
+
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
     """Get messages sent by partners for admin view"""
@@ -8716,7 +8904,7 @@ class ReplyToPartnerRequest(BaseModel):
 
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
-    """Admin replies to a partner message via email"""
+    """Admin replies to a partner message via email and stores in portal"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -8725,11 +8913,31 @@ async def reply_to_partner_message(message_id: str, request: ReplyToPartnerReque
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # Mark message as read
+    now = datetime.utcnow()
+    reply_id = str(uuid.uuid4())
+
+    # Mark message as read and store reply reference
     await db.partner_messages.update_one(
         {"id": message_id},
-        {"$set": {"read": True, "read_at": datetime.utcnow(), "replied": True, "replied_at": datetime.utcnow()}}
+        {"$set": {"read": True, "read_at": now, "replied": True, "replied_at": now, "reply_id": reply_id}}
     )
+
+    # Store the reply in partner_conversations collection for the partner to see
+    conversation_reply = {
+        "id": reply_id,
+        "type": "admin_reply",
+        "partner_id": message.get("from_partner_id"),
+        "partner_name": request.partner_name,
+        "partner_email": request.partner_email,
+        "original_message_id": message_id,
+        "original_message_content": message.get("content", ""),
+        "order_number": message.get("order_number"),
+        "from_admin_name": request.admin_name or "Admin",
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+    await db.partner_conversations.insert_one(conversation_reply)
 
     # Send email reply to partner
     try:

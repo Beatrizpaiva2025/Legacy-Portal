@@ -12095,19 +12095,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
-      {/* Notification Banner - Show unread notifications */}
+      {/* Notification Banner - Show unread notifications - Bright Yellow */}
       {(isAdmin || isPM) && notifications.filter(n => !n.is_read).length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 bg-yellow-200 border-2 border-yellow-400 rounded-lg shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-blue-600 mr-2">🔔</span>
-              <span className="text-sm font-medium text-blue-800">
-                {notifications.filter(n => !n.is_read).length} new notification(s)
+              <span className="text-2xl mr-3">🔔</span>
+              <span className="text-base font-bold text-yellow-900">
+                {notifications.filter(n => !n.is_read).length} NEW NOTIFICATION(S)
               </span>
             </div>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
             >
               {showNotifications ? 'Hide' : 'View'}
             </button>
@@ -12117,26 +12117,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {notifications.filter(n => !n.is_read).map((notif) => (
                 <div
                   key={notif.id}
-                  className={`p-2 rounded text-xs ${
-                    notif.type === 'assignment_declined' ? 'bg-red-100 border border-red-200' :
-                    notif.type === 'assignment_accepted' ? 'bg-green-100 border border-green-200' :
-                    'bg-white border'
+                  className={`p-3 rounded-lg text-sm border-2 shadow ${
+                    notif.type === 'assignment_declined' ? 'bg-red-100 border-red-300' :
+                    notif.type === 'assignment_accepted' ? 'bg-green-100 border-green-300' :
+                    notif.type === 'payment_proof_received' ? 'bg-yellow-100 border-yellow-400' :
+                    'bg-white border-yellow-300'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium">
+                      <div className="font-bold">
                         {notif.type === 'assignment_declined' ? '❌' :
-                         notif.type === 'assignment_accepted' ? '✅' : '📋'} {notif.title}
+                         notif.type === 'assignment_accepted' ? '✅' :
+                         notif.type === 'payment_proof_received' ? '💰' : '📋'} {notif.title}
                       </div>
-                      <div className="text-gray-600 mt-0.5">{notif.message}</div>
-                      <div className="text-[10px] text-gray-400 mt-1">
+                      <div className="text-gray-700 mt-1">{notif.message}</div>
+                      {notif.order_number && (
+                        <div className="text-xs text-purple-700 font-medium mt-1">Order: {notif.order_number}</div>
+                      )}
+                      <div className="text-[10px] text-gray-500 mt-1 font-medium">
                         {new Date(notif.created_at).toLocaleString()}
                       </div>
                     </div>
                     <button
                       onClick={() => markNotificationRead(notif.id)}
-                      className="text-gray-400 hover:text-gray-600 text-xs"
+                      className="text-gray-500 hover:text-gray-700 text-xs font-medium"
                     >
                       Mark read
                     </button>
@@ -12148,21 +12153,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </div>
       )}
 
-      {/* Partner Messages Panel */}
+      {/* Partner Messages Panel - Bright Yellow for Attention */}
       {partnerMessages.filter(m => !m.read).length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 bg-yellow-300 border-2 border-yellow-500 rounded-lg shadow-lg animate-pulse">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-blue-600 mr-2">💬</span>
-              <span className="text-sm font-medium text-blue-800">
-                {partnerMessages.filter(m => !m.read).length} message(s) from partners
+              <span className="text-2xl mr-3">💬</span>
+              <span className="text-base font-bold text-yellow-900">
+                🔔 {partnerMessages.filter(m => !m.read).length} NEW MESSAGE(S) FROM PARTNERS
               </span>
             </div>
             <button
               onClick={() => setShowPartnerMessages(!showPartnerMessages)}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
             >
-              {showPartnerMessages ? 'Hide' : 'View'}
+              {showPartnerMessages ? 'Hide' : 'View Messages'}
             </button>
           </div>
           {showPartnerMessages && (
@@ -12170,42 +12175,47 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {partnerMessages.filter(m => !m.read).map((msg) => (
                 <div
                   key={msg.id}
-                  className="p-3 bg-white rounded border border-blue-200"
+                  className="p-3 bg-white rounded-lg border-2 border-yellow-400 shadow"
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm text-blue-800">
+                        <span className="font-bold text-sm text-yellow-800">
                           {msg.from_partner_name}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">
                           {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
                         </span>
+                        {msg.order_number && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded font-medium">
+                            Order: {msg.order_number}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 mb-2">
+                      <div className="text-xs text-gray-600 mb-2">
                         {msg.from_partner_email}
                       </div>
-                      <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                      <div className="text-sm text-gray-800 bg-yellow-50 p-3 rounded border border-yellow-200">
                         {msg.content}
                       </div>
-                      <div className="text-[10px] text-gray-400 mt-2">
+                      <div className="text-[10px] text-gray-500 mt-2 font-medium">
                         {new Date(msg.created_at).toLocaleString()}
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-2 pt-2 border-t">
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-yellow-200">
                     <button
                       onClick={() => {
                         setReplyingToMessage(msg);
                         setReplyContent('');
                       }}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700"
                     >
                       📧 Reply
                     </button>
                     <button
                       onClick={() => markPartnerMessageRead(msg.id)}
-                      className="px-3 py-1 text-gray-600 border rounded text-xs hover:bg-gray-100"
+                      className="px-3 py-1 text-gray-600 border border-gray-300 rounded text-xs hover:bg-gray-100"
                     >
                       Mark as read
                     </button>
