@@ -8597,6 +8597,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             ));
                           }
                           setProcessingStatus('✅ Translation loaded!');
+                        } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+                          // Word document - convert to HTML using mammoth
+                          setProcessingStatus('🔄 Converting Word document...');
+                          const html = await convertWordToHtml(file);
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, translatedText: html } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Translation loaded!');
                         } else {
                           // For PDF/images, extract text via OCR
                           const fileBase64 = await fileToBase64(file);
