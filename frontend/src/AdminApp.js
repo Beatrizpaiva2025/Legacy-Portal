@@ -1718,7 +1718,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
-  const [useClaudeOcr, setUseClaudeOcr] = useState(true); // Default to Claude for better formatting
+  const [useClaudeOcr, setUseClaudeOcr] = useState(false); // Default to AWS Textract
   const [ocrSpecialCommands, setOcrSpecialCommands] = useState('Maintain the EXACT original layout and formatting. Preserve all line breaks, spacing, and document structure. Extract tables with proper alignment.');
 
   // Approval checkboxes state
@@ -7009,21 +7009,99 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="border rounded p-3 bg-white">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs font-medium">Extracted Text:</span>
-                        <button
-                          onClick={() => {
-                            const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
-                            const blob = new Blob([text], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = 'ocr_text_for_cat.txt';
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          📥 Download for CAT Tool
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                              const blob = new Blob([text], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.txt';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            title="Download as TXT"
+                          >
+                            TXT
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<hr style="border: 2px dashed #ccc; margin: 20px 0;">\n\n');
+                              const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h1>OCR Extracted Text</h1>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([htmlContent], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.html';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            title="Download as HTML"
+                          >
+                            HTML
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<br style="page-break-before: always;">\n\n');
+                              const docContent = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1in; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: Courier New, monospace; }
+  </style>
+</head>
+<body>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([docContent], { type: 'application/msword' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.doc';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                            title="Download as Word"
+                          >
+                            Word
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
