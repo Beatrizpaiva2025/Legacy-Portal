@@ -246,10 +246,13 @@ const TRANSLATIONS = {
 };
 
 // UI Languages with flags
+// Flag image helper - uses flagcdn.com for cross-platform compatibility
+const getFlagUrl = (countryCode) => `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
+
 const UI_LANGUAGES = [
-  { code: 'en', flag: '🇺🇸' },
-  { code: 'es', flag: '🇪🇸' },
-  { code: 'pt', flag: '🇧🇷' }
+  { code: 'en', countryCode: 'us', name: 'English' },
+  { code: 'es', countryCode: 'es', name: 'Español' },
+  { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
 // Get user's language preference (English is default)
@@ -300,76 +303,76 @@ const PAYMENT_STATUS = {
 
 // Languages list for FROM field (all common languages)
 const FROM_LANGUAGES = [
-  { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
-  { code: 'english_uk', name: 'English (UK)', flag: '🇬🇧' },
-  { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'french', name: 'French', flag: '🇫🇷' },
-  { code: 'german', name: 'German', flag: '🇩🇪' },
-  { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
-  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', flag: '🇵🇹' },
-  { code: 'italian', name: 'Italian', flag: '🇮🇹' },
-  { code: 'chinese_simplified', name: 'Chinese (Simplified)', flag: '🇨🇳' },
-  { code: 'chinese_traditional', name: 'Chinese (Traditional)', flag: '🇹🇼' },
-  { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'korean', name: 'Korean', flag: '🇰🇷' },
-  { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'russian', name: 'Russian', flag: '🇷🇺' },
-  { code: 'dutch', name: 'Dutch', flag: '🇳🇱' },
-  { code: 'polish', name: 'Polish', flag: '🇵🇱' },
-  { code: 'turkish', name: 'Turkish', flag: '🇹🇷' },
-  { code: 'vietnamese', name: 'Vietnamese', flag: '🇻🇳' },
-  { code: 'thai', name: 'Thai', flag: '🇹🇭' },
-  { code: 'indonesian', name: 'Indonesian', flag: '🇮🇩' },
-  { code: 'malay', name: 'Malay', flag: '🇲🇾' },
-  { code: 'hindi', name: 'Hindi', flag: '🇮🇳' },
-  { code: 'bengali', name: 'Bengali', flag: '🇧🇩' },
-  { code: 'urdu', name: 'Urdu', flag: '🇵🇰' },
-  { code: 'punjabi', name: 'Punjabi', flag: '🇮🇳' },
-  { code: 'tamil', name: 'Tamil', flag: '🇮🇳' },
-  { code: 'telugu', name: 'Telugu', flag: '🇮🇳' },
-  { code: 'greek', name: 'Greek', flag: '🇬🇷' },
-  { code: 'czech', name: 'Czech', flag: '🇨🇿' },
-  { code: 'romanian', name: 'Romanian', flag: '🇷🇴' },
-  { code: 'hungarian', name: 'Hungarian', flag: '🇭🇺' },
-  { code: 'swedish', name: 'Swedish', flag: '🇸🇪' },
-  { code: 'norwegian', name: 'Norwegian', flag: '🇳🇴' },
-  { code: 'danish', name: 'Danish', flag: '🇩🇰' },
-  { code: 'finnish', name: 'Finnish', flag: '🇫🇮' },
-  { code: 'hebrew', name: 'Hebrew', flag: '🇮🇱' },
-  { code: 'persian', name: 'Persian (Farsi)', flag: '🇮🇷' },
-  { code: 'ukrainian', name: 'Ukrainian', flag: '🇺🇦' },
-  { code: 'croatian', name: 'Croatian', flag: '🇭🇷' },
-  { code: 'serbian', name: 'Serbian', flag: '🇷🇸' },
-  { code: 'bulgarian', name: 'Bulgarian', flag: '🇧🇬' },
-  { code: 'slovak', name: 'Slovak', flag: '🇸🇰' },
-  { code: 'slovenian', name: 'Slovenian', flag: '🇸🇮' },
-  { code: 'lithuanian', name: 'Lithuanian', flag: '🇱🇹' },
-  { code: 'latvian', name: 'Latvian', flag: '🇱🇻' },
-  { code: 'estonian', name: 'Estonian', flag: '🇪🇪' },
-  { code: 'swahili', name: 'Swahili', flag: '🇰🇪' },
-  { code: 'tagalog', name: 'Tagalog (Filipino)', flag: '🇵🇭' },
-  { code: 'afrikaans', name: 'Afrikaans', flag: '🇿🇦' },
-  { code: 'catalan', name: 'Catalan', flag: '🇪🇸' },
-  { code: 'haitian_creole', name: 'Haitian Creole', flag: '🇭🇹' }
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' },
+  { code: 'polish', name: 'Polish', countryCode: 'pl' },
+  { code: 'turkish', name: 'Turkish', countryCode: 'tr' },
+  { code: 'vietnamese', name: 'Vietnamese', countryCode: 'vn' },
+  { code: 'thai', name: 'Thai', countryCode: 'th' },
+  { code: 'indonesian', name: 'Indonesian', countryCode: 'id' },
+  { code: 'malay', name: 'Malay', countryCode: 'my' },
+  { code: 'hindi', name: 'Hindi', countryCode: 'in' },
+  { code: 'bengali', name: 'Bengali', countryCode: 'bd' },
+  { code: 'urdu', name: 'Urdu', countryCode: 'pk' },
+  { code: 'punjabi', name: 'Punjabi', countryCode: 'in' },
+  { code: 'tamil', name: 'Tamil', countryCode: 'in' },
+  { code: 'telugu', name: 'Telugu', countryCode: 'in' },
+  { code: 'greek', name: 'Greek', countryCode: 'gr' },
+  { code: 'czech', name: 'Czech', countryCode: 'cz' },
+  { code: 'romanian', name: 'Romanian', countryCode: 'ro' },
+  { code: 'hungarian', name: 'Hungarian', countryCode: 'hu' },
+  { code: 'swedish', name: 'Swedish', countryCode: 'se' },
+  { code: 'norwegian', name: 'Norwegian', countryCode: 'no' },
+  { code: 'danish', name: 'Danish', countryCode: 'dk' },
+  { code: 'finnish', name: 'Finnish', countryCode: 'fi' },
+  { code: 'hebrew', name: 'Hebrew', countryCode: 'il' },
+  { code: 'persian', name: 'Persian (Farsi)', countryCode: 'ir' },
+  { code: 'ukrainian', name: 'Ukrainian', countryCode: 'ua' },
+  { code: 'croatian', name: 'Croatian', countryCode: 'hr' },
+  { code: 'serbian', name: 'Serbian', countryCode: 'rs' },
+  { code: 'bulgarian', name: 'Bulgarian', countryCode: 'bg' },
+  { code: 'slovak', name: 'Slovak', countryCode: 'sk' },
+  { code: 'slovenian', name: 'Slovenian', countryCode: 'si' },
+  { code: 'lithuanian', name: 'Lithuanian', countryCode: 'lt' },
+  { code: 'latvian', name: 'Latvian', countryCode: 'lv' },
+  { code: 'estonian', name: 'Estonian', countryCode: 'ee' },
+  { code: 'swahili', name: 'Swahili', countryCode: 'ke' },
+  { code: 'tagalog', name: 'Tagalog (Filipino)', countryCode: 'ph' },
+  { code: 'afrikaans', name: 'Afrikaans', countryCode: 'za' },
+  { code: 'catalan', name: 'Catalan', countryCode: 'es' },
+  { code: 'haitian_creole', name: 'Haitian Creole', countryCode: 'ht' }
 ];
 
 // Languages list for TO field (target languages)
 const TO_LANGUAGES = [
-  { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
-  { code: 'english_uk', name: 'English (UK)', flag: '🇬🇧' },
-  { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'french', name: 'French', flag: '🇫🇷' },
-  { code: 'german', name: 'German', flag: '🇩🇪' },
-  { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
-  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', flag: '🇵🇹' },
-  { code: 'italian', name: 'Italian', flag: '🇮🇹' },
-  { code: 'chinese_simplified', name: 'Chinese (Simplified)', flag: '🇨🇳' },
-  { code: 'chinese_traditional', name: 'Chinese (Traditional)', flag: '🇹🇼' },
-  { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'korean', name: 'Korean', flag: '🇰🇷' },
-  { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'russian', name: 'Russian', flag: '🇷🇺' },
-  { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' }
 ];
 
 // Keep LANGUAGES for backward compatibility
@@ -514,12 +517,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-6 h-4 object-cover rounded-sm" />
                 </button>
               ))}
             </div>
@@ -1380,7 +1383,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 >
                   {FROM_LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
+                      {lang.name}
                     </option>
                   ))}
                 </select>
@@ -1406,7 +1409,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   >
                     {TO_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
+                        {lang.name}
                       </option>
                     ))}
                   </select>
@@ -3024,12 +3027,12 @@ function App() {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-2xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-7 h-5 object-cover rounded-sm" />
                 </button>
               ))}
             </div>
