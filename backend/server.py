@@ -1056,8 +1056,33 @@ class Partner(BaseModel):
     password_hash: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None  # EIN/CNPJ
+    # Payment & Billing
+    payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
+    default_payment_method: str = "zelle"  # zelle, card, invoice
+    credit_limit: float = 0.0  # Maximum outstanding balance allowed
+    current_balance: float = 0.0  # Current outstanding balance
+    # Statistics for eligibility
+    total_orders: int = 0
+    total_paid_orders: int = 0
+    total_revenue: float = 0.0
+    # Status
     is_active: bool = True
+    is_approved: bool = True  # Admin can approve/suspend partners
+    payment_plan_approved: bool = False  # For invoice plans, needs admin approval
+    # Agreement
+    agreed_to_terms: bool = False
+    agreed_at: Optional[datetime] = None
+    # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_order_at: Optional[datetime] = None
+    last_payment_at: Optional[datetime] = None
 
 class PartnerCreate(BaseModel):
     company_name: str
@@ -1065,6 +1090,18 @@ class PartnerCreate(BaseModel):
     password: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None
+    # Payment preferences
+    payment_plan: str = "pay_per_order"
+    default_payment_method: str = "zelle"
+    # Agreement
+    agreed_to_terms: bool = False
 
 class PartnerLogin(BaseModel):
     email: EmailStr
@@ -1221,7 +1258,10 @@ class TranslationOrder(BaseModel):
     deadline: Optional[datetime] = None  # Translation deadline
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
-    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
+    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    shipping_address: Optional[Dict[str, str]] = None
     # Document classification
     document_type: Optional[str] = None  # birth_certificate, marriage_certificate, diploma, etc.
     document_category: Optional[str] = None  # financial, educational, personal, bank_statement, etc.
@@ -1239,6 +1279,12 @@ class TranslationOrderCreate(BaseModel):
     notes: Optional[str] = None
     document_filename: Optional[str] = None
     document_ids: Optional[List[str]] = None  # IDs of uploaded documents
+    payment_method: Optional[str] = "invoice"  # 'invoice' or 'zelle'
+    zelle_receipt_id: Optional[str] = None
+    payment_status: Optional[str] = "pending"
+    total_price: Optional[float] = None
+    shipping_address: Optional[Dict[str, str]] = None
+    create_invoice: Optional[bool] = True
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -3643,13 +3689,31 @@ async def register_partner(partner_data: PartnerCreate):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Create partner
+        # Determine if invoice plan needs approval
+        needs_approval = partner_data.payment_plan in ['biweekly', 'monthly']
+
+        # Create partner with all fields
         partner = Partner(
             company_name=partner_data.company_name,
             email=partner_data.email,
             password_hash=hash_password(partner_data.password),
             contact_name=partner_data.contact_name,
-            phone=partner_data.phone
+            phone=partner_data.phone,
+            # Address
+            address_street=partner_data.address_street,
+            address_city=partner_data.address_city,
+            address_state=partner_data.address_state,
+            address_zip=partner_data.address_zip,
+            address_country=partner_data.address_country,
+            tax_id=partner_data.tax_id,
+            # Payment settings
+            payment_plan=partner_data.payment_plan,
+            default_payment_method=partner_data.default_payment_method,
+            # For invoice plans, start with approval pending
+            payment_plan_approved=not needs_approval,  # Auto-approve pay_per_order
+            # Agreement
+            agreed_to_terms=partner_data.agreed_to_terms,
+            agreed_at=datetime.utcnow() if partner_data.agreed_to_terms else None
         )
 
         await db.partners.insert_one(partner.dict())
@@ -3657,6 +3721,32 @@ async def register_partner(partner_data: PartnerCreate):
         # Generate token
         token = generate_token()
         active_tokens[token] = partner.id
+
+        # Send notification email to admin if invoice plan requested
+        if needs_approval:
+            try:
+                admin_subject = f"New Partner Registration - Invoice Plan Approval Needed: {partner.company_name}"
+                admin_content = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #1e40af;">New Partner Registration - Approval Required</h2>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 10px;">
+                        <p><strong>Company:</strong> {partner.company_name}</p>
+                        <p><strong>Contact:</strong> {partner.contact_name}</p>
+                        <p><strong>Email:</strong> {partner.email}</p>
+                        <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
+                        <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
+                        {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
+                        {f'<p><strong>Tax ID:</strong> {partner.tax_id}</p>' if partner.tax_id else ''}
+                    </div>
+                    <p style="margin-top: 20px; color: #6b7280;">
+                        This partner has requested an invoice-based payment plan. Please review and approve/deny in the admin panel.
+                    </p>
+                </div>
+                """
+                await send_email("contact@legacytranslations.com", admin_subject, admin_content)
+            except Exception as email_error:
+                logger.error(f"Failed to send admin notification: {email_error}")
 
         return PartnerResponse(
             id=partner.id,
@@ -5574,6 +5664,17 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Set due date (30 days from now for payment)
         due_date = datetime.utcnow() + timedelta(days=30)
 
+        # Determine payment status based on payment method
+        payment_status = "pending"
+        if order_data.payment_method == "zelle":
+            payment_status = "pending_zelle"
+
+        # Get Zelle receipt URL if available
+        zelle_receipt_url = None
+        if order_data.zelle_receipt_id:
+            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+            zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
+
         # Create order
         order = TranslationOrder(
             partner_id=partner["id"],
@@ -5594,7 +5695,12 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             urgency_fee=urgency_fee,
             total_price=total_price,
             due_date=due_date,
-            document_filename=order_data.document_filename
+            document_filename=order_data.document_filename,
+            payment_method=order_data.payment_method,
+            payment_status=payment_status,
+            zelle_receipt_id=order_data.zelle_receipt_id,
+            zelle_receipt_url=zelle_receipt_url,
+            shipping_address=order_data.shipping_address
         )
 
         await db.translation_orders.insert_one(order.dict())
@@ -5648,19 +5754,56 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "client_email": order.client_email
             }
 
-            # Notify partner
-            await email_service.send_order_confirmation_email(
-                partner["email"],
-                order_details,
-                is_partner=True
-            )
+            # If Zelle payment, send Zelle-specific emails
+            if order_data.payment_method == "zelle":
+                # Send Zelle pending email to partner
+                try:
+                    zelle_order_details = {
+                        **order_details,
+                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
+                        "customer_email": partner["email"]
+                    }
+                    email_html = get_zelle_pending_email_template(
+                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        zelle_order_details
+                    )
+                    await email_service.send_email(
+                        partner["email"],
+                        f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
+                        email_html,
+                        "html"
+                    )
+                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                except Exception as ze:
+                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
 
-            # Notify company
-            await email_service.send_order_confirmation_email(
-                "contact@legacytranslations.com",
-                order_details,
-                is_partner=False
-            )
+                # Send Zelle admin notification
+                try:
+                    admin_html = get_zelle_admin_notification_template(zelle_order_details, zelle_receipt_url)
+                    await email_service.send_email(
+                        "contact@legacytranslations.com",
+                        f"🔔 Partner Zelle Payment - {order.order_number} - ${order.total_price:.2f}",
+                        admin_html,
+                        "html"
+                    )
+                    logger.info("Zelle admin notification sent")
+                except Exception as ae:
+                    logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
+            else:
+                # Standard order confirmation emails
+                # Notify partner
+                await email_service.send_order_confirmation_email(
+                    partner["email"],
+                    order_details,
+                    is_partner=True
+                )
+
+                # Notify company
+                await email_service.send_order_confirmation_email(
+                    "contact@legacytranslations.com",
+                    order_details,
+                    is_partner=False
+                )
 
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
@@ -7245,6 +7388,45 @@ async def delete_partner(partner_id: str, admin_key: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting partner: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+@api_router.delete("/admin/partners/by-email/{email}")
+async def delete_partner_by_email(email: str, admin_key: str):
+    """Delete a partner by email (admin only) - useful for testing"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Find the partner by email
+        partner = await db.partners.find_one({"email": email})
+        if not partner:
+            raise HTTPException(status_code=404, detail=f"Partner with email '{email}' not found")
+
+        partner_id = partner.get("id")
+        partner_name = partner.get("company_name", partner.get("name", "Unknown"))
+
+        # Delete the partner
+        await db.partners.delete_one({"email": email})
+
+        # Mark their orders as orphaned
+        await db.translation_orders.update_many(
+            {"partner_id": partner_id},
+            {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+        )
+
+        logger.info(f"Partner deleted by email: {partner_name} ({email})")
+
+        return {
+            "status": "success",
+            "message": f"Partner '{partner_name}' ({email}) deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
