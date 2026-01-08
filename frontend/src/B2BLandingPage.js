@@ -4,14 +4,27 @@ import axios from 'axios';
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const B2BLandingPage = () => {
-  // Check for reset_token or verify route and redirect to partner portal
+  // Check for reset_token, verify route, or orders path and redirect appropriately
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const resetToken = urlParams.get('reset_token');
+    const pathname = window.location.pathname;
 
     // Check for verification route in hash
     const hash = window.location.hash;
     const verifyMatch = hash.match(/^#\/verify\/(.+)$/);
+
+    // Redirect /orders/* paths to customer portal
+    if (pathname.startsWith('/orders')) {
+      window.location.href = '/#/customer';
+      return;
+    }
+
+    // Redirect /customer path to customer portal (hash route)
+    if (pathname.startsWith('/customer')) {
+      window.location.href = '/#/customer';
+      return;
+    }
 
     if (resetToken) {
       // Redirect to partner portal with reset token

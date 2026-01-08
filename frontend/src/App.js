@@ -86,11 +86,41 @@ const TRANSLATIONS = {
     phone: 'Phone',
     login: 'Log In',
     register: 'Register',
-    // Partner Terms
-    agreeToTerms: 'I agree to the',
-    partnerTerms: 'Partner Terms and Conditions',
-    andAcknowledge: 'and acknowledge that I have read and understood the partnership agreement.',
-    mustAgreeToTerms: 'You must agree to the Partner Terms and Conditions to create an account.',
+    // Registration - Address
+    companyAddress: 'Company Address',
+    street: 'Street Address',
+    city: 'City',
+    state: 'State',
+    zipCode: 'ZIP Code',
+    country: 'Country',
+    taxId: 'Tax ID (EIN/CNPJ) - Optional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: 'Payment Plan',
+    payPerOrder: 'Pay Per Order',
+    payPerOrderDesc: 'Pay for each order via Zelle or card',
+    biweeklyInvoice: 'Biweekly Invoice',
+    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks (requires approval)',
+    monthlyInvoice: 'Monthly Invoice',
+    monthlyInvoiceDesc: 'Receive monthly invoice (requires approval)',
+    invoiceRequiresApproval: 'Invoice plans require account approval after registration',
+    paymentMethod: 'Preferred Payment Method',
+    zelle: 'Zelle',
+    creditCard: 'Credit Card',
+    invoice: 'Invoice',
+    // Agreement
+    partnerAgreement: 'Partner Agreement',
+    agreementTerms: 'Terms and Conditions',
+    termsIntro: 'By registering as a Partner, you agree to the following terms:',
+    term1: 'No fees or commitments to cancel at any time',
+    term2: 'Pay Per Order: Payment required before delivery',
+    term3: 'Invoice Plans: Payment due within 15 days of invoice',
+    term4: 'Late payments may result in service suspension',
+    term5: 'All translations are for your company\'s use only',
+    term6: 'Prices may be updated with 30 days notice',
+    iAgreeToTerms: 'I agree to the Partner Agreement terms',
+    mustAgreeToTerms: 'You must agree to the terms to register',
+    // Partner Benefits
     partnerBenefits: 'Partner Benefits',
     net30Terms: 'Net 30 payment terms',
     volumeDiscounts: 'Volume discounts on translations',
@@ -174,11 +204,41 @@ const TRANSLATIONS = {
     phone: 'Teléfono',
     login: 'Ingresar',
     register: 'Registrar',
-    // Partner Terms
-    agreeToTerms: 'Acepto los',
-    partnerTerms: 'Términos y Condiciones de Asociación',
-    andAcknowledge: 'y reconozco que he leído y comprendido el acuerdo de asociación.',
-    mustAgreeToTerms: 'Debe aceptar los Términos y Condiciones de Asociación para crear una cuenta.',
+    // Registration - Address
+    companyAddress: 'Dirección de la Empresa',
+    street: 'Dirección',
+    city: 'Ciudad',
+    state: 'Estado',
+    zipCode: 'Código Postal',
+    country: 'País',
+    taxId: 'ID Fiscal (EIN/RFC) - Opcional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: 'Plan de Pago',
+    payPerOrder: 'Pago Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
+    biweeklyInvoice: 'Factura Quincenal',
+    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas (requiere aprobación)',
+    monthlyInvoice: 'Factura Mensual',
+    monthlyInvoiceDesc: 'Reciba factura mensual (requiere aprobación)',
+    invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
+    paymentMethod: 'Método de Pago Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Tarjeta de Crédito',
+    invoice: 'Factura',
+    // Agreement
+    partnerAgreement: 'Acuerdo de Partner',
+    agreementTerms: 'Términos y Condiciones',
+    termsIntro: 'Al registrarse como Partner, acepta los siguientes términos:',
+    term1: 'Sin tarifas ni compromisos para cancelar en cualquier momento',
+    term2: 'Pago Por Pedido: Pago requerido antes de la entrega',
+    term3: 'Planes de Factura: Pago debido dentro de 15 días',
+    term4: 'Pagos atrasados pueden resultar en suspensión del servicio',
+    term5: 'Todas las traducciones son para uso de su empresa únicamente',
+    term6: 'Los precios pueden actualizarse con 30 días de aviso',
+    iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
+    mustAgreeToTerms: 'Debe aceptar los términos para registrarse',
+    // Partner Benefits
     partnerBenefits: 'Beneficios de Socio',
     net30Terms: 'Términos de pago Net 30',
     volumeDiscounts: 'Descuentos por volumen en traducciones',
@@ -262,11 +322,41 @@ const TRANSLATIONS = {
     phone: 'Telefone',
     login: 'Entrar',
     register: 'Registrar',
-    // Partner Terms
-    agreeToTerms: 'Eu concordo com os',
-    partnerTerms: 'Termos e Condições de Parceria',
-    andAcknowledge: 'e reconheço que li e compreendi o acordo de parceria.',
-    mustAgreeToTerms: 'Você deve concordar com os Termos e Condições de Parceria para criar uma conta.',
+    // Registration - Address
+    companyAddress: 'Endereço da Empresa',
+    street: 'Endereço',
+    city: 'Cidade',
+    state: 'Estado',
+    zipCode: 'CEP',
+    country: 'País',
+    taxId: 'CNPJ/CPF - Opcional',
+    taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
+    // Payment Plan
+    paymentPlan: 'Plano de Pagamento',
+    payPerOrder: 'Pagar Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
+    biweeklyInvoice: 'Fatura Quinzenal',
+    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas (requer aprovação)',
+    monthlyInvoice: 'Fatura Mensal',
+    monthlyInvoiceDesc: 'Receba fatura mensal (requer aprovação)',
+    invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
+    paymentMethod: 'Método de Pagamento Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Cartão de Crédito',
+    invoice: 'Fatura',
+    // Agreement
+    partnerAgreement: 'Acordo de Partner',
+    agreementTerms: 'Termos e Condições',
+    termsIntro: 'Ao se cadastrar como Partner, você concorda com os seguintes termos:',
+    term1: 'Sem taxas ou compromissos para cancelar a qualquer momento',
+    term2: 'Pagar Por Pedido: Pagamento necessário antes da entrega',
+    term3: 'Planos de Fatura: Pagamento em até 15 dias',
+    term4: 'Pagamentos atrasados podem resultar em suspensão do serviço',
+    term5: 'Todas as traduções são para uso exclusivo da sua empresa',
+    term6: 'Preços podem ser atualizados com 30 dias de aviso',
+    iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
+    mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar',
+    // Partner Benefits
     partnerBenefits: 'Benefícios de Parceiro',
     net30Terms: 'Condições de pagamento Net 30',
     volumeDiscounts: 'Descontos por volume em traduções',
@@ -276,10 +366,13 @@ const TRANSLATIONS = {
 };
 
 // UI Languages with flags
+// Flag image helper - uses flagcdn.com for cross-platform compatibility
+const getFlagUrl = (countryCode) => `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
+
 const UI_LANGUAGES = [
-  { code: 'en', flag: '🇺🇸' },
-  { code: 'es', flag: '🇪🇸' },
-  { code: 'pt', flag: '🇧🇷' }
+  { code: 'en', countryCode: 'us', name: 'English' },
+  { code: 'es', countryCode: 'es', name: 'Español' },
+  { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
 // Get user's language preference (English is default)
@@ -328,21 +421,82 @@ const PAYMENT_STATUS = {
   'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
 };
 
-// Languages list
-const LANGUAGES = [
-  { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
-  { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'french', name: 'French', flag: '🇫🇷' },
-  { code: 'german', name: 'German', flag: '🇩🇪' },
-  { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
-  { code: 'italian', name: 'Italian', flag: '🇮🇹' },
-  { code: 'chinese', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'korean', name: 'Korean', flag: '🇰🇷' },
-  { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'russian', name: 'Russian', flag: '🇷🇺' },
-  { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
+// Languages list for FROM field (all common languages)
+const FROM_LANGUAGES = [
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' },
+  { code: 'polish', name: 'Polish', countryCode: 'pl' },
+  { code: 'turkish', name: 'Turkish', countryCode: 'tr' },
+  { code: 'vietnamese', name: 'Vietnamese', countryCode: 'vn' },
+  { code: 'thai', name: 'Thai', countryCode: 'th' },
+  { code: 'indonesian', name: 'Indonesian', countryCode: 'id' },
+  { code: 'malay', name: 'Malay', countryCode: 'my' },
+  { code: 'hindi', name: 'Hindi', countryCode: 'in' },
+  { code: 'bengali', name: 'Bengali', countryCode: 'bd' },
+  { code: 'urdu', name: 'Urdu', countryCode: 'pk' },
+  { code: 'punjabi', name: 'Punjabi', countryCode: 'in' },
+  { code: 'tamil', name: 'Tamil', countryCode: 'in' },
+  { code: 'telugu', name: 'Telugu', countryCode: 'in' },
+  { code: 'greek', name: 'Greek', countryCode: 'gr' },
+  { code: 'czech', name: 'Czech', countryCode: 'cz' },
+  { code: 'romanian', name: 'Romanian', countryCode: 'ro' },
+  { code: 'hungarian', name: 'Hungarian', countryCode: 'hu' },
+  { code: 'swedish', name: 'Swedish', countryCode: 'se' },
+  { code: 'norwegian', name: 'Norwegian', countryCode: 'no' },
+  { code: 'danish', name: 'Danish', countryCode: 'dk' },
+  { code: 'finnish', name: 'Finnish', countryCode: 'fi' },
+  { code: 'hebrew', name: 'Hebrew', countryCode: 'il' },
+  { code: 'persian', name: 'Persian (Farsi)', countryCode: 'ir' },
+  { code: 'ukrainian', name: 'Ukrainian', countryCode: 'ua' },
+  { code: 'croatian', name: 'Croatian', countryCode: 'hr' },
+  { code: 'serbian', name: 'Serbian', countryCode: 'rs' },
+  { code: 'bulgarian', name: 'Bulgarian', countryCode: 'bg' },
+  { code: 'slovak', name: 'Slovak', countryCode: 'sk' },
+  { code: 'slovenian', name: 'Slovenian', countryCode: 'si' },
+  { code: 'lithuanian', name: 'Lithuanian', countryCode: 'lt' },
+  { code: 'latvian', name: 'Latvian', countryCode: 'lv' },
+  { code: 'estonian', name: 'Estonian', countryCode: 'ee' },
+  { code: 'swahili', name: 'Swahili', countryCode: 'ke' },
+  { code: 'tagalog', name: 'Tagalog (Filipino)', countryCode: 'ph' },
+  { code: 'afrikaans', name: 'Afrikaans', countryCode: 'za' },
+  { code: 'catalan', name: 'Catalan', countryCode: 'es' },
+  { code: 'haitian_creole', name: 'Haitian Creole', countryCode: 'ht' }
 ];
+
+// Languages list for TO field (target languages)
+const TO_LANGUAGES = [
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' }
+];
+
+// Keep LANGUAGES for backward compatibility
+const LANGUAGES = TO_LANGUAGES;
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
@@ -367,14 +521,26 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [formData, setFormData] = useState({
     email: initialState.email,
     password: '',
     company_name: initialState.company,
     contact_name: initialState.name,
-    phone: initialState.phone
+    phone: initialState.phone,
+    // Address
+    address_street: '',
+    address_city: '',
+    address_state: '',
+    address_zip: '',
+    address_country: 'USA',
+    tax_id: '',
+    // Payment
+    payment_plan: 'pay_per_order',
+    default_payment_method: 'zelle',
+    // Agreement
+    agreed_to_terms: false
   });
+  const [showAgreement, setShowAgreement] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -396,9 +562,9 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     e.preventDefault();
     setError('');
 
-    // Check terms agreement for registration
-    if (!isLogin && !agreedToTerms) {
-      setError(t.mustAgreeToTerms || 'You must agree to the Partner Terms and Conditions to create an account.');
+    // Validate agreement for registration
+    if (!isLogin && !formData.agreed_to_terms) {
+      setError(t.mustAgreeToTerms);
       return;
     }
 
@@ -418,7 +584,18 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           company_name: formData.company_name,
           contact_name: formData.contact_name,
           phone: formData.phone,
-          agreed_to_terms: true
+          // Address
+          address_street: formData.address_street || null,
+          address_city: formData.address_city || null,
+          address_state: formData.address_state || null,
+          address_zip: formData.address_zip || null,
+          address_country: formData.address_country || 'USA',
+          tax_id: formData.tax_id || null,
+          // Payment
+          payment_plan: formData.payment_plan,
+          default_payment_method: formData.default_payment_method,
+          // Agreement
+          agreed_to_terms: formData.agreed_to_terms
         });
         onLogin(response.data);
       }
@@ -492,12 +669,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-6 h-4 object-cover rounded-sm" />
                 </button>
               ))}
             </div>
@@ -563,6 +740,202 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                     placeholder="+1 (555) 123-4567"
                   />
                 </div>
+
+                {/* Company Address (Optional) */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">{t.companyAddress} (Optional)</h3>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                      value={formData.address_street}
+                      onChange={(e) => setFormData({...formData, address_street: e.target.value})}
+                      placeholder={t.street}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_city}
+                        onChange={(e) => setFormData({...formData, address_city: e.target.value})}
+                        placeholder={t.city}
+                      />
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_state}
+                        onChange={(e) => setFormData({...formData, address_state: e.target.value})}
+                        placeholder={t.state}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_zip}
+                        onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
+                        placeholder={t.zipCode}
+                      />
+                      <select
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                        value={formData.address_country}
+                        onChange={(e) => setFormData({...formData, address_country: e.target.value})}
+                      >
+                        <option value="USA">USA</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
+                      value={formData.tax_id}
+                      onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
+                      placeholder={t.taxId}
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Plan Selection */}
+                <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.paymentPlan}</h3>
+                  <div className="space-y-2">
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="pay_per_order"
+                        checked={formData.payment_plan === 'pay_per_order'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.payPerOrder}</span>
+                        <p className="text-xs text-gray-500">{t.payPerOrderDesc}</p>
+                      </div>
+                    </label>
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="biweekly"
+                        checked={formData.payment_plan === 'biweekly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.biweeklyInvoice}</span>
+                        <p className="text-xs text-gray-500">{t.biweeklyInvoiceDesc}</p>
+                      </div>
+                    </label>
+                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="monthly"
+                        checked={formData.payment_plan === 'monthly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="mt-1 mr-3"
+                      />
+                      <div>
+                        <span className="font-medium text-gray-800">{t.monthlyInvoice}</span>
+                        <p className="text-xs text-gray-500">{t.monthlyInvoiceDesc}</p>
+                      </div>
+                    </label>
+                  </div>
+                  {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                    <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      {t.invoiceRequiresApproval}
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment Method Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'zelle'})}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'zelle' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.zelle}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'card'})}
+                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.creditCard}
+                    </button>
+                    {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, default_payment_method: 'invoice'})}
+                        className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'invoice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                      >
+                        {t.invoice}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Partner Agreement */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAgreement(!showAgreement)}
+                    className="w-full px-4 py-3 bg-gray-50 text-left flex justify-between items-center hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-gray-800">{t.partnerAgreement}</span>
+                    <span className="text-gray-500">{showAgreement ? '▲' : '▼'}</span>
+                  </button>
+                  {showAgreement && (
+                    <div className="p-4 bg-white border-t border-gray-200">
+                      <h4 className="font-semibold text-gray-800 mb-2">{t.agreementTerms}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{t.termsIntro}</p>
+                      <ul className="space-y-2 text-sm text-gray-600">
+                        <li className="flex items-start">
+                          <span className="text-green-500 mr-2">✓</span>
+                          <span>{t.term1}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term2}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term3}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-amber-500 mr-2">!</span>
+                          <span>{t.term4}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term5}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term6}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Agreement Checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.agreed_to_terms}
+                    onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
+                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{t.iAgreeToTerms}</span>
+                </label>
               </>
             )}
 
@@ -601,50 +974,11 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
             )}
 
-            {/* Partner Terms Agreement - Only show on registration */}
-            {!isLogin && (
-              <div className="p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-1 w-5 h-5 rounded border-yellow-400 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div className="text-sm">
-                    <span className="text-gray-700">
-                      {t.agreeToTerms || 'I agree to the'}{' '}
-                    </span>
-                    <a
-                      href="https://legacytranslations.com/partner-terms"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-700 font-semibold underline"
-                    >
-                      {t.partnerTerms || 'Partner Terms and Conditions'}
-                    </a>
-                    <span className="text-gray-700">
-                      {' '}{t.andAcknowledge || 'and acknowledge that I have read and understood the partnership agreement.'}
-                    </span>
-                  </div>
-                </label>
-                <div className="mt-3 text-xs text-yellow-700 bg-yellow-100 p-2 rounded">
-                  <strong>📋 {t.partnerBenefits || 'Partner Benefits'}:</strong>
-                  <ul className="mt-1 ml-4 list-disc">
-                    <li>{t.net30Terms || 'Net 30 payment terms'}</li>
-                    <li>{t.volumeDiscounts || 'Volume discounts on translations'}</li>
-                    <li>{t.dedicatedSupport || 'Dedicated account support'}</li>
-                    <li>{t.priorityProcessing || 'Priority order processing'}</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-
             <button
               type="submit"
-              disabled={loading || (!isLogin && !agreedToTerms)}
+              disabled={loading || (!isLogin && !formData.agreed_to_terms)}
               className={`w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 ${
-                !isLogin && !agreedToTerms
+                !isLogin && !formData.agreed_to_terms
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
               } disabled:from-gray-400 disabled:to-gray-500`}
@@ -931,7 +1265,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Payment method options
   const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
-  const ZELLE_PHONE = '(857) 208-1139';
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const zelleReceiptInputRef = useRef(null);
+  const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
 
   // Calculate quote when relevant fields change
@@ -1180,20 +1516,33 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     setError('');
 
     try {
+      // If Zelle payment, upload receipt first
+      let zelleReceiptId = null;
+      if (paymentMethod === 'zelle' && zelleReceipt) {
+        const receiptFormData = new FormData();
+        receiptFormData.append('file', zelleReceipt);
+        const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+        zelleReceiptId = uploadResponse.data.document_id;
+      }
+
       const orderData = {
         ...formData,
         word_count: wordCount,
         document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
         payment_method: paymentMethod,
-        create_invoice: paymentMethod === 'invoice'
+        create_invoice: paymentMethod === 'invoice',
+        zelle_receipt_id: zelleReceiptId,
+        payment_status: paymentMethod === 'zelle' ? 'pending_zelle' : 'pending',
+        total_price: quote?.total || 0,
+        shipping_address: (needsPhysicalCopy || formData.service_type === 'rmv') ? shippingAddress : null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
 
       const invoiceMsg = paymentMethod === 'invoice'
         ? ' Invoice will be sent to your email shortly.'
-        : ` Please send payment via Zelle to ${ZELLE_PHONE} (${ZELLE_NAME})`;
+        : ' We will verify your Zelle payment and send a confirmation email once confirmed.';
       setSuccess(`Order ${response.data.order.order_number} created successfully!${invoiceMsg}`);
 
       // Reset form
@@ -1211,6 +1560,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       setUploadedFiles([]);
       setQuote(null);
       setPaymentMethod('invoice');
+      setZelleReceipt(null);
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -1399,9 +1749,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   value={formData.translate_from}
                   onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
                 >
-                  {LANGUAGES.map((lang) => (
+                  {FROM_LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
+                      {lang.name}
                     </option>
                   ))}
                 </select>
@@ -1425,9 +1775,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     value={formData.translate_to}
                     onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
                   >
-                    {LANGUAGES.map((lang) => (
+                    {TO_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
+                        {lang.name}
                       </option>
                     ))}
                   </select>
@@ -1661,12 +2011,89 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
+            {/* Payment Method Selection */}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="invoice"
+                    checked={paymentMethod === 'invoice'}
+                    onChange={() => setPaymentMethod('invoice')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay by Invoice</span>
+                    <p className="text-sm text-gray-500 mt-1">Invoice sent to your email</p>
+                  </div>
+                </label>
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="zelle"
+                    checked={paymentMethod === 'zelle'}
+                    onChange={() => setPaymentMethod('zelle')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay with Zelle</span>
+                    <p className="text-sm text-gray-500 mt-1">Send to {ZELLE_EMAIL}</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Zelle Instructions & Receipt Upload */}
+              {paymentMethod === 'zelle' && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
+                  <h4 className="font-semibold text-purple-800">Zelle Payment Instructions</h4>
+                  <div className="space-y-2 text-sm text-purple-700">
+                    <p className="font-semibold">1. Open your bank app and select Zelle</p>
+                    <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
+                    <p className="font-semibold">3. Include your company name in the memo</p>
+                    <p className="font-semibold">4. Upload your payment receipt below</p>
+                  </div>
+
+                  {/* Receipt Upload */}
+                  <div>
+                    <input
+                      type="file"
+                      ref={zelleReceiptInputRef}
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => setZelleReceipt(e.target.files[0])}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => zelleReceiptInputRef.current?.click()}
+                      className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                    >
+                      {zelleReceipt ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          {zelleReceipt.name}
+                        </span>
+                      ) : (
+                        <span>Click to upload payment receipt</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {paymentMethod === 'zelle' && !zelleReceipt && (
+                    <p className="text-sm text-red-500">* Receipt is required for Zelle payments</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={submitting || wordCount === 0}
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+              disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? 'Creating Order...' : 'Create Order'}
+              {submitting ? 'Creating Order...' : (paymentMethod === 'zelle' ? 'Submit Order with Zelle' : 'Create Order')}
             </button>
           </form>
         </div>
@@ -3232,12 +3659,12 @@ function App() {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-2xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-7 h-5 object-cover rounded-sm" />
                 </button>
               ))}
             </div>

@@ -1718,7 +1718,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
-  const [useClaudeOcr, setUseClaudeOcr] = useState(true); // Default to Claude for better formatting
+  const [useClaudeOcr, setUseClaudeOcr] = useState(false); // Default to AWS Textract
   const [ocrSpecialCommands, setOcrSpecialCommands] = useState('Maintain the EXACT original layout and formatting. Preserve all line breaks, spacing, and document structure. Extract tables with proper alignment.');
 
   // Approval checkboxes state
@@ -2041,13 +2041,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               const response = await axios.get(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`);
               const orderData = response.data.order || response.data;
               if (orderData.translation_html) {
-                setTranslationResults([{
-                  translatedText: orderData.translation_html,
-                  filename: 'Translation',
-                  originalText: ''
-                }]);
-                setActiveSubTab('review');
-                setProcessingStatus(`✅ Translation loaded!`);
+                // Check for corrupted binary content
+                if (isBinaryContent(orderData.translation_html)) {
+                  setProcessingStatus('⚠️ Translation data is corrupted. Please re-upload the translation.');
+                } else {
+                  setTranslationResults([{
+                    translatedText: orderData.translation_html,
+                    filename: 'Translation',
+                    originalText: ''
+                  }]);
+                  setActiveSubTab('review');
+                  setProcessingStatus(`✅ Translation loaded!`);
+                }
               }
             } catch (err) {
               console.error('Failed to load translation:', err);
@@ -2179,6 +2184,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const orderData = response.data.order || response.data;
 
         if (orderData.translation_html) {
+          // Check for corrupted binary content (Word file that wasn't converted)
+          if (isBinaryContent(orderData.translation_html)) {
+            console.warn('Binary content detected in translation_html - this appears to be a corrupted Word file');
+            setProcessingStatus('⚠️ Translation data is corrupted (binary Word file). Please re-upload the translation.');
+            return false;
+          }
           // Set translation results with original text for proofreading
           setTranslationResults([{
             translatedText: orderData.translation_html,
@@ -3318,6 +3329,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     });
   };
 
+  // Helper function to detect if content is binary (corrupted Word file data)
+  const isBinaryContent = (content) => {
+    if (!content || typeof content !== 'string') return false;
+    // Check for common binary signatures
+    // PK = ZIP/DOCX header, starts with lots of null or control chars
+    if (content.startsWith('PK')) return true;
+    // Check for high ratio of non-printable characters
+    const nonPrintable = content.slice(0, 500).split('').filter(c => {
+      const code = c.charCodeAt(0);
+      return code < 32 && code !== 9 && code !== 10 && code !== 13;
+    }).length;
+    return nonPrintable > 50; // More than 10% non-printable in first 500 chars
+  };
+
   // Convert Word document (.docx) to HTML
   const convertWordToHtml = async (file) => {
     return new Promise((resolve, reject) => {
@@ -3834,8 +3859,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        // Word document (.docx)
-        if (fileName.endsWith('.docx')) {
+        // Word document (.docx or .doc)
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
           setQuickPackageProgress(`Converting Word document: ${file.name}`);
           const html = await convertWordToHtml(file);
           setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
@@ -5145,17 +5170,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
+      {/* Translator access: IN_HOUSE = ALL TABS | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
-          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'translator_inhouse'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
@@ -5182,6 +5207,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
         <div className="space-y-4">
+          {/* Processing Status Indicator */}
+          {processingStatus && (
+            <div className={`p-3 rounded-lg text-sm font-medium animate-pulse ${
+              processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
+              processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
+              'bg-blue-100 text-blue-700 border border-blue-300'
+            }`}>
+              {processingStatus}
+            </div>
+          )}
+
           {/* Translator Messages Panel */}
           {user?.role === 'translator' && (
             <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
@@ -5353,6 +5389,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {selectedFileId === file.id && (
                           <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
                         )}
+                        {/* Action buttons */}
+                        <div className="mt-2 flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              loadFileToWorkspace(file.id, file.filename);
+                            }}
+                            className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
+                            title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                          >
+                            📥 Load to Workspace
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadProjectDocument(file.id, file.filename);
+                            }}
+                            className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
+                            title={`Download ${file.filename}`}
+                          >
+                            ⬇️
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -5433,6 +5492,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </p>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Project Files Download Section - Show when project is selected */}
+          {selectedOrderId && viewMode === 'projects' && (
+            <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                📂 Project Files
+              </h3>
+              {allProjectFiles.filter(f => f.order_id === selectedOrderId).length > 0 ? (
+                <div className="space-y-2">
+                  {allProjectFiles.filter(f => f.order_id === selectedOrderId).map((file, idx) => (
+                    <div key={file.id || idx} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-gray-700 truncate block" title={file.filename}>
+                          {file.filename || 'Document'}
+                        </span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          file.file_status === 'pending' || file.file_status === 'received' ? 'bg-yellow-100 text-yellow-700' :
+                          file.file_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
+                          file.file_status === 'completed' || file.file_status === 'ready' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {file.file_status}
+                        </span>
+                      </div>
+                      <div className="flex gap-1 ml-3">
+                        <button
+                          onClick={() => loadFileToWorkspace(file.id, file.filename)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
+                          title="Load PDF/Image to workspace (PDF auto-converts to images)"
+                        >
+                          📥 Load to Workspace
+                        </button>
+                        <button
+                          onClick={() => downloadProjectDocument(file.id, file.filename)}
+                          className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
+                          title={`Download ${file.filename}`}
+                        >
+                          ⬇️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No files found for this project.</p>
+              )}
             </div>
           )}
 
@@ -6927,21 +7034,99 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="border rounded p-3 bg-white">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs font-medium">Extracted Text:</span>
-                        <button
-                          onClick={() => {
-                            const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
-                            const blob = new Blob([text], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = 'ocr_text_for_cat.txt';
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          📥 Download for CAT Tool
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                              const blob = new Blob([text], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.txt';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            title="Download as TXT"
+                          >
+                            TXT
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<hr style="border: 2px dashed #ccc; margin: 20px 0;">\n\n');
+                              const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h1>OCR Extracted Text</h1>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([htmlContent], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.html';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            title="Download as HTML"
+                          >
+                            HTML
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<br style="page-break-before: always;">\n\n');
+                              const docContent = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1in; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: Courier New, monospace; }
+  </style>
+</head>
+<body>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([docContent], { type: 'application/msword' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.doc';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                            title="Download as Word"
+                          >
+                            Word
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
@@ -7432,7 +7617,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     for (const file of files) {
                       const fileName = file.name.toLowerCase();
                       try {
-                        if (fileName.endsWith('.docx')) {
+                        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                           const html = await convertWordToHtml(file);
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                         } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -7442,7 +7627,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           const text = await readTxtFile(file);
                           const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                        } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                        } else if (fileName.endsWith('.pdf')) {
+                          // Convert PDF to individual page images
+                          setProcessingStatus(`Converting PDF: ${file.name}...`);
+                          const images = await convertPdfToImages(file, (page, total) => {
+                            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                          });
+                          images.forEach((img, idx) => {
+                            const imgHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
+                            setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
+                          });
+                        } else if (file.type.startsWith('image/')) {
                           const dataUrl = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onload = () => resolve(reader.result);
@@ -7453,7 +7648,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         }
                       } catch (err) {
                         console.error('Upload error:', err);
-                        setProcessingStatus(`⚠️ Errorr: ${file.name}`);
+                        setProcessingStatus(`⚠️ Error: ${file.name}`);
                       }
                     }
                     setProcessingStatus('✅ Translation uploaded!');
@@ -7731,7 +7926,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setProcessingStatus(`Processing page ${idx + 1}...`);
                             try {
                               let html = '';
-                              if (fileName.endsWith('.docx')) {
+                              if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                                 html = await convertWordToHtml(file);
                               } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
                                 html = await readHtmlFile(file);
@@ -7803,7 +7998,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         for (const file of files) {
                           const fileName = file.name.toLowerCase();
                           try {
-                            if (fileName.endsWith('.docx')) {
+                            if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                               const html = await convertWordToHtml(file);
                               setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
                             } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -7948,8 +8143,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* PROOFREADING TAB - Admin and PM Only */}
-      {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
+      {/* PROOFREADING TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'proofreading' && (isAdmin || isPM || isInHouseTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
@@ -8279,24 +8474,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="mr-2">←</span> Back: Review
                   </button>
                   <div className="flex gap-3">
-                    {/* Reject Button */}
-                    <button
-                      onClick={rejectTranslation}
-                      disabled={sendingToProjects}
-                      className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
-                    >
-                      ❌ Reject
-                    </button>
+                    {/* Reject Button - Only for Admin and PM */}
+                    {(isAdmin || isPM) && (
+                      <button
+                        onClick={rejectTranslation}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
+                      >
+                        ❌ Reject
+                      </button>
+                    )}
 
-                    {/* Approve Button - Different behavior for PM vs Admin */}
+                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
                     <button
                       onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        isPM && !isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
+                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
-                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
+                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -8311,7 +8508,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isPM && !isAdmin ? (
+                  {isInHouseTranslator ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                    </>
+                  ) : isPM && !isAdmin ? (
                     <>
                       📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
                       <br/>
@@ -8408,6 +8609,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       try {
                         if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
                           const text = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(text)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           const html = `<div style="white-space: pre-wrap;">${text}</div>`;
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
@@ -8419,6 +8625,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setProcessingStatus('✅ Translation loaded!');
                         } else if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
                           const html = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, translatedText: html } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Translation loaded!');
+                        } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+                          // Word document - convert to HTML using mammoth
+                          setProcessingStatus('🔄 Converting Word document...');
+                          const html = await convertWordToHtml(file);
+                          // Check for binary content (corrupted conversion)
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ Word document appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
@@ -9007,6 +9235,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       '📤 Send to PM for Review'
                     )}
                   </button>
+
+                  {/* Download Button for Contractors */}
+                  <button
+                    onClick={handleQuickPackageDownload}
+                    disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                    className="w-full mt-3 py-2 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {quickPackageLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      '📥 Download Package (Print/PDF)'
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-1 text-center">
+                    Opens print window - save as PDF
+                  </p>
 
                   {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
                     <p className="text-[10px] text-purple-600 mt-2">
@@ -9778,8 +10025,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* TRANSLATION MEMORY TAB - Admin Only */}
-      {activeSubTab === 'tm' && isAdmin && (
+      {/* TRANSLATION MEMORY TAB - Admin and In-House Translators */}
+      {activeSubTab === 'tm' && (isAdmin || isInHouseTranslator) && (
         <div className="bg-white rounded shadow">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -12420,7 +12667,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -12961,15 +13208,6 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => assignTranslator(order.id, 'Admin (Self)')}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
-                            title="Assign to yourself as Admin"
-                          >
-                            👑 Assign to Me
-                          </button>
-                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
@@ -21092,6 +21330,76 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
+  // Load file to workspace (download and convert PDF to images automatically)
+  const loadFileToWorkspace = async (docId, filename) => {
+    try {
+      setProcessingStatus('Downloading file...');
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+
+      if (response.data.file_data) {
+        const contentType = response.data.content_type || 'application/pdf';
+        const base64Data = response.data.file_data;
+        const fileNameLower = (filename || '').toLowerCase();
+
+        // Check if it's a PDF - needs conversion to images
+        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
+          setProcessingStatus('Converting PDF to images...');
+
+          // Convert base64 to blob/file for processing
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
+
+          // Convert PDF to images using existing function
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
+          });
+
+          // Load images into workspace
+          const loadedDocs = images.map(img => ({
+            filename: img.filename,
+            data: `data:${img.type};base64,${img.data}`,
+            contentType: img.type
+          }));
+
+          setOriginalContents(loadedDocs);
+          setCurrentDocIndex(0);
+          setProcessingStatus('');
+          alert(`✅ PDF converted! ${loadedDocs.length} page(s) loaded to workspace.`);
+
+        } else if (contentType.startsWith('image/')) {
+          // Image file - load directly
+          setOriginalContents([{
+            filename: filename || 'image',
+            data: `data:${contentType};base64,${base64Data}`,
+            contentType: contentType
+          }]);
+          setCurrentDocIndex(0);
+          setProcessingStatus('');
+          alert('✅ Image loaded to workspace!');
+
+        } else {
+          // Other file types - just download
+          setProcessingStatus('');
+          const link = document.createElement('a');
+          link.href = `data:${contentType};base64,${base64Data}`;
+          link.download = filename || 'document';
+          link.click();
+          alert('File downloaded. This file type cannot be loaded to workspace directly.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load file to workspace:', err);
+      setProcessingStatus('');
+      alert('Error loading file to workspace');
+    }
+  };
+
   // Handle PM original document upload (with PDF to image conversion)
   const handlePmOriginalUpload = async (event) => {
     const selectedFiles = Array.from(event.target.files);
@@ -21188,7 +21496,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         htmlContent = content;
       }
       // Word document
-      else if (fileName.endsWith('.docx')) {
+      else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
         try {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
@@ -21518,29 +21826,35 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
         .signature-title { font-size: 11px; color: #666; }
         .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
-        .stamp-container { text-align: right; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #1a365d; border-radius: 50%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-family: Arial, sans-serif; color: #1a365d;
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
-        .stamp-text-top { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-        .stamp-center { text-align: center; margin: 5px 0; }
-        .stamp-company { font-size: 9px; font-weight: bold; }
-        .stamp-ata { font-size: 8px; }
+        .stamp::before {
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
+        }
+        .stamp-text-top {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
         .translation-content { margin-top: 10px; }
-        .translation-image { max-width: 100%; height: auto; }
+        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
         .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
-        .page-title { font-size: 18px; font-weight: bold; color: #1a365d; margin-bottom: 15px; text-align: center; }
-        .original-image-container { text-align: center; }
-        .original-image { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
         @page { @top-center { content: element(header); } }
@@ -21669,22 +21983,34 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         });
       } else if (order.translation_html) {
         // Load translation from order's translation_html field
-        setTranslatedContent({
-          filename: 'Translation',
-          html: order.translation_html,
-          contentType: 'text/html'
-        });
+        // Check for corrupted binary content
+        if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+          console.warn('Binary content detected in translation_html');
+          alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+        } else {
+          setTranslatedContent({
+            filename: 'Translation',
+            html: order.translation_html,
+            contentType: 'text/html'
+          });
+        }
       } else {
         // Try to fetch order details to get translation_html
         try {
           const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
           const orderData = orderRes.data.order || orderRes.data;
           if (orderData.translation_html) {
-            setTranslatedContent({
-              filename: 'Translation',
-              html: orderData.translation_html,
-              contentType: 'text/html'
-            });
+            // Check for corrupted binary content
+            if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+              console.warn('Binary content detected in translation_html');
+              alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+            } else {
+              setTranslatedContent({
+                filename: 'Translation',
+                html: orderData.translation_html,
+                contentType: 'text/html'
+              });
+            }
           }
         } catch (orderErr) {
           console.error('Failed to fetch order details:', orderErr);
