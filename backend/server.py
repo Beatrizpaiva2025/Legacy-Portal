@@ -7391,6 +7391,45 @@ async def delete_partner(partner_id: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
+@api_router.delete("/admin/partners/by-email/{email}")
+async def delete_partner_by_email(email: str, admin_key: str):
+    """Delete a partner by email (admin only) - useful for testing"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Find the partner by email
+        partner = await db.partners.find_one({"email": email})
+        if not partner:
+            raise HTTPException(status_code=404, detail=f"Partner with email '{email}' not found")
+
+        partner_id = partner.get("id")
+        partner_name = partner.get("company_name", partner.get("name", "Unknown"))
+
+        # Delete the partner
+        await db.partners.delete_one({"email": email})
+
+        # Mark their orders as orphaned
+        await db.translation_orders.update_many(
+            {"partner_id": partner_id},
+            {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+        )
+
+        logger.info(f"Partner deleted by email: {partner_name} ({email})")
+
+        return {
+            "status": "success",
+            "message": f"Partner '{partner_name}' ({email}) deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting partner by email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
 @api_router.get("/admin/orders/{order_id}")
 async def admin_get_single_order(order_id: str, admin_key: str):
     """Get a single order by ID (admin or PM)"""
