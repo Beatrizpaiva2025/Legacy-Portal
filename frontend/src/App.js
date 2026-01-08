@@ -298,21 +298,82 @@ const PAYMENT_STATUS = {
   'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
 };
 
-// Languages list
-const LANGUAGES = [
+// Languages list for FROM field (all common languages)
+const FROM_LANGUAGES = [
   { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
+  { code: 'english_uk', name: 'English (UK)', flag: '🇬🇧' },
   { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
   { code: 'french', name: 'French', flag: '🇫🇷' },
   { code: 'german', name: 'German', flag: '🇩🇪' },
   { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', flag: '🇵🇹' },
   { code: 'italian', name: 'Italian', flag: '🇮🇹' },
-  { code: 'chinese', name: 'Chinese', flag: '🇨🇳' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', flag: '🇨🇳' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', flag: '🇹🇼' },
+  { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'korean', name: 'Korean', flag: '🇰🇷' },
+  { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
+  { code: 'russian', name: 'Russian', flag: '🇷🇺' },
+  { code: 'dutch', name: 'Dutch', flag: '🇳🇱' },
+  { code: 'polish', name: 'Polish', flag: '🇵🇱' },
+  { code: 'turkish', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'vietnamese', name: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'thai', name: 'Thai', flag: '🇹🇭' },
+  { code: 'indonesian', name: 'Indonesian', flag: '🇮🇩' },
+  { code: 'malay', name: 'Malay', flag: '🇲🇾' },
+  { code: 'hindi', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'bengali', name: 'Bengali', flag: '🇧🇩' },
+  { code: 'urdu', name: 'Urdu', flag: '🇵🇰' },
+  { code: 'punjabi', name: 'Punjabi', flag: '🇮🇳' },
+  { code: 'tamil', name: 'Tamil', flag: '🇮🇳' },
+  { code: 'telugu', name: 'Telugu', flag: '🇮🇳' },
+  { code: 'greek', name: 'Greek', flag: '🇬🇷' },
+  { code: 'czech', name: 'Czech', flag: '🇨🇿' },
+  { code: 'romanian', name: 'Romanian', flag: '🇷🇴' },
+  { code: 'hungarian', name: 'Hungarian', flag: '🇭🇺' },
+  { code: 'swedish', name: 'Swedish', flag: '🇸🇪' },
+  { code: 'norwegian', name: 'Norwegian', flag: '🇳🇴' },
+  { code: 'danish', name: 'Danish', flag: '🇩🇰' },
+  { code: 'finnish', name: 'Finnish', flag: '🇫🇮' },
+  { code: 'hebrew', name: 'Hebrew', flag: '🇮🇱' },
+  { code: 'persian', name: 'Persian (Farsi)', flag: '🇮🇷' },
+  { code: 'ukrainian', name: 'Ukrainian', flag: '🇺🇦' },
+  { code: 'croatian', name: 'Croatian', flag: '🇭🇷' },
+  { code: 'serbian', name: 'Serbian', flag: '🇷🇸' },
+  { code: 'bulgarian', name: 'Bulgarian', flag: '🇧🇬' },
+  { code: 'slovak', name: 'Slovak', flag: '🇸🇰' },
+  { code: 'slovenian', name: 'Slovenian', flag: '🇸🇮' },
+  { code: 'lithuanian', name: 'Lithuanian', flag: '🇱🇹' },
+  { code: 'latvian', name: 'Latvian', flag: '🇱🇻' },
+  { code: 'estonian', name: 'Estonian', flag: '🇪🇪' },
+  { code: 'swahili', name: 'Swahili', flag: '🇰🇪' },
+  { code: 'tagalog', name: 'Tagalog (Filipino)', flag: '🇵🇭' },
+  { code: 'afrikaans', name: 'Afrikaans', flag: '🇿🇦' },
+  { code: 'catalan', name: 'Catalan', flag: '🇪🇸' },
+  { code: 'haitian_creole', name: 'Haitian Creole', flag: '🇭🇹' }
+];
+
+// Languages list for TO field (target languages)
+const TO_LANGUAGES = [
+  { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
+  { code: 'english_uk', name: 'English (UK)', flag: '🇬🇧' },
+  { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'french', name: 'French', flag: '🇫🇷' },
+  { code: 'german', name: 'German', flag: '🇩🇪' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', flag: '🇵🇹' },
+  { code: 'italian', name: 'Italian', flag: '🇮🇹' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', flag: '🇨🇳' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', flag: '🇹🇼' },
   { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
   { code: 'korean', name: 'Korean', flag: '🇰🇷' },
   { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
   { code: 'russian', name: 'Russian', flag: '🇷🇺' },
   { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
 ];
+
+// Keep LANGUAGES for backward compatibility
+const LANGUAGES = TO_LANGUAGES;
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
@@ -1317,7 +1378,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   value={formData.translate_from}
                   onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
                 >
-                  {LANGUAGES.map((lang) => (
+                  {FROM_LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
                       {lang.flag} {lang.name}
                     </option>
@@ -1343,7 +1404,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     value={formData.translate_to}
                     onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
                   >
-                    {LANGUAGES.map((lang) => (
+                    {TO_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
                         {lang.flag} {lang.name}
                       </option>
