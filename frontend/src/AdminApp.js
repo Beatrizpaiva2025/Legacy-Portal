@@ -13060,8 +13060,9 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
-              const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
+              const hasDeadline = order.deadline ? true : false;
+              const orderDeadline = hasDeadline ? new Date(order.deadline) : null;
+              const daysUntil = hasDeadline ? Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               return (
                 <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
                   {/* Code */}
@@ -13203,7 +13204,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
-                  {/* Deadline with date+time */}
+                  {/* Deadline with date+time - Only shows when explicitly set by Admin/PM */}
                   <td className="px-3 py-3">
                     {editingDeadline === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
@@ -13224,7 +13225,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <button onClick={() => setEditingDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
-                    ) : (
+                    ) : hasDeadline ? (
                       <div
                         onClick={() => isAdmin && startEditingDeadline(order)}
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
@@ -13236,7 +13237,15 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
                         )}
                       </div>
-                    )}
+                    ) : (
+                      <span
+                        onClick={() => isAdmin && startEditingDeadline(order)}
+                        className={`text-xs text-gray-400 ${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={isAdmin ? "Click to set deadline" : ""}
+                      >
+                        -
+                      </span>
+                    )
                   </td>
                   {/* Status */}
                   <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
