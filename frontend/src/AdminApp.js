@@ -268,7 +268,7 @@ const AdminLogin = ({ onLogin }) => {
       setSuccess('If an account exists with this email, a password reset link has been sent.');
       setForgotEmail('');
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Errorr sending reset email');
+      setErrorr(err.response?.data?.detail || 'Error sending reset email');
     } finally {
       setLoading(false);
     }
@@ -2109,7 +2109,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       console.error('Failed to fetch documents:', err);
-      setProcessingStatus(`❌ Error ao buscar documents: ${err.message}`);
+      setProcessingStatus(`❌ Error fetching documents: ${err.message}`);
     } finally {
       setLoadingProjectFiles(false);
     }
@@ -2170,7 +2170,85 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (err) {
       console.error('Failed to load file:', err);
-      setProcessingStatus(`❌ Error ao load file: ${err.message}`);
+      setProcessingStatus(`❌ Error loading file: ${err.message}`);
+    }
+  };
+
+  // Download project document directly
+  const downloadProjectDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Error downloading document');
+    }
+  };
+
+  // Load file to workspace (download and convert PDF to images automatically)
+  const loadFileToWorkspace = async (docId, filename) => {
+    try {
+      setProcessingStatus('Downloading file...');
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+
+      if (response.data.file_data) {
+        const contentType = response.data.content_type || 'application/pdf';
+        const base64Data = response.data.file_data;
+        const fileNameLower = (filename || '').toLowerCase();
+
+        // Check if it's a PDF - needs conversion to images
+        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
+          setProcessingStatus('Converting PDF to images...');
+
+          // Convert base64 to blob/file for processing
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
+
+          // Convert PDF to images using existing function
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
+          });
+
+          // Load images into workspace
+          setOriginalImages(images);
+          setProcessingStatus('');
+          alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
+
+        } else if (contentType.startsWith('image/')) {
+          // Image file - load directly
+          setOriginalImages([{
+            filename: filename || 'image',
+            data: base64Data,
+            type: contentType
+          }]);
+          setProcessingStatus('');
+          alert('✅ Image loaded to workspace!');
+
+        } else {
+          // Other file types - just download
+          setProcessingStatus('');
+          const link = document.createElement('a');
+          link.href = `data:${contentType};base64,${base64Data}`;
+          link.download = filename || 'document';
+          link.click();
+          alert('File downloaded. This file type cannot be loaded to workspace directly.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load file to workspace:', err);
+      setProcessingStatus('');
+      alert('Error loading file to workspace');
     }
   };
 
@@ -5285,7 +5363,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <span className="text-lg">✅</span>
                       <div className="text-left">
                         <div className="font-medium">Entregar ao Cliente</div>
-                        <div className="text-[10px] text-gray-500">Finalizar e enviar</div>
+                        <div className="text-[10px] text-gray-500">Finalize and send</div>
                       </div>
                     </button>
                   </div>
@@ -6508,7 +6586,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                         link.click();
                                       }
                                     } catch (err) {
-                                      alert('Error ao baixar file');
+                                      alert('Error downloading file');
                                     }
                                   }}
                                   className="px-2 py-1.5 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 transition-colors"
@@ -8661,7 +8739,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {/* Observations */}
                     {proofreadingResult.observacoes && (
                       <div className="p-3 bg-gray-100 border border-gray-200 rounded">
-                        <h4 className="text-xs font-medium text-gray-700 mb-1">📝 Observações:</h4>
+                        <h4 className="text-xs font-medium text-gray-700 mb-1">📝 Observations:</h4>
                         <p className="text-xs text-gray-600">{proofreadingResult.observacoes}</p>
                       </div>
                     )}
@@ -11328,7 +11406,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }, 2000);
     } catch (err) {
       console.error('Failed to send email:', err);
-      setDeliveryStatus('❌ Error ao enviar email: ' + (err.response?.data?.detail || err.message));
+      setDeliveryStatus('❌ Error sending email: ' + (err.response?.data?.detail || err.message));
     } finally {
       setDeliverySending(false);
     }
@@ -11341,7 +11419,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to delete:', err);
-      alert('Error ao deletar pedido');
+      alert('Error deleting order');
     }
   };
 
@@ -11524,7 +11602,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert(`${fileList.length} file(s) sent(s) successfully!`);
     } catch (err) {
       console.error('Failed to upload translation:', err);
-      alert('Error ao enviar file');
+      alert('Error sending file');
     } finally {
       setUploadingFile(false);
     }
@@ -11577,7 +11655,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
-      alert('Error ao enviar: ' + (err.response?.data?.detail || err.message));
+      alert('Error sending: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSendingToClient(false);
     }
@@ -14750,10 +14828,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   htmlFor="translationFile"
                   className={`block px-2 py-1.5 border-2 border-dashed rounded text-center cursor-pointer hover:bg-gray-50 text-[10px] ${uploadingFile ? 'opacity-50' : ''}`}
                 >
-                  {uploadingFile ? 'Enviando...' : '📁 Selecionar file(s) (PDF, DOC, HTML)'}
+                  {uploadingFile ? 'Sending...' : '📁 Select file(s) (PDF, DOC, HTML)'}
                 </label>
                 <div className="text-[9px] text-gray-400 mt-1 text-center">
-                  Para traduções feitas fora do sistema
+                  For translations done outside the system
                 </div>
               </div>
 
@@ -17681,7 +17759,7 @@ const UsersPage = ({ adminKey, user }) => {
       alert('Perfil atualizado successfully!');
     } catch (err) {
       console.error('Errorr updating user:', err);
-      alert(err.response?.data?.detail || 'Error ao update perfil');
+      alert(err.response?.data?.detail || 'Error updating profile');
     } finally {
       setSavingUser(false);
     }
@@ -17718,7 +17796,7 @@ const UsersPage = ({ adminKey, user }) => {
       link.click();
     } catch (err) {
       console.error('Errorr downloading document:', err);
-      alert('Error ao baixar document');
+      alert('Error downloading document');
     }
   };
 
@@ -17730,7 +17808,7 @@ const UsersPage = ({ adminKey, user }) => {
       await fetchUserDocuments(userId);
     } catch (err) {
       console.error('Errorr deleting document:', err);
-      alert('Error ao excluir document');
+      alert('Error deleting document');
     }
   };
 
@@ -17766,12 +17844,12 @@ const UsersPage = ({ adminKey, user }) => {
       if (response.data?.invitation_link) {
         const copyLink = window.confirm(
           `✅ ${response.data.message}\n\n` +
-          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `⚠️ The email may go to spam. Copy the invite link?\n\n` +
           `Link: ${response.data.invitation_link}`
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copiado! Envie to o usuário por WhatsApp ou outro meio.');
+          alert('Link copied! Send it to the user via WhatsApp or another method.');
         }
       } else {
         alert(response.data?.message || 'User created!');
@@ -17781,7 +17859,7 @@ const UsersPage = ({ adminKey, user }) => {
       setShowCreateForm(false);
       fetchUsers();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Errorr creating user');
+      alert(err.response?.data?.detail || 'Error creating user');
     } finally {
       setCreating(false);
     }
@@ -17802,12 +17880,12 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.delete(`${API}/admin/users/${userId}?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Errorr deleting user');
+      alert('Error deleting user');
     }
   };
 
   const handleResendInvitation = async (userId, userName, userEmail) => {
-    if (!window.confirm(`Reenviar convite to "${userName}" (${userEmail})?`)) return;
+    if (!window.confirm(`Resend invite to "${userName}" (${userEmail})?`)) return;
     try {
       const response = await axios.post(`${API}/admin/auth/resend-invitation?admin_key=${adminKey}`, {
         user_id: userId
@@ -17817,18 +17895,18 @@ const UsersPage = ({ adminKey, user }) => {
       if (response.data?.invitation_link) {
         const copyLink = window.confirm(
           `✅ ${response.data.message}\n\n` +
-          `⚠️ O email pode cair no spam. Copiar o link de convite?\n\n` +
+          `⚠️ The email may go to spam. Copy the invite link?\n\n` +
           `Link: ${response.data.invitation_link}`
         );
         if (copyLink) {
           navigator.clipboard.writeText(response.data.invitation_link);
-          alert('Link copiado! Envie to o usuário por WhatsApp ou outro meio.');
+          alert('Link copied! Send it to the user via WhatsApp or another method.');
         }
       } else {
-        alert(response.data?.message || 'Convite resent!');
+        alert(response.data?.message || 'Invite resent!');
       }
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error ao reenviar convite');
+      alert(err.response?.data?.detail || 'Error resending invite');
     }
   };
 
@@ -18463,7 +18541,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       alert('Payment registrado successfully!');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Error ao registrar pagamento');
+      alert(err.response?.data?.detail || 'Error registering payment');
     }
   };
 
@@ -18474,7 +18552,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Error ao update pagamento');
+      alert('Error updating payment');
     }
   };
 
@@ -21393,7 +21471,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       pages: 'Número de Páginas',
       pricePerPage: 'Preço por Página',
       subtotal: 'Subtotal',
-      urgencyFee: 'Taxa de Urgência',
+      urgencyFee: 'Urgency Fee',
       discount: 'Desconto',
       total: 'TOTAL',
       notes: 'Observações',
@@ -21484,7 +21562,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setShowQuotePreview(false);
     } catch (err) {
       console.error('Failed to send quote:', err);
-      alert('❌ Error ao enviar orçamento. Tente novamente.');
+      alert('❌ Error sending quote. Please try again.');
     } finally {
       setSendingQuote(false);
     }
@@ -21608,101 +21686,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         delete newState[docId];
         return newState;
       });
-    }
-  };
-
-  // Download document
-  const downloadProjectDocument = async (docId, filename) => {
-    try {
-      setProcessingStatus('Downloading file...');
-      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
-      if (response.data.file_data) {
-        const link = document.createElement('a');
-        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
-        link.download = filename || 'document.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setProcessingStatus(`✅ Downloaded: ${filename}`);
-        setTimeout(() => setProcessingStatus(''), 3000);
-      } else {
-        setProcessingStatus('');
-        alert('Document data not found. The file may not have been uploaded properly.');
-      }
-    } catch (err) {
-      console.error('Failed to download:', err);
-      setProcessingStatus('');
-      alert('Error downloading document: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
-  // Load file to workspace (download and convert PDF to images automatically)
-  const loadFileToWorkspace = async (docId, filename) => {
-    try {
-      setProcessingStatus('Downloading file...');
-      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
-
-      if (response.data.file_data) {
-        const contentType = response.data.content_type || 'application/pdf';
-        const base64Data = response.data.file_data;
-        const fileNameLower = (filename || '').toLowerCase();
-
-        // Check if it's a PDF - needs conversion to images
-        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
-          setProcessingStatus('Converting PDF to images...');
-
-          // Convert base64 to blob/file for processing
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/pdf' });
-          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
-
-          // Convert PDF to images using existing function
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
-          });
-
-          // Load images into workspace
-          const loadedDocs = images.map(img => ({
-            filename: img.filename,
-            data: `data:${img.type};base64,${img.data}`,
-            contentType: img.type
-          }));
-
-          setOriginalContents(loadedDocs);
-          setCurrentDocIndex(0);
-          setProcessingStatus('');
-          alert(`✅ PDF converted! ${loadedDocs.length} page(s) loaded to workspace.`);
-
-        } else if (contentType.startsWith('image/')) {
-          // Image file - load directly
-          setOriginalContents([{
-            filename: filename || 'image',
-            data: `data:${contentType};base64,${base64Data}`,
-            contentType: contentType
-          }]);
-          setCurrentDocIndex(0);
-          setProcessingStatus('');
-          alert('✅ Image loaded to workspace!');
-
-        } else {
-          // Other file types - just download
-          setProcessingStatus('');
-          const link = document.createElement('a');
-          link.href = `data:${contentType};base64,${base64Data}`;
-          link.download = filename || 'document';
-          link.click();
-          alert('File downloaded. This file type cannot be loaded to workspace directly.');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load file to workspace:', err);
-      setProcessingStatus('');
-      alert('Error loading file to workspace');
     }
   };
 
@@ -22384,7 +22367,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert(alertMessage);
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('❌ Error ao aprovar translation');
+      alert('❌ Error approving translation');
     } finally {
       setSendingAction(false);
     }
@@ -22507,7 +22490,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
     } catch (error) {
       console.error('Proofreading error:', error);
-      setProofreadingErrorr(error.response?.data?.detail || error.message || 'Error ao executar review automática');
+      setProofreadingErrorr(error.response?.data?.detail || error.message || 'Error running automatic review');
     } finally {
       setIsProofreading(false);
     }
@@ -22693,13 +22676,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           <div className="grid grid-cols-2 gap-4">
             {/* Quote Form */}
             <div className="bg-white rounded-lg shadow p-4">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">💰 Gerar Orçamento Profissional</h3>
+              <h3 className="text-sm font-bold text-gray-800 mb-4">💰 Generate Professional Quote</h3>
 
               <div className="space-y-3">
                 {/* Client Info */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Nome do Cliente *</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Name *</label>
                     <input
                       type="text"
                       value={quoteForm.clientName}
@@ -22709,7 +22692,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Email do Cliente *</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Client Email *</label>
                     <input
                       type="email"
                       value={quoteForm.clientEmail}
@@ -22722,7 +22705,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Document Type */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Documento</label>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Document Type</label>
                   <select
                     value={quoteForm.documentType}
                     onChange={(e) => setQuoteForm({...quoteForm, documentType: e.target.value})}
@@ -22735,7 +22718,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Languages */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Origem</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Source Language</label>
                     <select
                       value={quoteForm.sourceLanguage}
                       onChange={(e) => setQuoteForm({...quoteForm, sourceLanguage: e.target.value})}
@@ -22745,7 +22728,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma de Destino</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Target Language</label>
                     <select
                       value={quoteForm.targetLanguage}
                       onChange={(e) => setQuoteForm({...quoteForm, targetLanguage: e.target.value})}
@@ -22759,7 +22742,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {/* Service Type & Urgency */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Tipo de Serviço</label>
+                    <label className="block text-[10px] font-medium text-gray-600 mb-1">Service Type</label>
                     <select
                       value={quoteForm.serviceType}
                       onChange={(e) => {
@@ -22846,19 +22829,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Observações</label>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Notes</label>
                   <textarea
                     value={quoteForm.notes}
                     onChange={(e) => setQuoteForm({...quoteForm, notes: e.target.value})}
                     className="w-full px-2 py-1.5 text-xs border rounded"
                     rows="2"
-                    placeholder="Observações adicionais to o orçamento..."
+                    placeholder="Additional notes for the quote..."
                   />
                 </div>
 
                 {/* Quote Language Selection */}
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Idioma do Orçamento</label>
+                  <label className="block text-[10px] font-medium text-gray-600 mb-1">Quote Language</label>
                   <div className="flex gap-2">
                     {[
                       { value: 'en', label: '🇺🇸 English' },
@@ -22886,7 +22869,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     onClick={() => setShowQuotePreview(true)}
                     className="w-full px-4 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600"
                   >
-                    👁️ Visualizar Orçamento
+                    👁️ Preview Quote
                   </button>
                 </div>
               </div>
@@ -22896,7 +22879,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             <div className="space-y-4">
               {/* Price Summary */}
               <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-sm font-bold text-gray-800 mb-3">📊 Resumo do Orçamento</h3>
+                <h3 className="text-sm font-bold text-gray-800 mb-3">📊 Quote Summary</h3>
                 {(() => {
                   const prices = calculateQuote();
                   return (
@@ -22907,13 +22890,13 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
                       {prices.urgencyFee > 0 && (
                         <div className="flex justify-between text-sm text-blue-600">
-                          <span>Taxa de Urgência ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
+                          <span>Urgency Fee ({quoteForm.urgency === 'priority' ? '+25%' : '+100%'})</span>
                           <span>+${prices.urgencyFee.toFixed(2)}</span>
                         </div>
                       )}
                       {prices.deliveryFee > 0 && (
                         <div className="flex justify-between text-sm text-blue-600">
-                          <span>Taxa de Entrega ({PM_DELIVERY_OPTIONS[quoteForm.deliveryMethod]?.name})</span>
+                          <span>Delivery Fee ({PM_DELIVERY_OPTIONS[quoteForm.deliveryMethod]?.name})</span>
                           <span>+${prices.deliveryFee.toFixed(2)}</span>
                         </div>
                       )}
@@ -23066,7 +23049,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               )}
                               {prices.deliveryFee > 0 && (
                                 <tr className="border-b text-blue-600">
-                                  <td className="py-2">{quoteLanguage === 'pt' ? 'Taxa de Entrega' : quoteLanguage === 'es' ? 'Tarifa de Envío' : 'Delivery Fee'}</td>
+                                  <td className="py-2">{quoteLanguage === 'pt' ? 'Delivery Fee' : quoteLanguage === 'es' ? 'Tarifa de Envío' : 'Delivery Fee'}</td>
                                   <td className="py-2 text-right">+${prices.deliveryFee.toFixed(2)}</td>
                                 </tr>
                               )}
@@ -23125,14 +23108,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       onClick={() => window.print()}
                       className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 flex items-center gap-1"
                     >
-                      🖨️ Imprimir
+                      🖨️ Print
                     </button>
                     <button
                       onClick={sendQuoteEmail}
                       disabled={sendingQuote || !quoteForm.clientEmail}
                       className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
                     >
-                      {sendingQuote ? '⏳ Enviando...' : '📧 Enviar por Email'}
+                      {sendingQuote ? '⏳ Sending...' : '📧 Send by Email'}
                     </button>
                   </div>
                 </div>
@@ -23609,7 +23592,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       onClick={() => { setSelectedTranslator(translator); setActiveSection('messages'); }}
                       className="mt-3 w-full px-2 py-1 bg-blue-500 text-white text-[10px] rounded hover:bg-blue-600"
                     >
-                      💬 Enviar Mensagem
+                      💬 Send Message
                     </button>
                   </div>
                 );
@@ -23791,12 +23774,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'messages' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Translatores</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Communication with Translators</h3>
 
             <div className="grid grid-cols-3 gap-4">
               {/* Translator List */}
               <div className="border rounded-lg p-3">
-                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Translator</h4>
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Select Translator</h4>
                 <div className="space-y-1 max-h-80 overflow-y-auto">
                   {translators.length > 0 ? (
                     translators.map(translator => (
@@ -23827,7 +23810,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 {selectedTranslator ? (
                   <>
                     <h4 className="text-xs font-medium text-gray-600 mb-2">
-                      Conversa com {selectedTranslator.name}
+                      Conversation with {selectedTranslator.name}
                     </h4>
 
                     {/* Messages */}
@@ -23844,14 +23827,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             }`}
                           >
                             <div className="font-medium text-[10px] text-gray-500 mb-1">
-                              {msg.from} • {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US')}
                             </div>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
                           </div>
                         ))}
                       {messages.filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name).length === 0 && (
                         <div className="text-center py-8 text-gray-400 text-xs">
-                          Noa message yet
+                          No messages yet
                         </div>
                       )}
                     </div>
@@ -23863,14 +23846,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                        placeholder="Digite sua message..."
+                        placeholder="Type your message..."
                         className="flex-1 px-3 py-2 border rounded text-xs"
                       />
                       <button
                         onClick={sendMessage}
                         className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
                       >
-                        Enviar
+                        Send
                       </button>
                     </div>
                   </>
