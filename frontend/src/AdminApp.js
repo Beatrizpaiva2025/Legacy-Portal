@@ -2461,7 +2461,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         'ready': 'Ready for Delivery',
         'deliver': 'Client',
         'client': 'Client (Review)',
-        'pending_admin_approval': 'Admin (for client delivery)'
+        'admin': 'Admin',
+        'pending_admin_approval': 'Admin (for client delivery)',
+        'finalize_admin': 'Admin (Finalized - Ready for Client)'
       };
       const destinationLabel = destinationLabels[destination] || destination;
 
@@ -2491,9 +2493,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             // For PM/Admin, just clear status after showing success
             setTimeout(() => setProcessingStatus(''), 3000);
           }
-        } else if (destination === 'pending_admin_approval') {
-          setProcessingStatus(`✅ Translation approved and sent to Admin for client delivery!`);
-          setTimeout(() => setProcessingStatus(''), 3000);
+        } else if (destination === 'pending_admin_approval' || destination === 'finalize_admin') {
+          setProcessingStatus(`✅ Translation finalized and sent to Admin for client delivery!`);
+          if (isTranslator) {
+            // Reset and go back to START
+            setTimeout(() => {
+              setSelectedOrderId('');
+              setOrderNumber('');
+              setTranslationResults([]);
+              setOriginalImages([]);
+              setActiveSubTab('start');
+              setProcessingStatus('');
+              fetchAssignedOrders();
+            }, 2000);
+          } else {
+            setTimeout(() => setProcessingStatus(''), 3000);
+          }
         } else {
           setProcessingStatus(`✅ Translation sent to ${destinationLabel}!`);
           setTimeout(() => setProcessingStatus(''), 3000);
@@ -5393,8 +5408,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
-          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator'] },
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
@@ -9405,7 +9420,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </select>
                     </div>
 
-                    {/* In-House Translator: Choose PM or Admin */}
+                    {/* In-House Translator: Choose PM or Finalize to Admin */}
                     {isInHouseTranslator && (
                       <div className="mb-3">
                         <label className="block text-xs font-medium text-gray-700 mb-1">Send to *</label>
@@ -9414,8 +9429,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           onChange={(e) => setSendDestination(e.target.value)}
                           className="w-full px-2 py-1.5 text-xs border rounded"
                         >
-                          <option value="pm">📤 Send to PM</option>
-                          <option value="admin">📤 Send to Admin</option>
+                          <option value="pm">📤 Send to PM (for review)</option>
+                          <option value="finalize_admin">✅ Finalize & Send to Admin</option>
                         </select>
                       </div>
                     )}
@@ -9423,9 +9438,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <button
                       onClick={() => sendToProjects(isInHouseTranslator ? sendDestination : 'review')}
                       disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                      className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      className={`w-full py-2 text-white text-sm font-bold rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                        sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                      }`}
                     >
-                      {sendingToProjects ? '⏳ Sending...' : isInHouseTranslator ? '📤 Submit' : '📤 Submit & Notify Admin/PM'}
+                      {sendingToProjects ? '⏳ Sending...' : isInHouseTranslator ? (sendDestination === 'finalize_admin' ? '✅ Finalize' : '📤 Submit') : '📤 Submit & Notify Admin/PM'}
                     </button>
 
                     {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
@@ -9867,23 +9884,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {/* Admin only can send to client */}
                       {isAdmin && <option value="client">📧 Send to Client</option>}
                       {/* PM sends to Admin for final approval */}
-                      {isPM && !isAdmin && <option value="admin">📤 Send to Admin</option>}
-                      {/* In-House Translator: Send to PM or Admin (never to client) */}
+                      {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                      {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
                       {isInHouseTranslator && (
                         <>
-                          <option value="pm">📤 Send to PM</option>
-                          <option value="admin">📤 Send to Admin</option>
+                          <option value="pm">📤 Send to PM (for review)</option>
+                          <option value="finalize_admin">✅ Finalize & Send to Admin</option>
                         </>
+                      )}
+                      {/* Contractor: Only send to PM */}
+                      {isContractor && (
+                        <option value="pm">📤 Send to PM</option>
                       )}
                     </select>
                     <button
                       onClick={() => sendToProjects(sendDestination)}
                       disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim()}
                       className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                        sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                        sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
+                        sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
+                        'bg-blue-600 hover:bg-blue-700'
                       }`}
                     >
-                      {sendingToProjects ? '⏳ Sending...' : '📤 Deliver'}
+                      {sendingToProjects ? '⏳ Sending...' : sendDestination === 'finalize_admin' ? '✅ Finalize' : '📤 Deliver'}
                     </button>
                   </div>
                 </div>
