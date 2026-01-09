@@ -3255,11 +3255,57 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Helper function to try replacing text with multiple strategies
+  const tryReplaceText = (html, foundText, suggestionText) => {
+    let updatedHtml = html;
+    let replaced = false;
+
+    // Strategy 1: Try exact match (case insensitive)
+    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(escapedText, 'gi');
+
+    if (exactRegex.test(html)) {
+      updatedHtml = html.replace(exactRegex, suggestionText);
+      replaced = true;
+    }
+
+    // Strategy 2: Try matching with flexible whitespace
+    if (!replaced) {
+      const flexiblePattern = foundText
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+      if (flexibleRegex.test(html)) {
+        updatedHtml = html.replace(flexibleRegex, suggestionText);
+        replaced = true;
+      }
+    }
+
+    // Strategy 3: Try finding words individually
+    if (!replaced) {
+      const words = foundText.split(/\s+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const wordPattern = words
+          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+        const wordRegex = new RegExp(wordPattern, 'gi');
+
+        if (wordRegex.test(html)) {
+          updatedHtml = html.replace(wordRegex, suggestionText);
+          replaced = true;
+        }
+      }
+    }
+
+    return { updatedHtml, replaced };
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = erro.found || erro.original || erro.traducao_errada;
-    const suggestionText = erro.sugestao || erro.correcao;
+    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3269,17 +3315,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    // Replace the found text with the suggestion
-    const updatedHtml = currentResult.translatedText.replace(
-      new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-      suggestionText
-    );
+    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+
+    if (!result.replaced) {
+      alert(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: updatedHtml
+      translatedText: result.updatedHtml
     };
     setTranslationResults(newResults);
 
@@ -3302,20 +3349,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!currentResult?.translatedText) return;
 
     let updatedHtml = currentResult.translatedText;
+    let appliedCount = 0;
+
     const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions
-      const foundText = erro.found || erro.original || erro.traducao_errada;
-      const suggestionText = erro.sugestao || erro.correcao;
+      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
-        updatedHtml = updatedHtml.replace(
-          new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-          suggestionText
-        );
-        return { ...erro, applied: true };
+        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
       }
       return erro;
     });
+
+    if (appliedCount === 0) {
+      alert('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
