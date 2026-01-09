@@ -1255,7 +1255,8 @@ class TranslationOrder(BaseModel):
     translator_assignment_token: Optional[str] = None  # Token for accept/decline
     translator_assignment_status: str = "none"  # none, pending, accepted, declined
     translator_assignment_responded_at: Optional[datetime] = None
-    deadline: Optional[datetime] = None  # Translation deadline
+    deadline: Optional[datetime] = None  # Client deadline - when to deliver to client
+    translator_deadline: Optional[datetime] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
@@ -1298,7 +1299,8 @@ class TranslationOrderUpdate(BaseModel):
     # Assignment updates (by name - for direct assignment from dropdown)
     assigned_pm: Optional[str] = None
     assigned_translator: Optional[str] = None
-    deadline: Optional[str] = None  # Changed to str to accept ISO string
+    deadline: Optional[str] = None  # Client deadline - Changed to str to accept ISO string
+    translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
     # NEW: Additional editable fields
