@@ -805,12 +805,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
         <div className="relative z-10 text-center max-w-md">
           <div className="bg-white rounded-2xl p-6 mb-8 shadow-xl mx-auto inline-block">
             <img
-              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              src="/images/legacy-logo.png"
               alt="Legacy Translations"
               className="h-16"
             />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-4">Business Partner Portal</h1>
+          <h1 className="text-4xl font-bold text-white mb-4">{isLogin ? 'Business Partner Portal' : t.createAccount}</h1>
           <p className="text-blue-200 text-lg mb-8">
             Streamlined translation services for corporate clients
           </p>
