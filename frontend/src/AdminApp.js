@@ -1543,6 +1543,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
@@ -1550,6 +1551,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [documentType, setDocumentType] = useState('Birth Certificate');
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
+  const [savedTranslatorName, setSavedTranslatorName] = useState(''); // Saved translator name from database - DO NOT change on UI selection
   const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
@@ -1744,6 +1746,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
+
+  // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
+  const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
 
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
@@ -2214,7 +2219,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           if (orderData.translation_source_language) setSourceLanguage(orderData.translation_source_language);
           if (orderData.translation_target_language) setTargetLanguage(orderData.translation_target_language);
           if (orderData.translation_document_type) setDocumentType(orderData.translation_document_type);
-          if (orderData.translation_translator_name) setSelectedTranslator(orderData.translation_translator_name);
+          if (orderData.translation_translator_name) {
+            setSelectedTranslator(orderData.translation_translator_name);
+            setSavedTranslatorName(orderData.translation_translator_name); // Save original name from DB - used for certificate signature
+          }
           if (orderData.translation_type_setting) setTranslationType(orderData.translation_type_setting);
           if (orderData.translation_page_format) setPageFormat(orderData.translation_page_format);
           if (orderData.translation_include_cover !== undefined) setIncludeCover(orderData.translation_include_cover);
@@ -3182,11 +3190,129 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Generate translation text with highlighted errors
+  const getHighlightedTranslation = () => {
+    const currentResult = translationResults[selectedResultIndex];
+    if (!currentResult?.translatedText || !proofreadingResult?.erros || proofreadingResult.erros.length === 0) {
+      return currentResult?.translatedText || '<p>No translation</p>';
+    }
+
+    let highlightedHtml = currentResult.translatedText;
+
+    // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    const errorsToHighlight = proofreadingResult.erros
+      .map((erro, idx) => ({
+        text: erro.found || erro.original || erro.traducao_errada || '',
+        severity: erro.severidade || erro.gravidade || 'MÉDIO',
+        suggestion: erro.sugestao || erro.correcao || '',
+        type: erro.tipo || 'Geral',
+        index: idx,
+        applied: erro.applied
+      }))
+      .filter(e => e.text && e.text.length > 0 && !e.applied)
+      .sort((a, b) => b.text.length - a.text.length);
+
+    // Apply highlighting for each error
+    errorsToHighlight.forEach(error => {
+      const severityColor = error.severity === 'CRÍTICO' ? '#fee2e2' : // red-100
+                           error.severity === 'ALTO' ? '#dbeafe' : // blue-100
+                           error.severity === 'MÉDIO' ? '#fef3c7' : // yellow-100
+                           '#e0e7ff'; // indigo-100 for BAIXO
+
+      const borderColor = error.severity === 'CRÍTICO' ? '#ef4444' : // red-500
+                         error.severity === 'ALTO' ? '#3b82f6' : // blue-500
+                         error.severity === 'MÉDIO' ? '#f59e0b' : // yellow-500
+                         '#6366f1'; // indigo-500 for BAIXO
+
+      const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Create tooltip with error details
+      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+
+      // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
+      const regex = new RegExp(escapedText, 'i');
+      highlightedHtml = highlightedHtml.replace(
+        regex,
+        `<mark data-error-index="${error.index}" style="background-color: ${severityColor}; border-bottom: 2px solid ${borderColor}; padding: 2px 4px; border-radius: 3px; cursor: pointer; transition: all 0.2s;" title="${tooltipText}" class="proofreading-error-highlight">${error.text}</mark>`
+      );
+    });
+
+    return highlightedHtml;
+  };
+
+  // Handle click on highlighted error in translation - scroll to and highlight the table row
+  const handleHighlightedErrorClick = (e) => {
+    const mark = e.target.closest('mark[data-error-index]');
+    if (mark) {
+      const errorIndex = parseInt(mark.getAttribute('data-error-index'), 10);
+      setHighlightedErrorIndex(errorIndex);
+
+      // Scroll the error table row into view
+      setTimeout(() => {
+        const errorRow = document.querySelector(`[data-error-row="${errorIndex}"]`);
+        if (errorRow) {
+          errorRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Clear the highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedErrorIndex(null);
+      }, 3000);
+    }
+  };
+
+  // Helper function to try replacing text with multiple strategies
+  const tryReplaceText = (html, foundText, suggestionText) => {
+    let updatedHtml = html;
+    let replaced = false;
+
+    // Strategy 1: Try exact match (case insensitive)
+    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(escapedText, 'gi');
+
+    if (exactRegex.test(html)) {
+      updatedHtml = html.replace(exactRegex, suggestionText);
+      replaced = true;
+    }
+
+    // Strategy 2: Try matching with flexible whitespace
+    if (!replaced) {
+      const flexiblePattern = foundText
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+      if (flexibleRegex.test(html)) {
+        updatedHtml = html.replace(flexibleRegex, suggestionText);
+        replaced = true;
+      }
+    }
+
+    // Strategy 3: Try finding words individually
+    if (!replaced) {
+      const words = foundText.split(/\s+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const wordPattern = words
+          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+        const wordRegex = new RegExp(wordPattern, 'gi');
+
+        if (wordRegex.test(html)) {
+          updatedHtml = html.replace(wordRegex, suggestionText);
+          replaced = true;
+        }
+      }
+    }
+
+    return { updatedHtml, replaced };
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = erro.found || erro.original || erro.traducao_errada;
-    const suggestionText = erro.sugestao || erro.correcao;
+    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3196,17 +3322,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    // Replace the found text with the suggestion
-    const updatedHtml = currentResult.translatedText.replace(
-      new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-      suggestionText
-    );
+    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+
+    if (!result.replaced) {
+      alert(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: updatedHtml
+      translatedText: result.updatedHtml
     };
     setTranslationResults(newResults);
 
@@ -3229,20 +3356,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!currentResult?.translatedText) return;
 
     let updatedHtml = currentResult.translatedText;
+    let appliedCount = 0;
+
     const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions
-      const foundText = erro.found || erro.original || erro.traducao_errada;
-      const suggestionText = erro.sugestao || erro.correcao;
+      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
-        updatedHtml = updatedHtml.replace(
-          new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-          suggestionText
-        );
-        return { ...erro, applied: true };
+        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
       }
       return erro;
     });
+
+    if (appliedCount === 0) {
+      alert('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
@@ -3767,10 +3902,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
-        // Increase or decrease by 2pt
+        // Increase or decrease by 2pt (min 4pt to allow very small sizes)
         const newSize = command === 'increaseFontSize'
           ? Math.min(currentSizePt + 2, 48)
-          : Math.max(currentSizePt - 2, 8);
+          : Math.max(currentSizePt - 2, 4);
         span.style.fontSize = `${newSize}pt`;
 
         try {
@@ -4107,7 +4242,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Small delay to let UI update
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4168,8 +4305,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -4653,7 +4790,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       certData = await createCertification();
     }
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4725,8 +4864,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -5406,10 +5545,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               e.stopPropagation();
                               downloadProjectDocument(file.id, file.filename);
                             }}
-                            className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                            title={`Download ${file.filename}`}
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                            title={`Download original file: ${file.filename}`}
                           >
-                            ⬇️
+                            ⬇️ Download
                           </button>
                         </div>
                       </div>
@@ -5528,10 +5667,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </button>
                         <button
                           onClick={() => downloadProjectDocument(file.id, file.filename)}
-                          className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                          title={`Download ${file.filename}`}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                          title={`Download original file: ${file.filename}`}
                         >
-                          ⬇️
+                          ⬇️ Download
                         </button>
                       </div>
                     </div>
@@ -5543,10 +5682,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Quick Start Guide */}
+          {/* Quick Start Guide - Different steps for IN_HOUSE vs regular translators */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> 1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver
+              <strong>Quick Start:</strong> {isInHouseTranslator || isAdmin || isPM
+                ? '1️⃣ START → 2️⃣ TRANSLATE → 3️⃣ REVIEW → 4️⃣ PROOFREADING → 5️⃣ DELIVER'
+                : '1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver'}
             </p>
           </div>
 
@@ -8265,16 +8406,82 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
 
-                {/* Translation Preview */}
+                {/* Translation Preview/Edit */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-green-100 border-b">
-                    <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
+                  <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-green-700">
+                        📄 Translation ({targetLanguage}) {proofreadingViewMode === 'edit' && '- ✏️ Editing'}
+                      </span>
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => setProofreadingViewMode('preview')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => setProofreadingViewMode('edit')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
+                    </div>
+                    {proofreadingViewMode === 'preview' && proofreadingResult?.erros?.length > 0 && (
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#fef3c7', border: '1px solid #f59e0b'}}></span> Médio
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#e0e7ff', border: '1px solid #6366f1'}}></span> Baixo
+                      </span>
+                    )}
                   </div>
+
+                  {/* Edit Toolbar - Only visible in edit mode */}
+                  {proofreadingViewMode === 'edit' && (
+                    <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div
-                      className="text-xs"
-                      dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
-                    />
+                    {proofreadingViewMode === 'preview' ? (
+                      <>
+                        <div
+                          className="text-xs leading-relaxed"
+                          onClick={handleHighlightedErrorClick}
+                          dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
+                        />
+                        {proofreadingResult?.erros?.length > 0 && (
+                          <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="text-xs leading-relaxed focus:outline-none min-h-[200px]"
+                        style={{border: '2px solid #10B981', borderRadius: '4px', padding: '8px'}}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -8386,13 +8593,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
-                                  <tr key={idx} className={`border-t ${
-                                    erro.applied ? 'bg-green-50 opacity-60' :
-                                    severity === 'CRÍTICO' ? 'bg-red-50' :
-                                    severity === 'ALTO' ? 'bg-blue-50' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                    'bg-blue-50'
-                                  }`}>
+                                  <tr
+                                    key={idx}
+                                    data-error-row={idx}
+                                    className={`border-t transition-all duration-300 ${
+                                      highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
+                                      erro.applied ? 'bg-green-50 opacity-60' :
+                                      severity === 'CRÍTICO' ? 'bg-red-50' :
+                                      severity === 'ALTO' ? 'bg-blue-50' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                      'bg-blue-50'
+                                    }`}>
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
@@ -10767,9 +10978,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Editing states for inline edits
   const [editingTags, setEditingTags] = useState(null); // Order ID being edited
-  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited
+  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited for client deadline
+  const [editingTranslatorDeadline, setEditingTranslatorDeadline] = useState(null); // Order ID being edited for translator deadline
   const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
   const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
+  const [tempTranslatorDeadlineValue, setTempTranslatorDeadlineValue] = useState({ date: '', time: '' });
 
   // Send to Client modal state
   const [sendingOrder, setSendingOrder] = useState(null); // Order being sent
@@ -11197,6 +11410,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update deadline:', err);
+    }
+  };
+
+  // Edit translator deadline
+  const startEditingTranslatorDeadline = (order) => {
+    setEditingTranslatorDeadline(order.id);
+    const deadlineDate = order.translator_deadline ? new Date(order.translator_deadline) : new Date();
+    setTempTranslatorDeadlineValue({
+      date: deadlineDate.toISOString().split('T')[0],
+      time: deadlineDate.toTimeString().slice(0, 5)
+    });
+  };
+
+  const saveTranslatorDeadlineEdit = async (orderId) => {
+    try {
+      const deadlineDateTime = `${tempTranslatorDeadlineValue.date}T${tempTranslatorDeadlineValue.time || '17:00'}:00`;
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_deadline: deadlineDateTime
+      });
+      setEditingTranslatorDeadline(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update translator deadline:', err);
     }
   };
 
@@ -11863,17 +12099,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         ? { name: user?.name || 'Admin', id: 'self' }
         : translatorList.find(t => t.id === assignmentDetails.translator_id);
 
-      // Build deadline if provided
-      let deadline = null;
+      // Build translator deadline if provided
+      let translatorDeadline = null;
       if (assignmentDetails.due_date) {
-        deadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
       }
 
       // Update order with translator assignment
       await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
         assigned_translator_id: isSelfAssignment ? null : assignmentDetails.translator_id,
         assigned_translator: isSelfAssignment ? (user?.name || 'Admin') : selectedTranslator?.name,
-        deadline: deadline,
+        translator_deadline: translatorDeadline,
         internal_notes: assignmentDetails.project_notes,
         self_assigned: isSelfAssignment,
         skip_email: isSelfAssignment
@@ -12338,10 +12574,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 )}
               </div>
 
-              {/* Due Date */}
+              {/* Translator Deadline - When translator must return */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Date</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Translator Deadline</label>
                   <input
                     type="date"
                     value={assignmentDetails.due_date}
@@ -12350,7 +12586,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Time</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
                   <input
                     type="time"
                     value={assignmentDetails.due_time}
@@ -13057,7 +13293,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução">TR Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente">Client Deadline</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -13070,8 +13307,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
-              const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
+              // Translator deadline - when translator must return
+              const hasTranslatorDeadline = order.translator_deadline ? true : false;
+              const translatorDeadline = hasTranslatorDeadline ? new Date(order.translator_deadline) : null;
+              const translatorDaysUntil = hasTranslatorDeadline ? Math.ceil((translatorDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+              // Client deadline - when to deliver to client
+              const hasClientDeadline = order.deadline ? true : false;
+              const clientDeadline = hasClientDeadline ? new Date(order.deadline) : null;
+              const clientDaysUntil = hasClientDeadline ? Math.ceil((clientDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               return (
                 <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
                   {/* Code */}
@@ -13213,7 +13456,50 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
-                  {/* Deadline with date+time */}
+                  {/* Translator Deadline - When translator must return translation */}
+                  <td className="px-3 py-3">
+                    {editingTranslatorDeadline === order.id && (isAdmin || isPM) ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="date"
+                          value={tempTranslatorDeadlineValue.date}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, date: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <input
+                          type="time"
+                          value={tempTranslatorDeadlineValue.time}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, time: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveTranslatorDeadlineEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                          <button onClick={() => setEditingTranslatorDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
+                        </div>
+                      </div>
+                    ) : hasTranslatorDeadline ? (
+                      <div
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to edit translator deadline" : ""}
+                      >
+                        {translatorDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{translatorDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {translatorDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${translatorDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({translatorDaysUntil}d)</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`text-xs text-gray-400 ${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to set translator deadline" : ""}
+                      >
+                        -
+                      </span>
+                    )}
+                  </td>
+                  {/* Client Deadline - When to deliver to client */}
                   <td className="px-3 py-3">
                     {editingDeadline === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
@@ -13234,18 +13520,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <button onClick={() => setEditingDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
-                    ) : (
+                    ) : hasClientDeadline ? (
                       <div
                         onClick={() => isAdmin && startEditingDeadline(order)}
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                        title={isAdmin ? "Click to edit deadline" : ""}
+                        title={isAdmin ? "Click to edit client deadline" : ""}
                       >
-                        {orderDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {daysUntil > 0 && order.translation_status !== 'delivered' && (
-                          <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
+                        {clientDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{clientDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {clientDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${clientDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({clientDaysUntil}d)</span>
                         )}
                       </div>
+                    ) : (
+                      <span
+                        onClick={() => isAdmin && startEditingDeadline(order)}
+                        className={`text-xs text-gray-400 ${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={isAdmin ? "Click to set client deadline" : ""}
+                      >
+                        -
+                      </span>
                     )}
                   </td>
                   {/* Status */}
@@ -21317,16 +21611,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Download document
   const downloadProjectDocument = async (docId, filename) => {
     try {
+      setProcessingStatus('Downloading file...');
       const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
       if (response.data.file_data) {
         const link = document.createElement('a');
         link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
         link.download = filename || 'document.pdf';
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        setProcessingStatus(`✅ Downloaded: ${filename}`);
+        setTimeout(() => setProcessingStatus(''), 3000);
+      } else {
+        setProcessingStatus('');
+        alert('Document data not found. The file may not have been uploaded properly.');
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Errorr downloading document');
+      setProcessingStatus('');
+      alert('Error downloading document: ' + (err.response?.data?.detail || err.message));
     }
   };
 

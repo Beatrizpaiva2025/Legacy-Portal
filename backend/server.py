@@ -1255,7 +1255,8 @@ class TranslationOrder(BaseModel):
     translator_assignment_token: Optional[str] = None  # Token for accept/decline
     translator_assignment_status: str = "none"  # none, pending, accepted, declined
     translator_assignment_responded_at: Optional[datetime] = None
-    deadline: Optional[datetime] = None  # Translation deadline
+    deadline: Optional[datetime] = None  # Client deadline - when to deliver to client
+    translator_deadline: Optional[datetime] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
@@ -1298,7 +1299,8 @@ class TranslationOrderUpdate(BaseModel):
     # Assignment updates (by name - for direct assignment from dropdown)
     assigned_pm: Optional[str] = None
     assigned_translator: Optional[str] = None
-    deadline: Optional[str] = None  # Changed to str to accept ISO string
+    deadline: Optional[str] = None  # Client deadline - Changed to str to accept ISO string
+    translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
     # NEW: Additional editable fields
@@ -1633,6 +1635,7 @@ async def bot_calculate_quote(request: BotQuoteRequest):
             "translation_status": "Quote",  # This makes it appear in Quote filter!
             "payment_status": "pending",
             "source": "whatsapp_bot",
+            "revenue_source": "whatsapp",  # Track as WhatsApp revenue
             "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
             "has_document": bool(request.document_base64 or request.document_url)
@@ -1789,6 +1792,7 @@ async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
         "translation_status": "pending",
         "payment_status": "pending",
         "source": "whatsapp_bot",
+        "revenue_source": "whatsapp",  # Track as WhatsApp revenue
         "bot_quote_id": quote_id,
         "created_at": datetime.utcnow(),
         "notes": quote.get("notes", "")
@@ -3661,10 +3665,10 @@ async def submit_b2b_interest(request: B2BInterestRequest):
 
         prospect_email_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 40px 30px; text-align: center;">
-                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="height: 50px; margin-bottom: 20px;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Welcome to Legacy Translations!</h1>
+            <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 35px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Welcome to Legacy Translations!</h1>
             </div>
+            <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
             <div style="padding: 40px 30px;">
                 <p style="font-size: 18px; color: #333;">Hi {request.contact_name},</p>
@@ -7255,8 +7259,8 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         start_date = datetime(now.year, now.month, 1)
         end_date = now
 
-    # Get revenue (paid orders)
-    orders = await db.orders.find({
+    # Get revenue (paid orders) from translation_orders collection
+    orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
@@ -7264,9 +7268,26 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_revenue = sum(o.get("total_price", 0) for o in orders)
 
     # Revenue by source
+    # Handle both revenue_source field and legacy source field (for whatsapp_bot)
+    def get_order_source(order):
+        # First check revenue_source field
+        revenue_source = order.get("revenue_source")
+        if revenue_source and revenue_source in REVENUE_SOURCES:
+            return revenue_source
+        # Check legacy source field for whatsapp_bot
+        source = order.get("source", "")
+        if source == "whatsapp_bot":
+            return "whatsapp"
+        # Check partner_id for whatsapp_bot
+        partner_id = order.get("partner_id", "")
+        if partner_id == "whatsapp_bot":
+            return "whatsapp"
+        # Default to website
+        return "website"
+
     revenue_by_source = {}
     for source in REVENUE_SOURCES.keys():
-        source_orders = [o for o in orders if o.get("revenue_source", "website") == source]
+        source_orders = [o for o in orders if get_order_source(o) == source]
         revenue_by_source[source] = {
             "label": REVENUE_SOURCES[source],
             "amount": sum(o.get("total_price", 0) for o in source_orders),
@@ -7311,7 +7332,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_expenses += translator_payments_total
 
     # Invoices summary
-    all_orders = await db.orders.find({
+    all_orders = await db.translation_orders.find({
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
 
@@ -7330,7 +7351,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         prev_start = start_date - (end_date - start_date)
         prev_end = start_date
 
-    prev_orders = await db.orders.find({
+    prev_orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": prev_start, "$lt": prev_end}
     }).to_list(1000)
