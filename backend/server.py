@@ -16615,6 +16615,343 @@ async def aws_diagnostic():
 
     return result
 
+# ==================== SALES CONTROL ENDPOINTS ====================
+
+class Salesperson(BaseModel):
+    id: str = None
+    name: str
+    email: str
+    phone: str = ""
+    commission_type: str = "percentage"  # percentage, fixed, hybrid
+    commission_rate: float = 0  # percentage or fixed amount per partner
+    base_salary: float = 0
+    monthly_target: int = 10  # partners per month
+    status: str = "active"  # active, inactive
+    hired_date: str = None
+    notes: str = ""
+    created_at: str = None
+
+class SalesGoal(BaseModel):
+    id: str = None
+    salesperson_id: str
+    month: str  # YYYY-MM format
+    target_partners: int
+    target_revenue: float
+    achieved_partners: int = 0
+    achieved_revenue: float = 0
+    bonus_earned: float = 0
+    status: str = "in_progress"  # in_progress, achieved, missed
+    created_at: str = None
+
+class PartnerAcquisition(BaseModel):
+    id: str = None
+    salesperson_id: str
+    partner_id: str
+    partner_name: str
+    partner_tier: str = "bronze"  # bronze, silver, gold, platinum
+    acquisition_date: str = None
+    commission_paid: float = 0
+    commission_status: str = "pending"  # pending, approved, paid
+    notes: str = ""
+    created_at: str = None
+
+# Get all salespeople
+@app.get("/admin/salespeople")
+async def get_salespeople(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+
+    # Get acquisition counts for each salesperson
+    for sp in salespeople:
+        sp["_id"] = str(sp["_id"])
+        acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
+        sp["total_acquisitions"] = acquisitions
+
+        # Get current month acquisitions
+        current_month = datetime.now().strftime("%Y-%m")
+        month_acquisitions = await db.partner_acquisitions.count_documents({
+            "salesperson_id": sp["id"],
+            "acquisition_date": {"$regex": f"^{current_month}"}
+        })
+        sp["month_acquisitions"] = month_acquisitions
+
+    return salespeople
+
+# Create salesperson
+@app.post("/admin/salespeople")
+async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salesperson.id = str(uuid.uuid4())[:8]
+    salesperson.created_at = datetime.now().isoformat()
+    salesperson.hired_date = salesperson.hired_date or datetime.now().strftime("%Y-%m-%d")
+
+    await db.salespeople.insert_one(salesperson.dict())
+
+    return {"success": True, "salesperson": salesperson.dict()}
+
+# Update salesperson
+@app.put("/admin/salespeople/{salesperson_id}")
+async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
+
+    result = await db.salespeople.update_one(
+        {"id": salesperson_id},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    return {"success": True}
+
+# Delete salesperson
+@app.delete("/admin/salespeople/{salesperson_id}")
+async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    result = await db.salespeople.delete_one({"id": salesperson_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    return {"success": True}
+
+# Get sales goals
+@app.get("/admin/sales-goals")
+async def get_sales_goals(admin_key: str = Header(None), month: str = None):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    query = {}
+    if month:
+        query["month"] = month
+
+    goals = await db.sales_goals.find(query).sort("month", -1).to_list(100)
+
+    for goal in goals:
+        goal["_id"] = str(goal["_id"])
+        # Get salesperson name
+        sp = await db.salespeople.find_one({"id": goal["salesperson_id"]})
+        goal["salesperson_name"] = sp["name"] if sp else "Unknown"
+
+    return goals
+
+# Create/Update sales goal
+@app.post("/admin/sales-goals")
+async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    # Check if goal already exists for this salesperson/month
+    existing = await db.sales_goals.find_one({
+        "salesperson_id": goal.salesperson_id,
+        "month": goal.month
+    })
+
+    if existing:
+        # Update existing goal
+        await db.sales_goals.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "target_partners": goal.target_partners,
+                "target_revenue": goal.target_revenue
+            }}
+        )
+        return {"success": True, "updated": True}
+
+    goal.id = str(uuid.uuid4())[:8]
+    goal.created_at = datetime.now().isoformat()
+
+    await db.sales_goals.insert_one(goal.dict())
+
+    return {"success": True, "goal": goal.dict()}
+
+# Get partner acquisitions
+@app.get("/admin/partner-acquisitions")
+async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id: str = None):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    query = {}
+    if salesperson_id:
+        query["salesperson_id"] = salesperson_id
+
+    acquisitions = await db.partner_acquisitions.find(query).sort("acquisition_date", -1).to_list(200)
+
+    for acq in acquisitions:
+        acq["_id"] = str(acq["_id"])
+        # Get salesperson name
+        sp = await db.salespeople.find_one({"id": acq["salesperson_id"]})
+        acq["salesperson_name"] = sp["name"] if sp else "Unknown"
+
+    return acquisitions
+
+# Record partner acquisition
+@app.post("/admin/partner-acquisitions")
+async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    acquisition.id = str(uuid.uuid4())[:8]
+    acquisition.created_at = datetime.now().isoformat()
+    acquisition.acquisition_date = acquisition.acquisition_date or datetime.now().strftime("%Y-%m-%d")
+
+    # Calculate commission based on tier
+    tier_commissions = {
+        "bronze": 50,
+        "silver": 75,
+        "gold": 100,
+        "platinum": 150
+    }
+
+    salesperson = await db.salespeople.find_one({"id": acquisition.salesperson_id})
+    if salesperson:
+        if salesperson.get("commission_type") == "fixed":
+            acquisition.commission_paid = salesperson.get("commission_rate", 0)
+        else:
+            acquisition.commission_paid = tier_commissions.get(acquisition.partner_tier, 50)
+
+    await db.partner_acquisitions.insert_one(acquisition.dict())
+
+    # Update sales goal if exists for this month
+    month = acquisition.acquisition_date[:7]  # YYYY-MM
+    goal = await db.sales_goals.find_one({
+        "salesperson_id": acquisition.salesperson_id,
+        "month": month
+    })
+
+    if goal:
+        await db.sales_goals.update_one(
+            {"id": goal["id"]},
+            {"$inc": {"achieved_partners": 1}}
+        )
+
+    return {"success": True, "acquisition": acquisition.dict()}
+
+# Update acquisition commission status
+@app.put("/admin/partner-acquisitions/{acquisition_id}/status")
+async def update_acquisition_status(acquisition_id: str, status: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    if status not in ["pending", "approved", "paid"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    result = await db.partner_acquisitions.update_one(
+        {"id": acquisition_id},
+        {"$set": {"commission_status": status}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    return {"success": True}
+
+# Get sales dashboard stats
+@app.get("/admin/sales-dashboard")
+async def get_sales_dashboard(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    current_month = datetime.now().strftime("%Y-%m")
+
+    # Total salespeople
+    total_salespeople = await db.salespeople.count_documents({"status": "active"})
+
+    # Total partners acquired this month
+    month_acquisitions = await db.partner_acquisitions.count_documents({
+        "acquisition_date": {"$regex": f"^{current_month}"}
+    })
+
+    # Total partners acquired all time
+    total_acquisitions = await db.partner_acquisitions.count_documents({})
+
+    # Pending commissions
+    pending_pipeline = [
+        {"$match": {"commission_status": {"$in": ["pending", "approved"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    pending_result = await db.partner_acquisitions.aggregate(pending_pipeline).to_list(1)
+    pending_commissions = pending_result[0]["total"] if pending_result else 0
+
+    # Paid commissions this month
+    paid_pipeline = [
+        {"$match": {
+            "commission_status": "paid",
+            "acquisition_date": {"$regex": f"^{current_month}"}
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    paid_result = await db.partner_acquisitions.aggregate(paid_pipeline).to_list(1)
+    paid_commissions = paid_result[0]["total"] if paid_result else 0
+
+    # Top performers this month
+    top_performers_pipeline = [
+        {"$match": {"acquisition_date": {"$regex": f"^{current_month}"}}},
+        {"$group": {
+            "_id": "$salesperson_id",
+            "count": {"$sum": 1},
+            "commission": {"$sum": "$commission_paid"}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_performers = await db.partner_acquisitions.aggregate(top_performers_pipeline).to_list(5)
+
+    # Add salesperson names to top performers
+    for performer in top_performers:
+        sp = await db.salespeople.find_one({"id": performer["_id"]})
+        performer["name"] = sp["name"] if sp else "Unknown"
+        performer["salesperson_id"] = performer.pop("_id")
+
+    # Monthly trend (last 6 months)
+    monthly_trend = []
+    for i in range(5, -1, -1):
+        month_date = datetime.now() - timedelta(days=30*i)
+        month_str = month_date.strftime("%Y-%m")
+        count = await db.partner_acquisitions.count_documents({
+            "acquisition_date": {"$regex": f"^{month_str}"}
+        })
+        monthly_trend.append({
+            "month": month_str,
+            "acquisitions": count
+        })
+
+    # Acquisitions by tier
+    tier_pipeline = [
+        {"$group": {
+            "_id": "$partner_tier",
+            "count": {"$sum": 1}
+        }}
+    ]
+    tier_distribution = await db.partner_acquisitions.aggregate(tier_pipeline).to_list(10)
+    tier_dict = {t["_id"]: t["count"] for t in tier_distribution}
+
+    return {
+        "total_salespeople": total_salespeople,
+        "month_acquisitions": month_acquisitions,
+        "total_acquisitions": total_acquisitions,
+        "pending_commissions": pending_commissions,
+        "paid_commissions": paid_commissions,
+        "top_performers": top_performers,
+        "monthly_trend": monthly_trend,
+        "tier_distribution": {
+            "bronze": tier_dict.get("bronze", 0),
+            "silver": tier_dict.get("silver", 0),
+            "gold": tier_dict.get("gold", 0),
+            "platinum": tier_dict.get("platinum", 0)
+        },
+        "current_month": current_month
+    }
+
 @app.on_event("startup")
 async def create_default_partner():
     """Create default partner from environment variables if set"""

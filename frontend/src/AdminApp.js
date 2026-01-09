@@ -539,6 +539,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
     { id: 'mia-bot', label: 'MIA Bot', icon: '🤖', roles: ['admin'], isExternal: true }
@@ -23677,6 +23678,913 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   );
 };
 
+// ==================== SALES CONTROL PAGE ====================
+const SalesControlPage = ({ adminKey }) => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [salespeople, setSalespeople] = useState([]);
+  const [acquisitions, setAcquisitions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showAddSalesperson, setShowAddSalesperson] = useState(false);
+  const [showAddAcquisition, setShowAddAcquisition] = useState(false);
+  const [showSetGoal, setShowSetGoal] = useState(false);
+  const [editingSalesperson, setEditingSalesperson] = useState(null);
+
+  // Form states
+  const [newSalesperson, setNewSalesperson] = useState({
+    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10
+  });
+  const [newAcquisition, setNewAcquisition] = useState({
+    salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
+  });
+  const [newGoal, setNewGoal] = useState({
+    salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
+  });
+
+  const API_URL = process.env.REACT_APP_API_URL || '';
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [spRes, acqRes, goalsRes, dashRes] = await Promise.all([
+        fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } })
+      ]);
+
+      if (spRes.ok) setSalespeople(await spRes.json());
+      if (acqRes.ok) setAcquisitions(await acqRes.json());
+      if (goalsRes.ok) setGoals(await goalsRes.json());
+      if (dashRes.ok) setDashboard(await dashRes.json());
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+    }
+    setLoading(false);
+  };
+
+  const handleAddSalesperson = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newSalesperson)
+      });
+      if (res.ok) {
+        setShowAddSalesperson(false);
+        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10 });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error adding salesperson:', error);
+    }
+  };
+
+  const handleUpdateSalesperson = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople/${editingSalesperson.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(editingSalesperson)
+      });
+      if (res.ok) {
+        setEditingSalesperson(null);
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error updating salesperson:', error);
+    }
+  };
+
+  const handleDeleteSalesperson = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this salesperson?')) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople/${id}`, {
+        method: 'DELETE',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) fetchAllData();
+    } catch (error) {
+      console.error('Error deleting salesperson:', error);
+    }
+  };
+
+  const handleAddAcquisition = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newAcquisition)
+      });
+      if (res.ok) {
+        setShowAddAcquisition(false);
+        setNewAcquisition({ salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: '' });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error adding acquisition:', error);
+    }
+  };
+
+  const handleSetGoal = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/sales-goals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newGoal)
+      });
+      if (res.ok) {
+        setShowSetGoal(false);
+        setNewGoal({ salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000 });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error setting goal:', error);
+    }
+  };
+
+  const handleUpdateCommissionStatus = async (acquisitionId, status) => {
+    try {
+      const res = await fetch(`${API_URL}/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
+        method: 'PUT',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) fetchAllData();
+    } catch (error) {
+      console.error('Error updating commission status:', error);
+    }
+  };
+
+  const tierColors = {
+    bronze: 'bg-amber-600',
+    silver: 'bg-gray-400',
+    gold: 'bg-yellow-500',
+    platinum: 'bg-purple-500'
+  };
+
+  const statusColors = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    approved: 'bg-blue-100 text-blue-800',
+    paid: 'bg-green-100 text-green-800'
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-full">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <span className="text-3xl">📈</span> Sales Control & Goals
+        </h1>
+        <p className="text-gray-500 mt-1">Manage salespeople, track acquisitions, and monitor goals</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+          { id: 'salespeople', label: 'Salespeople', icon: '👥' },
+          { id: 'acquisitions', label: 'Acquisitions', icon: '🤝' },
+          { id: 'goals', label: 'Goals', icon: '🎯' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="mr-1">{tab.icon}</span> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && dashboard && (
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
+              <p className="text-gray-500 text-sm">Active Salespeople</p>
+              <p className="text-3xl font-bold text-gray-800">{dashboard.total_salespeople}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
+              <p className="text-gray-500 text-sm">This Month</p>
+              <p className="text-3xl font-bold text-green-600">{dashboard.month_acquisitions}</p>
+              <p className="text-xs text-gray-400">partners acquired</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
+              <p className="text-gray-500 text-sm">Total Acquisitions</p>
+              <p className="text-3xl font-bold text-gray-800">{dashboard.total_acquisitions}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
+              <p className="text-gray-500 text-sm">Pending Commissions</p>
+              <p className="text-3xl font-bold text-yellow-600">${dashboard.pending_commissions}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-emerald-500">
+              <p className="text-gray-500 text-sm">Paid This Month</p>
+              <p className="text-3xl font-bold text-emerald-600">${dashboard.paid_commissions}</p>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Performers */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>🏆</span> Top Performers This Month
+              </h3>
+              {dashboard.top_performers.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboard.top_performers.map((performer, idx) => (
+                    <div key={performer.salesperson_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🏅'}</span>
+                        <div>
+                          <p className="font-medium text-gray-800">{performer.name}</p>
+                          <p className="text-sm text-gray-500">{performer.count} partners</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-green-600">${performer.commission}</p>
+                        <p className="text-xs text-gray-400">commission</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-center py-8">No acquisitions this month yet</p>
+              )}
+            </div>
+
+            {/* Tier Distribution */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>📊</span> Partner Tiers Distribution
+              </h3>
+              <div className="space-y-4">
+                {['platinum', 'gold', 'silver', 'bronze'].map(tier => {
+                  const count = dashboard.tier_distribution[tier] || 0;
+                  const total = Object.values(dashboard.tier_distribution).reduce((a, b) => a + b, 0) || 1;
+                  const percentage = Math.round((count / total) * 100);
+                  return (
+                    <div key={tier}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="capitalize font-medium flex items-center gap-2">
+                          {tier === 'platinum' ? '💎' : tier === 'gold' ? '🥇' : tier === 'silver' ? '🥈' : '🥉'}
+                          {tier}
+                        </span>
+                        <span className="text-gray-500">{count} partners ({percentage}%)</span>
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${tierColors[tier]} transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Trend */}
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>📈</span> Monthly Acquisition Trend
+            </h3>
+            <div className="flex items-end justify-between h-40 gap-2">
+              {dashboard.monthly_trend.map(month => {
+                const maxAcq = Math.max(...dashboard.monthly_trend.map(m => m.acquisitions), 1);
+                const heightPercent = (month.acquisitions / maxAcq) * 100;
+                return (
+                  <div key={month.month} className="flex-1 flex flex-col items-center">
+                    <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '120px' }}>
+                      <div
+                        className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
+                        style={{ height: `${heightPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{month.month.slice(5)}</p>
+                    <p className="text-sm font-semibold text-gray-700">{month.acquisitions}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Salespeople Tab */}
+      {activeTab === 'salespeople' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Salespeople ({salespeople.length})</h3>
+            <button
+              onClick={() => setShowAddSalesperson(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+            >
+              <span>➕</span> Add Salesperson
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Contact</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Monthly Target</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">This Month</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {salespeople.map(sp => (
+                  <tr key={sp.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{sp.name}</p>
+                      <p className="text-xs text-gray-400">Since {sp.hired_date}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-gray-600">{sp.email}</p>
+                      <p className="text-xs text-gray-400">{sp.phone}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium capitalize">
+                        {sp.commission_type}
+                      </span>
+                      {sp.commission_type === 'fixed' && (
+                        <span className="ml-2 text-sm text-gray-500">${sp.commission_rate}/partner</span>
+                      )}
+                      {sp.base_salary > 0 && (
+                        <span className="ml-2 text-xs text-gray-400">Base: ${sp.base_salary}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-lg font-semibold text-gray-700">{sp.monthly_target}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-lg font-semibold ${sp.month_acquisitions >= sp.monthly_target ? 'text-green-600' : 'text-gray-700'}`}>
+                        {sp.month_acquisitions}
+                      </span>
+                      {sp.month_acquisitions >= sp.monthly_target && <span className="ml-1">🎉</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-lg font-semibold text-purple-600">{sp.total_acquisitions}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${sp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {sp.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingSalesperson(sp)}
+                          className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                          title="Edit"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSalesperson(sp.id)}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {salespeople.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-4xl mb-2">👥</p>
+                <p>No salespeople yet. Add your first salesperson!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Acquisitions Tab */}
+      {activeTab === 'acquisitions' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Partner Acquisitions ({acquisitions.length})</h3>
+            <button
+              onClick={() => setShowAddAcquisition(true)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              disabled={salespeople.length === 0}
+            >
+              <span>🤝</span> Record Acquisition
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Partner</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {acquisitions.map(acq => (
+                  <tr key={acq.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-600">{acq.acquisition_date}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{acq.partner_name}</p>
+                      <p className="text-xs text-gray-400">ID: {acq.partner_id}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[acq.partner_tier]}`}>
+                        {acq.partner_tier === 'platinum' ? '💎' : acq.partner_tier === 'gold' ? '🥇' : acq.partner_tier === 'silver' ? '🥈' : '🥉'} {acq.partner_tier}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{acq.salesperson_name}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-green-600">${acq.commission_paid}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
+                        {acq.commission_status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={acq.commission_status}
+                        onChange={(e) => handleUpdateCommissionStatus(acq.id, e.target.value)}
+                        className="text-xs border rounded px-2 py-1"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="paid">Paid</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {acquisitions.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-4xl mb-2">🤝</p>
+                <p>No acquisitions recorded yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Goals Tab */}
+      {activeTab === 'goals' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Sales Goals</h3>
+            <button
+              onClick={() => setShowSetGoal(true)}
+              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
+              disabled={salespeople.length === 0}
+            >
+              <span>🎯</span> Set Goal
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {goals.map(goal => {
+              const progress = Math.min((goal.achieved_partners / goal.target_partners) * 100, 100);
+              const isAchieved = goal.achieved_partners >= goal.target_partners;
+              return (
+                <div key={goal.id} className={`bg-white rounded-xl shadow-sm p-5 border-2 ${isAchieved ? 'border-green-500' : 'border-transparent'}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <p className="font-semibold text-gray-800">{goal.salesperson_name}</p>
+                      <p className="text-sm text-gray-500">{goal.month}</p>
+                    </div>
+                    {isAchieved && <span className="text-2xl">🏆</span>}
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-500">Progress</span>
+                      <span className="font-medium">{goal.achieved_partners} / {goal.target_partners}</span>
+                    </div>
+                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${isAchieved ? 'bg-green-500' : 'bg-blue-500'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Target Revenue</span>
+                    <span className="font-medium text-gray-700">${goal.target_revenue}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {goals.length === 0 && (
+            <div className="text-center py-12 text-gray-400 bg-white rounded-xl">
+              <p className="text-4xl mb-2">🎯</p>
+              <p>No goals set yet. Set goals for your salespeople!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Salesperson Modal */}
+      {showAddSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>👤</span> Add Salesperson
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={newSalesperson.name}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={newSalesperson.email}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={newSalesperson.phone}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                <select
+                  value={newSalesperson.commission_type}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="tier">By Tier ($50-150/partner)</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+              {newSalesperson.commission_type === 'fixed' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Commission ($)</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.commission_rate}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="50"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                <input
+                  type="number"
+                  value={newSalesperson.base_salary}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target (partners)</label>
+                <input
+                  type="number"
+                  value={newSalesperson.monthly_target}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="10"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddSalesperson(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSalesperson}
+                disabled={!newSalesperson.name || !newSalesperson.email}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                Add Salesperson
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Salesperson Modal */}
+      {editingSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>✏️</span> Edit Salesperson
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={editingSalesperson.name}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={editingSalesperson.email}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={editingSalesperson.phone}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                <select
+                  value={editingSalesperson.commission_type}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_type: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="tier">By Tier ($50-150/partner)</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+              {editingSalesperson.commission_type === 'fixed' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Commission ($)</label>
+                  <input
+                    type="number"
+                    value={editingSalesperson.commission_rate}
+                    onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                <input
+                  type="number"
+                  value={editingSalesperson.base_salary}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, base_salary: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target</label>
+                <input
+                  type="number"
+                  value={editingSalesperson.monthly_target}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, monthly_target: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={editingSalesperson.status}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, status: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditingSalesperson(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateSalesperson}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Acquisition Modal */}
+      {showAddAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>🤝</span> Record Partner Acquisition
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson *</label>
+                <select
+                  value={newAcquisition.salesperson_id}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, salesperson_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select salesperson...</option>
+                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
+                <input
+                  type="text"
+                  value={newAcquisition.partner_name}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Immigration Law Office LLC"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
+                <input
+                  type="text"
+                  value={newAcquisition.partner_id}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Optional - Partner system ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Tier *</label>
+                <select
+                  value={newAcquisition.partner_tier}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_tier: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="bronze">🥉 Bronze (10-29 pages/month) - $50 commission</option>
+                  <option value="silver">🥈 Silver (30-59 pages/month) - $75 commission</option>
+                  <option value="gold">🥇 Gold (60-99 pages/month) - $100 commission</option>
+                  <option value="platinum">💎 Platinum (100+ pages/month) - $150 commission</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={newAcquisition.notes}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Optional notes..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddAcquisition(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddAcquisition}
+                disabled={!newAcquisition.salesperson_id || !newAcquisition.partner_name}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+              >
+                Record Acquisition
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Goal Modal */}
+      {showSetGoal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>🎯</span> Set Sales Goal
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson *</label>
+                <select
+                  value={newGoal.salesperson_id}
+                  onChange={(e) => setNewGoal({...newGoal, salesperson_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select salesperson...</option>
+                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Month *</label>
+                <input
+                  type="month"
+                  value={newGoal.month}
+                  onChange={(e) => setNewGoal({...newGoal, month: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Partners</label>
+                <input
+                  type="number"
+                  value={newGoal.target_partners}
+                  onChange={(e) => setNewGoal({...newGoal, target_partners: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="10"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Revenue ($)</label>
+                <input
+                  type="number"
+                  value={newGoal.target_revenue}
+                  onChange={(e) => setNewGoal({...newGoal, target_revenue: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="5000"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowSetGoal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetGoal}
+                disabled={!newGoal.salesperson_id}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50"
+              >
+                Set Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== FLOATING CHAT WIDGET ====================
 const FloatingChatWidget = ({ adminKey, user }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -24003,6 +24911,10 @@ function AdminApp() {
       case 'settings':
         return userRole === 'admin'
           ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'sales-control':
+        return userRole === 'admin'
+          ? <SalesControlPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'mia-bot':
         return userRole === 'admin'
