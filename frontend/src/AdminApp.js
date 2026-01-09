@@ -5452,6 +5452,104 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
+          {/* Upload Document Section */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+            <h3 className="text-sm font-bold text-green-800 mb-3">📤 Upload Document to Translate</h3>
+            <p className="text-xs text-green-600 mb-3">Upload your document (PDF, Image, Word) to start translating</p>
+
+            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+              <input
+                type="file"
+                accept=".pdf,image/*,.docx,.doc"
+                multiple
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files);
+                  if (files.length === 0) return;
+
+                  setProcessingStatus('Processing uploaded files...');
+                  const newImages = [];
+
+                  for (const file of files) {
+                    const fileName = file.name.toLowerCase();
+                    try {
+                      if (fileName.endsWith('.pdf')) {
+                        // Convert PDF to images
+                        setProcessingStatus(`Converting PDF: ${file.name}...`);
+                        const images = await convertPdfToImages(file, (page, total) => {
+                          setProcessingStatus(`Converting PDF page ${page}/${total}...`);
+                        });
+                        images.forEach((img, idx) => {
+                          newImages.push({
+                            data: `data:${img.type};base64,${img.data}`,
+                            filename: `${file.name} - Page ${idx + 1}`,
+                            type: img.type
+                          });
+                        });
+                      } else if (file.type.startsWith('image/')) {
+                        // Load image directly
+                        const dataUrl = await new Promise((resolve) => {
+                          const reader = new FileReader();
+                          reader.onload = () => resolve(reader.result);
+                          reader.readAsDataURL(file);
+                        });
+                        newImages.push({
+                          data: dataUrl,
+                          filename: file.name,
+                          type: file.type
+                        });
+                      } else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                        // Convert Word to HTML and add to translation results
+                        setProcessingStatus(`Converting Word: ${file.name}...`);
+                        const html = await convertWordToHtml(file);
+                        setTranslationResults(prev => [...prev, {
+                          translatedText: '',
+                          originalText: html,
+                          filename: file.name
+                        }]);
+                      }
+                    } catch (err) {
+                      console.error('Upload error:', err);
+                      setProcessingStatus(`Error processing: ${file.name}`);
+                    }
+                  }
+
+                  if (newImages.length > 0) {
+                    setOriginalImages(prev => [...prev, ...newImages]);
+                    setProcessingStatus(`✅ ${newImages.length} page(s) loaded! Go to TRANSLATION tab to translate.`);
+                  } else if (translationResults.length > 0) {
+                    setProcessingStatus(`✅ Document loaded! Go to TRANSLATION tab to translate.`);
+                  }
+
+                  e.target.value = '';
+                }}
+                className="hidden"
+                id="start-upload-docs"
+              />
+              <label htmlFor="start-upload-docs" className="cursor-pointer">
+                <div className="text-3xl mb-2">📄</div>
+                <span className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 inline-block">
+                  Choose Files
+                </span>
+                <p className="text-xs text-gray-500 mt-2">PDF, Images, Word (.docx)</p>
+              </label>
+            </div>
+
+            {/* Show loaded files count */}
+            {(originalImages.length > 0 || translationResults.length > 0) && (
+              <div className="mt-3 p-2 bg-green-100 rounded-lg flex items-center justify-between">
+                <span className="text-xs text-green-700 font-medium">
+                  ✅ {originalImages.length + translationResults.length} document(s) loaded
+                </span>
+                <button
+                  onClick={() => setActiveSubTab('translate')}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                >
+                  Go to Translation →
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Translator Messages Panel */}
           {user?.role === 'translator' && (
             <div className={`border rounded-lg p-4 ${translatorMessages.filter(m => !m.read).length > 0 ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
