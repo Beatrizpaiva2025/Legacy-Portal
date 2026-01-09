@@ -3696,7 +3696,7 @@ async def submit_b2b_interest(request: B2BInterestRequest):
 
                 <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
                     <p style="color: #92400e; margin: 0; font-weight: 500;">
-                        <strong>First Translation FREE!</strong> Up to 2 pages - No commitment required
+                        <strong>First Certified Translation FREE!</strong> 1 page - No commitment required
                     </p>
                 </div>
 
