@@ -10767,9 +10767,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Editing states for inline edits
   const [editingTags, setEditingTags] = useState(null); // Order ID being edited
-  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited
+  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited for client deadline
+  const [editingTranslatorDeadline, setEditingTranslatorDeadline] = useState(null); // Order ID being edited for translator deadline
   const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
   const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
+  const [tempTranslatorDeadlineValue, setTempTranslatorDeadlineValue] = useState({ date: '', time: '' });
 
   // Send to Client modal state
   const [sendingOrder, setSendingOrder] = useState(null); // Order being sent
@@ -11197,6 +11199,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update deadline:', err);
+    }
+  };
+
+  // Edit translator deadline
+  const startEditingTranslatorDeadline = (order) => {
+    setEditingTranslatorDeadline(order.id);
+    const deadlineDate = order.translator_deadline ? new Date(order.translator_deadline) : new Date();
+    setTempTranslatorDeadlineValue({
+      date: deadlineDate.toISOString().split('T')[0],
+      time: deadlineDate.toTimeString().slice(0, 5)
+    });
+  };
+
+  const saveTranslatorDeadlineEdit = async (orderId) => {
+    try {
+      const deadlineDateTime = `${tempTranslatorDeadlineValue.date}T${tempTranslatorDeadlineValue.time || '17:00'}:00`;
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_deadline: deadlineDateTime
+      });
+      setEditingTranslatorDeadline(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update translator deadline:', err);
     }
   };
 
@@ -11863,17 +11888,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         ? { name: user?.name || 'Admin', id: 'self' }
         : translatorList.find(t => t.id === assignmentDetails.translator_id);
 
-      // Build deadline if provided
-      let deadline = null;
+      // Build translator deadline if provided
+      let translatorDeadline = null;
       if (assignmentDetails.due_date) {
-        deadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
       }
 
       // Update order with translator assignment
       await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
         assigned_translator_id: isSelfAssignment ? null : assignmentDetails.translator_id,
         assigned_translator: isSelfAssignment ? (user?.name || 'Admin') : selectedTranslator?.name,
-        deadline: deadline,
+        translator_deadline: translatorDeadline,
         internal_notes: assignmentDetails.project_notes,
         self_assigned: isSelfAssignment,
         skip_email: isSelfAssignment
@@ -12328,10 +12353,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 )}
               </div>
 
-              {/* Due Date */}
+              {/* Translator Deadline - When translator must return */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Date</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Translator Deadline</label>
                   <input
                     type="date"
                     value={assignmentDetails.due_date}
@@ -12340,7 +12365,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Time</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
                   <input
                     type="time"
                     value={assignmentDetails.due_time}
@@ -13047,7 +13072,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução">TR Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente">Client Deadline</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -13060,9 +13086,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const hasDeadline = order.deadline ? true : false;
-              const orderDeadline = hasDeadline ? new Date(order.deadline) : null;
-              const daysUntil = hasDeadline ? Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+              // Translator deadline - when translator must return
+              const hasTranslatorDeadline = order.translator_deadline ? true : false;
+              const translatorDeadline = hasTranslatorDeadline ? new Date(order.translator_deadline) : null;
+              const translatorDaysUntil = hasTranslatorDeadline ? Math.ceil((translatorDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+              // Client deadline - when to deliver to client
+              const hasClientDeadline = order.deadline ? true : false;
+              const clientDeadline = hasClientDeadline ? new Date(order.deadline) : null;
+              const clientDaysUntil = hasClientDeadline ? Math.ceil((clientDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               return (
                 <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
                   {/* Code */}
@@ -13204,7 +13235,50 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
-                  {/* Deadline with date+time - Only shows when explicitly set by Admin/PM */}
+                  {/* Translator Deadline - When translator must return translation */}
+                  <td className="px-3 py-3">
+                    {editingTranslatorDeadline === order.id && (isAdmin || isPM) ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="date"
+                          value={tempTranslatorDeadlineValue.date}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, date: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <input
+                          type="time"
+                          value={tempTranslatorDeadlineValue.time}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, time: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveTranslatorDeadlineEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                          <button onClick={() => setEditingTranslatorDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
+                        </div>
+                      </div>
+                    ) : hasTranslatorDeadline ? (
+                      <div
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to edit translator deadline" : ""}
+                      >
+                        {translatorDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{translatorDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {translatorDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${translatorDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({translatorDaysUntil}d)</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`text-xs text-gray-400 ${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to set translator deadline" : ""}
+                      >
+                        -
+                      </span>
+                    )}
+                  </td>
+                  {/* Client Deadline - When to deliver to client */}
                   <td className="px-3 py-3">
                     {editingDeadline === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
@@ -13225,27 +13299,27 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <button onClick={() => setEditingDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
-                    ) : hasDeadline ? (
+                    ) : hasClientDeadline ? (
                       <div
                         onClick={() => isAdmin && startEditingDeadline(order)}
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                        title={isAdmin ? "Click to edit deadline" : ""}
+                        title={isAdmin ? "Click to edit client deadline" : ""}
                       >
-                        {orderDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {daysUntil > 0 && order.translation_status !== 'delivered' && (
-                          <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
+                        {clientDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{clientDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {clientDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${clientDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({clientDaysUntil}d)</span>
                         )}
                       </div>
                     ) : (
                       <span
                         onClick={() => isAdmin && startEditingDeadline(order)}
                         className={`text-xs text-gray-400 ${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                        title={isAdmin ? "Click to set deadline" : ""}
+                        title={isAdmin ? "Click to set client deadline" : ""}
                       >
                         -
                       </span>
-                    )
+                    )}
                   </td>
                   {/* Status */}
                   <td className="px-3 py-3"><span className={`px-2 py-1 rounded text-xs font-medium ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>{getStatusLabel(order.translation_status)}</span></td>
