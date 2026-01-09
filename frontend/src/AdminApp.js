@@ -1543,6 +1543,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
@@ -3179,6 +3180,78 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProofreadingErrorr(error.message);
     } finally {
       setIsProofreading(false);
+    }
+  };
+
+  // Generate translation text with highlighted errors
+  const getHighlightedTranslation = () => {
+    const currentResult = translationResults[selectedResultIndex];
+    if (!currentResult?.translatedText || !proofreadingResult?.erros || proofreadingResult.erros.length === 0) {
+      return currentResult?.translatedText || '<p>No translation</p>';
+    }
+
+    let highlightedHtml = currentResult.translatedText;
+
+    // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    const errorsToHighlight = proofreadingResult.erros
+      .map((erro, idx) => ({
+        text: erro.found || erro.original || erro.traducao_errada || '',
+        severity: erro.severidade || erro.gravidade || 'MÉDIO',
+        suggestion: erro.sugestao || erro.correcao || '',
+        type: erro.tipo || 'Geral',
+        index: idx,
+        applied: erro.applied
+      }))
+      .filter(e => e.text && e.text.length > 0 && !e.applied)
+      .sort((a, b) => b.text.length - a.text.length);
+
+    // Apply highlighting for each error
+    errorsToHighlight.forEach(error => {
+      const severityColor = error.severity === 'CRÍTICO' ? '#fee2e2' : // red-100
+                           error.severity === 'ALTO' ? '#dbeafe' : // blue-100
+                           error.severity === 'MÉDIO' ? '#fef3c7' : // yellow-100
+                           '#e0e7ff'; // indigo-100 for BAIXO
+
+      const borderColor = error.severity === 'CRÍTICO' ? '#ef4444' : // red-500
+                         error.severity === 'ALTO' ? '#3b82f6' : // blue-500
+                         error.severity === 'MÉDIO' ? '#f59e0b' : // yellow-500
+                         '#6366f1'; // indigo-500 for BAIXO
+
+      const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Create tooltip with error details
+      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+
+      // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
+      const regex = new RegExp(escapedText, 'i');
+      highlightedHtml = highlightedHtml.replace(
+        regex,
+        `<mark data-error-index="${error.index}" style="background-color: ${severityColor}; border-bottom: 2px solid ${borderColor}; padding: 2px 4px; border-radius: 3px; cursor: pointer; transition: all 0.2s;" title="${tooltipText}" class="proofreading-error-highlight">${error.text}</mark>`
+      );
+    });
+
+    return highlightedHtml;
+  };
+
+  // Handle click on highlighted error in translation - scroll to and highlight the table row
+  const handleHighlightedErrorClick = (e) => {
+    const mark = e.target.closest('mark[data-error-index]');
+    if (mark) {
+      const errorIndex = parseInt(mark.getAttribute('data-error-index'), 10);
+      setHighlightedErrorIndex(errorIndex);
+
+      // Scroll the error table row into view
+      setTimeout(() => {
+        const errorRow = document.querySelector(`[data-error-row="${errorIndex}"]`);
+        if (errorRow) {
+          errorRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Clear the highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedErrorIndex(null);
+      }, 3000);
     }
   };
 
@@ -8267,14 +8340,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
                 {/* Translation Preview */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-green-100 border-b">
+                  <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
                     <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
+                    {proofreadingResult?.erros?.length > 0 && (
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#fef3c7', border: '1px solid #f59e0b'}}></span> Médio
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#e0e7ff', border: '1px solid #6366f1'}}></span> Baixo
+                      </span>
+                    )}
                   </div>
                   <div className="p-4 bg-white max-h-64 overflow-y-auto">
                     <div
-                      className="text-xs"
-                      dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
+                      className="text-xs leading-relaxed"
+                      onClick={handleHighlightedErrorClick}
+                      dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
                     />
+                    {proofreadingResult?.erros?.length > 0 && (
+                      <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -8386,13 +8471,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
-                                  <tr key={idx} className={`border-t ${
-                                    erro.applied ? 'bg-green-50 opacity-60' :
-                                    severity === 'CRÍTICO' ? 'bg-red-50' :
-                                    severity === 'ALTO' ? 'bg-blue-50' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                    'bg-blue-50'
-                                  }`}>
+                                  <tr
+                                    key={idx}
+                                    data-error-row={idx}
+                                    className={`border-t transition-all duration-300 ${
+                                      highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
+                                      erro.applied ? 'bg-green-50 opacity-60' :
+                                      severity === 'CRÍTICO' ? 'bg-red-50' :
+                                      severity === 'ALTO' ? 'bg-blue-50' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                      'bg-blue-50'
+                                    }`}>
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
