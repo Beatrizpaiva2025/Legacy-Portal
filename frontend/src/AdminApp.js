@@ -7816,80 +7816,125 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* REVIEW TAB - Simple review of saved translations */}
+      {/* REVIEW TAB - Side-by-side Original + Translation Review */}
       {activeSubTab === 'review' && (
         <div className="bg-white rounded shadow p-4">
-          <h2 className="text-sm font-bold mb-4">📋 Review Translations</h2>
+          <h2 className="text-sm font-bold mb-2">📋 Review Translation</h2>
 
-          {/* Projects with saved translations to review */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-bold text-blue-800 mb-3">📁 Projects Ready for Review</h3>
-            <p className="text-xs text-gray-600 mb-3">Select a project to review its translation:</p>
-
-            {assignedOrders.filter(o => o.translation_ready || o.translation_html).length > 0 ? (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {assignedOrders.filter(o => o.translation_ready || o.translation_html).map(order => (
-                  <div
-                    key={order.id}
-                    onClick={async () => {
-                      setSelectedOrderId(order.id);
-                      setOrderNumber(order.order_number);
-                      const loaded = await loadSavedTranslation(order);
-                      if (loaded) {
-                        setProcessingStatus(`✅ Translation for ${order.order_number} loaded!`);
-                        setTimeout(() => setProcessingStatus(''), 3000);
+          {/* Upload Translation */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+            <label className="flex items-center justify-center px-4 py-2 bg-green-500 text-white text-sm rounded cursor-pointer hover:bg-green-600 transition">
+              📄 Upload Translation (Word/HTML/TXT)
+              <input
+                type="file"
+                accept=".docx,.doc,.html,.htm,.txt,.pdf,image/*"
+                multiple
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files);
+                  if (files.length === 0) return;
+                  setProcessingStatus('Processing uploaded translation...');
+                  for (const file of files) {
+                    const fileName = file.name.toLowerCase();
+                    try {
+                      if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+                        const html = await convertWordToHtml(file);
+                        setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                      } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+                        const html = await readHtmlFile(file);
+                        setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                      } else if (fileName.endsWith('.txt')) {
+                        const text = await readTxtFile(file);
+                        const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
+                        setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
+                      } else if (fileName.endsWith('.pdf')) {
+                        setProcessingStatus(`Converting PDF: ${file.name}...`);
+                        const images = await convertPdfToImages(file, (page, total) => {
+                          setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                        });
+                        images.forEach((img, idx) => {
+                          const imgHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
+                          setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
+                        });
+                      } else if (file.type.startsWith('image/')) {
+                        const dataUrl = await new Promise((resolve) => {
+                          const reader = new FileReader();
+                          reader.onload = () => resolve(reader.result);
+                          reader.readAsDataURL(file);
+                        });
+                        const html = `<div style="text-align:center;"><img src="${dataUrl}" style="max-width:100%; height:auto;" alt="${file.name}" /></div>`;
+                        setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                       }
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
-                      selectedOrderId === order.id
-                        ? 'bg-green-100 border-2 border-green-500'
-                        : 'bg-white border border-gray-200 hover:bg-green-50 hover:border-green-400'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{selectedOrderId === order.id ? '✅' : '📝'}</span>
-                      <div>
-                        <div className="font-medium text-sm text-gray-800">{order.order_number}</div>
-                        <div className="text-xs text-gray-500">{order.client_name || order.partner_name}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-[10px] rounded-full ${
-                        order.translation_status === 'review' ? 'bg-indigo-100 text-indigo-700' :
-                        order.translation_status === 'pending_review' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {order.translation_status === 'review' ? 'Awaiting Review' :
-                         order.translation_status === 'pending_review' ? 'Pending Review' : 'Ready'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 text-center py-4">No projects with saved translations found.</p>
+                    } catch (err) {
+                      console.error('Upload error:', err);
+                      setProcessingStatus(`Error: ${file.name}`);
+                    }
+                  }
+                  setProcessingStatus('Translation uploaded!');
+                  setTimeout(() => setProcessingStatus(''), 3000);
+                  e.target.value = '';
+                }}
+                className="hidden"
+              />
+            </label>
+            {translationResults.length > 0 && (
+              <p className="text-xs text-green-600 mt-1 text-center">Translation loaded</p>
             )}
           </div>
 
           {/* Processing Status */}
           {processingStatus && (
             <div className={`mb-3 p-3 rounded text-sm font-medium ${
-              processingStatus.includes('❌') ? 'bg-red-100 text-red-700 border border-red-300' :
-              processingStatus.includes('✅') ? 'bg-green-100 text-green-700 border border-green-300' :
+              processingStatus.includes('Error') ? 'bg-red-100 text-red-700 border border-red-300' :
+              processingStatus.includes('uploaded') || processingStatus.includes('loaded') ? 'bg-green-100 text-green-700 border border-green-300' :
               'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
             }`}>
               {processingStatus}
             </div>
           )}
 
-          {/* Translation Preview - Only show when a translation is loaded */}
-          {translationResults.length > 0 && (
-            <div className="border rounded-lg overflow-hidden">
-              <div className="bg-gray-100 px-4 py-2 border-b flex justify-between items-center">
-                <span className="text-sm font-bold text-gray-700">
-                  🌐 Translation Preview - {orderNumber || 'Document'}
-                </span>
-                <div className="flex gap-2">
+          {translationResults.length > 0 ? (
+            <>
+              {/* Document selector */}
+              {translationResults.length > 1 && (
+                <div className="mb-3">
+                  <label className="text-xs text-gray-600 mr-2">Document:</label>
+                  <select
+                    value={selectedResultIndex}
+                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
+                    className="px-2 py-1 text-xs border rounded"
+                  >
+                    {translationResults.map((r, idx) => (
+                      <option key={idx} value={idx}>{r.filename || `Page ${idx + 1}`}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* View Mode Toggle + Download */}
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex rounded-md shadow-sm" role="group">
+                    <button
+                      onClick={() => setReviewViewMode('preview')}
+                      className={`px-3 py-1 text-xs font-medium rounded-l-md border ${
+                        reviewViewMode === 'preview'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => setReviewViewMode('edit')}
+                      className={`px-3 py-1 text-xs font-medium rounded-r-md border-t border-b border-r ${
+                        reviewViewMode === 'edit'
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Edit
+                    </button>
+                  </div>
                   <button
                     onClick={() => {
                       const content = translationResults[selectedResultIndex]?.translatedText || '';
@@ -7903,79 +7948,233 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     }}
                     className="px-3 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
                   >
-                    ⬇️ Download
+                    Download
                   </button>
+                </div>
+
+                {/* Edit Toolbar */}
+                {reviewViewMode === 'edit' && (
+                  <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded">
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Side by side view: Original | Translation */}
+              <div className="border rounded mb-4">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">Original Document</span>
+                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = {
+                                data: event.target.result,
+                                filename: file.name
+                              };
+                              setOriginalImages(newOriginalImages);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div className="px-3 py-2">
+                    <span className="text-xs font-bold text-gray-700">
+                      Translation ({targetLanguage}) - {reviewViewMode === 'preview' ? 'Preview' : 'Editing'}
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
+                  {/* Left: Original Document */}
+                  <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : translationResults[selectedResultIndex]?.original ? (
+                      <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400 text-xs">
+                        <div className="text-center">
+                          <p>No original document</p>
+                          <p className="mt-1">Click "Upload" above to add</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* Right: Translation */}
+                  <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                    {reviewViewMode === 'preview' ? (
+                      <iframe
+                        srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
+                        title="Translation Preview"
+                        className="w-full h-full border-0"
+                        style={{minHeight: '384px'}}
+                      />
+                    ) : (
+                      <div
+                        ref={editableRef}
+                        contentEditable
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Document selector if multiple */}
-              {translationResults.length > 1 && (
-                <div className="bg-gray-50 px-4 py-2 border-b">
-                  <label className="text-xs text-gray-600 mr-2">Page:</label>
-                  <select
-                    value={selectedResultIndex}
-                    onChange={(e) => setSelectedResultIndex(Number(e.target.value))}
-                    className="px-2 py-1 text-xs border rounded"
-                  >
-                    {translationResults.map((r, idx) => (
-                      <option key={idx} value={idx}>{r.filename || `Page ${idx + 1}`}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Preview iframe */}
-              <iframe
-                srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation content</p>'}
-                title="Translation Preview"
-                className="w-full border-0"
-                style={{height: '400px'}}
-              />
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="mt-4 flex justify-between items-center">
-            <button
-              onClick={() => setActiveSubTab('translate')}
-              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300"
-            >
-              ← Back to Translation
-            </button>
-
-            {translationResults.length > 0 && (
-              <div className="flex gap-2">
-                {/* Send to PM - for translators */}
-                {!isAdmin && !isPM && (
+              {/* Navigation and Send Buttons */}
+              <div className="mt-4 flex justify-between items-center">
+                <div className="flex gap-2">
                   <button
-                    onClick={async () => {
-                      await sendToProjects('pm');
-                      alert('Translation sent to PM for proofreading!');
-                      setTranslationResults([]);
-                      setOriginalImages([]);
-                      setSelectedOrderId(null);
-                      setOrderNumber('');
-                      fetchAssignedOrders();
-                    }}
-                    disabled={sendingToProjects}
+                    onClick={() => setActiveSubTab('translate')}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded hover:bg-gray-300"
+                  >
+                    Back: Translation
+                  </button>
+                  <button
+                    onClick={() => sendToProjects('save')}
+                    disabled={sendingToProjects || translationResults.length === 0}
                     className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300"
                   >
-                    📤 Send to PM
+                    Save
                   </button>
-                )}
+                </div>
+                <div className="flex gap-2">
+                  {/* Contractor: Only Send to PM */}
+                  {isContractor && (
+                    <button
+                      onClick={async () => {
+                        await sendToProjects('pm');
+                        alert('Translation sent to PM!');
+                        setTranslationResults([]);
+                        setOriginalImages([]);
+                        setSelectedOrderId(null);
+                        setOrderNumber('');
+                        fetchAssignedOrders();
+                      }}
+                      disabled={sendingToProjects}
+                      className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300"
+                    >
+                      Send to PM
+                    </button>
+                  )}
 
-                {/* Next: Proofreading - for admin/PM */}
-                {(isAdmin || isPM) && (
-                  <button
-                    onClick={() => setActiveSubTab('proofreading')}
-                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700"
-                  >
-                    Next: Proofreading →
-                  </button>
+                  {/* In-House Translator: Send to PM or Admin (never to client) */}
+                  {isInHouseTranslator && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          await sendToProjects('pm');
+                          alert('Translation sent to PM!');
+                          setTranslationResults([]);
+                          setOriginalImages([]);
+                          fetchAssignedOrders();
+                        }}
+                        disabled={sendingToProjects}
+                        className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300"
+                      >
+                        Send to PM
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await sendToProjects('admin');
+                          alert('Translation sent to Admin!');
+                          setTranslationResults([]);
+                          setOriginalImages([]);
+                          fetchAssignedOrders();
+                        }}
+                        disabled={sendingToProjects}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300"
+                      >
+                        Send to Admin
+                      </button>
+                    </>
+                  )}
+
+                  {/* PM/Admin: Next to Proofreading */}
+                  {(isAdmin || isPM) && (
+                    <button
+                      onClick={() => setActiveSubTab('proofreading')}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700"
+                    >
+                      Next: Proofreading
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="py-4">
+              {/* Show orders with saved translations */}
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-bold text-blue-800 mb-3">Projects with Translation to Review</h3>
+                <p className="text-xs text-gray-600 mb-3">Select a project to load a saved translation:</p>
+
+                {assignedOrders.filter(o => o.translation_ready || o.translation_html).length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {assignedOrders.filter(o => o.translation_ready || o.translation_html).map(order => (
+                      <div
+                        key={order.id}
+                        onClick={async () => {
+                          setSelectedOrderId(order.id);
+                          setOrderNumber(order.order_number);
+                          const loaded = await loadSavedTranslation(order);
+                          if (loaded) {
+                            setProcessingStatus(`Translation for ${order.order_number} loaded!`);
+                          }
+                        }}
+                        className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg cursor-pointer hover:bg-green-50 hover:border-green-400 transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg">📝</span>
+                          <div>
+                            <div className="font-medium text-sm text-gray-800">{order.order_number}</div>
+                            <div className="text-xs text-gray-500">{order.client_name || order.partner_name}</div>
+                          </div>
+                        </div>
+                        <span className="text-green-600">→</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 text-center py-4">No projects with saved translation found.</p>
                 )}
               </div>
-            )}
-          </div>
+
+              <div className="text-center py-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500 mb-3">Or start a new translation:</p>
+                <button
+                  onClick={() => setActiveSubTab('translate')}
+                  className="px-4 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                >
+                  Go to Translation
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -9184,10 +9383,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
                     <h3 className="text-sm font-bold text-blue-700 mb-2">
-                      📤 Submit & Notify Team
+                      📤 Submit Translation
                     </h3>
                     <p className="text-[10px] text-blue-600 mb-3">
-                      Link translation to order and notify team members
+                      {isInHouseTranslator ? 'Send to PM or Admin for review' : 'Link translation to order and notify team'}
                     </p>
 
                     <div className="mb-3">
@@ -9206,12 +9405,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </select>
                     </div>
 
+                    {/* In-House Translator: Choose PM or Admin */}
+                    {isInHouseTranslator && (
+                      <div className="mb-3">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Send to *</label>
+                        <select
+                          value={sendDestination}
+                          onChange={(e) => setSendDestination(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border rounded"
+                        >
+                          <option value="pm">📤 Send to PM</option>
+                          <option value="admin">📤 Send to Admin</option>
+                        </select>
+                      </div>
+                    )}
+
                     <button
-                      onClick={() => sendToProjects('review')}
+                      onClick={() => sendToProjects(isInHouseTranslator ? sendDestination : 'review')}
                       disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
                       className="w-full py-2 bg-blue-600 text-white text-sm font-bold rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                     >
-                      {sendingToProjects ? '⏳ Sending...' : '📤 Submit & Notify Admin/PM'}
+                      {sendingToProjects ? '⏳ Sending...' : isInHouseTranslator ? '📤 Submit' : '📤 Submit & Notify Admin/PM'}
                     </button>
 
                     {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
@@ -9643,15 +9857,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ))}
                   </select>
                   <div className="flex space-x-2">
-                    {/* PM/Admin: Deliver options */}
+                    {/* Role-based delivery options */}
                     <select
                       value={sendDestination}
                       onChange={(e) => setSendDestination(e.target.value)}
                       className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                       disabled={sendingToProjects}
                     >
-                      <option value="client">📧 Send to Client (Review)</option>
-                      {isPM && <option value="admin">📤 Send to Admin</option>}
+                      {/* Admin only can send to client */}
+                      {isAdmin && <option value="client">📧 Send to Client</option>}
+                      {/* PM sends to Admin for final approval */}
+                      {isPM && !isAdmin && <option value="admin">📤 Send to Admin</option>}
+                      {/* In-House Translator: Send to PM or Admin (never to client) */}
+                      {isInHouseTranslator && (
+                        <>
+                          <option value="pm">📤 Send to PM</option>
+                          <option value="admin">📤 Send to Admin</option>
+                        </>
+                      )}
                     </select>
                     <button
                       onClick={() => sendToProjects(sendDestination)}
