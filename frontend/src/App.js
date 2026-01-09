@@ -603,37 +603,35 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   // Registration mode - compact single-page layout
   if (!isLogin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-6">
+        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
           {/* Left Side - Branding */}
-          <div className="lg:w-2/5 bg-gradient-to-br from-blue-900 to-blue-800 p-8 text-white flex flex-col justify-center">
-            <div className="bg-white rounded-xl p-4 mb-6 inline-block self-start">
-              <img
-                src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
-                alt="Legacy Translations"
-                className="h-10"
-              />
-            </div>
-            <h1 className="text-2xl font-bold mb-2">{t.createAccount}</h1>
-            <p className="text-blue-200 text-sm mb-6">{t.corporateOnly}</p>
+          <div className="lg:w-2/5 bg-gradient-to-br from-blue-900 to-blue-800 p-6 text-white flex flex-col justify-center">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="h-16 mb-4 brightness-0 invert"
+            />
+            <h1 className="text-xl font-bold mb-1">{t.createAccount}</h1>
+            <p className="text-blue-200 text-xs mb-4">{t.corporateOnly}</p>
 
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center text-xs">✓</span>
+                <span className="text-green-400">✓</span>
                 <span>{t.benefit1}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center text-xs">✓</span>
+                <span className="text-green-400">✓</span>
                 <span>{t.benefit2}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-5 h-5 bg-white/20 rounded-full flex items-center justify-center text-xs">✓</span>
+                <span className="text-green-400">✓</span>
                 <span>{t.benefit3}</span>
               </div>
             </div>
 
             {/* Language Selector */}
-            <div className="mt-6 pt-6 border-t border-white/20 flex items-center gap-2">
+            <div className="mt-4 pt-4 border-t border-white/20 flex items-center gap-2">
               {UI_LANGUAGES.map((uiLang) => (
                 <button
                   key={uiLang.code}
@@ -648,22 +646,22 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           </div>
 
           {/* Right Side - Form */}
-          <div className="lg:w-3/5 p-6 lg:p-8 max-h-screen overflow-y-auto">
+          <div className="lg:w-3/5 p-5 lg:p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3">
               {/* Row 1: Company & Contact */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyName} *</label>
                   <input
                     type="text"
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.company_name}
                     onChange={(e) => setFormData({...formData, company_name: e.target.value})}
                     placeholder="Your Company Inc."
@@ -674,7 +672,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                   <input
                     type="text"
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.contact_name}
                     onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
                     placeholder="John Smith"
@@ -683,13 +681,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
 
               {/* Row 2: Email & Phone */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyEmail} *</label>
                   <input
                     type="email"
                     required
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="you@company.com"
@@ -699,7 +697,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                   <label className="block text-xs font-medium text-gray-600 mb-1">{t.phoneOptional}</label>
                   <input
                     type="tel"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     placeholder="+1 (555) 123-4567"
@@ -709,27 +707,24 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
               {/* Payment Plan */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">{t.paymentPlan}</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <label className={`flex flex-col p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                     <input type="radio" name="payment_plan" value="pay_per_order" checked={formData.payment_plan === 'pay_per_order'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-sm text-gray-800">{t.payPerOrder}</span>
-                    <span className="text-xs text-gray-500 mt-1">{t.payPerOrderDesc}</span>
+                    <span className="font-medium text-xs text-gray-800">{t.payPerOrder}</span>
+                    <span className="text-[10px] text-gray-500">{t.payPerOrderDesc}</span>
                   </label>
-                  <label className={`flex flex-col p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                     <input type="radio" name="payment_plan" value="biweekly" checked={formData.payment_plan === 'biweekly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-sm text-gray-800">{t.biweeklyInvoice}</span>
-                    <span className="text-xs text-gray-500 mt-1">{t.biweeklyInvoiceDesc}</span>
+                    <span className="font-medium text-xs text-gray-800">{t.biweeklyInvoice}</span>
+                    <span className="text-[10px] text-gray-500">{t.biweeklyInvoiceDesc}</span>
                   </label>
-                  <label className={`flex flex-col p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                     <input type="radio" name="payment_plan" value="monthly" checked={formData.payment_plan === 'monthly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-sm text-gray-800">{t.monthlyInvoice}</span>
-                    <span className="text-xs text-gray-500 mt-1">{t.monthlyInvoiceDesc}</span>
+                    <span className="font-medium text-xs text-gray-800">{t.monthlyInvoice}</span>
+                    <span className="text-[10px] text-gray-500">{t.monthlyInvoiceDesc}</span>
                   </label>
                 </div>
-                {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
-                  <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">{t.invoiceRequiresApproval}</p>
-                )}
               </div>
 
               {/* Password */}
@@ -738,7 +733,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <input
                   type="password"
                   required
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   placeholder="Create a secure password"
@@ -746,15 +741,11 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               </div>
 
               {/* Terms - Compact */}
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-start gap-2 text-xs text-gray-600 mb-2">
-                  <span>✓ {t.term1}</span>
-                  <span>• {t.term2}</span>
-                </div>
-                <div className="flex items-start gap-2 text-xs text-gray-600">
-                  <span>• {t.term3}</span>
-                  <span className="text-amber-600">! {t.term4}</span>
-                </div>
+              <div className="bg-gray-50 rounded p-2 text-[10px] text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
+                <span>✓ {t.term1}</span>
+                <span>• {t.term2}</span>
+                <span>• {t.term3}</span>
+                <span className="text-amber-600">! {t.term4}</span>
               </div>
 
               {/* Agreement Checkbox */}
@@ -765,20 +756,20 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                   onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-700">{t.iAgreeToTerms}</span>
+                <span className="text-xs text-gray-700">{t.iAgreeToTerms}</span>
               </label>
 
               {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading || !formData.agreed_to_terms}
-                className={`w-full py-3 text-white rounded-lg font-semibold transition-all ${!formData.agreed_to_terms ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-900 hover:bg-blue-800'}`}
+                className={`w-full py-2.5 text-white rounded font-semibold text-sm transition-all ${!formData.agreed_to_terms ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-900 hover:bg-blue-800'}`}
               >
                 {loading ? t.pleaseWait : t.createAccount}
               </button>
 
               {/* Login Link */}
-              <p className="text-center text-sm text-gray-600">
+              <p className="text-center text-xs text-gray-600">
                 {t.haveAccount}{' '}
                 <button type="button" onClick={() => setIsLogin(true)} className="text-blue-600 hover:underline font-medium">
                   Login
@@ -2107,31 +2098,6 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             </button>
             <h2 className="text-xl font-bold text-gray-800 mb-1">Get Support</h2>
             <p className="text-gray-600 text-sm mb-4">Share details about your issue and our team will respond via email.</p>
-
-            {/* Live Chat Option - MIA BOT */}
-            <a
-              href="https://mia-atendimento-1.onrender.com/webchat/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block mb-4 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200 hover:from-teal-100 hover:to-teal-150 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-semibold text-teal-800">Live Chat</h3>
-                    <p className="text-xs text-teal-600">Instant support with MIA</p>
-                  </div>
-                </div>
-                <span className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold text-sm">
-                  Start Chat
-                </span>
-              </div>
-            </a>
 
             {/* Message Your Team Option */}
             <button
