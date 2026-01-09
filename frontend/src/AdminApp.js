@@ -1543,6 +1543,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
@@ -1744,6 +1745,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
+
+  // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
+  const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
 
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
@@ -3182,11 +3186,129 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Generate translation text with highlighted errors
+  const getHighlightedTranslation = () => {
+    const currentResult = translationResults[selectedResultIndex];
+    if (!currentResult?.translatedText || !proofreadingResult?.erros || proofreadingResult.erros.length === 0) {
+      return currentResult?.translatedText || '<p>No translation</p>';
+    }
+
+    let highlightedHtml = currentResult.translatedText;
+
+    // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    const errorsToHighlight = proofreadingResult.erros
+      .map((erro, idx) => ({
+        text: erro.found || erro.original || erro.traducao_errada || '',
+        severity: erro.severidade || erro.gravidade || 'MÉDIO',
+        suggestion: erro.sugestao || erro.correcao || '',
+        type: erro.tipo || 'Geral',
+        index: idx,
+        applied: erro.applied
+      }))
+      .filter(e => e.text && e.text.length > 0 && !e.applied)
+      .sort((a, b) => b.text.length - a.text.length);
+
+    // Apply highlighting for each error
+    errorsToHighlight.forEach(error => {
+      const severityColor = error.severity === 'CRÍTICO' ? '#fee2e2' : // red-100
+                           error.severity === 'ALTO' ? '#dbeafe' : // blue-100
+                           error.severity === 'MÉDIO' ? '#fef3c7' : // yellow-100
+                           '#e0e7ff'; // indigo-100 for BAIXO
+
+      const borderColor = error.severity === 'CRÍTICO' ? '#ef4444' : // red-500
+                         error.severity === 'ALTO' ? '#3b82f6' : // blue-500
+                         error.severity === 'MÉDIO' ? '#f59e0b' : // yellow-500
+                         '#6366f1'; // indigo-500 for BAIXO
+
+      const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Create tooltip with error details
+      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+
+      // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
+      const regex = new RegExp(escapedText, 'i');
+      highlightedHtml = highlightedHtml.replace(
+        regex,
+        `<mark data-error-index="${error.index}" style="background-color: ${severityColor}; border-bottom: 2px solid ${borderColor}; padding: 2px 4px; border-radius: 3px; cursor: pointer; transition: all 0.2s;" title="${tooltipText}" class="proofreading-error-highlight">${error.text}</mark>`
+      );
+    });
+
+    return highlightedHtml;
+  };
+
+  // Handle click on highlighted error in translation - scroll to and highlight the table row
+  const handleHighlightedErrorClick = (e) => {
+    const mark = e.target.closest('mark[data-error-index]');
+    if (mark) {
+      const errorIndex = parseInt(mark.getAttribute('data-error-index'), 10);
+      setHighlightedErrorIndex(errorIndex);
+
+      // Scroll the error table row into view
+      setTimeout(() => {
+        const errorRow = document.querySelector(`[data-error-row="${errorIndex}"]`);
+        if (errorRow) {
+          errorRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Clear the highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedErrorIndex(null);
+      }, 3000);
+    }
+  };
+
+  // Helper function to try replacing text with multiple strategies
+  const tryReplaceText = (html, foundText, suggestionText) => {
+    let updatedHtml = html;
+    let replaced = false;
+
+    // Strategy 1: Try exact match (case insensitive)
+    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(escapedText, 'gi');
+
+    if (exactRegex.test(html)) {
+      updatedHtml = html.replace(exactRegex, suggestionText);
+      replaced = true;
+    }
+
+    // Strategy 2: Try matching with flexible whitespace
+    if (!replaced) {
+      const flexiblePattern = foundText
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+      if (flexibleRegex.test(html)) {
+        updatedHtml = html.replace(flexibleRegex, suggestionText);
+        replaced = true;
+      }
+    }
+
+    // Strategy 3: Try finding words individually
+    if (!replaced) {
+      const words = foundText.split(/\s+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const wordPattern = words
+          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+        const wordRegex = new RegExp(wordPattern, 'gi');
+
+        if (wordRegex.test(html)) {
+          updatedHtml = html.replace(wordRegex, suggestionText);
+          replaced = true;
+        }
+      }
+    }
+
+    return { updatedHtml, replaced };
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = erro.found || erro.original || erro.traducao_errada;
-    const suggestionText = erro.sugestao || erro.correcao;
+    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3196,17 +3318,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    // Replace the found text with the suggestion
-    const updatedHtml = currentResult.translatedText.replace(
-      new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-      suggestionText
-    );
+    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+
+    if (!result.replaced) {
+      alert(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: updatedHtml
+      translatedText: result.updatedHtml
     };
     setTranslationResults(newResults);
 
@@ -3229,20 +3352,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!currentResult?.translatedText) return;
 
     let updatedHtml = currentResult.translatedText;
+    let appliedCount = 0;
+
     const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions
-      const foundText = erro.found || erro.original || erro.traducao_errada;
-      const suggestionText = erro.sugestao || erro.correcao;
+      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
-        updatedHtml = updatedHtml.replace(
-          new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-          suggestionText
-        );
-        return { ...erro, applied: true };
+        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
       }
       return erro;
     });
+
+    if (appliedCount === 0) {
+      alert('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
@@ -3767,10 +3898,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
-        // Increase or decrease by 2pt
+        // Increase or decrease by 2pt (min 4pt to allow very small sizes)
         const newSize = command === 'increaseFontSize'
           ? Math.min(currentSizePt + 2, 48)
-          : Math.max(currentSizePt - 2, 8);
+          : Math.max(currentSizePt - 2, 4);
         span.style.fontSize = `${newSize}pt`;
 
         try {
@@ -8265,16 +8396,82 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
 
-                {/* Translation Preview */}
+                {/* Translation Preview/Edit */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-green-100 border-b">
-                    <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
+                  <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-green-700">
+                        📄 Translation ({targetLanguage}) {proofreadingViewMode === 'edit' && '- ✏️ Editing'}
+                      </span>
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => setProofreadingViewMode('preview')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => setProofreadingViewMode('edit')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
+                    </div>
+                    {proofreadingViewMode === 'preview' && proofreadingResult?.erros?.length > 0 && (
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#fef3c7', border: '1px solid #f59e0b'}}></span> Médio
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#e0e7ff', border: '1px solid #6366f1'}}></span> Baixo
+                      </span>
+                    )}
                   </div>
+
+                  {/* Edit Toolbar - Only visible in edit mode */}
+                  {proofreadingViewMode === 'edit' && (
+                    <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div
-                      className="text-xs"
-                      dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
-                    />
+                    {proofreadingViewMode === 'preview' ? (
+                      <>
+                        <div
+                          className="text-xs leading-relaxed"
+                          onClick={handleHighlightedErrorClick}
+                          dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
+                        />
+                        {proofreadingResult?.erros?.length > 0 && (
+                          <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="text-xs leading-relaxed focus:outline-none min-h-[200px]"
+                        style={{border: '2px solid #10B981', borderRadius: '4px', padding: '8px'}}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -8386,13 +8583,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
-                                  <tr key={idx} className={`border-t ${
-                                    erro.applied ? 'bg-green-50 opacity-60' :
-                                    severity === 'CRÍTICO' ? 'bg-red-50' :
-                                    severity === 'ALTO' ? 'bg-blue-50' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                    'bg-blue-50'
-                                  }`}>
+                                  <tr
+                                    key={idx}
+                                    data-error-row={idx}
+                                    className={`border-t transition-all duration-300 ${
+                                      highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
+                                      erro.applied ? 'bg-green-50 opacity-60' :
+                                      severity === 'CRÍTICO' ? 'bg-red-50' :
+                                      severity === 'ALTO' ? 'bg-blue-50' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                      'bg-blue-50'
+                                    }`}>
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
