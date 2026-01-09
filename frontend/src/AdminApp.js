@@ -245,7 +245,8 @@ const AdminLogin = ({ onLogin }) => {
             role: response.data.role,
             name: response.data.name,
             email: response.data.email,
-            id: response.data.id
+            id: response.data.id,
+            translator_type: response.data.translator_type
           });
         }
       }
@@ -16807,7 +16808,8 @@ const TranslatorLogin = ({ onLogin }) => {
           role: response.data.role,
           name: response.data.name,
           email: response.data.email,
-          id: response.data.id
+          id: response.data.id,
+          translator_type: response.data.translator_type
         });
       }
     } catch (err) {
