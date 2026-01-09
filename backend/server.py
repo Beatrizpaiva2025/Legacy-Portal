@@ -1255,7 +1255,8 @@ class TranslationOrder(BaseModel):
     translator_assignment_token: Optional[str] = None  # Token for accept/decline
     translator_assignment_status: str = "none"  # none, pending, accepted, declined
     translator_assignment_responded_at: Optional[datetime] = None
-    deadline: Optional[datetime] = None  # Translation deadline
+    deadline: Optional[datetime] = None  # Client deadline - when to deliver to client
+    translator_deadline: Optional[datetime] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
     payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
@@ -1298,7 +1299,8 @@ class TranslationOrderUpdate(BaseModel):
     # Assignment updates (by name - for direct assignment from dropdown)
     assigned_pm: Optional[str] = None
     assigned_translator: Optional[str] = None
-    deadline: Optional[str] = None  # Changed to str to accept ISO string
+    deadline: Optional[str] = None  # Client deadline - Changed to str to accept ISO string
+    translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
     # NEW: Additional editable fields
@@ -1633,6 +1635,7 @@ async def bot_calculate_quote(request: BotQuoteRequest):
             "translation_status": "Quote",  # This makes it appear in Quote filter!
             "payment_status": "pending",
             "source": "whatsapp_bot",
+            "revenue_source": "whatsapp",  # Track as WhatsApp revenue
             "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
             "has_document": bool(request.document_base64 or request.document_url)
@@ -1789,6 +1792,7 @@ async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
         "translation_status": "pending",
         "payment_status": "pending",
         "source": "whatsapp_bot",
+        "revenue_source": "whatsapp",  # Track as WhatsApp revenue
         "bot_quote_id": quote_id,
         "created_at": datetime.utcnow(),
         "notes": quote.get("notes", "")
@@ -3655,6 +3659,81 @@ async def submit_b2b_interest(request: B2BInterestRequest):
             content=html_content,
             content_type="html"
         )
+
+        # Send welcome email to prospect with registration link
+        registration_url = f"https://portal.legacytranslations.com/#/partner?register=true&email={request.email}&company={request.company_name}&name={request.contact_name}&phone={request.phone or ''}"
+
+        prospect_email_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 35px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Welcome to Legacy Translations!</h1>
+            </div>
+            <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
+
+            <div style="padding: 40px 30px;">
+                <p style="font-size: 18px; color: #333;">Hi {request.contact_name},</p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    Thank you for your interest in becoming a Legacy Translations Partner! We received your inquiry and our team will contact you within 24 hours.
+                </p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    In the meantime, you can complete your partner account registration by clicking the button below:
+                </p>
+
+                <div style="text-align: center; margin: 35px 0;">
+                    <a href="{registration_url}" style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);">
+                        Complete Your Registration
+                    </a>
+                </div>
+
+                <div style="background: #f8fafc; border-radius: 12px; padding: 25px; margin: 30px 0;">
+                    <h3 style="color: #1e3a5f; margin-top: 0; margin-bottom: 15px;">Partner Benefits Include:</h3>
+                    <ul style="color: #555; line-height: 2; padding-left: 20px; margin: 0;">
+                        <li>Net 30 payment terms for approved partners</li>
+                        <li>Volume discounts on translations</li>
+                        <li>Priority order processing</li>
+                        <li>Dedicated account support</li>
+                        <li>Online dashboard to track all orders</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                    <p style="color: #92400e; margin: 0; font-weight: 500;">
+                        <strong>First Certified Translation FREE!</strong> 1 page - No commitment required
+                    </p>
+                </div>
+
+                <p style="color: #555; line-height: 1.6;">
+                    If you have any questions, feel free to reply to this email or contact us at
+                    <a href="mailto:contact@legacytranslations.com" style="color: #1e3a5f;">contact@legacytranslations.com</a>
+                </p>
+
+                <p style="color: #555; margin-top: 30px;">
+                    Best regards,<br>
+                    <strong style="color: #1e3a5f;">The Legacy Translations Team</strong>
+                </p>
+            </div>
+
+            <div style="background: #f1f5f9; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 12px; margin: 0;">
+                    © 2024 Legacy Translations. All rights reserved.<br>
+                    <a href="https://legacytranslations.com" style="color: #1e3a5f;">legacytranslations.com</a>
+                </p>
+            </div>
+        </div>
+        """
+
+        try:
+            await email_service.send_email(
+                to=request.email,
+                subject="Welcome to Legacy Translations - Complete Your Partner Registration",
+                content=prospect_email_content,
+                content_type="html"
+            )
+            logger.info(f"Welcome email sent to prospect: {request.email}")
+        except Exception as email_err:
+            logger.error(f"Failed to send welcome email to prospect: {str(email_err)}")
 
         # Save to database for tracking
         b2b_inquiry = {
@@ -7180,8 +7259,8 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         start_date = datetime(now.year, now.month, 1)
         end_date = now
 
-    # Get revenue (paid orders)
-    orders = await db.orders.find({
+    # Get revenue (paid orders) from translation_orders collection
+    orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
@@ -7189,9 +7268,26 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_revenue = sum(o.get("total_price", 0) for o in orders)
 
     # Revenue by source
+    # Handle both revenue_source field and legacy source field (for whatsapp_bot)
+    def get_order_source(order):
+        # First check revenue_source field
+        revenue_source = order.get("revenue_source")
+        if revenue_source and revenue_source in REVENUE_SOURCES:
+            return revenue_source
+        # Check legacy source field for whatsapp_bot
+        source = order.get("source", "")
+        if source == "whatsapp_bot":
+            return "whatsapp"
+        # Check partner_id for whatsapp_bot
+        partner_id = order.get("partner_id", "")
+        if partner_id == "whatsapp_bot":
+            return "whatsapp"
+        # Default to website
+        return "website"
+
     revenue_by_source = {}
     for source in REVENUE_SOURCES.keys():
-        source_orders = [o for o in orders if o.get("revenue_source", "website") == source]
+        source_orders = [o for o in orders if get_order_source(o) == source]
         revenue_by_source[source] = {
             "label": REVENUE_SOURCES[source],
             "amount": sum(o.get("total_price", 0) for o in source_orders),
@@ -7236,7 +7332,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_expenses += translator_payments_total
 
     # Invoices summary
-    all_orders = await db.orders.find({
+    all_orders = await db.translation_orders.find({
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
 
@@ -7255,7 +7351,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         prev_start = start_date - (end_date - start_date)
         prev_end = start_date
 
-    prev_orders = await db.orders.find({
+    prev_orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": prev_start, "$lt": prev_end}
     }).to_list(1000)
