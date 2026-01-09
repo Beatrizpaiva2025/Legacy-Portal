@@ -9393,19 +9393,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* ============ ADMIN/PM/IN-HOUSE SECTION: Submit & Notify Team ============ */}
+              {/* ============ ADMIN/PM/IN-HOUSE SECTION: Send to Projects ============ */}
               {(isAdmin || isPM || isInHouseTranslator) && (
                 <>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
-                    <h3 className="text-sm font-bold text-blue-700 mb-2">
-                      📤 Submit Translation
-                    </h3>
-                    <p className="text-[10px] text-blue-600 mb-3">
-                      {isInHouseTranslator ? 'Send to PM or Admin for review' : 'Link translation to order and notify team'}
-                    </p>
+                  <div className={`p-4 rounded mb-4 ${
+                    isApprovalComplete && documentType.trim()
+                      ? 'bg-green-50 border border-green-200'
+                      : 'bg-gray-50 border border-gray-200'
+                  }`}>
+                    <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
+                    <p className="text-[10px] text-gray-600 mb-3">Send this translation to a project for review and delivery.</p>
 
-                    <div className="mb-3">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Select Order *</label>
+                    {/* Validation warnings */}
+                    {(!isApprovalComplete || !documentType.trim()) && (
+                      <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                        <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                          {!documentType.trim() && <li>Fill in Document Type</li>}
+                          {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col space-y-2">
                       <select
                         value={selectedOrderId}
                         onChange={(e) => setSelectedOrderId(e.target.value)}
@@ -9418,37 +9428,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </option>
                         ))}
                       </select>
-                    </div>
-
-                    {/* In-House Translator: Choose PM or Finalize to Admin */}
-                    {isInHouseTranslator && (
-                      <div className="mb-3">
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Send to *</label>
+                      <div className="flex space-x-2">
+                        {/* Role-based delivery options - same as Normal Flow */}
                         <select
                           value={sendDestination}
                           onChange={(e) => setSendDestination(e.target.value)}
-                          className="w-full px-2 py-1.5 text-xs border rounded"
+                          className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                          disabled={sendingToProjects}
                         >
-                          <option value="pm">📤 Send to PM (for review)</option>
-                          <option value="finalize_admin">✅ Finalize & Send to Admin</option>
+                          {/* Admin only can send to client */}
+                          {isAdmin && <option value="client">📧 Send to Client</option>}
+                          {/* PM sends to Admin for final approval */}
+                          {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                          {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
+                          {isInHouseTranslator && (
+                            <>
+                              <option value="pm">📤 Send to PM (for review)</option>
+                              <option value="finalize_admin">✅ Finalize & Send to Admin</option>
+                            </>
+                          )}
                         </select>
+                        <button
+                          onClick={() => sendToProjects(sendDestination)}
+                          disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
+                          className={`flex-1 px-4 py-2 text-white text-xs rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
+                            sendDestination === 'client' ? 'bg-green-600 hover:bg-green-700' :
+                            sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' :
+                            'bg-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          {sendingToProjects ? '⏳ Sending...' : sendDestination === 'finalize_admin' ? '✅ Finalize' : '📤 Deliver'}
+                        </button>
                       </div>
-                    )}
-
-                    <button
-                      onClick={() => sendToProjects(isInHouseTranslator ? sendDestination : 'review')}
-                      disabled={!selectedOrderId || sendingToProjects || !isApprovalComplete || !documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)}
-                      className={`w-full py-2 text-white text-sm font-bold rounded disabled:bg-gray-300 disabled:cursor-not-allowed ${
-                        sendDestination === 'finalize_admin' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
-                      }`}
-                    >
-                      {sendingToProjects ? '⏳ Sending...' : isInHouseTranslator ? (sendDestination === 'finalize_admin' ? '✅ Finalize' : '📤 Submit') : '📤 Submit & Notify Admin/PM'}
-                    </button>
-
-                    {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
-                      <p className="text-[10px] text-blue-600 mt-2">
-                        ⚠️ Fill document type and upload translation first
-                      </p>
+                    </div>
+                    {availableOrders.length === 0 && (
+                      <p className="text-[10px] text-yellow-600 mt-2">No orders available. Create an order first in the Projects tab.</p>
                     )}
                   </div>
 
