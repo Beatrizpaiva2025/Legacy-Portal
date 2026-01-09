@@ -1303,6 +1303,8 @@ class TranslationOrderUpdate(BaseModel):
     translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
+    # Manual translator assignment status override (for admin to manually mark as accepted)
+    translator_assignment_status: Optional[str] = None  # pending, accepted, declined
     # NEW: Additional editable fields
     client_name: Optional[str] = None
     client_email: Optional[str] = None
@@ -7684,6 +7686,12 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["deadline"] = update_data.deadline
         if update_data.internal_notes is not None:
             update_dict["internal_notes"] = update_data.internal_notes
+
+        # Manual translator assignment status override (admin can manually mark as accepted)
+        if update_data.translator_assignment_status is not None:
+            if update_data.translator_assignment_status in ["pending", "accepted", "declined", "none"]:
+                update_dict["translator_assignment_status"] = update_data.translator_assignment_status
+                update_dict["translator_assignment_responded_at"] = datetime.utcnow()
 
         # NEW: Handle additional editable fields from project modal
         if update_data.client_name is not None:

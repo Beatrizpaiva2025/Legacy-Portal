@@ -13424,7 +13424,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {order.assigned_translator_name || order.assigned_translator}
                         </span>
                         {order.translator_assignment_status === 'pending' && (
-                          <span className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200">Pending</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded inline-block w-fit border border-yellow-200">Pending</span>
+                            {(isAdmin || isPM) && (
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Mark this assignment as accepted by the translator?')) {
+                                    try {
+                                      await axios.patch(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`, {
+                                        translator_assignment_status: 'accepted'
+                                      });
+                                      fetchOrders();
+                                      alert('Status updated to Accepted');
+                                    } catch (err) {
+                                      alert('Failed to update status: ' + (err.response?.data?.detail || err.message));
+                                    }
+                                  }
+                                }}
+                                className="text-[10px] px-1 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 border border-green-200"
+                                title="Manually mark as accepted"
+                              >
+                                ✓ Accept
+                              </button>
+                            )}
+                          </div>
                         )}
                         {order.translator_assignment_status === 'accepted' && (
                           <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit">✓ Accepted</span>
