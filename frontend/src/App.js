@@ -114,10 +114,8 @@ const TRANSLATIONS = {
     termsIntro: 'By registering as a Partner, you agree to the following terms:',
     term1: 'No fees or commitments to cancel at any time',
     term2: 'Pay Per Order: Payment required before delivery',
-    term3: 'Invoice Plans: Payment due within 15 days of invoice',
+    term3: 'Invoice Plans: Payment due within 30 days of invoice',
     term4: 'Late payments may result in service suspension',
-    term5: 'All translations are for your company\'s use only',
-    term6: 'Prices may be updated with 30 days notice',
     iAgreeToTerms: 'I agree to the Partner Agreement terms',
     mustAgreeToTerms: 'You must agree to the terms to register',
     // Partner Benefits
@@ -232,10 +230,8 @@ const TRANSLATIONS = {
     termsIntro: 'Al registrarse como Partner, acepta los siguientes términos:',
     term1: 'Sin tarifas ni compromisos para cancelar en cualquier momento',
     term2: 'Pago Por Pedido: Pago requerido antes de la entrega',
-    term3: 'Planes de Factura: Pago debido dentro de 15 días',
+    term3: 'Planes de Factura: Pago debido dentro de 30 días',
     term4: 'Pagos atrasados pueden resultar en suspensión del servicio',
-    term5: 'Todas las traducciones son para uso de su empresa únicamente',
-    term6: 'Los precios pueden actualizarse con 30 días de aviso',
     iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
     mustAgreeToTerms: 'Debe aceptar los términos para registrarse',
     // Partner Benefits
@@ -350,10 +346,8 @@ const TRANSLATIONS = {
     termsIntro: 'Ao se cadastrar como Partner, você concorda com os seguintes termos:',
     term1: 'Sem taxas ou compromissos para cancelar a qualquer momento',
     term2: 'Pagar Por Pedido: Pagamento necessário antes da entrega',
-    term3: 'Planos de Fatura: Pagamento em até 15 dias',
+    term3: 'Planos de Fatura: Pagamento em até 30 dias',
     term4: 'Pagamentos atrasados podem resultar em suspensão do serviço',
-    term5: 'Todas as traduções são para uso exclusivo da sua empresa',
-    term6: 'Preços podem ser atualizados com 30 dias de aviso',
     iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
     mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar',
     // Partner Benefits
@@ -912,14 +906,6 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                         <li className="flex items-start">
                           <span className="text-amber-500 mr-2">!</span>
                           <span>{t.term4}</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{t.term5}</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{t.term6}</span>
                         </li>
                       </ul>
                     </div>
