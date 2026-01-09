@@ -1746,6 +1746,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
 
+  // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
+  const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
+
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
 
@@ -3895,10 +3898,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
-        // Increase or decrease by 2pt
+        // Increase or decrease by 2pt (min 4pt to allow very small sizes)
         const newSize = command === 'increaseFontSize'
           ? Math.min(currentSizePt + 2, 48)
-          : Math.max(currentSizePt - 2, 8);
+          : Math.max(currentSizePt - 2, 4);
         span.style.fontSize = `${newSize}pt`;
 
         try {
@@ -8393,11 +8396,30 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
 
-                {/* Translation Preview */}
+                {/* Translation Preview/Edit */}
                 <div className="border rounded-lg overflow-hidden">
                   <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
-                    <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
-                    {proofreadingResult?.erros?.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-green-700">
+                        📄 Translation ({targetLanguage}) {proofreadingViewMode === 'edit' && '- ✏️ Editing'}
+                      </span>
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => setProofreadingViewMode('preview')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => setProofreadingViewMode('edit')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
+                    </div>
+                    {proofreadingViewMode === 'preview' && proofreadingResult?.erros?.length > 0 && (
                       <span className="text-[10px] text-gray-500 flex items-center gap-1">
                         <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
                         <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
@@ -8406,14 +8428,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </span>
                     )}
                   </div>
+
+                  {/* Edit Toolbar - Only visible in edit mode */}
+                  {proofreadingViewMode === 'edit' && (
+                    <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div
-                      className="text-xs leading-relaxed"
-                      onClick={handleHighlightedErrorClick}
-                      dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
-                    />
-                    {proofreadingResult?.erros?.length > 0 && (
-                      <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                    {proofreadingViewMode === 'preview' ? (
+                      <>
+                        <div
+                          className="text-xs leading-relaxed"
+                          onClick={handleHighlightedErrorClick}
+                          dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
+                        />
+                        {proofreadingResult?.erros?.length > 0 && (
+                          <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="text-xs leading-relaxed focus:outline-none min-h-[200px]"
+                        style={{border: '2px solid #10B981', borderRadius: '4px', padding: '8px'}}
+                      />
                     )}
                   </div>
                 </div>
