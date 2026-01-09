@@ -607,11 +607,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
         <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
           {/* Left Side - Branding */}
           <div className="lg:w-2/5 bg-gradient-to-br from-blue-900 to-blue-800 p-8 text-white flex flex-col justify-center">
-            <img
-              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
-              alt="Legacy Translations"
-              className="h-12 mb-6 brightness-0 invert"
-            />
+            <div className="bg-white rounded-xl p-4 mb-6 inline-block self-start">
+              <img
+                src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+                alt="Legacy Translations"
+                className="h-10"
+              />
+            </div>
             <h1 className="text-2xl font-bold mb-2">{t.createAccount}</h1>
             <p className="text-blue-200 text-sm mb-6">{t.corporateOnly}</p>
 
