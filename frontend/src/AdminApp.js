@@ -245,7 +245,8 @@ const AdminLogin = ({ onLogin }) => {
             role: response.data.role,
             name: response.data.name,
             email: response.data.email,
-            id: response.data.id
+            id: response.data.id,
+            translator_type: response.data.translator_type // 'in_house' or 'contractor'
           });
         }
       }
@@ -16831,7 +16832,8 @@ const TranslatorLogin = ({ onLogin }) => {
           role: response.data.role,
           name: response.data.name,
           email: response.data.email,
-          id: response.data.id
+          id: response.data.id,
+          translator_type: response.data.translator_type // 'in_house' or 'contractor'
         });
       }
     } catch (err) {
@@ -24251,7 +24253,7 @@ function AdminApp() {
   }, []);
 
   const handleLogin = (userData) => {
-    // userData can be: { adminKey, role, name, email, id, token }
+    // userData can be: { adminKey, role, name, email, id, token, translator_type }
     const key = userData.adminKey || userData.token;
     setAdminKey(key);
     setUser(userData);
