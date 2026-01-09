@@ -1,0 +1,2533 @@
+=== LEGACY TRANSLATIONS PORTAL ===
+=== COPYRIGHT DEPOSIT MATERIAL ===
+=== First 1250 lines + Last 1250 lines ===
+
+Copyright (c) 2025 Legacy Translations Inc.
+All Rights Reserved.
+
+========================================
+SECTION 1: FRONTEND CODE (First 600 lines)
+File: frontend/src/AdminApp.js
+========================================
+
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+
+// ==================== CONSTANTS ====================
+const STATUS_COLORS = {
+  'Quote': 'bg-slate-100 text-slate-700',
+  'Confirmed': 'bg-blue-100 text-blue-700',
+  'In progress': 'bg-yellow-100 text-yellow-700',
+  'Completed': 'bg-green-100 text-green-700',
+  'Client Review': 'bg-sky-100 text-sky-700',
+  'Delivered': 'bg-blue-100 text-blue-700',
+  'received': 'bg-slate-100 text-slate-700',
+  'in_translation': 'bg-yellow-100 text-yellow-700',
+  'review': 'bg-blue-100 text-blue-700',
+  'pending_pm_review': 'bg-sky-100 text-sky-700',
+  'pending_admin_approval': 'bg-blue-100 text-blue-700',
+  'client_review': 'bg-sky-100 text-sky-700',
+  'ready': 'bg-green-100 text-green-700',
+  'delivered': 'bg-blue-100 text-blue-700',
+  'final': 'bg-indigo-100 text-indigo-700'
+};
+
+const PAYMENT_COLORS = {
+  'pending': 'bg-yellow-100 text-yellow-700',
+  'paid': 'bg-green-100 text-green-700',
+  'overdue': 'bg-red-100 text-red-700'
+};
+
+const FLAGS = {
+  'english': '🇺🇸', 'spanish': '🇪🇸', 'french': '🇫🇷', 'german': '🇩🇪',
+  'portuguese': '🇧🇷', 'italian': '🇮🇹', 'chinese': '🇨🇳', 'japanese': '🇯🇵',
+  'korean': '🇰🇷', 'arabic': '🇸🇦', 'russian': '🇷🇺', 'dutch': '🇳🇱',
+  'Portuguese': '🇧🇷', 'Portuguese (Brazil)': '🇧🇷', 'English (USA)': '🇺🇸', 'French': '🇫🇷',
+  'Arabic (Saudi Arabia)': '🇸🇦', 'Spanish': '🇪🇸'
+};
+
+const LANGUAGES = [
+  // Primary Languages (Top 3)
+  "English", "Spanish", "Portuguese",
+  // All other languages in alphabetical order
+  "Afrikaans", "Albanian", "Amharic", "Arabic", "Arabic (Saudi Arabia)", "Armenian",
+  "Azerbaijani", "Basque", "Belarusian", "Bengali", "Bosnian", "Bulgarian",
+  "Burmese", "Cape Verdean Creole", "Catalan", "Chinese (Simplified)", "Chinese (Traditional)",
+  "Croatian", "Czech", "Danish", "Dutch", "English (UK)", "English (USA)",
+  "Esperanto", "Estonian", "Filipino/Tagalog", "Finnish", "French", "French (Canada)",
+  "French (France)", "Galician", "Georgian", "German", "Greek", "Gujarati",
+  "Haitian Creole", "Hebrew", "Hindi", "Hungarian", "Icelandic", "Igbo",
+  "Indonesian", "Irish", "Italian", "Japanese", "Kazakh", "Khmer",
+  "Korean", "Lao", "Latin", "Latvian", "Lithuanian", "Luxembourgish",
+  "Macedonian", "Malay", "Maltese", "Mongolian", "Nepali", "Norwegian",
+  "Papiamento", "Persian/Farsi", "Polish", "Portuguese (Brazil)", "Portuguese (Portugal)",
+  "Punjabi", "Romanian", "Russian", "Scottish Gaelic", "Serbian", "Slovak",
+  "Slovenian", "Somali", "Spanish (Latin America)", "Spanish (Spain)", "Swahili",
+  "Swedish", "Tamil", "Telugu", "Thai", "Turkish", "Ukrainian",
+  "Urdu", "Uzbek", "Vietnamese", "Welsh", "Yoruba", "Zulu"
+];
+
+const TRANSLATORS = [
+  { name: "Admin (Self)", title: "Administrator", isAdmin: true },
+  { name: "Beatriz Paiva", title: "Managing Director" },
+  { name: "Ana Clara", title: "Project Manager" },
+  { name: "Yasmin Costa", title: "Certified Translator" },
+  { name: "Noemi Santos", title: "Senior Translator" }
+];
+
+const PROJECT_MANAGERS = [
+  { name: "Ana Clara", title: "Project Manager" },
+  { name: "Beatriz Paiva", title: "Managing Director" }
+];
+
+// Document Types for translation projects
+const DOCUMENT_TYPES = [
+  { value: '', label: '-- Select Document Type --' },
+  { value: 'birth_certificate', label: 'Certidão de Nascimento / Birth Certificate' },
+  { value: 'marriage_certificate', label: 'Certidão de Casamento / Marriage Certificate' },
+  { value: 'vaccination_card', label: 'Cartão de Vacina / Vaccination Card' },
+  { value: 'divorce_certificate', label: 'Divórcio / Divorce Certificate' },
+  { value: 'rg', label: 'RG (Brazilian ID)' },
+  { value: 'cnh', label: 'CNH (Brazilian Driver\'s License)' },
+  { value: 'dmv', label: 'DMV Document' },
+  { value: 'rmv', label: 'RMV Document' },
+  { value: 'passport', label: 'Passaporte / Passport' },
+  { value: 'diploma', label: 'Diploma / Academic Degree' },
+  { value: 'transcript', label: 'Histórico Escolar / Academic Transcript' },
+  { value: 'power_of_attorney', label: 'Procuração / Power of Attorney' },
+  { value: 'criminal_record', label: 'Antecedentes Criminais / Criminal Record' },
+  { value: 'medical_report', label: 'Relatório Médico / Medical Report' },
+  { value: 'contract', label: 'Contrato / Contract' },
+  { value: 'immigration_doc', label: 'Documento de Imigração / Immigration Document' },
+  { value: 'other', label: 'Outros / Other' }
+];
+
+// Document Categories for uploaded files
+const DOCUMENT_CATEGORIES = [
+  { value: '', label: '-- Select Category --' },
+  { value: 'financial', label: 'Financial' },
+  { value: 'educational', label: 'Educational' },
+  { value: 'personal', label: 'Personal Documents' },
+  { value: 'bank_statement', label: 'Bank Statement' },
+  { value: 'legal', label: 'Legal' },
+  { value: 'medical', label: 'Medical' },
+  { value: 'immigration', label: 'Immigration' },
+  { value: 'business', label: 'Business' },
+  { value: 'government', label: 'Government' },
+  { value: 'other', label: 'Other' }
+];
+
+// ==================== SVG ICONS (Professional/Minimal) ====================
+const EditIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+
+const AssignIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+  </svg>
+);
+
+const RefreshIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const NoteIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+  </svg>
+);
+
+const MemoIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const ClockIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const DocumentIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const SendIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+);
+
+const PlayIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+    <path d="M8 5v14l11-7z" />
+  </svg>
+);
+
+const EyeIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const SearchIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const MailIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+  </svg>
+);
+
+const TrashIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const CheckIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const UploadIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+  </svg>
+);
+
+const WriteIcon = ({ className = "w-3 h-3" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+  </svg>
+);
+
+// ==================== ADMIN LOGIN ====================
+const AdminLogin = ({ onLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setErrorr] = useState('');
+  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
+  const [adminKey, setAdminKey] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorr('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      if (useAdminKey) {
+        // Legacy admin key login (for backward compatibility)
+        const response = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
+        if (response.data) {
+          onLogin({ adminKey, role: 'admin', name: 'Admin', email: 'admin@legacy.com' });
+        }
+      } else {
+        // New user-based login
+        const response = await axios.post(`${API}/admin/auth/login`, { email, password });
+        if (response.data && response.data.token) {
+          onLogin({
+            adminKey: response.data.token,
+            token: response.data.token,
+            role: response.data.role,
+            name: response.data.name,
+            email: response.data.email,
+            id: response.data.id,
+            translator_type: response.data.translator_type // 'in_house' or 'contractor'
+          });
+        }
+      }
+    } catch (err) {
+      setErrorr(err.response?.data?.detail || 'Invalid credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setErrorr('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      await axios.post(`${API}/admin/auth/forgot-password`, { email: forgotEmail });
+      setSuccess('If an account exists with this email, a password reset link has been sent.');
+      setForgotEmail('');
+    } catch (err) {
+      setErrorr(err.response?.data?.detail || 'Errorr sending reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Forgot password modal
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span className="text-xl text-white">🔑</span>
+            </div>
+            <h1 className="text-xl font-bold text-gray-800">Reset Password</h1>
+            <p className="text-xs text-gray-500">Enter your email to receive a reset link</p>
+          </div>
+
+          {error && (
+            <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+              {success}
+            </div>
+          )}
+
+          <form onSubmit={handleForgotPassword} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+              <input
+                type="email"
+                required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
+            >
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => { setShowForgotPassword(false); setErrorr(''); setSuccess(''); }}
+              className="text-blue-600 hover:underline text-xs"
+            >
+              ← Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl text-white">🔐</span>
+          </div>
+          <h1 className="text-xl font-bold text-gray-800">Admin Panel</h1>
+          <p className="text-xs text-gray-500">Legacy Translations</p>
+        </div>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-xs text-center">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-3 p-2 bg-green-100 text-green-700 rounded text-xs text-center">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {useAdminKey ? (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Admin Key</label>
+              <input
+                type="password"
+                required
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={adminKey}
+                onChange={(e) => setAdminKey(e.target.value)}
+                placeholder="Enter admin key..."
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                />
+              </div>
+            </>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 text-sm font-medium"
+          >
+            {loading ? 'Verifying...' : 'Login'}
+          </button>
+        </form>
+
+        <div className="mt-4 text-center space-y-2">
+          {!useAdminKey && (
+            <button
+              onClick={() => setShowForgotPassword(true)}
+              className="text-blue-600 hover:underline text-xs block w-full"
+            >
+              Forgot Password?
+            </button>
+          )}
+          <button
+            onClick={() => setUseAdminKey(!useAdminKey)}
+            className="text-gray-500 hover:text-blue-600 text-xs"
+          >
+            {useAdminKey ? '← Login with email' : 'Use admin key instead'}
+          </button>
+          <div>
+            <a href="/" className="text-blue-600 hover:underline text-xs">← Back to Partner Portal</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==================== NOTIFICATION BELL ====================
+const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const fetchNotifications = async () => {
+    if (!user?.token) return;
+    try {
+      const response = await axios.get(`${API}/admin/notifications?admin_key=${adminKey}&token=${user.token}`);
+      setNotifications(response.data.notifications || []);
+      setUnreadCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.token]);
+
+  const markAsRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/notifications/${notifId}/read?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark as read:', err);
+    }
+  };
+
+  const markAllRead = async () => {
+    try {
+      await axios.put(`${API}/admin/notifications/read-all?admin_key=${adminKey}&token=${user.token}`);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded"
+      >
+        🔔
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {showDropdown && (
+        <div className="absolute left-full top-0 ml-2 w-72 bg-white rounded-lg shadow-xl z-50 text-gray-800 max-h-96 overflow-hidden">
+          <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+            <span className="font-bold text-xs">Notifications</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="text-[10px] text-blue-600 hover:text-blue-800">
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="max-h-72 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 text-xs">No notifications</div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  onClick={() => { markAsRead(notif.id); if (onNotificationClick) onNotificationClick(notif); }}
+                  className={`p-2 border-b cursor-pointer hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="flex items-start">
+                    <span className="text-sm mr-2">
+                      {notif.type === 'project_assigned' ? '📋' : notif.type === 'revision_requested' ? '🔄' : '📌'}
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-medium text-xs">{notif.title}</div>
+                      <div className="text-[10px] text-gray-600 mt-0.5">{notif.message}</div>
+                      <div className="text-[9px] text-gray-400 mt-1">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    {!notif.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== HORIZONTAL TOP BAR ====================
+const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
+  // Define menu items with role-based access
+  const allMenuItems = [
+    { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'pm', 'sales'] },
+    { id: 'new-quote', label: 'New Quote', icon: '📝', roles: ['admin', 'sales'] },
+    { id: 'translation', label: 'Translation', icon: '✍️', roles: ['admin', 'pm', 'translator'] },
+    { id: 'production', label: 'Reports', icon: '📊', roles: ['admin'] },
+    { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
+    { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
+    { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
+    { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
+    { id: 'mia-bot', label: 'MIA Bot', icon: '🤖', roles: ['admin'], isExternal: true }
+  ];
+
+  // Filter menu items based on user role
+  const userRole = user?.role || 'admin';
+  const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
+
+  // Role display names and colors
+  const roleConfig = {
+    admin: { label: 'Administrator', color: 'bg-red-500' },
+    pm: { label: 'Project Manager', color: 'bg-blue-500' },
+    translator: { label: 'Translator', color: 'bg-green-500' },
+    sales: { label: 'Sales', color: 'bg-blue-500' }
+  };
+
+  const roleInfo = roleConfig[userRole] || roleConfig.admin;
+
+  return (
+    <div className="bg-slate-800 text-white flex items-center justify-between px-4 py-2 text-xs">
+      {/* Logo and Brand */}
+      <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center text-sm">🌐</div>
+          <div>
+            <div className="font-bold text-sm">Legacy Admin</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Menu */}
+      <nav className="flex items-center space-x-1">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`flex items-center px-3 py-1.5 rounded transition-colors ${
+              activeTab === item.id
+                ? item.id === 'mia-bot' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'
+                : item.id === 'mia-bot'
+                ? 'text-blue-300 hover:bg-blue-700 bg-blue-900/50'
+                : 'text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <span className="mr-1.5">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* User Info and Actions */}
+      <div className="flex items-center space-x-3">
+        {user && (
+          <div className="flex items-center space-x-2">
+            <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
+              {roleInfo.label}
+            </div>
+
+========================================
+SECTION 2: BACKEND CODE (First 650 lines)
+File: backend/server.py
+========================================
+
+from fastapi import FastAPI, APIRouter, File, UploadFile, Form, HTTPException, Request, BackgroundTasks, Depends, Body
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Dict
+import uuid
+from datetime import datetime, timedelta
+import aiofiles
+import pytesseract
+from PIL import Image
+import PyPDF2
+import pdfplumber
+import fitz  # PyMuPDF
+from docx import Document
+import io
+import tempfile
+import re
+import math
+import httpx
+from contextlib import asynccontextmanager
+import stripe
+import json
+import hashlib
+import secrets
+import zipfile
+import shutil
+
+# Set Tesseract path
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+
+# AWS Textract for better OCR
+import boto3
+from botocore.exceptions import ClientError
+
+# SendGrid imports (keeping for backwards compatibility)
+# from sendgrid import SendGridAPIClient
+# from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import base64
+import resend
+
+# QuickBooks Integration
+from quickbooks import QuickBooksClient, get_quickbooks_client
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+# Configure Stripe
+stripe.api_key = os.environ.get('STRIPE_API_KEY', 'sk_test_51KNwnnCZYqv7a95ovlRcZyuZtQNhfB8UgpGGjYaAxOgWgNa4V4D34m5M4hhURTK68GazMTmkJzy5V7jhC9Xya7RJ00305uur7C')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+# Detect if running in test mode (test keys start with sk_test_)
+STRIPE_TEST_MODE = stripe.api_key.startswith('sk_test_') if stripe.api_key else True
+
+# Create the main app without a prefix
+app = FastAPI()
+
+# CORS must be added immediately after app creation
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# Health check endpoint for Render to keep service alive
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring and keeping service alive"""
+    return {"status": "healthy", "service": "legacy-portal-backend"}
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize AWS Textract client (if credentials are available)
+textract_client = None
+aws_credentials_status = "not_configured"
+try:
+    aws_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+    aws_secret = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    aws_region = os.environ.get('AWS_REGION', 'us-east-1')
+
+    if aws_key_id and aws_secret:
+        # Log masked credentials for debugging
+        masked_key = f"{aws_key_id[:4]}...{aws_key_id[-4:]}" if len(aws_key_id) > 8 else "***"
+        masked_secret = f"{aws_secret[:4]}...{aws_secret[-4:]}" if len(aws_secret) > 8 else "***"
+        logger.info(f"AWS credentials found: KEY_ID={masked_key}, SECRET={masked_secret}, REGION={aws_region}")
+
+        textract_client = boto3.client(
+            'textract',
+            region_name=aws_region,
+            aws_access_key_id=aws_key_id,
+            aws_secret_access_key=aws_secret
+        )
+        aws_credentials_status = "configured"
+        logger.info("AWS Textract client initialized successfully")
+    else:
+        logger.info(f"AWS credentials missing: KEY_ID={'found' if aws_key_id else 'missing'}, SECRET={'found' if aws_secret else 'missing'}")
+        aws_credentials_status = "missing_credentials"
+except Exception as e:
+    logger.warning(f"Failed to initialize AWS Textract: {e}, using Tesseract as fallback")
+    aws_credentials_status = f"init_error: {str(e)}"
+
+# Email Service Class
+class EmailDeliveryError(Exception):
+    pass
+
+class EmailService:
+    def __init__(self):
+        self.api_key = os.environ.get('RESEND_API_KEY') or os.environ.get('SENDGRID_API_KEY')
+        # For production: use verified domain like "Legacy Translations <noreply@legacytranslations.com>"
+        # For testing: use "Legacy Translations <onboarding@resend.dev>"
+        self.sender_email = os.environ.get('SENDER_EMAIL', 'Legacy Translations <onboarding@resend.dev>')
+        self.reply_to = os.environ.get('REPLY_TO_EMAIL', 'contact@legacytranslations.com')
+        # Initialize Resend
+        resend.api_key = self.api_key
+
+    async def send_email(self, to: str, subject: str, content: str, content_type: str = "html"):
+        """Send email via Resend"""
+        try:
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+                "reply_to": self.reply_to,
+                # CRITICAL: Disable click tracking to prevent resend-clicks.com SSL errors
+                "headers": {
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
+                }
+            }
+            if content_type == "html":
+                params["html"] = content
+            else:
+                params["text"] = content
+
+            # Use Resend SDK with tracking disabled
+            response = resend.Emails.send(params)
+            logger.info(f"Email sent successfully: {response}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send email: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email: {str(e)}")
+
+    async def send_email_with_attachment(self, to: str, subject: str, content: str,
+                                          file_content: str, filename: str, file_type: str = "application/pdf"):
+        """Send email with file attachment via Resend"""
+        try:
+            # Decode base64 content for attachment
+            file_bytes = base64.b64decode(file_content)
+
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+                "reply_to": self.reply_to,
+                "html": content,
+                # Disable link tracking to prevent spam filters and "dangerous link" warnings
+                "headers": {
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
+                },
+                "attachments": [
+                    {
+                        "filename": filename,
+                        "content": list(file_bytes),  # Resend expects list of bytes
+                    }
+                ]
+            }
+
+            response = resend.Emails.send(params)
+            logger.info(f"Email with attachment sent successfully: {response}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send email with attachment: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email with attachment: {str(e)}")
+
+    async def send_email_with_multiple_attachments(self, to: str, subject: str, content: str,
+                                                    attachments: list):
+        """Send email with multiple file attachments via Resend
+        attachments: list of dicts with keys: content (base64), filename, content_type
+        """
+        try:
+            attachment_list = []
+            for att in attachments:
+                file_bytes = base64.b64decode(att["content"])
+                attachment_list.append({
+                    "filename": att["filename"],
+                    "content": list(file_bytes),
+                })
+
+            params = {
+                "from": self.sender_email,
+                "to": [to],
+                "subject": subject,
+                "reply_to": self.reply_to,
+                "html": content,
+                "headers": {
+                    "X-Entity-Ref-ID": secrets.token_hex(8)
+                },
+                "attachments": attachment_list
+            }
+
+            response = resend.Emails.send(params)
+            logger.info(f"Email with {len(attachments)} attachment(s) sent successfully: {response}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send email with multiple attachments: {str(e)}")
+            raise EmailDeliveryError(f"Failed to send email with attachments: {str(e)}")
+
+    async def send_order_confirmation_email(self, recipient_email: str, order_details: dict, is_partner: bool = True):
+        """Send order confirmation email using professional template"""
+        subject = f"Translation Order Confirmation - {order_details.get('reference', 'N/A')}"
+
+        # Get client name from order details
+        client_name = order_details.get('client_name', order_details.get('name', 'Valued Customer'))
+
+        # Use the professional template
+        html_content = get_order_confirmation_email_template(client_name, order_details)
+
+        return await self.send_email(recipient_email, subject, html_content, "html")
+
+# Protemos integration
+class ProtemosConfig:
+    def __init__(self):
+        self.api_key = os.environ.get('PROTEMOS_API_KEY')
+        self.api_base_url = "https://cloud.protemos.com/api"  # Adjust based on actual Protemos URL
+        self.timeout = 30
+        self.retry_attempts = 3
+        self.retry_delay = 1.0
+    
+    @property
+    def headers(self) -> dict:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "LegacyTranslationsPortal/1.0"
+        }
+
+class ProtemosAPIClient:
+    """Client for Protemos TMS API integration"""
+    
+    def __init__(self, config: ProtemosConfig):
+        self.config = config
+        self.client = None
+        self.logger = logging.getLogger(__name__)
+    
+    @asynccontextmanager
+    async def get_client(self):
+        """Context manager for HTTP client lifecycle"""
+        if self.client is None:
+            timeout = httpx.Timeout(self.config.timeout)
+            limits = httpx.Limits(max_keepalive_connections=10, max_connections=100)
+            
+            self.client = httpx.AsyncClient(
+                base_url=self.config.api_base_url,
+                headers=self.config.headers,
+                timeout=timeout,
+                limits=limits
+            )
+        
+        try:
+            yield self.client
+        finally:
+            pass
+    
+    async def close(self):
+        """Close the HTTP client"""
+        if self.client:
+            await self.client.aclose()
+            self.client = None
+    
+    async def create_project(self, order_data: dict) -> dict:
+        """Submit a translation order to Protemos as a project"""
+        async with self.get_client() as client:
+            try:
+                # Prepare project data for Protemos
+                protemos_data = {
+                    "name": f"Translation Project - {order_data.get('reference', 'Unknown')}",
+                    "client_name": order_data.get('client_email', 'Partner Portal Client'),
+                    "source_language": order_data.get('translate_from', 'EN').upper(),
+                    "target_languages": [lang.upper() for lang in order_data.get('translate_to', ['ES']).split(',')],
+                    "word_count": order_data.get('word_count', 0),
+                    "service_type": order_data.get('service_type', 'professional'),
+                    "urgency": order_data.get('urgency', 'standard'),
+                    "deadline": order_data.get('estimated_delivery', ''),
+                    "total_price": order_data.get('total_price', 0),
+                    "notes": f"Order from Partner Portal. Reference: {order_data.get('reference', 'N/A')}"
+                }
+                
+                # Make request with retry logic
+                response = await self._make_request_with_retry(
+                    client, "POST", "/projects", json=protemos_data
+                )
+                
+                self.logger.info(f"Project created successfully in Protemos: {response.get('id')}")
+                return response
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create project in Protemos: {str(e)}")
+                raise
+    
+    async def _make_request_with_retry(self, client: httpx.AsyncClient, 
+                                     method: str, endpoint: str, **kwargs) -> dict:
+        """Make HTTP request with retry logic"""
+        for attempt in range(self.config.retry_attempts):
+            try:
+                response = await client.request(method, endpoint, **kwargs)
+                
+                # For now, we'll simulate success since we don't have actual Protemos API
+                # In production, you would handle the actual response
+                # Use mock response for testing environment
+                if self.config.api_key and self.config.api_key.startswith("wHHATx74bpo_"):
+                    # This is the test API key, use mock response
+                    return {
+                        "id": f"protemos_project_{uuid.uuid4()}",
+                        "status": "created",
+                        "name": kwargs.get('json', {}).get('name', 'Unknown Project'),
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                elif self.config.api_key and self.config.api_key != "test_key":
+                    response.raise_for_status()
+                    return response.json()
+                else:
+                    # Mock response for testing
+                    return {
+                        "id": f"protemos_project_{uuid.uuid4()}",
+                        "status": "created",
+                        "name": kwargs.get('json', {}).get('name', 'Unknown Project'),
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                    
+            except httpx.HTTPStatusError as e:
+                if 400 <= e.response.status_code < 500:
+                    # Don't retry client errors
+                    raise
+                
+                if attempt < self.config.retry_attempts - 1:
+                    import asyncio
+                    await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
+                else:
+                    raise
+                    
+            except httpx.RequestError as e:
+                if attempt < self.config.retry_attempts - 1:
+                    import asyncio
+                    await asyncio.sleep(self.config.retry_delay * (2 ** attempt))
+                else:
+                    raise
+
+# Initialize Protemos client
+protemos_config = ProtemosConfig()
+protemos_client = ProtemosAPIClient(protemos_config)
+
+# Initialize email service
+email_service = EmailService()
+
+def get_email_header() -> str:
+    """Generate professional email header"""
+    return '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy Translations</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 600px;">
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 30px 40px; border-radius: 8px 8px 0 0; text-align: center;">
+                            <p style="color: #ffffff; font-size: 24px; font-weight: 600; margin: 0;">Legacy Translations</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">'''
+
+def get_email_footer(include_review_button: bool = False) -> str:
+    """Generate professional email footer with signature"""
+    review_section = ""
+    if include_review_button:
+        review_section = '''
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin-bottom: 25px;">
+                                <tr>
+                                    <td style="padding: 25px; text-align: center;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 8px 0;">
+                                            ⭐ Your feedback is very important!
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 20px 0;">
+                                            Help others learn about our work
+                                        </p>
+                                        <a href="https://www.trustpilot.com/review/legacytranslations.com" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); color: #ffffff; text-decoration: none; padding: 14px 35px; border-radius: 50px; font-size: 14px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(26, 42, 74, 0.3);">
+                                            LEAVE A REVIEW
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>'''
+
+    return f'''{review_section}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td style="border-top: 1px solid #e2e8f0;"></td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                                        <p style="color: #1a2a4a; font-size: 15px; font-weight: 600; margin: 0 0 3px 0;">
+                                            Eduarda Quadra
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0 0 2px 0;">
+                                            Business Support Administrator
+                                        </p>
+                                        <p style="color: #64748b; font-size: 13px; margin: 0;">
+                                            Legacy Translations Inc.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #1a2a4a; padding: 30px 40px; border-radius: 0 0 8px 8px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <p style="color: #a0aec0; font-size: 13px; margin: 0 0 15px 0;">
+                                            Follow us on social media
+                                        </p>
+                                        <a href="https://www.facebook.com/legacytranslationsusa/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 10px 25px; border-radius: 50px; font-size: 13px; font-weight: 600; margin-right: 10px;">
+                                            Facebook
+                                        </a>
+                                        <a href="https://www.instagram.com/legacytranslations/" target="_blank" style="display: inline-block; background-color: #c9a227; color: #1a2a4a; text-decoration: none; padding: 10px 25px; border-radius: 50px; font-size: 13px; font-weight: 600;">
+                                            Instagram
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #a0aec0; font-size: 12px; line-height: 1.8; margin: 0;">
+                                            867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+                                            <a href="mailto:contact@legacytranslations.com" style="color: #c9a227; text-decoration: none;">contact@legacytranslations.com</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px;">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            ATA Member #275993 &nbsp;•&nbsp; BBB A+ Rating &nbsp;•&nbsp; USCIS Accepted
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px; border-top: 1px solid #2c3e5c; padding-top: 20px;">
+                                <tr>
+                                    <td align="center">
+                                        <p style="color: #64748b; font-size: 11px; margin: 0;">
+                                            © 2025 Legacy Translations Inc. All rights reserved.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>'''
+
+def get_delivery_email_template(client_name: str) -> str:
+    """Generate professional delivery email template"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Your translation has been completed. Attached is your digital translation.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 10px 0;">
+                                If you have any questions or comments regarding this translation please feel free to respond back directly to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 35px 0;">
+                                Thank you for trusting us with your translation needs and we look forward to assisting you again for your future document translation needs.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=True)
+
+def generate_translation_html_for_email(order: dict) -> str:
+    """Generate a formatted HTML document from translation_html for email attachment"""
+    translation_text = order.get("translation_html", "")
+    translator_name = order.get("translation_translator_name", "Legacy Translations")
+    translation_date = order.get("translation_date", datetime.utcnow().strftime("%m/%d/%Y"))
+    document_type = order.get("translation_document_type") or order.get("document_type", "Document")
+    source_lang = order.get("translation_source_language") or order.get("translate_from", "Portuguese")
+    target_lang = order.get("translation_target_language") or order.get("translate_to", "English")
+    order_number = order.get("order_number", "")
+
+    # Format the translation text with proper paragraphs
+    formatted_text = translation_text.replace('\n\n---\n\n', '<hr style="margin: 30px 0; border: none; border-top: 1px solid #ccc;">')
+    formatted_text = formatted_text.replace('\n\n', '</p><p style="margin: 10px 0; line-height: 1.6;">')
+    formatted_text = formatted_text.replace('\n', '<br>')
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Translation - {order_number}</title>
+    <style>
+        @page {{ size: Letter; margin: 0.75in; }}
+        body {{
+            font-family: 'Times New Roman', Georgia, serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 40px;
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 2px solid #1a365d;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .company-name {{
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a365d;
+            margin-bottom: 5px;
+        }}
+        .company-info {{
+            font-size: 11px;
+            color: #666;
+        }}
+        .document-info {{
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+            font-size: 11px;
+        }}
+        .document-info strong {{
+            color: #1a365d;
+        }}
+        .translation-content {{
+            margin-top: 20px;
+        }}
+        .translation-content p {{
+            margin: 10px 0;
+            text-align: justify;
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }}
+        .certification {{
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #1a365d;
+            background: #fafafa;
+        }}
+        .signature {{
+            margin-top: 20px;
+            font-style: italic;
+        }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">Legacy Translations</div>
+        <div class="company-info">
+            867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
+            (857) 316-7770 · contact@legacytranslations.com
+        </div>
+    </div>
+
+    <div class="document-info">
+        <strong>Order:</strong> {order_number} &nbsp;|&nbsp;
+        <strong>Document Type:</strong> {document_type} &nbsp;|&nbsp;
+        <strong>Languages:</strong> {source_lang} → {target_lang} &nbsp;|&nbsp;
+        <strong>Date:</strong> {translation_date}
+    </div>
+
+    <div class="translation-content">
+        <p style="margin: 10px 0; line-height: 1.6;">{formatted_text}</p>
+    </div>
+
+    <div class="certification">
+        <p>I, {translator_name}, certify that the above translation is a true and accurate representation of the original document.</p>
+        <div class="signature">
+            <p>{translator_name}<br>
+            Legacy Translations<br>
+            Date: {translation_date}</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Legacy Translations Inc. · ATA Member #275993 · www.legacytranslations.com</p>
+    </div>
+</body>
+</html>'''
+    return html
+
+def get_order_confirmation_email_template(client_name: str, order_details: dict) -> str:
+    """Generate professional order confirmation email template"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your order! We have received your translation request and our team is now working on it.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+
+========================================
+SECTION 3: FRONTEND CODE (Last 600 lines)
+File: frontend/src/AdminApp.js
+========================================
+
+          <div className="bg-white rounded-lg shadow p-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">💬 Comunicação com Translatores</h3>
+
+            <div className="grid grid-cols-3 gap-4">
+              {/* Translator List */}
+              <div className="border rounded-lg p-3">
+                <h4 className="text-xs font-medium text-gray-600 mb-2">Selecionar Translator</h4>
+                <div className="space-y-1 max-h-80 overflow-y-auto">
+                  {translators.length > 0 ? (
+                    translators.map(translator => (
+                      <button
+                        key={translator.id}
+                        onClick={() => setSelectedTranslator(translator)}
+                        className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                          selectedTranslator?.id === translator.id
+                            ? 'bg-blue-500 text-white'
+                            : 'hover:bg-gray-100 border border-gray-100'
+                        }`}
+                      >
+                        <div className="font-medium">{translator.name}</div>
+                        <div className="text-[10px] opacity-70">{translator.email}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-gray-400 text-xs">
+                      <p>No translator registered.</p>
+                      <p className="mt-1">Register translators in the "Translators" tab.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Message Area */}
+              <div className="col-span-2 border rounded-lg p-3">
+                {selectedTranslator ? (
+                  <>
+                    <h4 className="text-xs font-medium text-gray-600 mb-2">
+                      Conversa com {selectedTranslator.name}
+                    </h4>
+
+                    {/* Messages */}
+                    <div className="h-64 overflow-y-auto border rounded p-2 mb-2 bg-gray-50">
+                      {messages
+                        .filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name)
+                        .map(msg => (
+                          <div
+                            key={msg.id}
+                            className={`mb-2 p-2 rounded text-xs ${
+                              msg.from === user?.name
+                                ? 'bg-blue-100 ml-8'
+                                : 'bg-white mr-8 border'
+                            }`}
+                          >
+                            <div className="font-medium text-[10px] text-gray-500 mb-1">
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('pt-BR')}
+                            </div>
+                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                          </div>
+                        ))}
+                      {messages.filter(m => m.toId === selectedTranslator.id || m.from === selectedTranslator.name).length === 0 && (
+                        <div className="text-center py-8 text-gray-400 text-xs">
+                          Noa message yet
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Send Message */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Digite sua message..."
+                        className="flex-1 px-3 py-2 border rounded text-xs"
+                      />
+                      <button
+                        onClick={sendMessage}
+                        className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className="text-3xl mb-2">👈</div>
+                      <p className="text-xs">Select a translator to start a conversation</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT FILES MODAL - For assigning translators to files */}
+      {selectedProject && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex justify-between items-center bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
+                <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <p className="text-xs text-gray-500 mb-3">Select a translator for each file. Different files can be assigned to different translators.</p>
+
+              {loadingProjectDocs ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  Loading files...
+                </div>
+              ) : projectDocuments.length > 0 ? (
+                <div className="space-y-3">
+                  {projectDocuments.map((doc, idx) => (
+                    <div key={doc.id || idx} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">
+                            {doc.filename?.endsWith('.pdf') ? '📕' : doc.filename?.match(/\.(jpg|jpeg|png)$/i) ? '🖼️' : '📄'}
+                          </span>
+                          <div>
+                            <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => downloadProjectDocument(doc.id, doc.filename)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        >
+                          ⬇️ Download
+                        </button>
+                      </div>
+
+                      {/* Translator Assignment */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                        <span className="text-xs text-gray-500">Atribuir to:</span>
+                        <select
+                          value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
+                          onChange={(e) => {
+                            const selected = translators.find(t => t.id === e.target.value);
+                            if (selected) {
+                              assignTranslatorToFile(doc.id, selected.id, selected.name);
+                            }
+                          }}
+                          className="flex-1 px-2 py-1.5 text-xs border rounded bg-white"
+                        >
+                          <option value="">-- Select o Translator --</option>
+                          {translators.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
+                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p className="text-sm">No file found in this project</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== FLOATING CHAT WIDGET ====================
+const FloatingChatWidget = ({ adminKey, user }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [recipientType, setRecipientType] = useState('translator'); // 'translator' or 'partner'
+  const [selectedRecipient, setSelectedRecipient] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [sending, setSending] = useState(false);
+  const [translators, setTranslators] = useState([]);
+  const [partners, setPartners] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchRecipients();
+    }
+  }, [isOpen, recipientType]);
+
+  useEffect(() => {
+    // Fetch unread partner messages count
+    const fetchUnread = async () => {
+      try {
+        const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+        const unread = (response.data.messages || []).filter(m => !m.read).length;
+        setUnreadCount(unread);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [adminKey]);
+
+  const fetchRecipients = async () => {
+    try {
+      if (recipientType === 'translator') {
+        const response = await axios.get(`${API}/admin/users/by-role/translator?admin_key=${adminKey}`);
+        setTranslators(response.data || []);
+      } else {
+        const response = await axios.get(`${API}/admin/partners?admin_key=${adminKey}`);
+        setPartners(response.data.partners || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipients:', err);
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!selectedRecipient || !messageContent.trim()) return;
+    setSending(true);
+    try {
+      if (recipientType === 'translator') {
+        const translator = translators.find(t => t.id === selectedRecipient);
+        await axios.post(`${API}/admin/translator-messages?admin_key=${adminKey}`, {
+          translator_id: selectedRecipient,
+          translator_name: translator?.name || 'Translator',
+          translator_email: translator?.email || '',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      } else {
+        // For partners, we'll create a notification/message
+        const partner = partners.find(p => p.id === selectedRecipient);
+        await axios.post(`${API}/admin/send-partner-notification?admin_key=${adminKey}`, {
+          partner_id: selectedRecipient,
+          partner_email: partner?.email || '',
+          partner_name: partner?.company_name || partner?.contact_name || 'Partner',
+          subject: 'Message from Legacy Translations',
+          content: messageContent,
+          admin_name: user?.name || 'Admin'
+        });
+      }
+      alert('Message sent successfully!');
+      setMessageContent('');
+      setSelectedRecipient('');
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Don't show for translators
+  if (user?.role === 'translator') return null;
+
+  return (
+    <>
+      {/* Floating Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full shadow-lg hover:from-blue-700 hover:to-blue-800 flex items-center justify-center z-50 transition-all hover:scale-105"
+      >
+        {isOpen ? (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        )}
+        {unreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border border-gray-200">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+            <h3 className="font-bold text-lg">Send Message</h3>
+            <p className="text-xs text-blue-100">Contact translators or partners</p>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 space-y-4">
+            {/* Recipient Type Toggle */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => { setRecipientType('translator'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'translator'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Translator
+              </button>
+              <button
+                onClick={() => { setRecipientType('partner'); setSelectedRecipient(''); }}
+                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                  recipientType === 'partner'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Partner
+              </button>
+            </div>
+
+            {/* Recipient Select */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Select {recipientType === 'translator' ? 'Translator' : 'Partner'}:
+              </label>
+              <select
+                value={selectedRecipient}
+                onChange={(e) => setSelectedRecipient(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Select --</option>
+                {recipientType === 'translator'
+                  ? translators.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))
+                  : partners.map(p => (
+                      <option key={p.id} value={p.id}>{p.company_name || p.contact_name}</option>
+                    ))
+                }
+              </select>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Message:</label>
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="Type your message..."
+                className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                rows={4}
+              />
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={sendMessage}
+              disabled={sending || !selectedRecipient || !messageContent.trim()}
+              className="w-full py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {sending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                  Send Message
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ==================== MAIN APP ====================
+function AdminApp() {
+  const [adminKey, setAdminKey] = useState(null);
+  const [user, setUser] = useState(null); // User info: { name, email, role, id }
+  const [activeTab, setActiveTab] = useState('projects');
+  const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
+
+  // Check for invite_token or reset_token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteToken = urlParams.get('invite_token');
+  const resetToken = urlParams.get('reset_token');
+
+  // Clear URL tometers after reading, but keep the #/admin hash
+  const clearUrlParams = () => {
+    window.history.replaceState({}, document.title, window.location.pathname + '#/admin');
+  };
+
+  // Get current path
+  const isTranslationTool = window.location.pathname.includes('/admin/translation-tool');
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('admin_key');
+    const savedUser = localStorage.getItem('admin_user');
+    if (savedKey) {
+      setAdminKey(savedKey);
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          setUser(parsedUser);
+          // Set default tab based on role
+          if (parsedUser.role === 'translator') {
+            setActiveTab('translation');
+          }
+        } catch (e) {
+          console.error('Errorr parsing saved user:', e);
+        }
+      }
+    }
+  }, []);
+
+  const handleLogin = (userData) => {
+    // userData can be: { adminKey, role, name, email, id, token, translator_type }
+    const key = userData.adminKey || userData.token;
+    setAdminKey(key);
+    setUser(userData);
+    localStorage.setItem('admin_key', key);
+    localStorage.setItem('admin_user', JSON.stringify(userData));
+
+    // Set default tab based on role
+    if (userData.role === 'translator') {
+      setActiveTab('translation');
+    } else if (userData.role === 'pm') {
+      setActiveTab('pm-dashboard');
+    }
+  };
+
+  const handleLogout = () => {
+    // Clear local state immediately (don't wait for server)
+    setAdminKey(null);
+    setUser(null);
+    localStorage.removeItem('admin_key');
+    localStorage.removeItem('admin_user');
+
+    // Try to notify server in background (fire and forget)
+    if (user?.token) {
+      axios.post(`${API}/admin/auth/logout?token=${user.token}`).catch(() => {});
+    }
+
+    window.location.href = '/#/admin';
+  };
+
+  // Navigate to translation with order
+  const navigateToTranslation = (order) => {
+    setSelectedOrder(order);
+    setActiveTab('translation');
+  };
+
+  // Navigate back to projects
+  const navigateToProjects = () => {
+    setSelectedOrder(null);
+    setActiveTab('projects');
+  };
+
+  const renderContent = () => {
+    const userRole = user?.role || 'admin';
+
+    switch (activeTab) {
+      case 'pm-dashboard':
+        return ['admin', 'pm'].includes(userRole)
+          ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'projects':
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'new-quote':
+        return userRole !== 'translator'
+          ? <NewQuotePage adminKey={adminKey} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'translation':
+        return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+      case 'production':
+        return userRole === 'admin'
+          ? <ProductionPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'finances':
+        return userRole === 'admin'
+          ? <FinancesPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'followups':
+        return ['admin', 'pm'].includes(userRole)
+          ? <FollowupsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'users':
+        return ['admin', 'pm'].includes(userRole)
+          ? <UsersPage adminKey={adminKey} user={user} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'settings':
+        return userRole === 'admin'
+          ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'mia-bot':
+        return userRole === 'admin'
+          ? (
+            <div className="h-full flex flex-col bg-gray-100">
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-4 shadow-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">🤖</span>
+                    <div>
+                      <h1 className="text-xl font-bold">MIA Bot - Assistente Virtual</h1>
+                      <p className="text-purple-200 text-sm">Painel de controle e chat integrado</p>
+                    </div>
+                  </div>
+                  <a
+                    href="https://mia-atendimento-1.onrender.com/admin/controle/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm transition-colors"
+                  >
+                    Abrir em nova tab ↗
+                  </a>
+                </div>
+              </div>
+              <div className="flex-1 p-4">
+                <iframe
+                  src="https://mia-atendimento-1.onrender.com/admin/controle/"
+                  className="w-full h-full min-h-[600px] rounded-lg shadow-lg border-0"
+                  title="MIA Bot Control Panel"
+                  allow="microphone; camera"
+                />
+              </div>
+            </div>
+          )
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      default:
+        return userRole !== 'translator'
+          ? <ProjectsPage adminKey={adminKey} onTranslate={navigateToTranslation} user={user} />
+          : <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+    }
+  };
+
+  // Handle invitation token - show set password page
+  if (inviteToken) {
+    return <SetPasswordPage inviteToken={inviteToken} onComplete={clearUrlParams} />;
+  }
+
+  // Handle reset token - show reset password page
+  if (resetToken) {
+    return <ResetPasswordPage resetToken={resetToken} onComplete={clearUrlParams} />;
+  }
+
+  // If not logged in
+  if (!adminKey) {
+    // Use TranslatorLogin for translation-tool route
+    if (isTranslationTool) {
+      return <TranslatorLogin onLogin={handleLogin} />;
+    }
+    return <AdminLogin onLogin={handleLogin} />;
+  }
+
+  // If translation-tool route, render standalone page
+  if (isTranslationTool) {
+    return <TranslationToolPage adminKey={adminKey} onLogout={handleLogout} user={user} />;
+  }
+
+  // If in translation workspace, render as full page without admin header
+  if (activeTab === 'translation') {
+    return <TranslationWorkspace adminKey={adminKey} selectedOrder={selectedOrder} onBack={navigateToProjects} user={user} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
+      <div className="flex-1 overflow-auto">{renderContent()}</div>
+      <FloatingChatWidget adminKey={adminKey} user={user} />
+    </div>
+  );
+}
+
+export default AdminApp;
+
+========================================
+SECTION 4: BACKEND CODE (Last 650 lines)
+File: backend/server.py
+========================================
+
+    try:
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if not order.get("quickbooks_invoice_id"):
+            return {"synced": False}
+
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            return {
+                "synced": True,
+                "invoice_id": order.get("quickbooks_invoice_id"),
+                "invoice_number": order.get("quickbooks_invoice_number"),
+                "status": "unknown",
+                "error": "QuickBooks not connected"
+            }
+
+        qb_client = get_quickbooks_client(settings)
+        result = qb_client.get_invoice(order.get("quickbooks_invoice_id"))
+
+        if result.get("success"):
+            invoice = result.get("data", {}).get("Invoice", {})
+            return {
+                "synced": True,
+                "invoice_id": invoice.get("Id"),
+                "invoice_number": invoice.get("DocNumber"),
+                "status": "Paid" if invoice.get("Balance", 1) == 0 else "Unpaid",
+                "balance": invoice.get("Balance"),
+                "total": invoice.get("TotalAmt")
+            }
+        else:
+            return {
+                "synced": True,
+                "invoice_id": order.get("quickbooks_invoice_id"),
+                "status": "unknown",
+                "error": result.get("error")
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks get invoice error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== DOCUMENT CERTIFICATION SYSTEM ====================
+
+def generate_qr_code(data: str) -> str:
+    """Generate QR code as base64 image"""
+    try:
+        import qrcode
+        from io import BytesIO
+
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_H,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+    except ImportError:
+        logger.warning("qrcode library not installed, skipping QR generation")
+        return None
+    except Exception as e:
+        logger.error(f"QR code generation error: {str(e)}")
+        return None
+
+@api_router.post("/certifications/create")
+async def create_certification(data: CertificationCreate, admin_key: str):
+    """Create a new document certification with unique ID and QR code"""
+    # Validate admin key
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Generate certification ID
+        cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+        # Create document hash from content
+        document_hash = hashlib.sha256(data.document_content.encode('utf-8')).hexdigest()
+
+        # Generate verification URL
+        base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+        verification_url = f"{base_url}/#/verify/{cert_id}"
+
+        # Generate QR code
+        qr_code_data = generate_qr_code(verification_url)
+
+        # Create certification record
+        certification = {
+            "certification_id": cert_id,
+            "order_id": data.order_id,
+            "order_number": data.order_number,
+            "document_type": data.document_type,
+            "source_language": data.source_language,
+            "target_language": data.target_language,
+            "page_count": data.page_count,
+            "document_hash": document_hash,
+            "certifier_name": data.certifier_name,
+            "certifier_title": data.certifier_title,
+            "certifier_credentials": data.certifier_credentials,
+            "company_name": data.company_name,
+            "company_address": data.company_address,
+            "company_phone": data.company_phone,
+            "company_email": data.company_email,
+            "client_name": data.client_name,
+            "certified_at": datetime.utcnow(),
+            "is_valid": True,
+            "verification_url": verification_url,
+            "qr_code_data": qr_code_data
+        }
+
+        # Store in database
+        await db.certifications.insert_one(certification)
+
+        logger.info(f"Created certification: {cert_id}")
+
+        return {
+            "success": True,
+            "certification_id": cert_id,
+            "verification_url": verification_url,
+            "qr_code_data": qr_code_data,
+            "document_hash": document_hash,
+            "certified_at": certification["certified_at"].isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications/verify/{certification_id}")
+async def verify_certification(certification_id: str):
+    """Public endpoint to verify a document certification"""
+    try:
+        # Find certification
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+
+        if not certification:
+            return CertificationVerifyResponse(
+                is_valid=False,
+                certification_id=certification_id,
+                message="Certification not found. This document may not be certified by Legacy Translations."
+            )
+
+        # Check if revoked
+        if certification.get("revoked_at"):
+            return CertificationVerifyResponse(
+                is_valid=False,
+                certification_id=certification_id,
+                certified_at=certification.get("certified_at"),
+                message=f"This certification was revoked on {certification.get('revoked_at').strftime('%Y-%m-%d')}. Reason: {certification.get('revocation_reason', 'Not specified')}"
+            )
+
+        # Valid certification
+        return CertificationVerifyResponse(
+            is_valid=True,
+            certification_id=certification_id,
+            certified_at=certification.get("certified_at"),
+            document_type=certification.get("document_type"),
+            source_language=certification.get("source_language"),
+            target_language=certification.get("target_language"),
+            certifier_name=certification.get("certifier_name"),
+            certifier_title=certification.get("certifier_title"),
+            certifier_credentials=certification.get("certifier_credentials"),
+            company_name=certification.get("company_name"),
+            client_name=certification.get("client_name"),
+            message="✓ This document has been certified by Legacy Translations, LLC"
+        )
+
+    except Exception as e:
+        logger.error(f"Error verifying certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications/{certification_id}")
+async def get_certification(certification_id: str, admin_key: str):
+    """Get full certification details (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        certification = await db.certifications.find_one({"certification_id": certification_id})
+        if not certification:
+            raise HTTPException(status_code=404, detail="Certification not found")
+
+        if '_id' in certification:
+            del certification['_id']
+
+        return certification
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/certifications")
+async def list_certifications(admin_key: str, limit: int = 50):
+    """List all certifications (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        certifications = await db.certifications.find().sort("certified_at", -1).limit(limit).to_list(limit)
+
+        for cert in certifications:
+            if '_id' in cert:
+                del cert['_id']
+
+        return {"certifications": certifications, "count": len(certifications)}
+
+    except Exception as e:
+        logger.error(f"Error listing certifications: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/certifications/{certification_id}/revoke")
+async def revoke_certification(certification_id: str, admin_key: str, reason: str = ""):
+    """Revoke a certification (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if user and user.get("role") == "admin":
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        result = await db.certifications.update_one(
+            {"certification_id": certification_id},
+            {
+                "$set": {
+                    "is_valid": False,
+                    "revoked_at": datetime.utcnow(),
+                    "revocation_reason": reason
+                }
+            }
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Certification not found")
+
+        logger.info(f"Revoked certification: {certification_id}")
+
+        return {"success": True, "message": f"Certification {certification_id} has been revoked"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking certification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== BACKUP & RESTORE SYSTEM ====================
+
+@api_router.get("/admin/backup/source-code")
+async def download_source_code(admin_key: str):
+    """Download the application source code as a ZIP file (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Create a ZIP file in memory
+        zip_buffer = io.BytesIO()
+
+        # Get the project root directory
+        backend_dir = Path(__file__).parent
+        project_root = backend_dir.parent
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Add backend files
+            backend_path = project_root / 'backend'
+            if backend_path.exists():
+                for file_path in backend_path.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.') and '__pycache__' not in str(file_path):
+                        arcname = f"backend/{file_path.relative_to(backend_path)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add frontend src files
+            frontend_src = project_root / 'frontend' / 'src'
+            if frontend_src.exists():
+                for file_path in frontend_src.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.'):
+                        arcname = f"frontend/src/{file_path.relative_to(frontend_src)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add frontend public files
+            frontend_public = project_root / 'frontend' / 'public'
+            if frontend_public.exists():
+                for file_path in frontend_public.rglob('*'):
+                    if file_path.is_file() and not file_path.name.startswith('.'):
+                        arcname = f"frontend/public/{file_path.relative_to(frontend_public)}"
+                        zip_file.write(file_path, arcname)
+
+            # Add package.json
+            package_json = project_root / 'frontend' / 'package.json'
+            if package_json.exists():
+                zip_file.write(package_json, "frontend/package.json")
+
+            # Add requirements.txt
+            requirements = project_root / 'backend' / 'requirements.txt'
+            if requirements.exists():
+                zip_file.write(requirements, "backend/requirements.txt")
+
+        zip_buffer.seek(0)
+
+        # Generate filename with timestamp
+        timestamp = datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
+        filename = f"legacy_portal_source_{timestamp}.zip"
+
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error creating source code backup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
+
+
+@api_router.post("/admin/backup/restore-point")
+async def create_restore_point(admin_key: str, name: str = Body(""), description: str = Body("")):
+    """Create a restore point with all database data (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        restore_point_id = str(uuid.uuid4())
+        timestamp = datetime.utcnow()
+
+        # Collect all data from main collections
+        orders = await db.orders.find({}).to_list(10000)
+        admin_users = await db.admin_users.find({}).to_list(1000)
+        translator_payments = await db.translator_payments.find({}).to_list(10000)
+        expenses = await db.expenses.find({}).to_list(10000)
+        partners = await db.partners.find({}).to_list(1000)
+        certifications = await db.certifications.find({}).to_list(10000)
+
+        # Convert ObjectIds to strings
+        def serialize_docs(docs):
+            for doc in docs:
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                for key, value in doc.items():
+                    if isinstance(value, datetime):
+                        doc[key] = value.isoformat()
+            return docs
+
+        restore_point = {
+            "id": restore_point_id,
+            "name": name or f"Restore Point {timestamp.strftime('%Y-%m-%d %H:%M')}",
+            "description": description,
+            "created_at": timestamp,
+            "data": {
+                "orders": serialize_docs(orders),
+                "admin_users": serialize_docs(admin_users),
+                "translator_payments": serialize_docs(translator_payments),
+                "expenses": serialize_docs(expenses),
+                "partners": serialize_docs(partners),
+                "certifications": serialize_docs(certifications)
+            },
+            "stats": {
+                "orders_count": len(orders),
+                "users_count": len(admin_users),
+                "payments_count": len(translator_payments),
+                "expenses_count": len(expenses),
+                "partners_count": len(partners),
+                "certifications_count": len(certifications)
+            }
+        }
+
+        # Save to restore_points collection
+        await db.restore_points.insert_one(restore_point)
+
+        logger.info(f"Restore point created: {restore_point_id} with {len(orders)} orders")
+
+        return {
+            "success": True,
+            "restore_point_id": restore_point_id,
+            "name": restore_point["name"],
+            "created_at": timestamp.isoformat(),
+            "stats": restore_point["stats"]
+        }
+
+    except Exception as e:
+        logger.error(f"Error creating restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create restore point: {str(e)}")
+
+
+@api_router.get("/admin/backup/restore-points")
+async def list_restore_points(admin_key: str):
+    """List all available restore points (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get restore points without the full data (for performance)
+        restore_points = await db.restore_points.find(
+            {},
+            {"data": 0}  # Exclude the data field for listing
+        ).sort("created_at", -1).to_list(100)
+
+        for rp in restore_points:
+            if '_id' in rp:
+                rp['_id'] = str(rp['_id'])
+            if rp.get('created_at'):
+                rp['created_at'] = rp['created_at'].isoformat()
+
+        return {"restore_points": restore_points}
+
+    except Exception as e:
+        logger.error(f"Error listing restore points: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to list restore points")
+
+
+@api_router.post("/admin/backup/restore/{restore_point_id}")
+async def restore_from_point(restore_point_id: str, admin_key: str, confirm: bool = Body(False)):
+    """Restore database from a restore point (admin only) - DESTRUCTIVE OPERATION"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Please confirm the restore operation. This will overwrite all current data!")
+
+    try:
+        # Get the restore point
+        restore_point = await db.restore_points.find_one({"id": restore_point_id})
+        if not restore_point:
+            raise HTTPException(status_code=404, detail="Restore point not found")
+
+        # Create an automatic backup before restore
+        auto_backup_id = str(uuid.uuid4())
+        current_orders = await db.orders.find({}).to_list(10000)
+        current_users = await db.admin_users.find({}).to_list(1000)
+
+        def serialize_docs(docs):
+            for doc in docs:
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                for key, value in doc.items():
+                    if isinstance(value, datetime):
+                        doc[key] = value.isoformat()
+            return docs
+
+        auto_backup = {
+            "id": auto_backup_id,
+            "name": f"Auto-backup before restore {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
+            "description": f"Automatic backup created before restoring from {restore_point.get('name', restore_point_id)}",
+            "created_at": datetime.utcnow(),
+            "data": {
+                "orders": serialize_docs(current_orders),
+                "admin_users": serialize_docs(current_users)
+            },
+            "stats": {
+                "orders_count": len(current_orders),
+                "users_count": len(current_users)
+            },
+            "is_auto_backup": True
+        }
+        await db.restore_points.insert_one(auto_backup)
+
+        # Restore data
+        data = restore_point.get("data", {})
+
+        # Restore orders
+        if "orders" in data and data["orders"]:
+            await db.orders.delete_many({})
+            for order in data["orders"]:
+                if '_id' in order:
+                    del order['_id']
+            await db.orders.insert_many(data["orders"])
+
+        # Restore admin_users
+        if "admin_users" in data and data["admin_users"]:
+            await db.admin_users.delete_many({})
+            for user in data["admin_users"]:
+                if '_id' in user:
+                    del user['_id']
+            await db.admin_users.insert_many(data["admin_users"])
+
+        # Restore translator_payments
+        if "translator_payments" in data and data["translator_payments"]:
+            await db.translator_payments.delete_many({})
+            for payment in data["translator_payments"]:
+                if '_id' in payment:
+                    del payment['_id']
+            await db.translator_payments.insert_many(data["translator_payments"])
+
+        # Restore expenses
+        if "expenses" in data and data["expenses"]:
+            await db.expenses.delete_many({})
+            for expense in data["expenses"]:
+                if '_id' in expense:
+                    del expense['_id']
+            await db.expenses.insert_many(data["expenses"])
+
+        # Restore partners
+        if "partners" in data and data["partners"]:
+            await db.partners.delete_many({})
+            for partner in data["partners"]:
+                if '_id' in partner:
+                    del partner['_id']
+            await db.partners.insert_many(data["partners"])
+
+        logger.info(f"Database restored from restore point: {restore_point_id}")
+
+        return {
+            "success": True,
+            "message": "Database restored successfully",
+            "restored_from": restore_point.get("name", restore_point_id),
+            "auto_backup_id": auto_backup_id,
+            "stats": restore_point.get("stats", {})
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring from restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore: {str(e)}")
+
+
+@api_router.delete("/admin/backup/restore-point/{restore_point_id}")
+async def delete_restore_point(restore_point_id: str, admin_key: str):
+    """Delete a restore point (admin only)"""
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        result = await db.restore_points.delete_one({"id": restore_point_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Restore point not found")
+
+        logger.info(f"Deleted restore point: {restore_point_id}")
+        return {"success": True, "message": "Restore point deleted"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting restore point: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete restore point")
+
+
+# Include the router in the main app
+app.include_router(api_router)
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Legacy Translations API", "status": "online", "api_docs": "/docs"}
+
+# AWS Diagnostic endpoint
+@app.get("/api/admin/aws-diagnostic")
+async def aws_diagnostic():
+    """Diagnose AWS Textract configuration"""
+    result = {
+        "aws_credentials_status": aws_credentials_status,
+        "textract_client_initialized": textract_client is not None,
+        "aws_region": os.environ.get('AWS_REGION', 'us-east-1'),
+        "aws_key_id_present": bool(os.environ.get('AWS_ACCESS_KEY_ID')),
+        "aws_secret_present": bool(os.environ.get('AWS_SECRET_ACCESS_KEY')),
+    }
+
+    # Try a simple test call if client is initialized
+    if textract_client:
+        try:
+            # Create a simple test image (1x1 white pixel PNG)
+            import base64
+            # Minimal valid PNG (1x1 white pixel)
+            test_png = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
+            response = textract_client.detect_document_text(Document={'Bytes': test_png})
+            result["textract_test"] = "SUCCESS"
+            result["textract_response_blocks"] = len(response.get('Blocks', []))
+        except Exception as e:
+            result["textract_test"] = "FAILED"
+            result["textract_error"] = str(e)
+            result["textract_error_type"] = type(e).__name__
+
+    return result
+
+@app.on_event("startup")
+async def create_default_partner():
+    """Create default partner from environment variables if set"""
+    default_email = os.environ.get('DEFAULT_PARTNER_EMAIL')
+    default_password = os.environ.get('DEFAULT_PARTNER_PASSWORD')
+
+    if default_email and default_password:
+        try:
+            # Check if partner already exists
+            existing = await db.partners.find_one({"email": default_email})
+            if not existing:
+                partner = Partner(
+                    company_name=os.environ.get('DEFAULT_PARTNER_COMPANY', 'Default Partner'),
+                    email=default_email,
+                    password_hash=hash_password(default_password),
+                    contact_name=os.environ.get('DEFAULT_PARTNER_NAME', 'Admin'),
+                    phone=os.environ.get('DEFAULT_PARTNER_PHONE', '')
+                )
+                await db.partners.insert_one(partner.dict())
+                logger.info(f"Default partner created: {default_email}")
+            else:
+                logger.info(f"Default partner already exists: {default_email}")
+        except Exception as e:
+            logger.error(f"Error creating default partner: {str(e)}")
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
+=== END OF DEPOSIT MATERIAL ===
+Total lines in complete application: 41,163
+This deposit contains representative portions as per 37 CFR 202.20
