@@ -2162,6 +2162,84 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Download project document directly
+  const downloadProjectDocument = async (docId, filename) => {
+    try {
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+      if (response.data.file_data) {
+        const link = document.createElement('a');
+        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
+        link.download = filename || 'document.pdf';
+        link.click();
+      }
+    } catch (err) {
+      console.error('Failed to download:', err);
+      alert('Error downloading document');
+    }
+  };
+
+  // Load file to workspace (download and convert PDF to images automatically)
+  const loadFileToWorkspace = async (docId, filename) => {
+    try {
+      setProcessingStatus('Downloading file...');
+      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
+
+      if (response.data.file_data) {
+        const contentType = response.data.content_type || 'application/pdf';
+        const base64Data = response.data.file_data;
+        const fileNameLower = (filename || '').toLowerCase();
+
+        // Check if it's a PDF - needs conversion to images
+        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
+          setProcessingStatus('Converting PDF to images...');
+
+          // Convert base64 to blob/file for processing
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
+
+          // Convert PDF to images using existing function
+          const images = await convertPdfToImages(file, (page, total) => {
+            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
+          });
+
+          // Load images into workspace
+          setOriginalImages(images);
+          setProcessingStatus('');
+          alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
+
+        } else if (contentType.startsWith('image/')) {
+          // Image file - load directly
+          setOriginalImages([{
+            filename: filename || 'image',
+            data: base64Data,
+            type: contentType
+          }]);
+          setProcessingStatus('');
+          alert('✅ Image loaded to workspace!');
+
+        } else {
+          // Other file types - just download
+          setProcessingStatus('');
+          const link = document.createElement('a');
+          link.href = `data:${contentType};base64,${base64Data}`;
+          link.download = filename || 'document';
+          link.click();
+          alert('File downloaded. This file type cannot be loaded to workspace directly.');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load file to workspace:', err);
+      setProcessingStatus('');
+      alert('Error loading file to workspace');
+    }
+  };
+
   // Load document from order (legacy - loads first file automatically)
   const loadOrderDocument = async (order) => {
     await selectProject(order);
@@ -21145,92 +21223,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         delete newState[docId];
         return newState;
       });
-    }
-  };
-
-  // Download document
-  const downloadProjectDocument = async (docId, filename) => {
-    try {
-      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
-      if (response.data.file_data) {
-        const link = document.createElement('a');
-        link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
-        link.download = filename || 'document.pdf';
-        link.click();
-      }
-    } catch (err) {
-      console.error('Failed to download:', err);
-      alert('Errorr downloading document');
-    }
-  };
-
-  // Load file to workspace (download and convert PDF to images automatically)
-  const loadFileToWorkspace = async (docId, filename) => {
-    try {
-      setProcessingStatus('Downloading file...');
-      const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
-
-      if (response.data.file_data) {
-        const contentType = response.data.content_type || 'application/pdf';
-        const base64Data = response.data.file_data;
-        const fileNameLower = (filename || '').toLowerCase();
-
-        // Check if it's a PDF - needs conversion to images
-        if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
-          setProcessingStatus('Converting PDF to images...');
-
-          // Convert base64 to blob/file for processing
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/pdf' });
-          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
-
-          // Convert PDF to images using existing function
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
-          });
-
-          // Load images into workspace
-          const loadedDocs = images.map(img => ({
-            filename: img.filename,
-            data: `data:${img.type};base64,${img.data}`,
-            contentType: img.type
-          }));
-
-          setOriginalContents(loadedDocs);
-          setCurrentDocIndex(0);
-          setProcessingStatus('');
-          alert(`✅ PDF converted! ${loadedDocs.length} page(s) loaded to workspace.`);
-
-        } else if (contentType.startsWith('image/')) {
-          // Image file - load directly
-          setOriginalContents([{
-            filename: filename || 'image',
-            data: `data:${contentType};base64,${base64Data}`,
-            contentType: contentType
-          }]);
-          setCurrentDocIndex(0);
-          setProcessingStatus('');
-          alert('✅ Image loaded to workspace!');
-
-        } else {
-          // Other file types - just download
-          setProcessingStatus('');
-          const link = document.createElement('a');
-          link.href = `data:${contentType};base64,${base64Data}`;
-          link.download = filename || 'document';
-          link.click();
-          alert('File downloaded. This file type cannot be loaded to workspace directly.');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load file to workspace:', err);
-      setProcessingStatus('');
-      alert('Error loading file to workspace');
     }
   };
 
