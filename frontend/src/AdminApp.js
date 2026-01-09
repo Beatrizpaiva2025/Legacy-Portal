@@ -23844,11 +23844,31 @@ const SalesControlPage = ({ adminKey }) => {
   return (
     <div className="p-6 bg-gray-50 min-h-full">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <span className="text-3xl">📈</span> Sales Control & Goals
-        </h1>
-        <p className="text-gray-500 mt-1">Manage salespeople, track acquisitions, and monitor goals</p>
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <span className="text-3xl">📈</span> Sales Control & Goals
+          </h1>
+          <p className="text-gray-500 mt-1">Manage salespeople, track acquisitions, and monitor goals</p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href="/docs/PARTNER_PROGRAM_PRESENTATION.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center gap-2 shadow-md"
+          >
+            <span>📊</span> Partner Program Presentation
+          </a>
+          <a
+            href="/docs/COMMISSION_AND_DISCOUNT_STRUCTURE.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            <span>📋</span> Commission Docs
+          </a>
+        </div>
       </div>
 
       {/* Tabs */}

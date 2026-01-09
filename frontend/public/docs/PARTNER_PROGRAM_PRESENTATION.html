@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programa de Parceiros - Legacy Translation Services</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #0f3460 0%, #533483 100%);
+            border-radius: 20px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: #a0a0a0;
+        }
+
+        /* Section */
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .section-title {
+            font-size: 2em;
+            margin-bottom: 30px;
+            color: #ffd700;
+            border-bottom: 2px solid #ffd700;
+            padding-bottom: 10px;
+        }
+
+        /* Overview Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #533483 0%, #0f3460 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .stat-label {
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        /* Service Cards */
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+        }
+
+        .service-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            border-radius: 20px;
+            padding: 35px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card.premium {
+            border-color: #ffd700;
+        }
+
+        .service-card.standard {
+            border-color: #4CAF50;
+        }
+
+        .service-card.whitelabel {
+            border-color: #9c27b0;
+        }
+
+        .service-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+        }
+
+        .service-badge {
+            position: absolute;
+            top: 20px;
+            right: -30px;
+            background: #ffd700;
+            color: #000;
+            padding: 5px 40px;
+            transform: rotate(45deg);
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .service-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .service-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .service-price {
+            font-size: 2.5em;
+            color: #ffd700;
+            margin: 20px 0;
+        }
+
+        .service-price span {
+            font-size: 0.5em;
+            color: #a0a0a0;
+        }
+
+        .service-features {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .service-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .service-features li::before {
+            content: "✓ ";
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        /* Discount Table */
+        .discount-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .discount-table th,
+        .discount-table td {
+            padding: 15px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .discount-table th {
+            background: linear-gradient(135deg, #533483 0%, #0f3460 100%);
+            color: #ffd700;
+        }
+
+        .discount-table tr:nth-child(even) {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .discount-table tr:hover {
+            background: rgba(255,215,0,0.1);
+        }
+
+        .tier-bronze { color: #cd7f32; }
+        .tier-silver { color: #c0c0c0; }
+        .tier-gold { color: #ffd700; }
+        .tier-platinum { color: #e5e4e2; }
+
+        /* Commission Section */
+        .commission-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .commission-card {
+            background: rgba(255,255,255,0.08);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .commission-percentage {
+            font-size: 3em;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        /* White Label Section */
+        .whitelabel-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .wl-feature {
+            background: rgba(156, 39, 176, 0.2);
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 4px solid #9c27b0;
+        }
+
+        .wl-feature h4 {
+            color: #e1bee7;
+            margin-bottom: 10px;
+        }
+
+        /* Pricing Tiers */
+        .pricing-comparison {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .pricing-tier {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .pricing-tier.recommended {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #000;
+            transform: scale(1.05);
+        }
+
+        .pricing-tier h3 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+
+        .pricing-tier .price {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+
+        .pricing-tier.recommended .price {
+            color: #000;
+        }
+
+        .pricing-tier ul {
+            list-style: none;
+            text-align: left;
+            margin: 20px 0;
+        }
+
+        .pricing-tier ul li {
+            padding: 8px 0;
+            font-size: 0.9em;
+        }
+
+        /* Charts Container */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .chart-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .chart-title {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        /* ROI Calculator */
+        .calculator {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+            padding: 40px;
+            border-radius: 20px;
+            margin: 30px 0;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .calc-label {
+            color: #a0a0a0;
+        }
+
+        .calc-value {
+            font-size: 1.3em;
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .calc-total {
+            background: #ffd700;
+            color: #000;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .calc-total .value {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        /* Process Flow */
+        .process-flow {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        .process-step {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .process-step::after {
+            content: "→";
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 2em;
+            color: #ffd700;
+        }
+
+        .process-step:last-child::after {
+            display: none;
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: #ffd700;
+            color: #000;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px;
+            margin-top: 40px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .contact-item {
+            font-size: 1.1em;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .pricing-comparison {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-tier.recommended {
+                transform: none;
+            }
+
+            .process-step::after {
+                display: none;
+            }
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* Highlight box */
+        .highlight-box {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #000;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .highlight-box h3 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+        }
+
+        /* Comparison table */
+        .comparison-table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: #ffd700;
+            color: #000;
+            padding: 15px;
+        }
+
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(255,215,0,0.1);
+        }
+
+        .check { color: #4CAF50; font-size: 1.5em; }
+        .cross { color: #f44336; font-size: 1.5em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🌐 Programa de Parceiros</h1>
+            <p>Legacy Translation Services - Soluções Completas em Tradução Certificada</p>
+            <p style="margin-top: 15px; color: #ffd700;">Margem de lucro de 76-84% | Traduções USCIS Aceitas</p>
+        </div>
+
+        <!-- Overview Stats -->
+        <div class="section">
+            <h2 class="section-title">📊 Visão Geral do Negócio</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">$24.99</div>
+                    <div class="stat-label">Preço por Página (Varejo)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$5.00</div>
+                    <div class="stat-label">Custo Contractor</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$0.70</div>
+                    <div class="stat-label">Custo In-House</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">84%</div>
+                    <div class="stat-label">Margem de Lucro</div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>💡 Vantagem Competitiva</h3>
+                <p>Nossa margem de 76-84% supera a média do mercado de 50-60%, permitindo descontos agressivos para parceiros sem comprometer a rentabilidade.</p>
+            </div>
+        </div>
+
+        <!-- Service Options -->
+        <div class="section">
+            <h2 class="section-title">🎯 Opções de Serviço para Parceiros</h2>
+
+            <div class="services-grid">
+                <!-- Premium Certified -->
+                <div class="service-card premium">
+                    <div class="service-badge">POPULAR</div>
+                    <div class="service-icon">🏆</div>
+                    <h3 class="service-title">Premium Certificado</h3>
+                    <div class="service-price">$24.99 <span>/página</span></div>
+                    <p style="color: #a0a0a0;">Preço de varejo | Descontos por volume</p>
+                    <ul class="service-features">
+                        <li>Tradução profissional certificada</li>
+                        <li>Certificado de precisão incluso</li>
+                        <li>Aceito por USCIS, tribunais e instituições</li>
+                        <li>Entrega em 24-72 horas</li>
+                        <li>Revisão por tradutor nativo</li>
+                        <li>Suporte prioritário ao parceiro</li>
+                        <li>Portal dedicado para gerenciamento</li>
+                    </ul>
+                    <p style="text-align: center; color: #ffd700; font-weight: bold;">Desconto parceiro: até 35% OFF</p>
+                </div>
+
+                <!-- Standard -->
+                <div class="service-card standard">
+                    <div class="service-icon">📄</div>
+                    <h3 class="service-title">Standard (Somente Tradução)</h3>
+                    <div class="service-price">$19.99 <span>/página</span></div>
+                    <p style="color: #a0a0a0;">Parceiro certifica | Maior margem</p>
+                    <ul class="service-features">
+                        <li>Tradução profissional de qualidade</li>
+                        <li>Parceiro emite própria certificação</li>
+                        <li>Ideal para tradutores certificados</li>
+                        <li>Entrega em 24-48 horas</li>
+                        <li>Formato editável disponível</li>
+                        <li>Volume mínimo: 20 páginas/mês</li>
+                        <li>Parceiro assume responsabilidade</li>
+                    </ul>
+                    <p style="text-align: center; color: #4CAF50; font-weight: bold;">Margem do parceiro: $10-30/página</p>
+                </div>
+
+                <!-- White Label -->
+                <div class="service-card whitelabel">
+                    <div class="service-icon">🏢</div>
+                    <h3 class="service-title">White Label</h3>
+                    <div class="service-price">Custom <span>projeto piloto</span></div>
+                    <p style="color: #a0a0a0;">Sua marca | Nosso trabalho</p>
+                    <ul class="service-features">
+                        <li>Serviço completo com SUA logo</li>
+                        <li>Portal personalizado (sua marca)</li>
+                        <li>Certificados com sua identidade</li>
+                        <li>Emails automáticos personalizados</li>
+                        <li>Relatórios com sua marca</li>
+                        <li>API de integração disponível</li>
+                        <li>Suporte técnico dedicado</li>
+                    </ul>
+                    <p style="text-align: center; color: #9c27b0; font-weight: bold;">Compromisso: 100+ páginas/mês</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Discount Structure -->
+        <div class="section">
+            <h2 class="section-title">💰 Estrutura de Descontos para Parceiros</h2>
+
+            <table class="discount-table">
+                <thead>
+                    <tr>
+                        <th>Tier</th>
+                        <th>Volume Mensal</th>
+                        <th>Desconto</th>
+                        <th>Preço/Página</th>
+                        <th>Economia Mensal</th>
+                        <th>Margem Parceiro*</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="tier-bronze">🥉 Bronze</span></td>
+                        <td>10-29 páginas</td>
+                        <td>10%</td>
+                        <td>$22.49</td>
+                        <td>até $72</td>
+                        <td>$7.50/página</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tier-silver">🥈 Silver</span></td>
+                        <td>30-59 páginas</td>
+                        <td>15%</td>
+                        <td>$21.24</td>
+                        <td>até $225</td>
+                        <td>$8.75/página</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tier-gold">🥇 Gold</span></td>
+                        <td>60-99 páginas</td>
+                        <td>25%</td>
+                        <td>$18.74</td>
+                        <td>até $618</td>
+                        <td>$11.25/página</td>
+                    </tr>
+                    <tr>
+                        <td><span class="tier-platinum">💎 Platinum</span></td>
+                        <td>100+ páginas</td>
+                        <td>35%</td>
+                        <td>$16.24</td>
+                        <td>$875+</td>
+                        <td>$13.75/página</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: 10px;">
+                *Margem do parceiro calculada se revender a $30/página (preço comum de mercado)
+            </p>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h4 class="chart-title">Desconto por Volume</h4>
+                    <canvas id="discountChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4 class="chart-title">Economia Anual por Tier</h4>
+                    <canvas id="savingsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- White Label Details -->
+        <div class="section">
+            <h2 class="section-title">🏢 Programa White Label - Detalhes</h2>
+
+            <p style="margin-bottom: 30px; font-size: 1.1em;">
+                Ofereça serviços de tradução certificada com <strong>sua própria marca</strong>. Nós fazemos todo o trabalho,
+                você fica com o crédito e constrói seu negócio.
+            </p>
+
+            <div class="whitelabel-features">
+                <div class="wl-feature">
+                    <h4>🎨 Personalização Completa</h4>
+                    <p>Logo, cores, certificados e emails com sua identidade visual</p>
+                </div>
+                <div class="wl-feature">
+                    <h4>🌐 Portal Dedicado</h4>
+                    <p>Subdomínio próprio ou integração com seu site existente</p>
+                </div>
+                <div class="wl-feature">
+                    <h4>📧 Comunicação Automatizada</h4>
+                    <p>Emails de status enviados com seu nome e contato</p>
+                </div>
+                <div class="wl-feature">
+                    <h4>📊 Relatórios Gerenciais</h4>
+                    <p>Dashboard com métricas e relatórios personalizados</p>
+                </div>
+                <div class="wl-feature">
+                    <h4>🔗 API de Integração</h4>
+                    <p>Conecte seu sistema diretamente ao nosso backend</p>
+                </div>
+                <div class="wl-feature">
+                    <h4>💬 Suporte Invisível</h4>
+                    <p>Suporte técnico que nunca aparece para seu cliente</p>
+                </div>
+            </div>
+
+            <h3 style="margin: 40px 0 20px; color: #9c27b0;">Planos White Label</h3>
+
+            <div class="pricing-comparison">
+                <div class="pricing-tier">
+                    <h3>🚀 Starter</h3>
+                    <div class="price" style="color: #9c27b0;">$500</div>
+                    <p style="color: #a0a0a0;">Setup único</p>
+                    <ul>
+                        <li>✓ Logo no certificado</li>
+                        <li>✓ 100 páginas/mês mínimo</li>
+                        <li>✓ Preço: $14.99/página</li>
+                        <li>✓ Emails personalizados</li>
+                        <li>✗ Portal dedicado</li>
+                        <li>✗ API</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-size: 0.9em; color: #a0a0a0;">
+                        Margem: $15-20/página
+                    </p>
+                </div>
+
+                <div class="pricing-tier recommended">
+                    <h3>⭐ Professional</h3>
+                    <div class="price">$1,500</div>
+                    <p>Setup + $200/mês</p>
+                    <ul>
+                        <li>✓ Tudo do Starter</li>
+                        <li>✓ Portal com sua marca</li>
+                        <li>✓ 200 páginas/mês mínimo</li>
+                        <li>✓ Preço: $12.99/página</li>
+                        <li>✓ Dashboard gerencial</li>
+                        <li>✗ API</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-size: 0.9em;">
+                        <strong>Margem: $17-22/página</strong>
+                    </p>
+                </div>
+
+                <div class="pricing-tier">
+                    <h3>💎 Enterprise</h3>
+                    <div class="price" style="color: #9c27b0;">$3,000</div>
+                    <p style="color: #a0a0a0;">Setup + $400/mês</p>
+                    <ul>
+                        <li>✓ Tudo do Professional</li>
+                        <li>✓ API completa</li>
+                        <li>✓ 500 páginas/mês mínimo</li>
+                        <li>✓ Preço: $10.99/página</li>
+                        <li>✓ Gerente de conta</li>
+                        <li>✓ SLA garantido</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-size: 0.9em; color: #a0a0a0;">
+                        Margem: $19-24/página
+                    </p>
+                </div>
+
+                <div class="pricing-tier">
+                    <h3>🏆 Custom</h3>
+                    <div class="price" style="color: #9c27b0;">Sob Consulta</div>
+                    <p style="color: #a0a0a0;">Projetos especiais</p>
+                    <ul>
+                        <li>✓ Volume 1000+ páginas</li>
+                        <li>✓ Integração total</li>
+                        <li>✓ Preço negociável</li>
+                        <li>✓ Desenvolvimento custom</li>
+                        <li>✓ Múltiplos idiomas</li>
+                        <li>✓ Exclusividade regional</li>
+                    </ul>
+                    <p style="margin-top: 15px; font-size: 0.9em; color: #a0a0a0;">
+                        Margem: negociável
+                    </p>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); color: #fff;">
+                <h3>💡 ROI White Label Professional</h3>
+                <p style="font-size: 1.2em; margin-top: 10px;">
+                    200 páginas/mês × $17 margem = <strong>$3,400/mês</strong><br>
+                    Custo: $200/mês | Lucro líquido: <strong>$3,200/mês</strong> | ROI: <strong>1,500%</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- Standard Translation -->
+        <div class="section">
+            <h2 class="section-title">📄 Tradução Standard - Parceiro Certifica</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                <div>
+                    <h3 style="color: #4CAF50; margin-bottom: 20px;">Como Funciona</h3>
+                    <div class="process-flow" style="flex-direction: column;">
+                        <div class="process-step" style="text-align: left; display: flex; align-items: center; gap: 15px;">
+                            <div class="step-number">1</div>
+                            <div>
+                                <strong>Parceiro Envia</strong><br>
+                                <span style="color: #a0a0a0;">Documento original via portal</span>
+                            </div>
+                        </div>
+                        <div class="process-step" style="text-align: left; display: flex; align-items: center; gap: 15px;">
+                            <div class="step-number">2</div>
+                            <div>
+                                <strong>Nós Traduzimos</strong><br>
+                                <span style="color: #a0a0a0;">Tradução profissional em 24-48h</span>
+                            </div>
+                        </div>
+                        <div class="process-step" style="text-align: left; display: flex; align-items: center; gap: 15px;">
+                            <div class="step-number">3</div>
+                            <div>
+                                <strong>Entrega sem Certificação</strong><br>
+                                <span style="color: #a0a0a0;">Arquivo editável (Word/PDF)</span>
+                            </div>
+                        </div>
+                        <div class="process-step" style="text-align: left; display: flex; align-items: center; gap: 15px;">
+                            <div class="step-number">4</div>
+                            <div>
+                                <strong>Parceiro Certifica</strong><br>
+                                <span style="color: #a0a0a0;">Usa própria credencial ATA/certificação</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 style="color: #4CAF50; margin-bottom: 20px;">Ideal Para</h3>
+                    <ul style="list-style: none;">
+                        <li style="padding: 15px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-bottom: 10px;">
+                            <strong>👨‍⚖️ Tradutores Certificados ATA</strong><br>
+                            <span style="color: #a0a0a0;">Que precisam de suporte em volume alto</span>
+                        </li>
+                        <li style="padding: 15px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-bottom: 10px;">
+                            <strong>🏛️ Escritórios de Advocacia</strong><br>
+                            <span style="color: #a0a0a0;">Com tradutor interno certificado</span>
+                        </li>
+                        <li style="padding: 15px; background: rgba(76, 175, 80, 0.1); border-radius: 10px; margin-bottom: 10px;">
+                            <strong>🌎 Agências de Tradução</strong><br>
+                            <span style="color: #a0a0a0;">Que querem terceirizar o trabalho braçal</span>
+                        </li>
+                    </ul>
+
+                    <div style="background: rgba(76, 175, 80, 0.2); padding: 20px; border-radius: 15px; margin-top: 20px;">
+                        <h4 style="color: #4CAF50;">Preços Standard</h4>
+                        <table style="width: 100%; margin-top: 15px;">
+                            <tr>
+                                <td>20-49 páginas</td>
+                                <td style="text-align: right; color: #4CAF50; font-weight: bold;">$19.99</td>
+                            </tr>
+                            <tr>
+                                <td>50-99 páginas</td>
+                                <td style="text-align: right; color: #4CAF50; font-weight: bold;">$17.99</td>
+                            </tr>
+                            <tr>
+                                <td>100+ páginas</td>
+                                <td style="text-align: right; color: #4CAF50; font-weight: bold;">$14.99</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Salesperson Commission -->
+        <div class="section">
+            <h2 class="section-title">👥 Estrutura de Comissões para Vendedores</h2>
+
+            <div class="commission-grid">
+                <div class="commission-card">
+                    <h3 style="margin-bottom: 15px;">🎯 Opção 1: 100% Comissão</h3>
+                    <div class="commission-percentage">$50-150</div>
+                    <p style="margin: 15px 0; color: #a0a0a0;">por parceiro fechado</p>
+                    <ul style="text-align: left; list-style: none; padding: 0 20px;">
+                        <li>✓ Sem salário base</li>
+                        <li>✓ Bronze: $50</li>
+                        <li>✓ Silver: $75</li>
+                        <li>✓ Gold: $100</li>
+                        <li>✓ Platinum: $150</li>
+                        <li>✓ +$25 bônus recorrência (3 meses)</li>
+                    </ul>
+                </div>
+
+                <div class="commission-card" style="border: 2px solid #ffd700;">
+                    <h3 style="margin-bottom: 15px; color: #ffd700;">⭐ Opção 2: Base + Comissão</h3>
+                    <div class="commission-percentage">$1,500 + $30</div>
+                    <p style="margin: 15px 0; color: #a0a0a0;">base + por parceiro</p>
+                    <ul style="text-align: left; list-style: none; padding: 0 20px;">
+                        <li>✓ $1,500/mês salário base</li>
+                        <li>✓ $30 por parceiro fechado</li>
+                        <li>✓ Meta: 15 parceiros/mês</li>
+                        <li>✓ Bônus $500 se meta batida</li>
+                        <li>✓ Potencial: $2,450/mês</li>
+                        <li>✓ Equipamento e treinamento</li>
+                    </ul>
+                </div>
+
+                <div class="commission-card">
+                    <h3 style="margin-bottom: 15px;">📈 Opção 3: Escalonada</h3>
+                    <div class="commission-percentage">2-5%</div>
+                    <p style="margin: 15px 0; color: #a0a0a0;">da receita gerada</p>
+                    <ul style="text-align: left; list-style: none; padding: 0 20px;">
+                        <li>✓ 2% nos primeiros 6 meses</li>
+                        <li>✓ 3% do mês 7-12</li>
+                        <li>✓ 5% após 12 meses</li>
+                        <li>✓ Renda passiva vitalícia</li>
+                        <li>✓ Exemplo: 50 parceiros ativos</li>
+                        <li>✓ = $500-2,500/mês passivo</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h4 class="chart-title">Comparativo de Ganhos do Vendedor</h4>
+                    <canvas id="commissionChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4 class="chart-title">Renda Passiva (Opção Escalonada)</h4>
+                    <canvas id="passiveIncomeChart"></canvas>
+                </div>
+            </div>
+
+            <h3 style="margin: 40px 0 20px;">📋 Requisitos e Benefícios</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspecto</th>
+                        <th>100% Comissão</th>
+                        <th>Base + Comissão</th>
+                        <th>Escalonada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align: left;">Renda mínima garantida</td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span> $1,500</td>
+                        <td><span class="cross">✗</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Potencial ilimitado</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Renda passiva</td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Horário flexível</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Treinamento incluso</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Material de vendas</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Service Comparison -->
+        <div class="section">
+            <h2 class="section-title">⚖️ Comparativo de Serviços</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Característica</th>
+                        <th>Premium Certificado</th>
+                        <th>Standard</th>
+                        <th>White Label</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align: left;">Preço base</td>
+                        <td>$24.99/página</td>
+                        <td>$19.99/página</td>
+                        <td>$10.99-14.99/página</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Certificação inclusa</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">✗</span></td>
+                        <td><span class="check">✓</span> (sua marca)</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Volume mínimo</td>
+                        <td>1 página</td>
+                        <td>20 páginas/mês</td>
+                        <td>100+ páginas/mês</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Descontos por volume</td>
+                        <td><span class="check">✓</span> até 35%</td>
+                        <td><span class="check">✓</span> até 25%</td>
+                        <td><span class="check">✓</span> incluso no plano</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Portal dedicado</td>
+                        <td>Portal parceiro</td>
+                        <td>Portal parceiro</td>
+                        <td><span class="check">✓</span> Sua marca</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Investimento inicial</td>
+                        <td>$0</td>
+                        <td>$0</td>
+                        <td>$500-3,000</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Margem do parceiro*</td>
+                        <td>$5-14/página</td>
+                        <td>$10-20/página</td>
+                        <td>$15-24/página</td>
+                    </tr>
+                    <tr>
+                        <td style="text-align: left;">Ideal para</td>
+                        <td>Escritórios pequenos</td>
+                        <td>Tradutores certificados</td>
+                        <td>Empresas/Agências</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: 10px;">
+                *Margem calculada se parceiro cobra $30-35/página (preço médio de mercado)
+            </p>
+        </div>
+
+        <!-- Financial Projections -->
+        <div class="section">
+            <h2 class="section-title">📈 Projeções Financeiras</h2>
+
+            <div class="calculator">
+                <h3 style="text-align: center; margin-bottom: 30px;">Projeção de Lucro Anual (Ano 1)</h3>
+
+                <div class="calc-row">
+                    <span class="calc-label">Parceiros ativos (final do ano)</span>
+                    <span class="calc-value">93 parceiros</span>
+                </div>
+                <div class="calc-row">
+                    <span class="calc-label">Páginas traduzidas/mês (média)</span>
+                    <span class="calc-value">680 páginas</span>
+                </div>
+                <div class="calc-row">
+                    <span class="calc-label">Preço médio por página</span>
+                    <span class="calc-value">$24.99</span>
+                </div>
+                <div class="calc-row">
+                    <span class="calc-label">Custo médio por página (in-house)</span>
+                    <span class="calc-value">$0.70 + fixo</span>
+                </div>
+                <div class="calc-row">
+                    <span class="calc-label">Receita anual</span>
+                    <span class="calc-value">$203,919</span>
+                </div>
+                <div class="calc-row">
+                    <span class="calc-label">Custos totais</span>
+                    <span class="calc-value">$35,654</span>
+                </div>
+
+                <div class="calc-total">
+                    <p>Lucro Líquido Ano 1</p>
+                    <div class="value">$168,265</div>
+                    <p style="margin-top: 10px;">Margem: 82.5%</p>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h4 class="chart-title">Crescimento de Parceiros (12 meses)</h4>
+                    <canvas id="partnersChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h4 class="chart-title">Receita vs Lucro Mensal</h4>
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Target Segments -->
+        <div class="section">
+            <h2 class="section-title">🎯 Segmentos Alvo para Vendedores</h2>
+
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                <div class="stat-card" style="text-align: left;">
+                    <div style="font-size: 2em; margin-bottom: 15px;">🏛️</div>
+                    <h3 style="color: #ffd700; margin-bottom: 10px;">Escritórios de Imigração</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Volume: 20-100 docs/mês</p>
+                    <ul style="list-style: none; font-size: 0.9em;">
+                        <li>• Vistos de trabalho e família</li>
+                        <li>• Green cards</li>
+                        <li>• Naturalizações</li>
+                        <li>• Asilo e DACA</li>
+                    </ul>
+                </div>
+
+                <div class="stat-card" style="text-align: left;">
+                    <div style="font-size: 2em; margin-bottom: 15px;">💼</div>
+                    <h3 style="color: #ffd700; margin-bottom: 10px;">Escritórios de Contabilidade</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Volume: 10-50 docs/mês</p>
+                    <ul style="list-style: none; font-size: 0.9em;">
+                        <li>• Declarações de renda estrangeiras</li>
+                        <li>• Documentos bancários</li>
+                        <li>• Contratos internacionais</li>
+                        <li>• ITIN applications</li>
+                    </ul>
+                </div>
+
+                <div class="stat-card" style="text-align: left;">
+                    <div style="font-size: 2em; margin-bottom: 15px;">🏦</div>
+                    <h3 style="color: #ffd700; margin-bottom: 10px;">Bancos e Financeiras</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Volume: 30-200 docs/mês</p>
+                    <ul style="list-style: none; font-size: 0.9em;">
+                        <li>• Abertura de contas</li>
+                        <li>• Empréstimos hipotecários</li>
+                        <li>• Verificação de identidade</li>
+                        <li>• Compliance KYC</li>
+                    </ul>
+                </div>
+
+                <div class="stat-card" style="text-align: left;">
+                    <div style="font-size: 2em; margin-bottom: 15px;">🎓</div>
+                    <h3 style="color: #ffd700; margin-bottom: 10px;">Universidades</h3>
+                    <p style="color: #a0a0a0; margin-bottom: 15px;">Volume: 50-500 docs/mês</p>
+                    <ul style="list-style: none; font-size: 0.9em;">
+                        <li>• Históricos escolares</li>
+                        <li>• Diplomas e certificados</li>
+                        <li>• Cartas de recomendação</li>
+                        <li>• Documentos de admissão</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA Section -->
+        <div class="section" style="text-align: center; background: linear-gradient(135deg, #533483 0%, #0f3460 100%);">
+            <h2 style="font-size: 2.5em; margin-bottom: 20px;">Pronto para Começar?</h2>
+            <p style="font-size: 1.2em; color: #a0a0a0; margin-bottom: 30px;">
+                Junte-se ao nosso programa de parceiros e comece a gerar receita recorrente hoje.
+            </p>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <div style="background: #ffd700; color: #000; padding: 20px 40px; border-radius: 10px; font-weight: bold; font-size: 1.2em;">
+                    📞 Agende uma Demo
+                </div>
+                <div style="background: transparent; border: 2px solid #ffd700; color: #ffd700; padding: 20px 40px; border-radius: 10px; font-weight: bold; font-size: 1.2em;">
+                    📧 Fale Conosco
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <h3 style="color: #ffd700; margin-bottom: 20px;">Legacy Translation Services</h3>
+            <p style="color: #a0a0a0;">Traduções Certificadas para USCIS, Tribunais e Instituições Educacionais</p>
+            <div class="contact-info">
+                <div class="contact-item">📧 contact@legacytranslation.com</div>
+                <div class="contact-item">📞 (XXX) XXX-XXXX</div>
+                <div class="contact-item">🌐 www.legacytranslation.com</div>
+            </div>
+            <p style="margin-top: 30px; color: #666; font-size: 0.9em;">
+                © 2025 Legacy Translation Services. Todos os direitos reservados.
+            </p>
+        </div>
+    </div>
+
+    <!-- Charts JavaScript -->
+    <script>
+        // Color palette
+        const colors = {
+            gold: '#ffd700',
+            purple: '#9c27b0',
+            green: '#4CAF50',
+            blue: '#2196F3',
+            orange: '#ff9800',
+            red: '#f44336'
+        };
+
+        // Discount Chart
+        const discountCtx = document.getElementById('discountChart').getContext('2d');
+        new Chart(discountCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Bronze (10-29)', 'Silver (30-59)', 'Gold (60-99)', 'Platinum (100+)'],
+                datasets: [{
+                    label: 'Desconto %',
+                    data: [10, 15, 25, 35],
+                    backgroundColor: ['#cd7f32', '#c0c0c0', '#ffd700', '#e5e4e2'],
+                    borderColor: ['#cd7f32', '#c0c0c0', '#ffd700', '#e5e4e2'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 40,
+                        ticks: { color: '#a0a0a0', callback: value => value + '%' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Savings Chart
+        const savingsCtx = document.getElementById('savingsChart').getContext('2d');
+        new Chart(savingsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Bronze', 'Silver', 'Gold', 'Platinum'],
+                datasets: [{
+                    data: [600, 2700, 7500, 10500],
+                    backgroundColor: ['#cd7f32', '#c0c0c0', '#ffd700', '#e5e4e2'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#fff' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': $' + context.raw.toLocaleString() + '/ano';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Commission Chart
+        const commissionCtx = document.getElementById('commissionChart').getContext('2d');
+        new Chart(commissionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['5 parceiros', '10 parceiros', '15 parceiros', '20 parceiros'],
+                datasets: [
+                    {
+                        label: '100% Comissão',
+                        data: [375, 750, 1125, 1500],
+                        backgroundColor: colors.blue
+                    },
+                    {
+                        label: 'Base + Comissão',
+                        data: [1650, 1800, 2450, 2100],
+                        backgroundColor: colors.gold
+                    },
+                    {
+                        label: 'Escalonada (6 meses)',
+                        data: [150, 300, 450, 600],
+                        backgroundColor: colors.purple
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0a0', callback: value => '$' + value },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Passive Income Chart
+        const passiveCtx = document.getElementById('passiveIncomeChart').getContext('2d');
+        new Chart(passiveCtx, {
+            type: 'line',
+            data: {
+                labels: ['Mês 1', 'Mês 6', 'Mês 12', 'Mês 18', 'Mês 24'],
+                datasets: [{
+                    label: 'Renda Passiva Mensal',
+                    data: [100, 500, 1200, 2000, 3000],
+                    borderColor: colors.purple,
+                    backgroundColor: 'rgba(156, 39, 176, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0a0', callback: value => '$' + value },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Partners Growth Chart
+        const partnersCtx = document.getElementById('partnersChart').getContext('2d');
+        new Chart(partnersCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                datasets: [{
+                    label: 'Parceiros Acumulados',
+                    data: [5, 12, 21, 31, 42, 52, 61, 70, 78, 84, 89, 93],
+                    borderColor: colors.gold,
+                    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0a0' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+
+        // Revenue vs Profit Chart
+        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+        new Chart(revenueCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                datasets: [
+                    {
+                        label: 'Receita',
+                        data: [1875, 4500, 7875, 11625, 15750, 19500, 22875, 26250, 29250, 31500, 33375, 34875],
+                        backgroundColor: colors.blue
+                    },
+                    {
+                        label: 'Lucro',
+                        data: [1515, 3700, 6535, 9700, 13165, 16325, 19185, 22045, 24585, 26485, 28085, 29405],
+                        backgroundColor: colors.green
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#fff' }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#a0a0a0', callback: value => '$' + (value/1000) + 'k' },
+                        grid: { color: 'rgba(255,255,255,0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
