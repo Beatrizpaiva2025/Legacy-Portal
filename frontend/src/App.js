@@ -607,11 +607,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
         <div className="w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
           {/* Left Side - Branding */}
           <div className="lg:w-2/5 bg-gradient-to-br from-blue-900 to-blue-800 p-8 text-white flex flex-col justify-center">
-            <img
-              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
-              alt="Legacy Translations"
-              className="h-12 mb-6 brightness-0 invert"
-            />
+            <div className="bg-white rounded-xl p-4 mb-6 inline-block self-start">
+              <img
+                src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+                alt="Legacy Translations"
+                className="h-10"
+              />
+            </div>
             <h1 className="text-2xl font-bold mb-2">{t.createAccount}</h1>
             <p className="text-blue-200 text-sm mb-6">{t.corporateOnly}</p>
 
@@ -2105,6 +2107,31 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             </button>
             <h2 className="text-xl font-bold text-gray-800 mb-1">Get Support</h2>
             <p className="text-gray-600 text-sm mb-4">Share details about your issue and our team will respond via email.</p>
+
+            {/* Live Chat Option - MIA BOT */}
+            <a
+              href="https://mia-atendimento-1.onrender.com/webchat/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block mb-4 p-4 bg-gradient-to-r from-teal-50 to-teal-100 rounded-lg border border-teal-200 hover:from-teal-100 hover:to-teal-150 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-teal-600 rounded-full flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <h3 className="font-semibold text-teal-800">Live Chat</h3>
+                    <p className="text-xs text-teal-600">Instant support with MIA</p>
+                  </div>
+                </div>
+                <span className="px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold text-sm">
+                  Start Chat
+                </span>
+              </div>
+            </a>
 
             {/* Message Your Team Option */}
             <button
