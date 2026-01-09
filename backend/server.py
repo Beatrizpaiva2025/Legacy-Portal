@@ -3663,10 +3663,10 @@ async def submit_b2b_interest(request: B2BInterestRequest):
 
         prospect_email_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 40px 30px; text-align: center;">
-                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="height: 50px; margin-bottom: 20px;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Welcome to Legacy Translations!</h1>
+            <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 35px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Welcome to Legacy Translations!</h1>
             </div>
+            <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
 
             <div style="padding: 40px 30px;">
                 <p style="font-size: 18px; color: #333;">Hi {request.contact_name},</p>
