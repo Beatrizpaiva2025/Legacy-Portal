@@ -356,11 +356,14 @@ Message: ${formData.message}
                     <span className="text-blue-200 text-sm">Each document includes QR code & unique serial number for instant authenticity verification by any institution</span>
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <svg className="w-6 h-6 text-yellow-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-start">
+                  <svg className="w-6 h-6 text-yellow-300 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                   </svg>
-                  <span className="text-yellow-200 font-semibold">First certified translation FREE (1 page)</span>
+                  <div>
+                    <span className="text-yellow-200 font-semibold block">First Certified Translation FREE (1 page)</span>
+                    <span className="text-blue-200 text-xs">We trust our quality — enjoy one free certified page of any document type</span>
+                  </div>
                 </div>
               </div>
             </div>
