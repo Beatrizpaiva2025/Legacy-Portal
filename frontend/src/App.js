@@ -96,7 +96,7 @@ const TRANSLATIONS = {
     taxId: 'Tax ID (EIN/CNPJ) - Optional',
     taxIdPlaceholder: 'XX-XXXXXXX',
     // Payment Plan
-    paymentPlan: 'Payment Plan',
+    paymentPlan: 'How would you like to pay?',
     payPerOrder: 'Pay Per Order',
     payPerOrderDesc: 'Pay for each order via Zelle or card',
     biweeklyInvoice: 'Biweekly Invoice',
@@ -212,7 +212,7 @@ const TRANSLATIONS = {
     taxId: 'ID Fiscal (EIN/RFC) - Opcional',
     taxIdPlaceholder: 'XX-XXXXXXX',
     // Payment Plan
-    paymentPlan: 'Plan de Pago',
+    paymentPlan: '¿Cómo prefiere pagar?',
     payPerOrder: 'Pago Por Pedido',
     payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
     biweeklyInvoice: 'Factura Quincenal',
@@ -328,7 +328,7 @@ const TRANSLATIONS = {
     taxId: 'CNPJ/CPF - Opcional',
     taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
     // Payment Plan
-    paymentPlan: 'Plano de Pagamento',
+    paymentPlan: 'Como prefere pagar?',
     payPerOrder: 'Pagar Por Pedido',
     payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
     biweeklyInvoice: 'Fatura Quinzenal',
@@ -830,36 +830,6 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                       {t.invoiceRequiresApproval}
                     </p>
                   )}
-                </div>
-
-                {/* Payment Method */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, default_payment_method: 'zelle'})}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'zelle' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                    >
-                      {t.zelle}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, default_payment_method: 'card'})}
-                      className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                    >
-                      {t.creditCard}
-                    </button>
-                    {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({...formData, default_payment_method: 'invoice'})}
-                        className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'invoice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                      >
-                        {t.invoice}
-                      </button>
-                    )}
-                  </div>
                 </div>
 
                 {/* Password Section */}
