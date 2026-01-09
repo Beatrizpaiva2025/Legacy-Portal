@@ -1551,6 +1551,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [documentType, setDocumentType] = useState('Birth Certificate');
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
+  const [savedTranslatorName, setSavedTranslatorName] = useState(''); // Saved translator name from database - DO NOT change on UI selection
   const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
@@ -2218,7 +2219,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           if (orderData.translation_source_language) setSourceLanguage(orderData.translation_source_language);
           if (orderData.translation_target_language) setTargetLanguage(orderData.translation_target_language);
           if (orderData.translation_document_type) setDocumentType(orderData.translation_document_type);
-          if (orderData.translation_translator_name) setSelectedTranslator(orderData.translation_translator_name);
+          if (orderData.translation_translator_name) {
+            setSelectedTranslator(orderData.translation_translator_name);
+            setSavedTranslatorName(orderData.translation_translator_name); // Save original name from DB - used for certificate signature
+          }
           if (orderData.translation_type_setting) setTranslationType(orderData.translation_type_setting);
           if (orderData.translation_page_format) setPageFormat(orderData.translation_page_format);
           if (orderData.translation_include_cover !== undefined) setIncludeCover(orderData.translation_include_cover);
@@ -4238,7 +4242,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Small delay to let UI update
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4299,8 +4305,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -4784,7 +4790,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       certData = await createCertification();
     }
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4856,8 +4864,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -5537,10 +5545,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               e.stopPropagation();
                               downloadProjectDocument(file.id, file.filename);
                             }}
-                            className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                            title={`Download ${file.filename}`}
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                            title={`Download original file: ${file.filename}`}
                           >
-                            ⬇️
+                            ⬇️ Download
                           </button>
                         </div>
                       </div>
@@ -5659,10 +5667,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </button>
                         <button
                           onClick={() => downloadProjectDocument(file.id, file.filename)}
-                          className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                          title={`Download ${file.filename}`}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                          title={`Download original file: ${file.filename}`}
                         >
-                          ⬇️
+                          ⬇️ Download
                         </button>
                       </div>
                     </div>
@@ -5674,10 +5682,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Quick Start Guide */}
+          {/* Quick Start Guide - Different steps for IN_HOUSE vs regular translators */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> 1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver
+              <strong>Quick Start:</strong> {isInHouseTranslator || isAdmin || isPM
+                ? '1️⃣ START → 2️⃣ TRANSLATE → 3️⃣ REVIEW → 4️⃣ PROOFREADING → 5️⃣ DELIVER'
+                : '1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver'}
             </p>
           </div>
 
@@ -21601,16 +21611,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Download document
   const downloadProjectDocument = async (docId, filename) => {
     try {
+      setProcessingStatus('Downloading file...');
       const response = await axios.get(`${API}/admin/order-documents/${docId}/download?admin_key=${adminKey}`);
       if (response.data.file_data) {
         const link = document.createElement('a');
         link.href = `data:${response.data.content_type || 'application/pdf'};base64,${response.data.file_data}`;
         link.download = filename || 'document.pdf';
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
+        setProcessingStatus(`✅ Downloaded: ${filename}`);
+        setTimeout(() => setProcessingStatus(''), 3000);
+      } else {
+        setProcessingStatus('');
+        alert('Document data not found. The file may not have been uploaded properly.');
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Errorr downloading document');
+      setProcessingStatus('');
+      alert('Error downloading document: ' + (err.response?.data?.detail || err.message));
     }
   };
 
