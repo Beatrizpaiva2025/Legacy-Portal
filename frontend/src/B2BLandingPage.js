@@ -58,10 +58,7 @@ const B2BLandingPage = () => {
     try {
       await axios.post(`${API}/b2b-interest`, formData);
       setSuccess(true);
-      // Redirect to partner portal after 2 seconds
-      setTimeout(() => {
-        window.location.href = `/#/partner?register=true&email=${encodeURIComponent(formData.email)}&company=${encodeURIComponent(formData.company_name)}&name=${encodeURIComponent(formData.contact_name)}&phone=${encodeURIComponent(formData.phone)}`;
-      }, 2000);
+      // No automatic redirect - user will receive email with registration link
     } catch (err) {
       try {
         await axios.post(`${API}/support-request`, {
@@ -77,10 +74,7 @@ Message: ${formData.message}
           `.trim()
         });
         setSuccess(true);
-        // Redirect to partner portal after 2 seconds
-        setTimeout(() => {
-          window.location.href = `/#/partner?register=true&email=${encodeURIComponent(formData.email)}&company=${encodeURIComponent(formData.company_name)}&name=${encodeURIComponent(formData.contact_name)}&phone=${encodeURIComponent(formData.phone)}`;
-        }, 2000);
+        // No automatic redirect - user will receive email with registration link
       } catch (err2) {
         setError('Failed to send request. Please try again or contact us directly.');
       }
@@ -376,17 +370,25 @@ Message: ${formData.message}
                 <div className="text-center py-8">
                   <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h3>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email!</h3>
                   <p className="text-gray-600 mb-4">
-                    Your request has been submitted successfully!
+                    Your partnership request has been submitted successfully!
                   </p>
-                  <p className="text-blue-600 font-medium mb-6">
-                    Redirecting you to create your partner account...
+                  <p className="text-blue-600 font-medium mb-4">
+                    We've sent you an email with a link to complete your registration.
                   </p>
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900 mx-auto"></div>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Our team will also contact you within 24 hours to discuss your needs.
+                  </p>
+                  <a
+                    href="/#/partner"
+                    className="inline-block px-6 py-3 bg-blue-900 text-white rounded-lg font-medium hover:bg-blue-800 transition-colors"
+                  >
+                    Go to Partner Login
+                  </a>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
