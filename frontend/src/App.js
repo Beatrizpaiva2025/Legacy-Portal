@@ -600,6 +600,370 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     }
   };
 
+  // Registration mode - full page centered layout like B2B page
+  if (!isLogin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+        {/* Header */}
+        <header className="bg-white shadow-sm fixed w-full top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="h-10 md:h-12"
+            />
+            <div className="flex items-center gap-4">
+              {/* Language Selector */}
+              <div className="flex items-center gap-2">
+                {UI_LANGUAGES.map((uiLang) => (
+                  <button
+                    key={uiLang.code}
+                    onClick={() => changeLanguage(uiLang.code)}
+                    className={`hover:scale-110 transition-transform ${
+                      lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
+                    }`}
+                    title={uiLang.name}
+                  >
+                    <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-6 h-4 object-cover rounded-sm" />
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setIsLogin(true)}
+                className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors"
+              >
+                Partner Login
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content */}
+        <div className="pt-24 pb-16">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            {/* Title Section */}
+            <div className="text-center mb-10">
+              <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
+                <span className="w-2 h-2 bg-blue-600 rounded-full mr-2"></span>
+                {t.corporateOnly}
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                {t.createAccount}
+              </h1>
+              <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                {t.benefit1} • {t.benefit2} • {t.benefit3}
+              </p>
+            </div>
+
+            {/* Registration Form Card */}
+            <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Info Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 text-blue-600 text-sm font-bold">1</span>
+                    {t.companyInfo || 'Company Information'}
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName} *</label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        value={formData.company_name}
+                        onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                        placeholder="Your Company Inc."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName} *</label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        value={formData.contact_name}
+                        onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                        placeholder="John Smith"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail} *</label>
+                      <input
+                        type="email"
+                        required
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        placeholder="you@company.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
+                      <input
+                        type="tel"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address Section - Collapsible */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddress && setShowAddress(!showAddress)}
+                    className="w-full px-4 py-3 bg-gray-50 text-left flex justify-between items-center hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-gray-700">{t.companyAddress} (Optional)</span>
+                    <span className="text-gray-400 text-sm">Click to expand</span>
+                  </button>
+                  <div className="p-4 bg-white border-t border-gray-200">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <input
+                          type="text"
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          value={formData.address_street}
+                          onChange={(e) => setFormData({...formData, address_street: e.target.value})}
+                          placeholder={t.street}
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.address_city}
+                        onChange={(e) => setFormData({...formData, address_city: e.target.value})}
+                        placeholder={t.city}
+                      />
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.address_state}
+                        onChange={(e) => setFormData({...formData, address_state: e.target.value})}
+                        placeholder={t.state}
+                      />
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.address_zip}
+                        onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
+                        placeholder={t.zipCode}
+                      />
+                      <select
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.address_country}
+                        onChange={(e) => setFormData({...formData, address_country: e.target.value})}
+                      >
+                        <option value="USA">USA</option>
+                        <option value="Brazil">Brazil</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Mexico">Mexico</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.tax_id}
+                        onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
+                        placeholder={t.taxId}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payment Plan Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 text-blue-600 text-sm font-bold">2</span>
+                    {t.paymentPlan}
+                  </h3>
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <label className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="pay_per_order"
+                        checked={formData.payment_plan === 'pay_per_order'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="sr-only"
+                      />
+                      <span className="font-semibold text-gray-800 mb-1">{t.payPerOrder}</span>
+                      <span className="text-xs text-gray-500">{t.payPerOrderDesc}</span>
+                    </label>
+                    <label className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="biweekly"
+                        checked={formData.payment_plan === 'biweekly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="sr-only"
+                      />
+                      <span className="font-semibold text-gray-800 mb-1">{t.biweeklyInvoice}</span>
+                      <span className="text-xs text-gray-500">{t.biweeklyInvoiceDesc}</span>
+                    </label>
+                    <label className={`flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_plan"
+                        value="monthly"
+                        checked={formData.payment_plan === 'monthly'}
+                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
+                        className="sr-only"
+                      />
+                      <span className="font-semibold text-gray-800 mb-1">{t.monthlyInvoice}</span>
+                      <span className="text-xs text-gray-500">{t.monthlyInvoiceDesc}</span>
+                    </label>
+                  </div>
+                  {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                    <p className="mt-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+                      {t.invoiceRequiresApproval}
+                    </p>
+                  )}
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'zelle'})}
+                      className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'zelle' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.zelle}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({...formData, default_payment_method: 'card'})}
+                      className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                    >
+                      {t.creditCard}
+                    </button>
+                    {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({...formData, default_payment_method: 'invoice'})}
+                        className={`flex-1 py-3 px-4 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'invoice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
+                      >
+                        {t.invoice}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Password Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 text-blue-600 text-sm font-bold">3</span>
+                    {t.password}
+                  </h3>
+                  <input
+                    type="password"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    placeholder="Create a secure password"
+                  />
+                </div>
+
+                {/* Terms Agreement */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowAgreement(!showAgreement)}
+                    className="w-full px-4 py-3 bg-gray-50 text-left flex justify-between items-center hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-gray-800">{t.partnerAgreement}</span>
+                    <span className="text-gray-500">{showAgreement ? '▲' : '▼'}</span>
+                  </button>
+                  {showAgreement && (
+                    <div className="p-4 bg-white border-t border-gray-200">
+                      <h4 className="font-semibold text-gray-800 mb-2">{t.agreementTerms}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{t.termsIntro}</p>
+                      <ul className="space-y-2 text-sm text-gray-600">
+                        <li className="flex items-start">
+                          <span className="text-green-500 mr-2">✓</span>
+                          <span>{t.term1}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term2}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-500 mr-2">•</span>
+                          <span>{t.term3}</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-amber-500 mr-2">!</span>
+                          <span>{t.term4}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Agreement Checkbox */}
+                <label className="flex items-start gap-3 cursor-pointer p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <input
+                    type="checkbox"
+                    checked={formData.agreed_to_terms}
+                    onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
+                    className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 font-medium">{t.iAgreeToTerms}</span>
+                </label>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={loading || !formData.agreed_to_terms}
+                  className={`w-full py-4 text-white rounded-lg font-semibold text-lg shadow-lg hover:shadow-xl transition-all ${
+                    !formData.agreed_to_terms
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-900 hover:bg-blue-800'
+                  }`}
+                >
+                  {loading ? t.pleaseWait : t.createAccount}
+                </button>
+
+                {/* Login Link */}
+                <div className="text-center pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsLogin(true)}
+                    className="text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium"
+                  >
+                    {t.haveAccount}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="bg-slate-900 text-white py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-slate-400 text-sm">© 2024 Legacy Translations. All rights reserved.</p>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // Login mode - compact centered layout
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex">
       {/* Left Side - Branding */}
@@ -686,7 +1050,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           {/* Title */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              {isLogin ? t.accessPortal : t.createAccount}
+              {t.accessPortal}
             </h2>
             <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full uppercase tracking-wide">
               {t.corporateOnly}
@@ -700,231 +1064,6 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                    placeholder="Your Company Inc."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
-                  <input
-                    type="tel"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-
-                {/* Company Address (Optional) */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">{t.companyAddress} (Optional)</h3>
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                      value={formData.address_street}
-                      onChange={(e) => setFormData({...formData, address_street: e.target.value})}
-                      placeholder={t.street}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                        value={formData.address_city}
-                        onChange={(e) => setFormData({...formData, address_city: e.target.value})}
-                        placeholder={t.city}
-                      />
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                        value={formData.address_state}
-                        onChange={(e) => setFormData({...formData, address_state: e.target.value})}
-                        placeholder={t.state}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                        value={formData.address_zip}
-                        onChange={(e) => setFormData({...formData, address_zip: e.target.value})}
-                        placeholder={t.zipCode}
-                      />
-                      <select
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                        value={formData.address_country}
-                        onChange={(e) => setFormData({...formData, address_country: e.target.value})}
-                      >
-                        <option value="USA">USA</option>
-                        <option value="Brazil">Brazil</option>
-                        <option value="Canada">Canada</option>
-                        <option value="Mexico">Mexico</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white text-sm"
-                      value={formData.tax_id}
-                      onChange={(e) => setFormData({...formData, tax_id: e.target.value})}
-                      placeholder={t.taxId}
-                    />
-                  </div>
-                </div>
-
-                {/* Payment Plan Selection */}
-                <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
-                  <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.paymentPlan}</h3>
-                  <div className="space-y-2">
-                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
-                      <input
-                        type="radio"
-                        name="payment_plan"
-                        value="pay_per_order"
-                        checked={formData.payment_plan === 'pay_per_order'}
-                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
-                        className="mt-1 mr-3"
-                      />
-                      <div>
-                        <span className="font-medium text-gray-800">{t.payPerOrder}</span>
-                        <p className="text-xs text-gray-500">{t.payPerOrderDesc}</p>
-                      </div>
-                    </label>
-                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
-                      <input
-                        type="radio"
-                        name="payment_plan"
-                        value="biweekly"
-                        checked={formData.payment_plan === 'biweekly'}
-                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
-                        className="mt-1 mr-3"
-                      />
-                      <div>
-                        <span className="font-medium text-gray-800">{t.biweeklyInvoice}</span>
-                        <p className="text-xs text-gray-500">{t.biweeklyInvoiceDesc}</p>
-                      </div>
-                    </label>
-                    <label className={`flex items-start p-3 rounded-lg border-2 cursor-pointer transition-all ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-white' : 'border-gray-200 bg-white hover:border-blue-300'}`}>
-                      <input
-                        type="radio"
-                        name="payment_plan"
-                        value="monthly"
-                        checked={formData.payment_plan === 'monthly'}
-                        onChange={(e) => setFormData({...formData, payment_plan: e.target.value})}
-                        className="mt-1 mr-3"
-                      />
-                      <div>
-                        <span className="font-medium text-gray-800">{t.monthlyInvoice}</span>
-                        <p className="text-xs text-gray-500">{t.monthlyInvoiceDesc}</p>
-                      </div>
-                    </label>
-                  </div>
-                  {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
-                    <p className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                      {t.invoiceRequiresApproval}
-                    </p>
-                  )}
-                </div>
-
-                {/* Payment Method Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t.paymentMethod}</label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, default_payment_method: 'zelle'})}
-                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'zelle' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                    >
-                      {t.zelle}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({...formData, default_payment_method: 'card'})}
-                      className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'card' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                    >
-                      {t.creditCard}
-                    </button>
-                    {(formData.payment_plan === 'biweekly' || formData.payment_plan === 'monthly') && (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({...formData, default_payment_method: 'invoice'})}
-                        className={`flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all ${formData.default_payment_method === 'invoice' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'}`}
-                      >
-                        {t.invoice}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Partner Agreement */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setShowAgreement(!showAgreement)}
-                    className="w-full px-4 py-3 bg-gray-50 text-left flex justify-between items-center hover:bg-gray-100 transition-colors"
-                  >
-                    <span className="font-medium text-gray-800">{t.partnerAgreement}</span>
-                    <span className="text-gray-500">{showAgreement ? '▲' : '▼'}</span>
-                  </button>
-                  {showAgreement && (
-                    <div className="p-4 bg-white border-t border-gray-200">
-                      <h4 className="font-semibold text-gray-800 mb-2">{t.agreementTerms}</h4>
-                      <p className="text-sm text-gray-600 mb-3">{t.termsIntro}</p>
-                      <ul className="space-y-2 text-sm text-gray-600">
-                        <li className="flex items-start">
-                          <span className="text-green-500 mr-2">✓</span>
-                          <span>{t.term1}</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{t.term2}</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{t.term3}</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-amber-500 mr-2">!</span>
-                          <span>{t.term4}</span>
-                        </li>
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Agreement Checkbox */}
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.agreed_to_terms}
-                    onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700">{t.iAgreeToTerms}</span>
-                </label>
-              </>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
               <input
@@ -948,76 +1087,66 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               />
             </div>
 
-            {isLogin && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
-                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                  {t.forgotPassword}
-                </button>
-              </div>
-            )}
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                {t.forgotPassword}
+              </button>
+            </div>
 
             <button
               type="submit"
-              disabled={loading || (!isLogin && !formData.agreed_to_terms)}
-              className={`w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 ${
-                !isLogin && !formData.agreed_to_terms
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
-              } disabled:from-gray-400 disabled:to-gray-500`}
+              disabled={loading}
+              className="w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500"
             >
-              {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
+              {loading ? t.pleaseWait : t.accessPortal}
             </button>
           </form>
 
           {/* Mobile Benefits */}
-          {isLogin && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 lg:hidden">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit1}</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit2}</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit3}</span>
-                </li>
-                <li className="flex items-start bg-yellow-50 rounded p-2 border border-yellow-200">
-                  <span className="text-yellow-600 mr-2">🔐</span>
-                  <span className="text-yellow-700 font-medium">{t.benefit4}</span>
-                </li>
-              </ul>
-            </div>
-          )}
+          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 lg:hidden">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit1}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit2}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit3}</span>
+              </li>
+              <li className="flex items-start bg-yellow-50 rounded p-2 border border-yellow-200">
+                <span className="text-yellow-600 mr-2">🔐</span>
+                <span className="text-yellow-700 font-medium">{t.benefit4}</span>
+              </li>
+            </ul>
+          </div>
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => setIsLogin(false)}
               className="text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium"
             >
-              {isLogin ? t.noAccount : t.haveAccount}
+              {t.noAccount}
             </button>
           </div>
 
           {/* Contact link */}
-          {isLogin && (
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500">
-                {t.notB2B}{' '}
-                <a href="mailto:contact@legacytranslations.com" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
-                  contact@legacytranslations.com
-                </a>
-              </p>
-            </div>
-          )}
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">
+              {t.notB2B}{' '}
+              <a href="mailto:contact@legacytranslations.com" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                contact@legacytranslations.com
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 

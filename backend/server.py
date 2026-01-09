@@ -3656,6 +3656,81 @@ async def submit_b2b_interest(request: B2BInterestRequest):
             content_type="html"
         )
 
+        # Send welcome email to prospect with registration link
+        registration_url = f"https://portal.legacytranslations.com/#/partner?register=true&email={request.email}&company={request.company_name}&name={request.contact_name}&phone={request.phone or ''}"
+
+        prospect_email_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); padding: 40px 30px; text-align: center;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="height: 50px; margin-bottom: 20px;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Welcome to Legacy Translations!</h1>
+            </div>
+
+            <div style="padding: 40px 30px;">
+                <p style="font-size: 18px; color: #333;">Hi {request.contact_name},</p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    Thank you for your interest in becoming a Legacy Translations Partner! We received your inquiry and our team will contact you within 24 hours.
+                </p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    In the meantime, you can complete your partner account registration by clicking the button below:
+                </p>
+
+                <div style="text-align: center; margin: 35px 0;">
+                    <a href="{registration_url}" style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);">
+                        Complete Your Registration
+                    </a>
+                </div>
+
+                <div style="background: #f8fafc; border-radius: 12px; padding: 25px; margin: 30px 0;">
+                    <h3 style="color: #1e3a5f; margin-top: 0; margin-bottom: 15px;">Partner Benefits Include:</h3>
+                    <ul style="color: #555; line-height: 2; padding-left: 20px; margin: 0;">
+                        <li>Net 30 payment terms for approved partners</li>
+                        <li>Volume discounts on translations</li>
+                        <li>Priority order processing</li>
+                        <li>Dedicated account support</li>
+                        <li>Online dashboard to track all orders</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                    <p style="color: #92400e; margin: 0; font-weight: 500;">
+                        <strong>First Translation FREE!</strong> Up to 2 pages - No commitment required
+                    </p>
+                </div>
+
+                <p style="color: #555; line-height: 1.6;">
+                    If you have any questions, feel free to reply to this email or contact us at
+                    <a href="mailto:contact@legacytranslations.com" style="color: #1e3a5f;">contact@legacytranslations.com</a>
+                </p>
+
+                <p style="color: #555; margin-top: 30px;">
+                    Best regards,<br>
+                    <strong style="color: #1e3a5f;">The Legacy Translations Team</strong>
+                </p>
+            </div>
+
+            <div style="background: #f1f5f9; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 12px; margin: 0;">
+                    © 2024 Legacy Translations. All rights reserved.<br>
+                    <a href="https://legacytranslations.com" style="color: #1e3a5f;">legacytranslations.com</a>
+                </p>
+            </div>
+        </div>
+        """
+
+        try:
+            await email_service.send_email(
+                to=request.email,
+                subject="Welcome to Legacy Translations - Complete Your Partner Registration",
+                content=prospect_email_content,
+                content_type="html"
+            )
+            logger.info(f"Welcome email sent to prospect: {request.email}")
+        except Exception as email_err:
+            logger.error(f"Failed to send welcome email to prospect: {str(email_err)}")
+
         # Save to database for tracking
         b2b_inquiry = {
             "id": str(uuid.uuid4()),
