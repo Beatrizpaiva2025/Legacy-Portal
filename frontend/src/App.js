@@ -85,7 +85,45 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Phone',
     login: 'Log In',
-    register: 'Register'
+    register: 'Register',
+    // Registration - Address
+    companyAddress: 'Company Address',
+    street: 'Street Address',
+    city: 'City',
+    state: 'State',
+    zipCode: 'ZIP Code',
+    country: 'Country',
+    taxId: 'Tax ID (EIN/CNPJ) - Optional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: 'How would you like to pay?',
+    payPerOrder: 'Pay Per Order',
+    payPerOrderDesc: 'Pay for each order via Zelle or card',
+    biweeklyInvoice: 'Biweekly Invoice',
+    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks (requires approval)',
+    monthlyInvoice: 'Monthly Invoice',
+    monthlyInvoiceDesc: 'Receive monthly invoice (requires approval)',
+    invoiceRequiresApproval: 'Invoice plans require account approval after registration',
+    paymentMethod: 'Preferred Payment Method',
+    zelle: 'Zelle',
+    creditCard: 'Credit Card',
+    invoice: 'Invoice',
+    // Agreement
+    partnerAgreement: 'Partner Agreement',
+    agreementTerms: 'Terms and Conditions',
+    termsIntro: 'By registering as a Partner, you agree to the following terms:',
+    term1: 'No fees or commitments to cancel at any time',
+    term2: 'Pay Per Order: Payment required before delivery',
+    term3: 'Invoice Plans: Payment due within 30 days of invoice',
+    term4: 'Late payments may result in service suspension',
+    iAgreeToTerms: 'I agree to the Partner Agreement terms',
+    mustAgreeToTerms: 'You must agree to the terms to register',
+    // Partner Benefits
+    partnerBenefits: 'Partner Benefits',
+    net30Terms: 'Net 30 payment terms',
+    volumeDiscounts: 'Volume discounts on translations',
+    dedicatedSupport: 'Dedicated account support',
+    priorityProcessing: 'Priority order processing'
   },
   es: {
     // Login
@@ -163,7 +201,45 @@ const TRANSLATIONS = {
     email: 'Correo Electrónico',
     phone: 'Teléfono',
     login: 'Ingresar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Registration - Address
+    companyAddress: 'Dirección de la Empresa',
+    street: 'Dirección',
+    city: 'Ciudad',
+    state: 'Estado',
+    zipCode: 'Código Postal',
+    country: 'País',
+    taxId: 'ID Fiscal (EIN/RFC) - Opcional',
+    taxIdPlaceholder: 'XX-XXXXXXX',
+    // Payment Plan
+    paymentPlan: '¿Cómo prefiere pagar?',
+    payPerOrder: 'Pago Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
+    biweeklyInvoice: 'Factura Quincenal',
+    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas (requiere aprobación)',
+    monthlyInvoice: 'Factura Mensual',
+    monthlyInvoiceDesc: 'Reciba factura mensual (requiere aprobación)',
+    invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
+    paymentMethod: 'Método de Pago Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Tarjeta de Crédito',
+    invoice: 'Factura',
+    // Agreement
+    partnerAgreement: 'Acuerdo de Partner',
+    agreementTerms: 'Términos y Condiciones',
+    termsIntro: 'Al registrarse como Partner, acepta los siguientes términos:',
+    term1: 'Sin tarifas ni compromisos para cancelar en cualquier momento',
+    term2: 'Pago Por Pedido: Pago requerido antes de la entrega',
+    term3: 'Planes de Factura: Pago debido dentro de 30 días',
+    term4: 'Pagos atrasados pueden resultar en suspensión del servicio',
+    iAgreeToTerms: 'Acepto los términos del Acuerdo de Partner',
+    mustAgreeToTerms: 'Debe aceptar los términos para registrarse',
+    // Partner Benefits
+    partnerBenefits: 'Beneficios de Socio',
+    net30Terms: 'Términos de pago Net 30',
+    volumeDiscounts: 'Descuentos por volumen en traducciones',
+    dedicatedSupport: 'Soporte de cuenta dedicado',
+    priorityProcessing: 'Procesamiento prioritario de pedidos'
   },
   pt: {
     // Login
@@ -241,15 +317,56 @@ const TRANSLATIONS = {
     email: 'Email',
     phone: 'Telefone',
     login: 'Entrar',
-    register: 'Registrar'
+    register: 'Registrar',
+    // Registration - Address
+    companyAddress: 'Endereço da Empresa',
+    street: 'Endereço',
+    city: 'Cidade',
+    state: 'Estado',
+    zipCode: 'CEP',
+    country: 'País',
+    taxId: 'CNPJ/CPF - Opcional',
+    taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
+    // Payment Plan
+    paymentPlan: 'Como prefere pagar?',
+    payPerOrder: 'Pagar Por Pedido',
+    payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
+    biweeklyInvoice: 'Fatura Quinzenal',
+    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas (requer aprovação)',
+    monthlyInvoice: 'Fatura Mensal',
+    monthlyInvoiceDesc: 'Receba fatura mensal (requer aprovação)',
+    invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
+    paymentMethod: 'Método de Pagamento Preferido',
+    zelle: 'Zelle',
+    creditCard: 'Cartão de Crédito',
+    invoice: 'Fatura',
+    // Agreement
+    partnerAgreement: 'Acordo de Partner',
+    agreementTerms: 'Termos e Condições',
+    termsIntro: 'Ao se cadastrar como Partner, você concorda com os seguintes termos:',
+    term1: 'Sem taxas ou compromissos para cancelar a qualquer momento',
+    term2: 'Pagar Por Pedido: Pagamento necessário antes da entrega',
+    term3: 'Planos de Fatura: Pagamento em até 30 dias',
+    term4: 'Pagamentos atrasados podem resultar em suspensão do serviço',
+    iAgreeToTerms: 'Concordo com os termos do Acordo de Partner',
+    mustAgreeToTerms: 'Você deve concordar com os termos para se cadastrar',
+    // Partner Benefits
+    partnerBenefits: 'Benefícios de Parceiro',
+    net30Terms: 'Condições de pagamento Net 30',
+    volumeDiscounts: 'Descontos por volume em traduções',
+    dedicatedSupport: 'Suporte de conta dedicado',
+    priorityProcessing: 'Processamento prioritário de pedidos'
   }
 };
 
 // UI Languages with flags
+// Flag image helper - uses flagcdn.com for cross-platform compatibility
+const getFlagUrl = (countryCode) => `https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`;
+
 const UI_LANGUAGES = [
-  { code: 'en', flag: '🇺🇸' },
-  { code: 'es', flag: '🇪🇸' },
-  { code: 'pt', flag: '🇧🇷' }
+  { code: 'en', countryCode: 'us', name: 'English' },
+  { code: 'es', countryCode: 'es', name: 'Español' },
+  { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
 // Get user's language preference (English is default)
@@ -298,21 +415,82 @@ const PAYMENT_STATUS = {
   'overdue': { color: 'bg-red-100 text-red-800', label: 'Overdue' }
 };
 
-// Languages list
-const LANGUAGES = [
-  { code: 'english', name: 'English (USA)', flag: '🇺🇸' },
-  { code: 'spanish', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'french', name: 'French', flag: '🇫🇷' },
-  { code: 'german', name: 'German', flag: '🇩🇪' },
-  { code: 'portuguese', name: 'Portuguese (Brazil)', flag: '🇧🇷' },
-  { code: 'italian', name: 'Italian', flag: '🇮🇹' },
-  { code: 'chinese', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'japanese', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'korean', name: 'Korean', flag: '🇰🇷' },
-  { code: 'arabic', name: 'Arabic', flag: '🇸🇦' },
-  { code: 'russian', name: 'Russian', flag: '🇷🇺' },
-  { code: 'dutch', name: 'Dutch', flag: '🇳🇱' }
+// Languages list for FROM field (all common languages)
+const FROM_LANGUAGES = [
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' },
+  { code: 'polish', name: 'Polish', countryCode: 'pl' },
+  { code: 'turkish', name: 'Turkish', countryCode: 'tr' },
+  { code: 'vietnamese', name: 'Vietnamese', countryCode: 'vn' },
+  { code: 'thai', name: 'Thai', countryCode: 'th' },
+  { code: 'indonesian', name: 'Indonesian', countryCode: 'id' },
+  { code: 'malay', name: 'Malay', countryCode: 'my' },
+  { code: 'hindi', name: 'Hindi', countryCode: 'in' },
+  { code: 'bengali', name: 'Bengali', countryCode: 'bd' },
+  { code: 'urdu', name: 'Urdu', countryCode: 'pk' },
+  { code: 'punjabi', name: 'Punjabi', countryCode: 'in' },
+  { code: 'tamil', name: 'Tamil', countryCode: 'in' },
+  { code: 'telugu', name: 'Telugu', countryCode: 'in' },
+  { code: 'greek', name: 'Greek', countryCode: 'gr' },
+  { code: 'czech', name: 'Czech', countryCode: 'cz' },
+  { code: 'romanian', name: 'Romanian', countryCode: 'ro' },
+  { code: 'hungarian', name: 'Hungarian', countryCode: 'hu' },
+  { code: 'swedish', name: 'Swedish', countryCode: 'se' },
+  { code: 'norwegian', name: 'Norwegian', countryCode: 'no' },
+  { code: 'danish', name: 'Danish', countryCode: 'dk' },
+  { code: 'finnish', name: 'Finnish', countryCode: 'fi' },
+  { code: 'hebrew', name: 'Hebrew', countryCode: 'il' },
+  { code: 'persian', name: 'Persian (Farsi)', countryCode: 'ir' },
+  { code: 'ukrainian', name: 'Ukrainian', countryCode: 'ua' },
+  { code: 'croatian', name: 'Croatian', countryCode: 'hr' },
+  { code: 'serbian', name: 'Serbian', countryCode: 'rs' },
+  { code: 'bulgarian', name: 'Bulgarian', countryCode: 'bg' },
+  { code: 'slovak', name: 'Slovak', countryCode: 'sk' },
+  { code: 'slovenian', name: 'Slovenian', countryCode: 'si' },
+  { code: 'lithuanian', name: 'Lithuanian', countryCode: 'lt' },
+  { code: 'latvian', name: 'Latvian', countryCode: 'lv' },
+  { code: 'estonian', name: 'Estonian', countryCode: 'ee' },
+  { code: 'swahili', name: 'Swahili', countryCode: 'ke' },
+  { code: 'tagalog', name: 'Tagalog (Filipino)', countryCode: 'ph' },
+  { code: 'afrikaans', name: 'Afrikaans', countryCode: 'za' },
+  { code: 'catalan', name: 'Catalan', countryCode: 'es' },
+  { code: 'haitian_creole', name: 'Haitian Creole', countryCode: 'ht' }
 ];
+
+// Languages list for TO field (target languages)
+const TO_LANGUAGES = [
+  { code: 'english', name: 'English (USA)', countryCode: 'us' },
+  { code: 'english_uk', name: 'English (UK)', countryCode: 'gb' },
+  { code: 'spanish', name: 'Spanish', countryCode: 'es' },
+  { code: 'french', name: 'French', countryCode: 'fr' },
+  { code: 'german', name: 'German', countryCode: 'de' },
+  { code: 'portuguese', name: 'Portuguese (Brazil)', countryCode: 'br' },
+  { code: 'portuguese_pt', name: 'Portuguese (Portugal)', countryCode: 'pt' },
+  { code: 'italian', name: 'Italian', countryCode: 'it' },
+  { code: 'chinese_simplified', name: 'Chinese (Simplified)', countryCode: 'cn' },
+  { code: 'chinese_traditional', name: 'Chinese (Traditional)', countryCode: 'tw' },
+  { code: 'japanese', name: 'Japanese', countryCode: 'jp' },
+  { code: 'korean', name: 'Korean', countryCode: 'kr' },
+  { code: 'arabic', name: 'Arabic', countryCode: 'sa' },
+  { code: 'russian', name: 'Russian', countryCode: 'ru' },
+  { code: 'dutch', name: 'Dutch', countryCode: 'nl' }
+];
+
+// Keep LANGUAGES for backward compatibility
+const LANGUAGES = TO_LANGUAGES;
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
@@ -342,8 +520,21 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     password: '',
     company_name: initialState.company,
     contact_name: initialState.name,
-    phone: initialState.phone
+    phone: initialState.phone,
+    // Address
+    address_street: '',
+    address_city: '',
+    address_state: '',
+    address_zip: '',
+    address_country: 'USA',
+    tax_id: '',
+    // Payment
+    payment_plan: 'pay_per_order',
+    default_payment_method: 'zelle',
+    // Agreement
+    agreed_to_terms: false
   });
+  const [showAgreement, setShowAgreement] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -364,6 +555,13 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    // Validate agreement for registration
+    if (!isLogin && !formData.agreed_to_terms) {
+      setError(t.mustAgreeToTerms);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -379,7 +577,19 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           password: formData.password,
           company_name: formData.company_name,
           contact_name: formData.contact_name,
-          phone: formData.phone
+          phone: formData.phone,
+          // Address
+          address_street: formData.address_street || null,
+          address_city: formData.address_city || null,
+          address_state: formData.address_state || null,
+          address_zip: formData.address_zip || null,
+          address_country: formData.address_country || 'USA',
+          tax_id: formData.tax_id || null,
+          // Payment
+          payment_plan: formData.payment_plan,
+          default_payment_method: formData.default_payment_method,
+          // Agreement
+          agreed_to_terms: formData.agreed_to_terms
         });
         onLogin(response.data);
       }
@@ -390,6 +600,189 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     }
   };
 
+  // Registration mode - compact single-page layout
+  if (!isLogin) {
+    return (
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center p-6">
+        <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+          {/* Left Side - Branding (White background) */}
+          <div className="lg:w-2/5 bg-white p-6 flex flex-col justify-center items-center">
+            <img
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
+              alt="Legacy Translations"
+              className="w-48 object-contain mb-6"
+            />
+            <h1 className="text-xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
+            <p className="text-gray-500 text-xs mb-4">{t.corporateOnly}</p>
+
+            <div className="space-y-2 text-xs text-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="text-green-600">✓</span>
+                <span>{t.benefit1}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-green-600">✓</span>
+                <span>{t.benefit2}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-green-600">✓</span>
+                <span>{t.benefit3}</span>
+              </div>
+            </div>
+
+            {/* Language Selector */}
+            <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-2">
+              {UI_LANGUAGES.map((uiLang) => (
+                <button
+                  key={uiLang.code}
+                  onClick={() => changeLanguage(uiLang.code)}
+                  className={`hover:scale-110 transition-transform ${lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'}`}
+                  title={uiLang.name}
+                >
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-6 h-4 object-cover rounded-sm" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Side - Form (Light gray background) */}
+          <div className="lg:w-3/5 p-5 lg:p-6 bg-gray-100">
+            {error && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              {/* Row 1: Company & Contact */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyName} *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.company_name}
+                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
+                    placeholder="Your Company Inc."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.contactName} *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.contact_name}
+                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
+                    placeholder="John Smith"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Email & Phone */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.companyEmail} *</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="you@company.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{t.phoneOptional}</label>
+                  <input
+                    type="tel"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+              </div>
+
+              {/* Payment Plan */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                    <input type="radio" name="payment_plan" value="pay_per_order" checked={formData.payment_plan === 'pay_per_order'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
+                    <span className="font-medium text-xs text-gray-800">{t.payPerOrder}</span>
+                    <span className="text-[10px] text-gray-500">{t.payPerOrderDesc}</span>
+                  </label>
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                    <input type="radio" name="payment_plan" value="biweekly" checked={formData.payment_plan === 'biweekly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
+                    <span className="font-medium text-xs text-gray-800">{t.biweeklyInvoice}</span>
+                    <span className="text-[10px] text-gray-500">{t.biweeklyInvoiceDesc}</span>
+                  </label>
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
+                    <input type="radio" name="payment_plan" value="monthly" checked={formData.payment_plan === 'monthly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
+                    <span className="font-medium text-xs text-gray-800">{t.monthlyInvoice}</span>
+                    <span className="text-[10px] text-gray-500">{t.monthlyInvoiceDesc}</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.password} *</label>
+                <input
+                  type="password"
+                  required
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  placeholder="Create a secure password"
+                />
+              </div>
+
+              {/* Terms - Compact */}
+              <div className="bg-gray-50 rounded p-2 text-[10px] text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
+                <span>✓ {t.term1}</span>
+                <span>• {t.term2}</span>
+                <span>• {t.term3}</span>
+                <span className="text-amber-600">! {t.term4}</span>
+              </div>
+
+              {/* Agreement Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.agreed_to_terms}
+                  onChange={(e) => setFormData({...formData, agreed_to_terms: e.target.checked})}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-xs text-gray-700">{t.iAgreeToTerms}</span>
+              </label>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading || !formData.agreed_to_terms}
+                className={`w-full py-2.5 text-white rounded font-semibold text-sm transition-all ${!formData.agreed_to_terms ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-900 hover:bg-blue-800'}`}
+              >
+                {loading ? t.pleaseWait : t.createAccount}
+              </button>
+
+              {/* Login Link */}
+              <p className="text-center text-xs text-gray-600">
+                {t.haveAccount}{' '}
+                <button type="button" onClick={() => setIsLogin(true)} className="text-blue-600 hover:underline font-medium">
+                  Login
+                </button>
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Login mode - compact centered layout
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex">
       {/* Left Side - Branding */}
@@ -403,11 +796,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
         {/* Content */}
         <div className="relative z-10 text-center max-w-md">
+          {/* Legacy Logo in white box */}
           <div className="bg-white rounded-2xl p-6 mb-8 shadow-xl mx-auto inline-block">
             <img
-              src="/images/legacy-logo.png"
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
               alt="Legacy Translations"
-              className="h-16"
+              className="h-16 object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">{isLogin ? 'Business Partner Portal' : t.createAccount}</h1>
@@ -455,12 +849,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-6 h-4 object-cover rounded-sm" />
                 </button>
               ))}
             </div>
@@ -478,7 +872,7 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           {/* Title */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              {isLogin ? t.accessPortal : t.createAccount}
+              {t.accessPortal}
             </h2>
             <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full uppercase tracking-wide">
               {t.corporateOnly}
@@ -492,43 +886,6 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyName}</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                    placeholder="Your Company Inc."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.contactName}</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.contact_name}
-                    onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                    placeholder="John Smith"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneOptional}</label>
-                  <input
-                    type="tel"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-gray-50"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </div>
-              </>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t.companyEmail}</label>
               <input
@@ -552,72 +909,66 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
               />
             </div>
 
-            {isLogin && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
-                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                  {t.forgotPassword}
-                </button>
-              </div>
-            )}
+            <div className="text-right">
+              <button
+                type="button"
+                onClick={() => { setShowForgotPassword(true); setResetEmail(formData.email); setResetSent(false); }}
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                {t.forgotPassword}
+              </button>
+            </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+              className="w-full py-3.5 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500"
             >
-              {loading ? t.pleaseWait : (isLogin ? t.accessPortal : t.createAccount)}
+              {loading ? t.pleaseWait : t.accessPortal}
             </button>
           </form>
 
           {/* Mobile Benefits */}
-          {isLogin && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 lg:hidden">
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
-              <ul className="space-y-2 text-sm text-gray-600">
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit1}</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit2}</span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">✓</span>
-                  <span>{t.benefit3}</span>
-                </li>
-                <li className="flex items-start bg-yellow-50 rounded p-2 border border-yellow-200">
-                  <span className="text-yellow-600 mr-2">🔐</span>
-                  <span className="text-yellow-700 font-medium">{t.benefit4}</span>
-                </li>
-              </ul>
-            </div>
-          )}
+          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 lg:hidden">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">{t.benefits}</h3>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit1}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit2}</span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-600 mr-2">✓</span>
+                <span>{t.benefit3}</span>
+              </li>
+              <li className="flex items-start bg-yellow-50 rounded p-2 border border-yellow-200">
+                <span className="text-yellow-600 mr-2">🔐</span>
+                <span className="text-yellow-700 font-medium">{t.benefit4}</span>
+              </li>
+            </ul>
+          </div>
 
           <div className="mt-6 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => setIsLogin(false)}
               className="text-blue-600 hover:text-blue-700 hover:underline text-sm font-medium"
             >
-              {isLogin ? t.noAccount : t.haveAccount}
+              {t.noAccount}
             </button>
           </div>
 
           {/* Contact link */}
-          {isLogin && (
-            <div className="mt-4 text-center">
-              <p className="text-sm text-gray-500">
-                {t.notB2B}{' '}
-                <a href="mailto:contact@legacytranslations.com" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
-                  contact@legacytranslations.com
-                </a>
-              </p>
-            </div>
-          )}
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500">
+              {t.notB2B}{' '}
+              <a href="mailto:contact@legacytranslations.com" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                contact@legacytranslations.com
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -851,7 +1202,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Payment method options
   const [paymentMethod, setPaymentMethod] = useState('invoice'); // 'invoice' or 'zelle'
-  const ZELLE_PHONE = '(857) 208-1139';
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const zelleReceiptInputRef = useRef(null);
+  const ZELLE_EMAIL = 'contact@legacytranslations.com';
   const ZELLE_NAME = 'Legacy Translations Inc.';
 
   // Calculate quote when relevant fields change
@@ -1100,20 +1453,33 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
     setError('');
 
     try {
+      // If Zelle payment, upload receipt first
+      let zelleReceiptId = null;
+      if (paymentMethod === 'zelle' && zelleReceipt) {
+        const receiptFormData = new FormData();
+        receiptFormData.append('file', zelleReceipt);
+        const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
+        zelleReceiptId = uploadResponse.data.document_id;
+      }
+
       const orderData = {
         ...formData,
         word_count: wordCount,
         document_filename: uploadedFiles[0]?.fileName || null,
         document_ids: uploadedFiles.map(f => f.documentId).filter(Boolean),
         payment_method: paymentMethod,
-        create_invoice: paymentMethod === 'invoice'
+        create_invoice: paymentMethod === 'invoice',
+        zelle_receipt_id: zelleReceiptId,
+        payment_status: paymentMethod === 'zelle' ? 'pending_zelle' : 'pending',
+        total_price: quote?.total || 0,
+        shipping_address: (needsPhysicalCopy || formData.service_type === 'rmv') ? shippingAddress : null
       };
 
       const response = await axios.post(`${API}/orders/create?token=${token}`, orderData);
 
       const invoiceMsg = paymentMethod === 'invoice'
         ? ' Invoice will be sent to your email shortly.'
-        : ` Please send payment via Zelle to ${ZELLE_PHONE} (${ZELLE_NAME})`;
+        : ' We will verify your Zelle payment and send a confirmation email once confirmed.';
       setSuccess(`Order ${response.data.order.order_number} created successfully!${invoiceMsg}`);
 
       // Reset form
@@ -1131,6 +1497,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       setUploadedFiles([]);
       setQuote(null);
       setPaymentMethod('invoice');
+      setZelleReceipt(null);
 
       if (onOrderCreated) {
         onOrderCreated(response.data.order);
@@ -1319,9 +1686,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   value={formData.translate_from}
                   onChange={(e) => setFormData({...formData, translate_from: e.target.value})}
                 >
-                  {LANGUAGES.map((lang) => (
+                  {FROM_LANGUAGES.map((lang) => (
                     <option key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
+                      {lang.name}
                     </option>
                   ))}
                 </select>
@@ -1345,9 +1712,9 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     value={formData.translate_to}
                     onChange={(e) => setFormData({...formData, translate_to: e.target.value})}
                   >
-                    {LANGUAGES.map((lang) => (
+                    {TO_LANGUAGES.map((lang) => (
                       <option key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
+                        {lang.name}
                       </option>
                     ))}
                   </select>
@@ -1581,12 +1948,89 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               </div>
             </div>
 
+            {/* Payment Method Selection */}
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-700">Payment Method</label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'invoice' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="invoice"
+                    checked={paymentMethod === 'invoice'}
+                    onChange={() => setPaymentMethod('invoice')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay by Invoice</span>
+                    <p className="text-sm text-gray-500 mt-1">Invoice sent to your email</p>
+                  </div>
+                </label>
+                <label className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'zelle' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="zelle"
+                    checked={paymentMethod === 'zelle'}
+                    onChange={() => setPaymentMethod('zelle')}
+                    className="sr-only"
+                  />
+                  <div>
+                    <span className="font-medium">Pay with Zelle</span>
+                    <p className="text-sm text-gray-500 mt-1">Send to {ZELLE_EMAIL}</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Zelle Instructions & Receipt Upload */}
+              {paymentMethod === 'zelle' && (
+                <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg space-y-4">
+                  <h4 className="font-semibold text-purple-800">Zelle Payment Instructions</h4>
+                  <div className="space-y-2 text-sm text-purple-700">
+                    <p className="font-semibold">1. Open your bank app and select Zelle</p>
+                    <p className="font-semibold">2. Send payment to: {ZELLE_EMAIL}</p>
+                    <p className="font-semibold">3. Include your company name in the memo</p>
+                    <p className="font-semibold">4. Upload your payment receipt below</p>
+                  </div>
+
+                  {/* Receipt Upload */}
+                  <div>
+                    <input
+                      type="file"
+                      ref={zelleReceiptInputRef}
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => setZelleReceipt(e.target.files[0])}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => zelleReceiptInputRef.current?.click()}
+                      className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-600 hover:border-purple-400 hover:bg-purple-100 transition-colors"
+                    >
+                      {zelleReceipt ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          {zelleReceipt.name}
+                        </span>
+                      ) : (
+                        <span>Click to upload payment receipt</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {paymentMethod === 'zelle' && !zelleReceipt && (
+                    <p className="text-sm text-red-500">* Receipt is required for Zelle payments</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button
               type="submit"
-              disabled={submitting || wordCount === 0}
-              className="w-full py-3 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 font-semibold"
+              disabled={submitting || wordCount === 0 || (paymentMethod === 'zelle' && !zelleReceipt)}
+              className={`w-full py-3 text-white rounded-md font-semibold ${paymentMethod === 'zelle' ? 'bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400' : 'bg-teal-600 hover:bg-teal-700 disabled:bg-gray-400'}`}
             >
-              {submitting ? 'Creating Order...' : 'Create Order'}
+              {submitting ? 'Creating Order...' : (paymentMethod === 'zelle' ? 'Submit Order with Zelle' : 'Create Order')}
             </button>
           </form>
         </div>
@@ -2287,17 +2731,44 @@ const OrdersPage = ({ token }) => {
 
 // ==================== MESSAGES PAGE ====================
 const MessagesPage = ({ token }) => {
-  const [messages, setMessages] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [systemMessages, setSystemMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('conversations');
 
   useEffect(() => {
-    fetchMessages();
+    fetchAllMessages();
   }, []);
 
-  const fetchMessages = async () => {
+  // Auto-mark unread conversations as read when viewing conversation tab
+  useEffect(() => {
+    if (activeTab === 'conversations' && conversations.length > 0) {
+      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
+      unreadConvs.forEach(conv => {
+        markConversationAsRead(conv.id);
+      });
+    }
+  }, [activeTab, conversations.length]);
+
+  // Auto-mark unread system messages as read when viewing notifications tab
+  useEffect(() => {
+    if (activeTab === 'notifications' && systemMessages.length > 0) {
+      const unreadMsgs = systemMessages.filter(m => !m.read);
+      unreadMsgs.forEach(msg => {
+        markSystemMessageAsRead(msg.id);
+      });
+    }
+  }, [activeTab, systemMessages.length]);
+
+  const fetchAllMessages = async () => {
     try {
-      const response = await axios.get(`${API}/messages?token=${token}`);
-      setMessages(response.data.messages || []);
+      // Fetch conversations (sent messages + admin replies)
+      const convResponse = await axios.get(`${API}/partner/conversations?token=${token}`);
+      setConversations(convResponse.data.conversations || []);
+
+      // Also fetch system messages
+      const msgResponse = await axios.get(`${API}/messages?token=${token}`);
+      setSystemMessages(msgResponse.data.messages || []);
     } catch (err) {
       console.error('Failed to fetch messages:', err);
     } finally {
@@ -2305,10 +2776,21 @@ const MessagesPage = ({ token }) => {
     }
   };
 
-  const markAsRead = async (messageId) => {
+  const markConversationAsRead = async (conversationId) => {
+    try {
+      await axios.put(`${API}/partner/conversations/${conversationId}/read?token=${token}`);
+      setConversations(prev => prev.map(conv =>
+        conv.id === conversationId ? { ...conv, read: true } : conv
+      ));
+    } catch (err) {
+      console.error('Failed to mark conversation as read:', err);
+    }
+  };
+
+  const markSystemMessageAsRead = async (messageId) => {
     try {
       await axios.put(`${API}/messages/${messageId}/read?token=${token}`);
-      setMessages(messages.map(msg =>
+      setSystemMessages(prev => prev.map(msg =>
         msg.id === messageId ? { ...msg, read: true } : msg
       ));
     } catch (err) {
@@ -2317,6 +2799,7 @@ const MessagesPage = ({ token }) => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -2332,9 +2815,14 @@ const MessagesPage = ({ token }) => {
       case 'delivery': return '🎉';
       case 'status': return '📋';
       case 'payment': return '💳';
+      case 'admin_reply': return '💬';
+      case 'partner_message': return '📤';
       default: return '✉️';
     }
   };
+
+  const unreadConversations = conversations.filter(c => c.direction === 'received' && !c.read).length;
+  const unreadSystemMessages = systemMessages.filter(m => !m.read).length;
 
   if (loading) {
     return (
@@ -2349,49 +2837,154 @@ const MessagesPage = ({ token }) => {
     <div className="p-8">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Messages</h1>
 
-      {messages.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="text-4xl mb-4">✉️</div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">No messages</h2>
-          <p className="text-gray-600">Messages from Legacy Translations will appear here</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
-                message.read ? 'border-gray-300' : 'border-teal-500'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="text-2xl">{getMessageIcon(message.type)}</div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <h3 className={`font-semibold ${message.read ? 'text-gray-600' : 'text-gray-800'}`}>
-                        {message.title}
-                      </h3>
-                      {!message.read && (
-                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
-                      )}
+      {/* Tab Navigation */}
+      <div className="flex border-b mb-6">
+        <button
+          onClick={() => setActiveTab('conversations')}
+          className={`px-4 py-2 font-medium border-b-2 -mb-px ${
+            activeTab === 'conversations'
+              ? 'border-teal-600 text-teal-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Conversations
+          {unreadConversations > 0 && (
+            <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+              {unreadConversations}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('notifications')}
+          className={`px-4 py-2 font-medium border-b-2 -mb-px ${
+            activeTab === 'notifications'
+              ? 'border-teal-600 text-teal-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          System Notifications
+          {unreadSystemMessages > 0 && (
+            <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full">
+              {unreadSystemMessages}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Conversations Tab */}
+      {activeTab === 'conversations' && (
+        <>
+          {conversations.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="text-4xl mb-4">💬</div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">No conversations</h2>
+              <p className="text-gray-600">Your messages with Legacy Translations will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
+                    conv.direction === 'sent'
+                      ? 'border-blue-400'
+                      : conv.read
+                        ? 'border-gray-300'
+                        : 'border-teal-500'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="text-2xl">
+                        {conv.direction === 'sent' ? '📤' : '📥'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 flex-wrap">
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            conv.direction === 'sent'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {conv.direction === 'sent' ? 'Sent' : 'Received'}
+                          </span>
+                          {conv.direction === 'received' && !conv.read && (
+                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
+                          )}
+                          {conv.order_number && (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                              Order: {conv.order_number}
+                            </span>
+                          )}
+                          {conv.replied && (
+                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                              Replied
+                            </span>
+                          )}
+                        </div>
+
+                        {conv.direction === 'sent' ? (
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-500">To: {conv.recipient_name || 'Admin'}</p>
+                            <p className="text-gray-700 mt-1">{conv.content}</p>
+                          </div>
+                        ) : (
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-500">From: {conv.from_admin_name || 'Admin'}</p>
+                            {conv.original_message_content && (
+                              <div className="bg-gray-50 border-l-2 border-gray-300 pl-3 py-2 my-2 text-sm text-gray-500">
+                                <span className="font-medium">Your message:</span> {conv.original_message_content}
+                              </div>
+                            )}
+                            <p className="text-gray-700 mt-1">{conv.content}</p>
+                          </div>
+                        )}
+
+                        <p className="text-sm text-gray-400 mt-2">{formatDate(conv.created_at)}</p>
+                      </div>
                     </div>
-                    <p className="text-gray-600 mt-1">{message.content}</p>
-                    <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
                   </div>
                 </div>
-                {!message.read && (
-                  <button
-                    onClick={() => markAsRead(message.id)}
-                    className="text-sm text-teal-600 hover:text-teal-800"
-                  >
-                    Mark as read
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
+      )}
+
+      {/* System Notifications Tab */}
+      {activeTab === 'notifications' && (
+        <>
+          {systemMessages.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="text-4xl mb-4">✉️</div>
+              <h2 className="text-xl font-semibold text-gray-800 mb-2">No notifications</h2>
+              <p className="text-gray-600">System notifications will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {systemMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-gray-300"
+                >
+                  <div className="flex items-start">
+                    <div className="flex items-start space-x-4">
+                      <div className="text-2xl">{getMessageIcon(message.type)}</div>
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-semibold text-gray-800">
+                            {message.title}
+                          </h3>
+                        </div>
+                        <p className="text-gray-600 mt-1">{message.content}</p>
+                        <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2634,36 +3227,49 @@ const VerificationPage = ({ certificationId }) => {
 };
 
 // ==================== PARTNER FLOATING CHAT WIDGET ====================
-const PartnerFloatingChatWidget = ({ token, partner }) => {
+const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messageContent, setMessageContent] = useState('');
   const [sending, setSending] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [messageSent, setMessageSent] = useState(false);
 
   useEffect(() => {
     if (token) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
+      fetchConversations();
+      const interval = setInterval(fetchConversations, 30000);
       return () => clearInterval(interval);
     }
   }, [token]);
 
-  const fetchNotifications = async () => {
+  // Auto-mark messages as read when opening inbox
+  useEffect(() => {
+    if (showNotifications && isOpen) {
+      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
+      unreadConvs.forEach(conv => {
+        markAsRead(conv.id);
+      });
+    }
+  }, [showNotifications, isOpen]);
+
+  const fetchConversations = async () => {
     try {
-      const response = await axios.get(`${API}/partner/notifications?token=${token}`);
-      setNotifications(response.data.notifications || []);
+      const response = await axios.get(`${API}/partner/conversations?token=${token}`);
+      setConversations(response.data.conversations || []);
     } catch (err) {
-      console.error('Failed to fetch notifications:', err);
+      console.error('Failed to fetch conversations:', err);
     }
   };
 
-  const markAsRead = async (notificationId) => {
+  const markAsRead = async (conversationId) => {
     try {
-      await axios.put(`${API}/partner/notifications/${notificationId}/read?token=${token}`);
-      fetchNotifications();
+      await axios.put(`${API}/partner/conversations/${conversationId}/read?token=${token}`);
+      setConversations(prev => prev.map(conv =>
+        conv.id === conversationId ? { ...conv, read: true } : conv
+      ));
     } catch (err) {
-      console.error('Failed to mark notification as read:', err);
+      console.error('Failed to mark as read:', err);
     }
   };
 
@@ -2678,9 +3284,10 @@ const PartnerFloatingChatWidget = ({ token, partner }) => {
         partner_name: partner?.company_name || partner?.contact_name || 'Partner',
         partner_email: partner?.email
       });
-      alert('Message sent successfully!');
       setMessageContent('');
-      setIsOpen(false);
+      setMessageSent(true);
+      fetchConversations();
+      setTimeout(() => setMessageSent(false), 5000);
     } catch (err) {
       console.error('Failed to send message:', err);
       alert('Failed to send message. Please try again.');
@@ -2689,7 +3296,8 @@ const PartnerFloatingChatWidget = ({ token, partner }) => {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Count unread received messages
+  const unreadCount = conversations.filter(c => c.direction === 'received' && !c.read).length;
 
   return (
     <>
@@ -2748,6 +3356,23 @@ const PartnerFloatingChatWidget = ({ token, partner }) => {
           <div className="p-4">
             {!showNotifications ? (
               <div className="space-y-4">
+                {messageSent && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-700 text-sm font-medium">Message sent successfully!</p>
+                    <p className="text-green-600 text-xs mt-1">
+                      You can view all your messages in the{' '}
+                      <button
+                        onClick={() => {
+                          setIsOpen(false);
+                          if (onNavigateToMessages) onNavigateToMessages();
+                        }}
+                        className="underline hover:text-green-800"
+                      >
+                        Messages section
+                      </button>
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Your Message:</label>
                   <textarea
@@ -2780,34 +3405,40 @@ const PartnerFloatingChatWidget = ({ token, partner }) => {
               </div>
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {notifications.length === 0 ? (
+                {conversations.filter(c => c.direction === 'received').length === 0 ? (
                   <div className="text-center text-gray-500 py-4">
                     <div className="text-2xl mb-2">📭</div>
-                    <p className="text-sm">No messages yet</p>
+                    <p className="text-sm">No replies yet</p>
                   </div>
                 ) : (
-                  notifications.map((notif) => (
+                  conversations.filter(c => c.direction === 'received').slice(0, 5).map((conv) => (
                     <div
-                      key={notif.id}
-                      className={`p-3 rounded-lg border ${notif.read ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'}`}
+                      key={conv.id}
+                      className="p-3 rounded-lg border bg-gray-50 border-gray-200"
                     >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs font-medium text-blue-700">{notif.from_admin_name}</span>
-                        {!notif.read && (
-                          <button
-                            onClick={() => markAsRead(notif.id)}
-                            className="text-xs text-blue-600 hover:underline"
-                          >
-                            Mark read
-                          </button>
-                        )}
+                      <div className="mb-1">
+                        <span className="text-xs font-medium text-blue-700">{conv.from_admin_name || 'Admin'}</span>
                       </div>
-                      <p className="text-sm text-gray-700">{notif.content}</p>
+                      {conv.original_message_content && (
+                        <p className="text-[10px] text-gray-500 italic mb-1">Re: {conv.original_message_content.substring(0, 50)}...</p>
+                      )}
+                      <p className="text-sm text-gray-700">{conv.content}</p>
                       <p className="text-[10px] text-gray-400 mt-1">
-                        {notif.created_at ? new Date(notif.created_at).toLocaleString() : ''}
+                        {conv.created_at ? new Date(conv.created_at).toLocaleString() : ''}
                       </p>
                     </div>
                   ))
+                )}
+                {conversations.filter(c => c.direction === 'received').length > 5 && (
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (onNavigateToMessages) onNavigateToMessages();
+                    }}
+                    className="w-full text-center text-sm text-blue-600 hover:underline py-2"
+                  >
+                    View all messages
+                  </button>
                 )}
               </div>
             )}
@@ -2965,12 +3596,12 @@ function App() {
                 <button
                   key={uiLang.code}
                   onClick={() => changeLanguage(uiLang.code)}
-                  className={`text-2xl hover:scale-110 transition-transform ${
+                  className={`hover:scale-110 transition-transform ${
                     lang === uiLang.code ? 'opacity-100 scale-110' : 'opacity-50 hover:opacity-80'
                   }`}
-                  title={uiLang.code.toUpperCase()}
+                  title={uiLang.name}
                 >
-                  {uiLang.flag}
+                  <img src={getFlagUrl(uiLang.countryCode)} alt={uiLang.name} className="w-7 h-5 object-cover rounded-sm" />
                 </button>
               ))}
             </div>
@@ -2982,7 +3613,7 @@ function App() {
         </header>
         {renderContent()}
       </div>
-      <PartnerFloatingChatWidget token={token} partner={partner} />
+      <PartnerFloatingChatWidget token={token} partner={partner} onNavigateToMessages={() => setActiveTab('messages')} />
     </div>
   );
 }

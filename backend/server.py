@@ -697,6 +697,189 @@ def get_simple_client_email_template(client_name: str, message_content: str) -> 
                             </p>'''
     return get_email_header() + content + get_email_footer(include_review_button=False)
 
+def get_zelle_pending_email_template(client_name: str, order_details: dict) -> str:
+    """Generate email template for Zelle payment pending confirmation"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Thank you for your order! We have received your Zelle payment submission and are currently verifying it.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            📋 Order Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Method:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">Zelle</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Status:</strong></td>
+                                                <td style="color: #f59e0b; font-size: 14px; padding: 5px 0; font-weight: 600;">⏳ Pending Verification</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Once we confirm your Zelle payment, you will receive another email confirming that your translation has begun.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions, please reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Best regards,<br>
+                                Legacy Translations Team
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_zelle_confirmed_email_template(client_name: str, order_details: dict) -> str:
+    """Generate email template for Zelle payment confirmed - translation started"""
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {client_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Great news! Your Zelle payment has been confirmed and your translation is now in progress.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            ✅ Order Confirmed
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Payment Status:</strong></td>
+                                                <td style="color: #10b981; font-size: 14px; padding: 5px 0; font-weight: 600;">✓ Confirmed</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Our team has started working on your translation. You will receive another email when your translation is complete and ready for download.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                If you have any questions, please reply to this email.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Best regards,<br>
+                                Legacy Translations Team
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+def get_zelle_admin_notification_template(order_details: dict, receipt_url: Optional[str] = None) -> str:
+    """Generate email template for admin notification of new Zelle payment"""
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
+    receipt_section = ""
+    if receipt_url:
+        receipt_section = f'''
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Receipt:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;"><a href="{receipt_url}" style="color: #3b82f6;">View Receipt</a></td>
+                                            </tr>'''
+
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                🔔 New Zelle Payment Received
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                A new order has been submitted with Zelle payment. Please verify the payment and confirm it in the admin panel.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-radius: 8px; margin: 25px 0; border: 1px solid #ffc107;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #856404; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            💰 Zelle Payment Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Order Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('reference', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Customer Name:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('customer_name', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Customer Email:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('customer_email', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Service:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('service_type', 'Translation').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A')} → {order_details.get('translate_to', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Amount:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">${order_details.get('total_price', 0):.2f}</td>
+                                            </tr>{receipt_section}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 30px auto;">
+                                <tr>
+                                    <td style="border-radius: 6px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                                        <a href="{portal_url}/#/admin/orders" style="display: inline-block; padding: 14px 30px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px;">
+                                            View in Admin Panel
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Please verify the Zelle payment in your bank account and confirm the order in the admin panel.
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
 def get_translator_assignment_email_template(translator_name: str, order_details: dict, accept_url: str, decline_url: str) -> str:
     """Generate email template for translator assignment with accept/decline buttons"""
     portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
@@ -843,6 +1026,16 @@ class PaymentCheckoutRequest(BaseModel):
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
 
+class ZelleOrderRequest(BaseModel):
+    quote_id: str
+    customer_email: str
+    customer_name: str
+    payment_method: str = "zelle"
+    zelle_receipt_id: Optional[str] = None
+    total_price: float
+    notes: Optional[str] = None
+    shipping_address: Optional[Dict[str, str]] = None
+
 class EmailNotificationRequest(BaseModel):
     quote_id: str
     partner_email: EmailStr
@@ -863,8 +1056,33 @@ class Partner(BaseModel):
     password_hash: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None  # EIN/CNPJ
+    # Payment & Billing
+    payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
+    default_payment_method: str = "zelle"  # zelle, card, invoice
+    credit_limit: float = 0.0  # Maximum outstanding balance allowed
+    current_balance: float = 0.0  # Current outstanding balance
+    # Statistics for eligibility
+    total_orders: int = 0
+    total_paid_orders: int = 0
+    total_revenue: float = 0.0
+    # Status
     is_active: bool = True
+    is_approved: bool = True  # Admin can approve/suspend partners
+    payment_plan_approved: bool = False  # For invoice plans, needs admin approval
+    # Agreement
+    agreed_to_terms: bool = False
+    agreed_at: Optional[datetime] = None
+    # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_order_at: Optional[datetime] = None
+    last_payment_at: Optional[datetime] = None
 
 class PartnerCreate(BaseModel):
     company_name: str
@@ -872,6 +1090,18 @@ class PartnerCreate(BaseModel):
     password: str
     contact_name: str
     phone: Optional[str] = None
+    # Address
+    address_street: Optional[str] = None
+    address_city: Optional[str] = None
+    address_state: Optional[str] = None
+    address_zip: Optional[str] = None
+    address_country: Optional[str] = "USA"
+    tax_id: Optional[str] = None
+    # Payment preferences
+    payment_plan: str = "pay_per_order"
+    default_payment_method: str = "zelle"
+    # Agreement
+    agreed_to_terms: bool = False
 
 class PartnerLogin(BaseModel):
     email: EmailStr
@@ -1025,10 +1255,14 @@ class TranslationOrder(BaseModel):
     translator_assignment_token: Optional[str] = None  # Token for accept/decline
     translator_assignment_status: str = "none"  # none, pending, accepted, declined
     translator_assignment_responded_at: Optional[datetime] = None
-    deadline: Optional[datetime] = None  # Translation deadline
+    deadline: Optional[datetime] = None  # Client deadline - when to deliver to client
+    translator_deadline: Optional[datetime] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None  # Notes visible only to admin/PM
     revenue_source: str = "website"  # website, whatsapp, social_media, referral, partner, other
-    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer
+    payment_method: Optional[str] = None  # credit_card, debit, paypal, zelle, venmo, pix, apple_pay, bank_transfer, invoice
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    shipping_address: Optional[Dict[str, str]] = None
     # Document classification
     document_type: Optional[str] = None  # birth_certificate, marriage_certificate, diploma, etc.
     document_category: Optional[str] = None  # financial, educational, personal, bank_statement, etc.
@@ -1046,6 +1280,12 @@ class TranslationOrderCreate(BaseModel):
     notes: Optional[str] = None
     document_filename: Optional[str] = None
     document_ids: Optional[List[str]] = None  # IDs of uploaded documents
+    payment_method: Optional[str] = "invoice"  # 'invoice' or 'zelle'
+    zelle_receipt_id: Optional[str] = None
+    payment_status: Optional[str] = "pending"
+    total_price: Optional[float] = None
+    shipping_address: Optional[Dict[str, str]] = None
+    create_invoice: Optional[bool] = True
 
 class TranslationOrderUpdate(BaseModel):
     translation_status: Optional[str] = None
@@ -1059,7 +1299,8 @@ class TranslationOrderUpdate(BaseModel):
     # Assignment updates (by name - for direct assignment from dropdown)
     assigned_pm: Optional[str] = None
     assigned_translator: Optional[str] = None
-    deadline: Optional[str] = None  # Changed to str to accept ISO string
+    deadline: Optional[str] = None  # Client deadline - Changed to str to accept ISO string
+    translator_deadline: Optional[str] = None  # Translator deadline - when translator must return
     internal_notes: Optional[str] = None
     revenue_source: Optional[str] = None  # website, whatsapp, social_media, referral, partner, other
     # NEW: Additional editable fields
@@ -1394,6 +1635,7 @@ async def bot_calculate_quote(request: BotQuoteRequest):
             "translation_status": "Quote",  # This makes it appear in Quote filter!
             "payment_status": "pending",
             "source": "whatsapp_bot",
+            "revenue_source": "whatsapp",  # Track as WhatsApp revenue
             "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
             "has_document": bool(request.document_base64 or request.document_url)
@@ -1550,6 +1792,7 @@ async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
         "translation_status": "pending",
         "payment_status": "pending",
         "source": "whatsapp_bot",
+        "revenue_source": "whatsapp",  # Track as WhatsApp revenue
         "bot_quote_id": quote_id,
         "created_at": datetime.utcnow(),
         "notes": quote.get("notes", "")
@@ -2735,8 +2978,8 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 'quantity': 1,
             }],
             'mode': 'payment',
-            'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}",
-            'cancel_url': f"{request.origin_url}?payment_cancelled=true",
+            'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}#/customer",
+            'cancel_url': f"{request.origin_url}?payment_cancelled=true#/customer",
             'metadata': {
                 'quote_id': request.quote_id,
                 'transaction_id': transaction.id,
@@ -2765,6 +3008,187 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
     except Exception as e:
         logger.error(f"Error creating payment checkout: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+# Zelle Payment Integration
+@api_router.post("/create-zelle-order")
+async def create_zelle_order(request: ZelleOrderRequest, background_tasks: BackgroundTasks):
+    """Create an order with Zelle payment (pending verification)"""
+
+    try:
+        # Get quote
+        quote = await db.translation_quotes.find_one({"id": request.quote_id})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found")
+
+        # Generate order number
+        order_count = await db.orders.count_documents({})
+        order_number = f"ORD-{datetime.utcnow().strftime('%Y%m%d')}-{order_count + 1:04d}"
+
+        # Get receipt URL if available
+        receipt_url = None
+        if request.zelle_receipt_id:
+            # Get the document/file URL
+            doc = await db.documents.find_one({"id": request.zelle_receipt_id})
+            if doc:
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
+
+        # Create order with pending_zelle status
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": request.quote_id,
+            "reference": quote.get("reference", "N/A"),
+            "customer_email": request.customer_email,
+            "customer_name": request.customer_name,
+            "client_name": request.customer_name,
+            "service_type": quote.get("service_type", "translation"),
+            "translate_from": quote.get("translate_from", ""),
+            "translate_to": quote.get("translate_to", ""),
+            "word_count": quote.get("word_count", 0),
+            "urgency": quote.get("urgency", "no"),
+            "total_price": request.total_price,
+            "payment_method": "zelle",
+            "payment_status": "pending_zelle",
+            "zelle_receipt_id": request.zelle_receipt_id,
+            "zelle_receipt_url": receipt_url,
+            "status": "pending_payment",
+            "notes": request.notes,
+            "shipping_address": request.shipping_address,
+            "document_ids": quote.get("document_ids", []),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "is_guest_order": True
+        }
+
+        await db.orders.insert_one(order)
+
+        # Update quote status
+        await db.translation_quotes.update_one(
+            {"id": request.quote_id},
+            {"$set": {"status": "pending_zelle", "order_id": order["id"], "updated_at": datetime.utcnow()}}
+        )
+
+        # Prepare order details for emails
+        order_details = {
+            "reference": order_number,
+            "service_type": order["service_type"],
+            "translate_from": order["translate_from"],
+            "translate_to": order["translate_to"],
+            "total_price": order["total_price"],
+            "customer_name": request.customer_name,
+            "customer_email": request.customer_email
+        }
+
+        # Send pending confirmation email to customer
+        try:
+            email_html = get_zelle_pending_email_template(request.customer_name, order_details)
+            await email_service.send_email(
+                request.customer_email,
+                f"Order Received - Zelle Payment Pending Verification - {order_number}",
+                email_html,
+                "html"
+            )
+            logger.info(f"Zelle pending email sent to customer: {request.customer_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle pending email to customer: {str(e)}")
+
+        # Send notification email to admin
+        try:
+            admin_email = os.environ.get("ADMIN_EMAIL", "contact@legacytranslations.com")
+            admin_html = get_zelle_admin_notification_template(order_details, receipt_url)
+            await email_service.send_email(
+                admin_email,
+                f"🔔 New Zelle Payment - {order_number} - ${request.total_price:.2f}",
+                admin_html,
+                "html"
+            )
+            logger.info(f"Zelle admin notification sent to: {admin_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle admin notification: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Order submitted with Zelle payment pending verification",
+            "order_id": order["id"],
+            "order_number": order_number
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Zelle order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create Zelle order")
+
+@api_router.post("/confirm-zelle-payment/{order_id}")
+async def confirm_zelle_payment(order_id: str, background_tasks: BackgroundTasks):
+    """Admin endpoint to confirm a Zelle payment and start the translation"""
+
+    try:
+        # Get order
+        order = await db.orders.find_one({"id": order_id})
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.get("payment_status") != "pending_zelle":
+            raise HTTPException(status_code=400, detail="Order is not pending Zelle payment")
+
+        # Update order status
+        await db.orders.update_one(
+            {"id": order_id},
+            {
+                "$set": {
+                    "payment_status": "paid",
+                    "status": "in_progress",
+                    "payment_confirmed_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        # Update quote status
+        if order.get("quote_id"):
+            await db.translation_quotes.update_one(
+                {"id": order["quote_id"]},
+                {"$set": {"status": "paid", "updated_at": datetime.utcnow()}}
+            )
+
+        # Prepare order details for email
+        order_details = {
+            "reference": order.get("order_number", order.get("reference", "N/A")),
+            "service_type": order.get("service_type", "translation"),
+            "translate_from": order.get("translate_from", ""),
+            "translate_to": order.get("translate_to", ""),
+            "total_price": order.get("total_price", 0)
+        }
+
+        # Send confirmation email to customer
+        try:
+            customer_email = order.get("customer_email")
+            customer_name = order.get("customer_name", order.get("client_name", "Valued Customer"))
+            if customer_email:
+                email_html = get_zelle_confirmed_email_template(customer_name, order_details)
+                await email_service.send_email(
+                    customer_email,
+                    f"Payment Confirmed - Translation Started - {order_details['reference']}",
+                    email_html,
+                    "html"
+                )
+                logger.info(f"Zelle confirmation email sent to customer: {customer_email}")
+        except Exception as e:
+            logger.error(f"Failed to send Zelle confirmation email: {str(e)}")
+
+        return {
+            "status": "success",
+            "message": "Zelle payment confirmed and translation started",
+            "order_id": order_id
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error confirming Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to confirm Zelle payment")
 
 @api_router.get("/payment-status/{session_id}")
 async def get_payment_status(session_id: str):
@@ -3236,6 +3660,81 @@ async def submit_b2b_interest(request: B2BInterestRequest):
             content_type="html"
         )
 
+        # Send welcome email to prospect with registration link
+        registration_url = f"https://portal.legacytranslations.com/#/partner?register=true&email={request.email}&company={request.company_name}&name={request.contact_name}&phone={request.phone or ''}"
+
+        prospect_email_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+            <div style="background: linear-gradient(135deg, #1a2a4a 0%, #2c3e5c 100%); padding: 35px 30px; text-align: center;">
+                <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Welcome to Legacy Translations!</h1>
+            </div>
+            <div style="background: linear-gradient(90deg, #c9a227 0%, #e6c547 50%, #c9a227 100%); height: 4px;"></div>
+
+            <div style="padding: 40px 30px;">
+                <p style="font-size: 18px; color: #333;">Hi {request.contact_name},</p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    Thank you for your interest in becoming a Legacy Translations Partner! We received your inquiry and our team will contact you within 24 hours.
+                </p>
+
+                <p style="color: #555; line-height: 1.6;">
+                    In the meantime, you can complete your partner account registration by clicking the button below:
+                </p>
+
+                <div style="text-align: center; margin: 35px 0;">
+                    <a href="{registration_url}" style="display: inline-block; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: #ffffff; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(30, 58, 95, 0.3);">
+                        Complete Your Registration
+                    </a>
+                </div>
+
+                <div style="background: #f8fafc; border-radius: 12px; padding: 25px; margin: 30px 0;">
+                    <h3 style="color: #1e3a5f; margin-top: 0; margin-bottom: 15px;">Partner Benefits Include:</h3>
+                    <ul style="color: #555; line-height: 2; padding-left: 20px; margin: 0;">
+                        <li>Net 30 payment terms for approved partners</li>
+                        <li>Volume discounts on translations</li>
+                        <li>Priority order processing</li>
+                        <li>Dedicated account support</li>
+                        <li>Online dashboard to track all orders</li>
+                    </ul>
+                </div>
+
+                <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 20px; margin: 25px 0; border-left: 4px solid #f59e0b;">
+                    <p style="color: #92400e; margin: 0; font-weight: 500;">
+                        <strong>First Certified Translation FREE!</strong> 1 page - No commitment required
+                    </p>
+                </div>
+
+                <p style="color: #555; line-height: 1.6;">
+                    If you have any questions, feel free to reply to this email or contact us at
+                    <a href="mailto:contact@legacytranslations.com" style="color: #1e3a5f;">contact@legacytranslations.com</a>
+                </p>
+
+                <p style="color: #555; margin-top: 30px;">
+                    Best regards,<br>
+                    <strong style="color: #1e3a5f;">The Legacy Translations Team</strong>
+                </p>
+            </div>
+
+            <div style="background: #f1f5f9; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+                <p style="color: #64748b; font-size: 12px; margin: 0;">
+                    © 2024 Legacy Translations. All rights reserved.<br>
+                    <a href="https://legacytranslations.com" style="color: #1e3a5f;">legacytranslations.com</a>
+                </p>
+            </div>
+        </div>
+        """
+
+        try:
+            await email_service.send_email(
+                to=request.email,
+                subject="Welcome to Legacy Translations - Complete Your Partner Registration",
+                content=prospect_email_content,
+                content_type="html"
+            )
+            logger.info(f"Welcome email sent to prospect: {request.email}")
+        except Exception as email_err:
+            logger.error(f"Failed to send welcome email to prospect: {str(email_err)}")
+
         # Save to database for tracking
         b2b_inquiry = {
             "id": str(uuid.uuid4()),
@@ -3269,13 +3768,31 @@ async def register_partner(partner_data: PartnerCreate):
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
 
-        # Create partner
+        # Determine if invoice plan needs approval
+        needs_approval = partner_data.payment_plan in ['biweekly', 'monthly']
+
+        # Create partner with all fields
         partner = Partner(
             company_name=partner_data.company_name,
             email=partner_data.email,
             password_hash=hash_password(partner_data.password),
             contact_name=partner_data.contact_name,
-            phone=partner_data.phone
+            phone=partner_data.phone,
+            # Address
+            address_street=partner_data.address_street,
+            address_city=partner_data.address_city,
+            address_state=partner_data.address_state,
+            address_zip=partner_data.address_zip,
+            address_country=partner_data.address_country,
+            tax_id=partner_data.tax_id,
+            # Payment settings
+            payment_plan=partner_data.payment_plan,
+            default_payment_method=partner_data.default_payment_method,
+            # For invoice plans, start with approval pending
+            payment_plan_approved=not needs_approval,  # Auto-approve pay_per_order
+            # Agreement
+            agreed_to_terms=partner_data.agreed_to_terms,
+            agreed_at=datetime.utcnow() if partner_data.agreed_to_terms else None
         )
 
         await db.partners.insert_one(partner.dict())
@@ -3283,6 +3800,32 @@ async def register_partner(partner_data: PartnerCreate):
         # Generate token
         token = generate_token()
         active_tokens[token] = partner.id
+
+        # Send notification email to admin if invoice plan requested
+        if needs_approval:
+            try:
+                admin_subject = f"New Partner Registration - Invoice Plan Approval Needed: {partner.company_name}"
+                admin_content = f"""
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #1e40af;">New Partner Registration - Approval Required</h2>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 10px;">
+                        <p><strong>Company:</strong> {partner.company_name}</p>
+                        <p><strong>Contact:</strong> {partner.contact_name}</p>
+                        <p><strong>Email:</strong> {partner.email}</p>
+                        <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
+                        <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
+                        {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
+                        {f'<p><strong>Tax ID:</strong> {partner.tax_id}</p>' if partner.tax_id else ''}
+                    </div>
+                    <p style="margin-top: 20px; color: #6b7280;">
+                        This partner has requested an invoice-based payment plan. Please review and approve/deny in the admin panel.
+                    </p>
+                </div>
+                """
+                await send_email("contact@legacytranslations.com", admin_subject, admin_content)
+            except Exception as email_error:
+                logger.error(f"Failed to send admin notification: {email_error}")
 
         return PartnerResponse(
             id=partner.id,
@@ -5200,6 +5743,17 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
         # Set due date (30 days from now for payment)
         due_date = datetime.utcnow() + timedelta(days=30)
 
+        # Determine payment status based on payment method
+        payment_status = "pending"
+        if order_data.payment_method == "zelle":
+            payment_status = "pending_zelle"
+
+        # Get Zelle receipt URL if available
+        zelle_receipt_url = None
+        if order_data.zelle_receipt_id:
+            backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+            zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
+
         # Create order
         order = TranslationOrder(
             partner_id=partner["id"],
@@ -5220,7 +5774,12 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             urgency_fee=urgency_fee,
             total_price=total_price,
             due_date=due_date,
-            document_filename=order_data.document_filename
+            document_filename=order_data.document_filename,
+            payment_method=order_data.payment_method,
+            payment_status=payment_status,
+            zelle_receipt_id=order_data.zelle_receipt_id,
+            zelle_receipt_url=zelle_receipt_url,
+            shipping_address=order_data.shipping_address
         )
 
         await db.translation_orders.insert_one(order.dict())
@@ -5274,19 +5833,56 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                 "client_email": order.client_email
             }
 
-            # Notify partner
-            await email_service.send_order_confirmation_email(
-                partner["email"],
-                order_details,
-                is_partner=True
-            )
+            # If Zelle payment, send Zelle-specific emails
+            if order_data.payment_method == "zelle":
+                # Send Zelle pending email to partner
+                try:
+                    zelle_order_details = {
+                        **order_details,
+                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
+                        "customer_email": partner["email"]
+                    }
+                    email_html = get_zelle_pending_email_template(
+                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        zelle_order_details
+                    )
+                    await email_service.send_email(
+                        partner["email"],
+                        f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
+                        email_html,
+                        "html"
+                    )
+                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                except Exception as ze:
+                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
 
-            # Notify company
-            await email_service.send_order_confirmation_email(
-                "contact@legacytranslations.com",
-                order_details,
-                is_partner=False
-            )
+                # Send Zelle admin notification
+                try:
+                    admin_html = get_zelle_admin_notification_template(zelle_order_details, zelle_receipt_url)
+                    await email_service.send_email(
+                        "contact@legacytranslations.com",
+                        f"🔔 Partner Zelle Payment - {order.order_number} - ${order.total_price:.2f}",
+                        admin_html,
+                        "html"
+                    )
+                    logger.info("Zelle admin notification sent")
+                except Exception as ae:
+                    logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
+            else:
+                # Standard order confirmation emails
+                # Notify partner
+                await email_service.send_order_confirmation_email(
+                    partner["email"],
+                    order_details,
+                    is_partner=True
+                )
+
+                # Notify company
+                await email_service.send_order_confirmation_email(
+                    "contact@legacytranslations.com",
+                    order_details,
+                    is_partner=False
+                )
 
         except Exception as e:
             logger.error(f"Failed to send order emails: {str(e)}")
@@ -6663,8 +7259,8 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         start_date = datetime(now.year, now.month, 1)
         end_date = now
 
-    # Get revenue (paid orders)
-    orders = await db.orders.find({
+    # Get revenue (paid orders) from translation_orders collection
+    orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
@@ -6672,9 +7268,26 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_revenue = sum(o.get("total_price", 0) for o in orders)
 
     # Revenue by source
+    # Handle both revenue_source field and legacy source field (for whatsapp_bot)
+    def get_order_source(order):
+        # First check revenue_source field
+        revenue_source = order.get("revenue_source")
+        if revenue_source and revenue_source in REVENUE_SOURCES:
+            return revenue_source
+        # Check legacy source field for whatsapp_bot
+        source = order.get("source", "")
+        if source == "whatsapp_bot":
+            return "whatsapp"
+        # Check partner_id for whatsapp_bot
+        partner_id = order.get("partner_id", "")
+        if partner_id == "whatsapp_bot":
+            return "whatsapp"
+        # Default to website
+        return "website"
+
     revenue_by_source = {}
     for source in REVENUE_SOURCES.keys():
-        source_orders = [o for o in orders if o.get("revenue_source", "website") == source]
+        source_orders = [o for o in orders if get_order_source(o) == source]
         revenue_by_source[source] = {
             "label": REVENUE_SOURCES[source],
             "amount": sum(o.get("total_price", 0) for o in source_orders),
@@ -6719,7 +7332,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_expenses += translator_payments_total
 
     # Invoices summary
-    all_orders = await db.orders.find({
+    all_orders = await db.translation_orders.find({
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
 
@@ -6738,7 +7351,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         prev_start = start_date - (end_date - start_date)
         prev_end = start_date
 
-    prev_orders = await db.orders.find({
+    prev_orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": prev_start, "$lt": prev_end}
     }).to_list(1000)
@@ -6871,6 +7484,45 @@ async def delete_partner(partner_id: str, admin_key: str):
         raise
     except Exception as e:
         logger.error(f"Error deleting partner: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+@api_router.delete("/admin/partners/by-email/{email}")
+async def delete_partner_by_email(email: str, admin_key: str):
+    """Delete a partner by email (admin only) - useful for testing"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Find the partner by email
+        partner = await db.partners.find_one({"email": email})
+        if not partner:
+            raise HTTPException(status_code=404, detail=f"Partner with email '{email}' not found")
+
+        partner_id = partner.get("id")
+        partner_name = partner.get("company_name", partner.get("name", "Unknown"))
+
+        # Delete the partner
+        await db.partners.delete_one({"email": email})
+
+        # Mark their orders as orphaned
+        await db.translation_orders.update_many(
+            {"partner_id": partner_id},
+            {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+        )
+
+        logger.info(f"Partner deleted by email: {partner_name} ({email})")
+
+        return {
+            "status": "success",
+            "message": f"Partner '{partner_name}' ({email}) deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
@@ -7293,6 +7945,69 @@ async def upload_payment_proof(
             )
             await db.notifications.insert_one(notification.dict())
 
+        # Send email notification to contact with View Receipt link
+        try:
+            api_url = os.environ.get("API_URL", "https://legacy-portal-backend.onrender.com")
+            admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+            view_receipt_url = f"{api_url}/api/payment-proofs/view/{payment_proof.id}"
+
+            email_html = f'''
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #1a365d 0%, #2d4a7c 100%); padding: 20px; text-align: center;">
+                    <h1 style="color: white; margin: 0;">🔔 New {payment_method.upper()} Payment Received</h1>
+                </div>
+                <div style="padding: 30px; background: #f9fafb;">
+                    <p style="color: #374151;">A new order has been submitted with {payment_method.upper()} payment. Please verify the payment and confirm it in the admin panel.</p>
+
+                    <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                        <p style="color: #92400e; font-weight: bold; font-size: 18px; margin: 0 0 15px 0;">
+                            💰 {payment_method.upper()} Payment Details
+                        </p>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Order Number:</td>
+                                <td style="padding: 8px 0; color: #374151;">{order_number or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Name:</td>
+                                <td style="padding: 8px 0; color: #374151;">{customer_name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Customer Email:</td>
+                                <td style="padding: 8px 0; color: #374151;"><a href="mailto:{customer_email}">{customer_email}</a></td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Total Amount:</td>
+                                <td style="padding: 8px 0; color: #374151; font-size: 18px; font-weight: bold;">${amount:.2f}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; color: #78350f; font-weight: bold;">Receipt:</td>
+                                <td style="padding: 8px 0;"><a href="{view_receipt_url}" style="color: #2563eb; font-weight: bold;">View Receipt</a></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 20px;">
+                        <a href="{admin_url}" style="display: inline-block; background: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                            Open Admin Panel
+                        </a>
+                    </div>
+                </div>
+                <div style="background: #1f2937; padding: 15px; text-align: center;">
+                    <p style="color: #9ca3af; margin: 0; font-size: 12px;">© 2025 Legacy Translations. All rights reserved.</p>
+                </div>
+            </div>
+            '''
+
+            await email_service.send_email(
+                "contact@legacytranslations.com",
+                f"🔔 New {payment_method.upper()} Payment - {customer_name} - ${amount:.2f}",
+                email_html
+            )
+            logger.info(f"Payment notification email sent to contact@legacytranslations.com")
+        except Exception as e:
+            logger.error(f"Failed to send payment notification email: {str(e)}")
+
         logger.info(f"Payment proof uploaded: {payment_proof.id} from {customer_email}")
 
         return {
@@ -7375,6 +8090,60 @@ async def get_payment_proof_detail(proof_id: str, admin_key: str, token: Optiona
         del proof['_id']
 
     return {"payment_proof": proof}
+
+
+@api_router.get("/payment-proofs/view/{proof_id}")
+async def view_payment_proof_file(proof_id: str):
+    """Public endpoint to view payment proof file (for email links)"""
+    from fastapi.responses import Response
+
+    proof = await db.payment_proofs.find_one({"id": proof_id})
+    if not proof:
+        raise HTTPException(status_code=404, detail="Payment proof not found")
+
+    file_data = proof.get("proof_file_data")
+    file_type = proof.get("proof_file_type", "image/png")
+
+    if not file_data:
+        raise HTTPException(status_code=404, detail="No file data found")
+
+    # Decode base64 data
+    try:
+        file_bytes = base64.b64decode(file_data)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to decode file data")
+
+    return Response(content=file_bytes, media_type=file_type)
+
+
+@api_router.get("/receipt/view/{order_number}")
+async def view_receipt_by_order(order_number: str):
+    """View payment receipt by order number - redirects to admin panel or returns proof"""
+    from fastapi.responses import RedirectResponse
+
+    # Try to find payment proof by order number
+    proof = await db.payment_proofs.find_one({"order_number": order_number})
+    if proof:
+        # Return the file directly
+        file_data = proof.get("proof_file_data")
+        file_type = proof.get("proof_file_type", "image/png")
+
+        if file_data:
+            from fastapi.responses import Response
+            file_bytes = base64.b64decode(file_data)
+            return Response(content=file_bytes, media_type=file_type)
+
+    # Try to find in translation_orders or customer_orders
+    order = await db.translation_orders.find_one({"order_number": order_number})
+    if not order:
+        order = await db.customer_orders.find_one({"order_number": order_number})
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Redirect to admin panel
+    admin_url = os.environ.get("ADMIN_URL", "https://legacy-portal-frontend.onrender.com/#/admin")
+    return RedirectResponse(url=f"{admin_url}?view_order={order_number}")
 
 @api_router.put("/admin/payment-proofs/{proof_id}/review")
 async def review_payment_proof(
@@ -8300,6 +9069,77 @@ async def send_partner_message(request: PartnerMessageRequest):
     return {"status": "success", "message_id": message_id}
 
 
+@api_router.get("/partner/conversations")
+async def get_partner_conversations(token: str):
+    """Get partner's message conversations with admin replies"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    partner_id = partner["id"]
+
+    # Get sent messages by partner
+    sent_messages = await db.partner_messages.find(
+        {"from_partner_id": partner_id}
+    ).sort("created_at", -1).to_list(100)
+
+    # Get admin replies to partner
+    admin_replies = await db.partner_conversations.find(
+        {"partner_id": partner_id}
+    ).sort("created_at", -1).to_list(100)
+
+    # Combine and organize into conversation threads
+    conversations = []
+
+    # Add sent messages
+    for msg in sent_messages:
+        msg["_id"] = str(msg["_id"])
+        msg["direction"] = "sent"
+        if msg.get("created_at"):
+            msg["created_at"] = msg["created_at"].isoformat()
+        if msg.get("read_at"):
+            msg["read_at"] = msg["read_at"].isoformat()
+        if msg.get("replied_at"):
+            msg["replied_at"] = msg["replied_at"].isoformat()
+        conversations.append(msg)
+
+    # Add admin replies
+    for reply in admin_replies:
+        reply["_id"] = str(reply["_id"])
+        reply["direction"] = "received"
+        if reply.get("created_at"):
+            reply["created_at"] = reply["created_at"].isoformat()
+        if reply.get("read_at"):
+            reply["read_at"] = reply["read_at"].isoformat()
+        conversations.append(reply)
+
+    # Sort by created_at descending
+    conversations.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+    return {"conversations": conversations}
+
+
+@api_router.put("/partner/conversations/{conversation_id}/read")
+async def mark_conversation_read(conversation_id: str, token: str):
+    """Mark a conversation item as read"""
+    # Verify token
+    partner = await db.partners.find_one({"token": token})
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Try to update in partner_conversations collection
+    result = await db.partner_conversations.update_one(
+        {"id": conversation_id, "partner_id": partner["id"]},
+        {"$set": {"read": True, "read_at": datetime.utcnow()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    return {"status": "success"}
+
+
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
     """Get messages sent by partners for admin view"""
@@ -8342,7 +9182,7 @@ class ReplyToPartnerRequest(BaseModel):
 
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
-    """Admin replies to a partner message via email"""
+    """Admin replies to a partner message via email and stores in portal"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -8351,11 +9191,31 @@ async def reply_to_partner_message(message_id: str, request: ReplyToPartnerReque
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
 
-    # Mark message as read
+    now = datetime.utcnow()
+    reply_id = str(uuid.uuid4())
+
+    # Mark message as read and store reply reference
     await db.partner_messages.update_one(
         {"id": message_id},
-        {"$set": {"read": True, "read_at": datetime.utcnow(), "replied": True, "replied_at": datetime.utcnow()}}
+        {"$set": {"read": True, "read_at": now, "replied": True, "replied_at": now, "reply_id": reply_id}}
     )
+
+    # Store the reply in partner_conversations collection for the partner to see
+    conversation_reply = {
+        "id": reply_id,
+        "type": "admin_reply",
+        "partner_id": message.get("from_partner_id"),
+        "partner_name": request.partner_name,
+        "partner_email": request.partner_email,
+        "original_message_id": message_id,
+        "original_message_content": message.get("content", ""),
+        "order_number": message.get("order_number"),
+        "from_admin_name": request.admin_name or "Admin",
+        "content": request.content,
+        "read": False,
+        "created_at": now
+    }
+    await db.partner_conversations.insert_one(conversation_reply)
 
     # Send email reply to partner
     try:
@@ -12781,7 +13641,7 @@ Output CLEAN, PROFESSIONAL HTML:
    - Margins: 20mm all sides
    - Line-height: 1.5
 
-3. Page size: {"US Letter (8.5\" × 11\")" if page_format == "letter" else "A4 (210mm × 297mm)"}
+3. Page size: {'US Letter (8.5" × 11")' if page_format == "letter" else 'A4 (210mm × 297mm)'}
 
 4. Structure:
    - Center main titles
@@ -15850,6 +16710,343 @@ async def aws_diagnostic():
             result["textract_error_type"] = type(e).__name__
 
     return result
+
+# ==================== SALES CONTROL ENDPOINTS ====================
+
+class Salesperson(BaseModel):
+    id: str = None
+    name: str
+    email: str
+    phone: str = ""
+    commission_type: str = "percentage"  # percentage, fixed, hybrid
+    commission_rate: float = 0  # percentage or fixed amount per partner
+    base_salary: float = 0
+    monthly_target: int = 10  # partners per month
+    status: str = "active"  # active, inactive
+    hired_date: str = None
+    notes: str = ""
+    created_at: str = None
+
+class SalesGoal(BaseModel):
+    id: str = None
+    salesperson_id: str
+    month: str  # YYYY-MM format
+    target_partners: int
+    target_revenue: float
+    achieved_partners: int = 0
+    achieved_revenue: float = 0
+    bonus_earned: float = 0
+    status: str = "in_progress"  # in_progress, achieved, missed
+    created_at: str = None
+
+class PartnerAcquisition(BaseModel):
+    id: str = None
+    salesperson_id: str
+    partner_id: str
+    partner_name: str
+    partner_tier: str = "bronze"  # bronze, silver, gold, platinum
+    acquisition_date: str = None
+    commission_paid: float = 0
+    commission_status: str = "pending"  # pending, approved, paid
+    notes: str = ""
+    created_at: str = None
+
+# Get all salespeople
+@app.get("/admin/salespeople")
+async def get_salespeople(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+
+    # Get acquisition counts for each salesperson
+    for sp in salespeople:
+        sp["_id"] = str(sp["_id"])
+        acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
+        sp["total_acquisitions"] = acquisitions
+
+        # Get current month acquisitions
+        current_month = datetime.now().strftime("%Y-%m")
+        month_acquisitions = await db.partner_acquisitions.count_documents({
+            "salesperson_id": sp["id"],
+            "acquisition_date": {"$regex": f"^{current_month}"}
+        })
+        sp["month_acquisitions"] = month_acquisitions
+
+    return salespeople
+
+# Create salesperson
+@app.post("/admin/salespeople")
+async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salesperson.id = str(uuid.uuid4())[:8]
+    salesperson.created_at = datetime.now().isoformat()
+    salesperson.hired_date = salesperson.hired_date or datetime.now().strftime("%Y-%m-%d")
+
+    await db.salespeople.insert_one(salesperson.dict())
+
+    return {"success": True, "salesperson": salesperson.dict()}
+
+# Update salesperson
+@app.put("/admin/salespeople/{salesperson_id}")
+async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
+
+    result = await db.salespeople.update_one(
+        {"id": salesperson_id},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    return {"success": True}
+
+# Delete salesperson
+@app.delete("/admin/salespeople/{salesperson_id}")
+async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    result = await db.salespeople.delete_one({"id": salesperson_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    return {"success": True}
+
+# Get sales goals
+@app.get("/admin/sales-goals")
+async def get_sales_goals(admin_key: str = Header(None), month: str = None):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    query = {}
+    if month:
+        query["month"] = month
+
+    goals = await db.sales_goals.find(query).sort("month", -1).to_list(100)
+
+    for goal in goals:
+        goal["_id"] = str(goal["_id"])
+        # Get salesperson name
+        sp = await db.salespeople.find_one({"id": goal["salesperson_id"]})
+        goal["salesperson_name"] = sp["name"] if sp else "Unknown"
+
+    return goals
+
+# Create/Update sales goal
+@app.post("/admin/sales-goals")
+async def create_sales_goal(goal: SalesGoal, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    # Check if goal already exists for this salesperson/month
+    existing = await db.sales_goals.find_one({
+        "salesperson_id": goal.salesperson_id,
+        "month": goal.month
+    })
+
+    if existing:
+        # Update existing goal
+        await db.sales_goals.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "target_partners": goal.target_partners,
+                "target_revenue": goal.target_revenue
+            }}
+        )
+        return {"success": True, "updated": True}
+
+    goal.id = str(uuid.uuid4())[:8]
+    goal.created_at = datetime.now().isoformat()
+
+    await db.sales_goals.insert_one(goal.dict())
+
+    return {"success": True, "goal": goal.dict()}
+
+# Get partner acquisitions
+@app.get("/admin/partner-acquisitions")
+async def get_partner_acquisitions(admin_key: str = Header(None), salesperson_id: str = None):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    query = {}
+    if salesperson_id:
+        query["salesperson_id"] = salesperson_id
+
+    acquisitions = await db.partner_acquisitions.find(query).sort("acquisition_date", -1).to_list(200)
+
+    for acq in acquisitions:
+        acq["_id"] = str(acq["_id"])
+        # Get salesperson name
+        sp = await db.salespeople.find_one({"id": acq["salesperson_id"]})
+        acq["salesperson_name"] = sp["name"] if sp else "Unknown"
+
+    return acquisitions
+
+# Record partner acquisition
+@app.post("/admin/partner-acquisitions")
+async def create_partner_acquisition(acquisition: PartnerAcquisition, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    acquisition.id = str(uuid.uuid4())[:8]
+    acquisition.created_at = datetime.now().isoformat()
+    acquisition.acquisition_date = acquisition.acquisition_date or datetime.now().strftime("%Y-%m-%d")
+
+    # Calculate commission based on tier
+    tier_commissions = {
+        "bronze": 50,
+        "silver": 75,
+        "gold": 100,
+        "platinum": 150
+    }
+
+    salesperson = await db.salespeople.find_one({"id": acquisition.salesperson_id})
+    if salesperson:
+        if salesperson.get("commission_type") == "fixed":
+            acquisition.commission_paid = salesperson.get("commission_rate", 0)
+        else:
+            acquisition.commission_paid = tier_commissions.get(acquisition.partner_tier, 50)
+
+    await db.partner_acquisitions.insert_one(acquisition.dict())
+
+    # Update sales goal if exists for this month
+    month = acquisition.acquisition_date[:7]  # YYYY-MM
+    goal = await db.sales_goals.find_one({
+        "salesperson_id": acquisition.salesperson_id,
+        "month": month
+    })
+
+    if goal:
+        await db.sales_goals.update_one(
+            {"id": goal["id"]},
+            {"$inc": {"achieved_partners": 1}}
+        )
+
+    return {"success": True, "acquisition": acquisition.dict()}
+
+# Update acquisition commission status
+@app.put("/admin/partner-acquisitions/{acquisition_id}/status")
+async def update_acquisition_status(acquisition_id: str, status: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    if status not in ["pending", "approved", "paid"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    result = await db.partner_acquisitions.update_one(
+        {"id": acquisition_id},
+        {"$set": {"commission_status": status}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    return {"success": True}
+
+# Get sales dashboard stats
+@app.get("/admin/sales-dashboard")
+async def get_sales_dashboard(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    current_month = datetime.now().strftime("%Y-%m")
+
+    # Total salespeople
+    total_salespeople = await db.salespeople.count_documents({"status": "active"})
+
+    # Total partners acquired this month
+    month_acquisitions = await db.partner_acquisitions.count_documents({
+        "acquisition_date": {"$regex": f"^{current_month}"}
+    })
+
+    # Total partners acquired all time
+    total_acquisitions = await db.partner_acquisitions.count_documents({})
+
+    # Pending commissions
+    pending_pipeline = [
+        {"$match": {"commission_status": {"$in": ["pending", "approved"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    pending_result = await db.partner_acquisitions.aggregate(pending_pipeline).to_list(1)
+    pending_commissions = pending_result[0]["total"] if pending_result else 0
+
+    # Paid commissions this month
+    paid_pipeline = [
+        {"$match": {
+            "commission_status": "paid",
+            "acquisition_date": {"$regex": f"^{current_month}"}
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    paid_result = await db.partner_acquisitions.aggregate(paid_pipeline).to_list(1)
+    paid_commissions = paid_result[0]["total"] if paid_result else 0
+
+    # Top performers this month
+    top_performers_pipeline = [
+        {"$match": {"acquisition_date": {"$regex": f"^{current_month}"}}},
+        {"$group": {
+            "_id": "$salesperson_id",
+            "count": {"$sum": 1},
+            "commission": {"$sum": "$commission_paid"}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    top_performers = await db.partner_acquisitions.aggregate(top_performers_pipeline).to_list(5)
+
+    # Add salesperson names to top performers
+    for performer in top_performers:
+        sp = await db.salespeople.find_one({"id": performer["_id"]})
+        performer["name"] = sp["name"] if sp else "Unknown"
+        performer["salesperson_id"] = performer.pop("_id")
+
+    # Monthly trend (last 6 months)
+    monthly_trend = []
+    for i in range(5, -1, -1):
+        month_date = datetime.now() - timedelta(days=30*i)
+        month_str = month_date.strftime("%Y-%m")
+        count = await db.partner_acquisitions.count_documents({
+            "acquisition_date": {"$regex": f"^{month_str}"}
+        })
+        monthly_trend.append({
+            "month": month_str,
+            "acquisitions": count
+        })
+
+    # Acquisitions by tier
+    tier_pipeline = [
+        {"$group": {
+            "_id": "$partner_tier",
+            "count": {"$sum": 1}
+        }}
+    ]
+    tier_distribution = await db.partner_acquisitions.aggregate(tier_pipeline).to_list(10)
+    tier_dict = {t["_id"]: t["count"] for t in tier_distribution}
+
+    return {
+        "total_salespeople": total_salespeople,
+        "month_acquisitions": month_acquisitions,
+        "total_acquisitions": total_acquisitions,
+        "pending_commissions": pending_commissions,
+        "paid_commissions": paid_commissions,
+        "top_performers": top_performers,
+        "monthly_trend": monthly_trend,
+        "tier_distribution": {
+            "bronze": tier_dict.get("bronze", 0),
+            "silver": tier_dict.get("silver", 0),
+            "gold": tier_dict.get("gold", 0),
+            "platinum": tier_dict.get("platinum", 0)
+        },
+        "current_month": current_month
+    }
 
 @app.on_event("startup")
 async def create_default_partner():

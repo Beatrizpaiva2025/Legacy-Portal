@@ -245,7 +245,8 @@ const AdminLogin = ({ onLogin }) => {
             role: response.data.role,
             name: response.data.name,
             email: response.data.email,
-            id: response.data.id
+            id: response.data.id,
+            translator_type: response.data.translator_type
           });
         }
       }
@@ -539,6 +540,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin', 'pm'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin', 'pm'], labelForPM: 'Translators' },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
     { id: 'mia-bot', label: 'MIA Bot', icon: '🤖', roles: ['admin'], isExternal: true }
@@ -1543,6 +1545,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
@@ -1550,6 +1553,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [documentType, setDocumentType] = useState('Birth Certificate');
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
+  const [savedTranslatorName, setSavedTranslatorName] = useState(''); // Saved translator name from database - DO NOT change on UI selection
   const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
@@ -1718,7 +1722,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // OCR Editor state
   const [ocrFontFamily, setOcrFontFamily] = useState('monospace');
   const [ocrFontSize, setOcrFontSize] = useState('12px');
-  const [useClaudeOcr, setUseClaudeOcr] = useState(true); // Default to Claude for better formatting
+  const [useClaudeOcr, setUseClaudeOcr] = useState(false); // Default to AWS Textract
   const [ocrSpecialCommands, setOcrSpecialCommands] = useState('Maintain the EXACT original layout and formatting. Preserve all line breaks, spacing, and document structure. Extract tables with proper alignment.');
 
   // Approval checkboxes state
@@ -1744,6 +1748,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
+
+  // Proofreading view mode: 'preview' shows highlighted errors, 'edit' allows editing
+  const [proofreadingViewMode, setProofreadingViewMode] = useState('preview');
 
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
@@ -2041,13 +2048,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               const response = await axios.get(`${API}/admin/orders/${selectedOrder.id}?admin_key=${adminKey}`);
               const orderData = response.data.order || response.data;
               if (orderData.translation_html) {
-                setTranslationResults([{
-                  translatedText: orderData.translation_html,
-                  filename: 'Translation',
-                  originalText: ''
-                }]);
-                setActiveSubTab('review');
-                setProcessingStatus(`✅ Translation loaded!`);
+                // Check for corrupted binary content
+                if (isBinaryContent(orderData.translation_html)) {
+                  setProcessingStatus('⚠️ Translation data is corrupted. Please re-upload the translation.');
+                } else {
+                  setTranslationResults([{
+                    translatedText: orderData.translation_html,
+                    filename: 'Translation',
+                    originalText: ''
+                  }]);
+                  setActiveSubTab('review');
+                  setProcessingStatus(`✅ Translation loaded!`);
+                }
               }
             } catch (err) {
               console.error('Failed to load translation:', err);
@@ -2257,6 +2269,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const orderData = response.data.order || response.data;
 
         if (orderData.translation_html) {
+          // Check for corrupted binary content (Word file that wasn't converted)
+          if (isBinaryContent(orderData.translation_html)) {
+            console.warn('Binary content detected in translation_html - this appears to be a corrupted Word file');
+            setProcessingStatus('⚠️ Translation data is corrupted (binary Word file). Please re-upload the translation.');
+            return false;
+          }
           // Set translation results with original text for proofreading
           setTranslationResults([{
             translatedText: orderData.translation_html,
@@ -2281,7 +2299,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           if (orderData.translation_source_language) setSourceLanguage(orderData.translation_source_language);
           if (orderData.translation_target_language) setTargetLanguage(orderData.translation_target_language);
           if (orderData.translation_document_type) setDocumentType(orderData.translation_document_type);
-          if (orderData.translation_translator_name) setSelectedTranslator(orderData.translation_translator_name);
+          if (orderData.translation_translator_name) {
+            setSelectedTranslator(orderData.translation_translator_name);
+            setSavedTranslatorName(orderData.translation_translator_name); // Save original name from DB - used for certificate signature
+          }
           if (orderData.translation_type_setting) setTranslationType(orderData.translation_type_setting);
           if (orderData.translation_page_format) setPageFormat(orderData.translation_page_format);
           if (orderData.translation_include_cover !== undefined) setIncludeCover(orderData.translation_include_cover);
@@ -3249,11 +3270,129 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Generate translation text with highlighted errors
+  const getHighlightedTranslation = () => {
+    const currentResult = translationResults[selectedResultIndex];
+    if (!currentResult?.translatedText || !proofreadingResult?.erros || proofreadingResult.erros.length === 0) {
+      return currentResult?.translatedText || '<p>No translation</p>';
+    }
+
+    let highlightedHtml = currentResult.translatedText;
+
+    // Create a list of errors to highlight with their original index, sorted by length (longest first)
+    const errorsToHighlight = proofreadingResult.erros
+      .map((erro, idx) => ({
+        text: erro.found || erro.original || erro.traducao_errada || '',
+        severity: erro.severidade || erro.gravidade || 'MÉDIO',
+        suggestion: erro.sugestao || erro.correcao || '',
+        type: erro.tipo || 'Geral',
+        index: idx,
+        applied: erro.applied
+      }))
+      .filter(e => e.text && e.text.length > 0 && !e.applied)
+      .sort((a, b) => b.text.length - a.text.length);
+
+    // Apply highlighting for each error
+    errorsToHighlight.forEach(error => {
+      const severityColor = error.severity === 'CRÍTICO' ? '#fee2e2' : // red-100
+                           error.severity === 'ALTO' ? '#dbeafe' : // blue-100
+                           error.severity === 'MÉDIO' ? '#fef3c7' : // yellow-100
+                           '#e0e7ff'; // indigo-100 for BAIXO
+
+      const borderColor = error.severity === 'CRÍTICO' ? '#ef4444' : // red-500
+                         error.severity === 'ALTO' ? '#3b82f6' : // blue-500
+                         error.severity === 'MÉDIO' ? '#f59e0b' : // yellow-500
+                         '#6366f1'; // indigo-500 for BAIXO
+
+      const escapedText = error.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Create tooltip with error details
+      const tooltipText = `Tipo: ${error.type} | Severidade: ${error.severity} | Sugestão: ${error.suggestion}`.replace(/"/g, '&quot;');
+
+      // Use simple global replace (case insensitive) - only replace first occurrence to avoid duplicates
+      const regex = new RegExp(escapedText, 'i');
+      highlightedHtml = highlightedHtml.replace(
+        regex,
+        `<mark data-error-index="${error.index}" style="background-color: ${severityColor}; border-bottom: 2px solid ${borderColor}; padding: 2px 4px; border-radius: 3px; cursor: pointer; transition: all 0.2s;" title="${tooltipText}" class="proofreading-error-highlight">${error.text}</mark>`
+      );
+    });
+
+    return highlightedHtml;
+  };
+
+  // Handle click on highlighted error in translation - scroll to and highlight the table row
+  const handleHighlightedErrorClick = (e) => {
+    const mark = e.target.closest('mark[data-error-index]');
+    if (mark) {
+      const errorIndex = parseInt(mark.getAttribute('data-error-index'), 10);
+      setHighlightedErrorIndex(errorIndex);
+
+      // Scroll the error table row into view
+      setTimeout(() => {
+        const errorRow = document.querySelector(`[data-error-row="${errorIndex}"]`);
+        if (errorRow) {
+          errorRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+
+      // Clear the highlight after 3 seconds
+      setTimeout(() => {
+        setHighlightedErrorIndex(null);
+      }, 3000);
+    }
+  };
+
+  // Helper function to try replacing text with multiple strategies
+  const tryReplaceText = (html, foundText, suggestionText) => {
+    let updatedHtml = html;
+    let replaced = false;
+
+    // Strategy 1: Try exact match (case insensitive)
+    const escapedText = foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(escapedText, 'gi');
+
+    if (exactRegex.test(html)) {
+      updatedHtml = html.replace(exactRegex, suggestionText);
+      replaced = true;
+    }
+
+    // Strategy 2: Try matching with flexible whitespace
+    if (!replaced) {
+      const flexiblePattern = foundText
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\s+/g, '\\s*(?:<[^>]*>)?\\s*');
+      const flexibleRegex = new RegExp(flexiblePattern, 'gi');
+
+      if (flexibleRegex.test(html)) {
+        updatedHtml = html.replace(flexibleRegex, suggestionText);
+        replaced = true;
+      }
+    }
+
+    // Strategy 3: Try finding words individually
+    if (!replaced) {
+      const words = foundText.split(/\s+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        const wordPattern = words
+          .map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('(?:[^<]*(?:<[^>]*>[^<]*)*?)');
+        const wordRegex = new RegExp(wordPattern, 'gi');
+
+        if (wordRegex.test(html)) {
+          updatedHtml = html.replace(wordRegex, suggestionText);
+          replaced = true;
+        }
+      }
+    }
+
+    return { updatedHtml, replaced };
+  };
+
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
     // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = erro.found || erro.original || erro.traducao_errada;
-    const suggestionText = erro.sugestao || erro.correcao;
+    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3263,17 +3402,18 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     const currentResult = translationResults[selectedResultIndex];
     if (!currentResult?.translatedText) return;
 
-    // Replace the found text with the suggestion
-    const updatedHtml = currentResult.translatedText.replace(
-      new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-      suggestionText
-    );
+    const result = tryReplaceText(currentResult.translatedText, foundText, suggestionText);
+
+    if (!result.replaced) {
+      alert(`Could not find text to replace: "${foundText.substring(0, 50)}${foundText.length > 50 ? '...' : ''}"\n\nThe text may have been modified or contains special formatting.`);
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: updatedHtml
+      translatedText: result.updatedHtml
     };
     setTranslationResults(newResults);
 
@@ -3296,20 +3436,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     if (!currentResult?.translatedText) return;
 
     let updatedHtml = currentResult.translatedText;
+    let appliedCount = 0;
+
     const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions
-      const foundText = erro.found || erro.original || erro.traducao_errada;
-      const suggestionText = erro.sugestao || erro.correcao;
+      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
+      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
-        updatedHtml = updatedHtml.replace(
-          new RegExp(foundText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-          suggestionText
-        );
-        return { ...erro, applied: true };
+        const result = tryReplaceText(updatedHtml, foundText, suggestionText);
+        if (result.replaced) {
+          updatedHtml = result.updatedHtml;
+          appliedCount++;
+          return { ...erro, applied: true };
+        }
       }
       return erro;
     });
+
+    if (appliedCount === 0) {
+      alert('No corrections could be applied. The text may have been modified or contains special formatting.');
+      return;
+    }
 
     // Update translation results
     const newResults = [...translationResults];
@@ -3394,6 +3542,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  };
+
+  // Helper function to detect if content is binary (corrupted Word file data)
+  const isBinaryContent = (content) => {
+    if (!content || typeof content !== 'string') return false;
+    // Check for common binary signatures
+    // PK = ZIP/DOCX header, starts with lots of null or control chars
+    if (content.startsWith('PK')) return true;
+    // Check for high ratio of non-printable characters
+    const nonPrintable = content.slice(0, 500).split('').filter(c => {
+      const code = c.charCodeAt(0);
+      return code < 32 && code !== 9 && code !== 10 && code !== 13;
+    }).length;
+    return nonPrintable > 50; // More than 10% non-printable in first 500 chars
   };
 
   // Convert Word document (.docx) to HTML
@@ -3820,10 +3982,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           currentSizePt = Math.round(fontSizePx * 0.75); // Convert px to pt
         }
 
-        // Increase or decrease by 2pt
+        // Increase or decrease by 2pt (min 4pt to allow very small sizes)
         const newSize = command === 'increaseFontSize'
           ? Math.min(currentSizePt + 2, 48)
-          : Math.max(currentSizePt - 2, 8);
+          : Math.max(currentSizePt - 2, 4);
         span.style.fontSize = `${newSize}pt`;
 
         try {
@@ -3912,8 +4074,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setQuickPackageProgress(`Processing translation ${i + 1}/${files.length}: ${file.name}`);
 
       try {
-        // Word document (.docx)
-        if (fileName.endsWith('.docx')) {
+        // Word document (.docx or .doc)
+        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
           setQuickPackageProgress(`Converting Word document: ${file.name}`);
           const html = await convertWordToHtml(file);
           setQuickTranslationHtml(prev => prev + (prev ? '<div style="page-break-before: always;"></div>' : '') + html);
@@ -4160,7 +4322,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Small delay to let UI update
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4221,8 +4385,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -4706,7 +4870,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       certData = await createCertification();
     }
 
-    const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+    // Use saved translator name from database if available, otherwise fall back to UI selection
+    const translatorNameForCert = savedTranslatorName || selectedTranslator;
+    const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
     const pageSizeCSS = pageFormat === 'a4' ? 'A4' : 'Letter';
     const certTitle = translationType === 'sworn' ? 'Sworn Translation Certificate' : 'Certification of Translation Accuracy';
 
@@ -4778,8 +4944,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Managing Director'}</div>
+                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
+                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -5223,17 +5389,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = START, TRANSLATION, REVIEW, DELIVER | CONTRACTOR = START, DELIVER */}
+      {/* Translator access: IN_HOUSE = ALL TABS | CONTRACTOR = START, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] },
-          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm'] },
+          { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin'] },
-          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin'] },
-          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm'] }
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'translator_inhouse'] },
+          { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
           // For translators, check translator_type for extended access
@@ -5459,10 +5625,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                               e.stopPropagation();
                               downloadProjectDocument(file.id, file.filename);
                             }}
-                            className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                            title={`Download ${file.filename}`}
+                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                            title={`Download original file: ${file.filename}`}
                           >
-                            ⬇️
+                            ⬇️ Download
                           </button>
                         </div>
                       </div>
@@ -5581,10 +5747,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </button>
                         <button
                           onClick={() => downloadProjectDocument(file.id, file.filename)}
-                          className="px-2 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded transition-colors"
-                          title={`Download ${file.filename}`}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                          title={`Download original file: ${file.filename}`}
                         >
-                          ⬇️
+                          ⬇️ Download
                         </button>
                       </div>
                     </div>
@@ -5596,10 +5762,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Quick Start Guide */}
+          {/* Quick Start Guide - Different steps for IN_HOUSE vs regular translators */}
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> 1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver
+              <strong>Quick Start:</strong> {isInHouseTranslator || isAdmin || isPM
+                ? '1️⃣ START → 2️⃣ TRANSLATE → 3️⃣ REVIEW → 4️⃣ PROOFREADING → 5️⃣ DELIVER'
+                : '1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver'}
             </p>
           </div>
 
@@ -7087,21 +7255,99 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="border rounded p-3 bg-white">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-xs font-medium">Extracted Text:</span>
-                        <button
-                          onClick={() => {
-                            const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
-                            const blob = new Blob([text], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = 'ocr_text_for_cat.txt';
-                            a.click();
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          📥 Download for CAT Tool
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n---\n\n');
+                              const blob = new Blob([text], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.txt';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            title="Download as TXT"
+                          >
+                            TXT
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<hr style="border: 2px dashed #ccc; margin: 20px 0;">\n\n');
+                              const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; }
+  </style>
+</head>
+<body>
+  <h1>OCR Extracted Text</h1>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([htmlContent], { type: 'text/html' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.html';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            title="Download as HTML"
+                          >
+                            HTML
+                          </button>
+                          <button
+                            onClick={() => {
+                              const text = ocrResults.map(r => r.text).join('\n\n<br style="page-break-before: always;">\n\n');
+                              const docContent = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Extracted Text</title>
+  <!--[if gte mso 9]>
+  <xml>
+    <w:WordDocument>
+      <w:View>Print</w:View>
+      <w:Zoom>100</w:Zoom>
+    </w:WordDocument>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1in; line-height: 1.6; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+    td, th { border: 1px solid #333; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font-family: Courier New, monospace; }
+  </style>
+</head>
+<body>
+  <div>${text}</div>
+</body>
+</html>`;
+                              const blob = new Blob([docContent], { type: 'application/msword' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = 'ocr_text_for_cat.doc';
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                            title="Download as Word"
+                          >
+                            Word
+                          </button>
+                        </div>
                       </div>
                       <textarea
                         value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
@@ -7592,7 +7838,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     for (const file of files) {
                       const fileName = file.name.toLowerCase();
                       try {
-                        if (fileName.endsWith('.docx')) {
+                        if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                           const html = await convertWordToHtml(file);
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
                         } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -7602,7 +7848,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           const text = await readTxtFile(file);
                           const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt;">${text}</div>`;
                           setTranslationResults(prev => [...prev, { translatedText: html, originalText: '', filename: file.name }]);
-                        } else if (fileName.endsWith('.pdf') || file.type.startsWith('image/')) {
+                        } else if (fileName.endsWith('.pdf')) {
+                          // Convert PDF to individual page images
+                          setProcessingStatus(`Converting PDF: ${file.name}...`);
+                          const images = await convertPdfToImages(file, (page, total) => {
+                            setProcessingStatus(`Converting PDF page ${page}/${total}`);
+                          });
+                          images.forEach((img, idx) => {
+                            const imgHtml = `<div style="text-align:center;"><img src="data:${img.type};base64,${img.data}" style="max-width:100%; height:auto;" alt="${file.name} page ${idx + 1}" /></div>`;
+                            setTranslationResults(prev => [...prev, { translatedText: imgHtml, originalText: '', filename: `${file.name} - Page ${idx + 1}` }]);
+                          });
+                        } else if (file.type.startsWith('image/')) {
                           const dataUrl = await new Promise((resolve) => {
                             const reader = new FileReader();
                             reader.onload = () => resolve(reader.result);
@@ -7613,7 +7869,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         }
                       } catch (err) {
                         console.error('Upload error:', err);
-                        setProcessingStatus(`⚠️ Errorr: ${file.name}`);
+                        setProcessingStatus(`⚠️ Error: ${file.name}`);
                       }
                     }
                     setProcessingStatus('✅ Translation uploaded!');
@@ -7891,7 +8147,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             setProcessingStatus(`Processing page ${idx + 1}...`);
                             try {
                               let html = '';
-                              if (fileName.endsWith('.docx')) {
+                              if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                                 html = await convertWordToHtml(file);
                               } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
                                 html = await readHtmlFile(file);
@@ -7963,7 +8219,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         for (const file of files) {
                           const fileName = file.name.toLowerCase();
                           try {
-                            if (fileName.endsWith('.docx')) {
+                            if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
                               const html = await convertWordToHtml(file);
                               setTranslationResults(prev => [...prev, { translatedText: html, originalText: '' }]);
                             } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
@@ -8108,8 +8364,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* PROOFREADING TAB - Admin and PM Only */}
-      {activeSubTab === 'proofreading' && (isAdmin || isPM) && (
+      {/* PROOFREADING TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'proofreading' && (isAdmin || isPM || isInHouseTranslator) && (
         <div className="bg-white rounded shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold">🔍 Proofreading & Quality Assurance</h2>
@@ -8230,16 +8486,82 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
 
-                {/* Translation Preview */}
+                {/* Translation Preview/Edit */}
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-green-100 border-b">
-                    <span className="text-xs font-bold text-green-700">📄 Translation ({targetLanguage})</span>
+                  <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-green-700">
+                        📄 Translation ({targetLanguage}) {proofreadingViewMode === 'edit' && '- ✏️ Editing'}
+                      </span>
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center gap-1 ml-2">
+                        <button
+                          onClick={() => setProofreadingViewMode('preview')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          👁️ Preview
+                        </button>
+                        <button
+                          onClick={() => setProofreadingViewMode('edit')}
+                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
+                    </div>
+                    {proofreadingViewMode === 'preview' && proofreadingResult?.erros?.length > 0 && (
+                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                        <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#fef3c7', border: '1px solid #f59e0b'}}></span> Médio
+                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#e0e7ff', border: '1px solid #6366f1'}}></span> Baixo
+                      </span>
+                    )}
                   </div>
+
+                  {/* Edit Toolbar - Only visible in edit mode */}
+                  {proofreadingViewMode === 'edit' && (
+                    <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
+                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
+                    </div>
+                  )}
+
                   <div className="p-4 bg-white max-h-64 overflow-y-auto">
-                    <div
-                      className="text-xs"
-                      dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>' }}
-                    />
+                    {proofreadingViewMode === 'preview' ? (
+                      <>
+                        <div
+                          className="text-xs leading-relaxed"
+                          onClick={handleHighlightedErrorClick}
+                          dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
+                        />
+                        {proofreadingResult?.erros?.length > 0 && (
+                          <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: translationResults[selectedResultIndex]?.translatedText || '' }}
+                        onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
+                        onMouseUp={saveSelection}
+                        onKeyUp={saveSelection}
+                        className="text-xs leading-relaxed focus:outline-none min-h-[200px]"
+                        style={{border: '2px solid #10B981', borderRadius: '4px', padding: '8px'}}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -8351,13 +8673,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
-                                  <tr key={idx} className={`border-t ${
-                                    erro.applied ? 'bg-green-50 opacity-60' :
-                                    severity === 'CRÍTICO' ? 'bg-red-50' :
-                                    severity === 'ALTO' ? 'bg-blue-50' :
-                                    severity === 'MÉDIO' ? 'bg-yellow-50' :
-                                    'bg-blue-50'
-                                  }`}>
+                                  <tr
+                                    key={idx}
+                                    data-error-row={idx}
+                                    className={`border-t transition-all duration-300 ${
+                                      highlightedErrorIndex === idx ? 'ring-2 ring-indigo-500 ring-inset shadow-lg scale-[1.01]' :
+                                      erro.applied ? 'bg-green-50 opacity-60' :
+                                      severity === 'CRÍTICO' ? 'bg-red-50' :
+                                      severity === 'ALTO' ? 'bg-blue-50' :
+                                      severity === 'MÉDIO' ? 'bg-yellow-50' :
+                                      'bg-blue-50'
+                                    }`}>
                                     <td className="px-2 py-2">
                                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                         severity === 'CRÍTICO' ? 'bg-red-500 text-white' :
@@ -8439,24 +8765,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <span className="mr-2">←</span> Back: Review
                   </button>
                   <div className="flex gap-3">
-                    {/* Reject Button */}
-                    <button
-                      onClick={rejectTranslation}
-                      disabled={sendingToProjects}
-                      className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
-                    >
-                      ❌ Reject
-                    </button>
+                    {/* Reject Button - Only for Admin and PM */}
+                    {(isAdmin || isPM) && (
+                      <button
+                        onClick={rejectTranslation}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
+                      >
+                        ❌ Reject
+                      </button>
+                    )}
 
-                    {/* Approve Button - Different behavior for PM vs Admin */}
+                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
                     <button
                       onClick={() => approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        isPM && !isAdmin ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
+                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
-                      {isPM && !isAdmin ? '📤 Send to Admin' : '✅ Approve'}
+                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -8471,7 +8799,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isPM && !isAdmin ? (
+                  {isInHouseTranslator ? (
+                    <>
+                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                    </>
+                  ) : isPM && !isAdmin ? (
                     <>
                       📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
                       <br/>
@@ -8568,6 +8900,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       try {
                         if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
                           const text = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(text)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           const html = `<div style="white-space: pre-wrap;">${text}</div>`;
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
@@ -8579,6 +8916,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           setProcessingStatus('✅ Translation loaded!');
                         } else if (file.type === 'text/html' || file.name.endsWith('.html') || file.name.endsWith('.htm')) {
                           const html = await file.text();
+                          // Check for binary content
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ File appears to be corrupted. Please try a different file.');
+                            return;
+                          }
+                          if (translationResults.length === 0) {
+                            setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
+                          } else {
+                            setTranslationResults(prev => prev.map((r, idx) =>
+                              idx === 0 ? { ...r, translatedText: html } : r
+                            ));
+                          }
+                          setProcessingStatus('✅ Translation loaded!');
+                        } else if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+                          // Word document - convert to HTML using mammoth
+                          setProcessingStatus('🔄 Converting Word document...');
+                          const html = await convertWordToHtml(file);
+                          // Check for binary content (corrupted conversion)
+                          if (isBinaryContent(html)) {
+                            setProcessingStatus('⚠️ Word document appears to be corrupted. Please try a different file.');
+                            return;
+                          }
                           if (translationResults.length === 0) {
                             setTranslationResults([{ translatedText: html, originalText: ocrResults[0]?.text || '', filename: file.name }]);
                           } else {
@@ -9167,6 +9526,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       '📤 Send to PM for Review'
                     )}
                   </button>
+
+                  {/* Download Button for Contractors */}
+                  <button
+                    onClick={handleQuickPackageDownload}
+                    disabled={(quickTranslationFiles.length === 0 && !quickTranslationHtml) || quickPackageLoading}
+                    className="w-full mt-3 py-2 bg-gradient-to-r from-green-600 to-blue-600 text-white text-sm font-medium rounded-lg hover:from-green-700 hover:to-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {quickPackageLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      '📥 Download Package (Print/PDF)'
+                    )}
+                  </button>
+                  <p className="text-[10px] text-gray-500 mt-1 text-center">
+                    Opens print window - save as PDF
+                  </p>
 
                   {(!documentType.trim() || (quickTranslationFiles.length === 0 && !quickTranslationHtml)) && (
                     <p className="text-[10px] text-purple-600 mt-2">
@@ -9938,8 +10316,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* TRANSLATION MEMORY TAB - Admin Only */}
-      {activeSubTab === 'tm' && isAdmin && (
+      {/* TRANSLATION MEMORY TAB - Admin and In-House Translators */}
+      {activeSubTab === 'tm' && (isAdmin || isInHouseTranslator) && (
         <div className="bg-white rounded shadow">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -10680,9 +11058,11 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   // Editing states for inline edits
   const [editingTags, setEditingTags] = useState(null); // Order ID being edited
-  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited
+  const [editingDeadline, setEditingDeadline] = useState(null); // Order ID being edited for client deadline
+  const [editingTranslatorDeadline, setEditingTranslatorDeadline] = useState(null); // Order ID being edited for translator deadline
   const [tempTagValue, setTempTagValue] = useState({ type: 'professional', notes: '' });
   const [tempDeadlineValue, setTempDeadlineValue] = useState({ date: '', time: '' });
+  const [tempTranslatorDeadlineValue, setTempTranslatorDeadlineValue] = useState({ date: '', time: '' });
 
   // Send to Client modal state
   const [sendingOrder, setSendingOrder] = useState(null); // Order being sent
@@ -11110,6 +11490,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update deadline:', err);
+    }
+  };
+
+  // Edit translator deadline
+  const startEditingTranslatorDeadline = (order) => {
+    setEditingTranslatorDeadline(order.id);
+    const deadlineDate = order.translator_deadline ? new Date(order.translator_deadline) : new Date();
+    setTempTranslatorDeadlineValue({
+      date: deadlineDate.toISOString().split('T')[0],
+      time: deadlineDate.toTimeString().slice(0, 5)
+    });
+  };
+
+  const saveTranslatorDeadlineEdit = async (orderId) => {
+    try {
+      const deadlineDateTime = `${tempTranslatorDeadlineValue.date}T${tempTranslatorDeadlineValue.time || '17:00'}:00`;
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_deadline: deadlineDateTime
+      });
+      setEditingTranslatorDeadline(null);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update translator deadline:', err);
     }
   };
 
@@ -11776,17 +12179,17 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         ? { name: user?.name || 'Admin', id: 'self' }
         : translatorList.find(t => t.id === assignmentDetails.translator_id);
 
-      // Build deadline if provided
-      let deadline = null;
+      // Build translator deadline if provided
+      let translatorDeadline = null;
       if (assignmentDetails.due_date) {
-        deadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
       }
 
       // Update order with translator assignment
       await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
         assigned_translator_id: isSelfAssignment ? null : assignmentDetails.translator_id,
         assigned_translator: isSelfAssignment ? (user?.name || 'Admin') : selectedTranslator?.name,
-        deadline: deadline,
+        translator_deadline: translatorDeadline,
         internal_notes: assignmentDetails.project_notes,
         self_assigned: isSelfAssignment,
         skip_email: isSelfAssignment
@@ -12008,19 +12411,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
-      {/* Notification Banner - Show unread notifications */}
+      {/* Notification Banner - Show unread notifications - Bright Yellow */}
       {(isAdmin || isPM) && notifications.filter(n => !n.is_read).length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 bg-yellow-200 border-2 border-yellow-400 rounded-lg shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-blue-600 mr-2">🔔</span>
-              <span className="text-sm font-medium text-blue-800">
-                {notifications.filter(n => !n.is_read).length} new notification(s)
+              <span className="text-2xl mr-3">🔔</span>
+              <span className="text-base font-bold text-yellow-900">
+                {notifications.filter(n => !n.is_read).length} NEW NOTIFICATION(S)
               </span>
             </div>
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
             >
               {showNotifications ? 'Hide' : 'View'}
             </button>
@@ -12030,26 +12433,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {notifications.filter(n => !n.is_read).map((notif) => (
                 <div
                   key={notif.id}
-                  className={`p-2 rounded text-xs ${
-                    notif.type === 'assignment_declined' ? 'bg-red-100 border border-red-200' :
-                    notif.type === 'assignment_accepted' ? 'bg-green-100 border border-green-200' :
-                    'bg-white border'
+                  className={`p-3 rounded-lg text-sm border-2 shadow ${
+                    notif.type === 'assignment_declined' ? 'bg-red-100 border-red-300' :
+                    notif.type === 'assignment_accepted' ? 'bg-green-100 border-green-300' :
+                    notif.type === 'payment_proof_received' ? 'bg-yellow-100 border-yellow-400' :
+                    'bg-white border-yellow-300'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium">
+                      <div className="font-bold">
                         {notif.type === 'assignment_declined' ? '❌' :
-                         notif.type === 'assignment_accepted' ? '✅' : '📋'} {notif.title}
+                         notif.type === 'assignment_accepted' ? '✅' :
+                         notif.type === 'payment_proof_received' ? '💰' : '📋'} {notif.title}
                       </div>
-                      <div className="text-gray-600 mt-0.5">{notif.message}</div>
-                      <div className="text-[10px] text-gray-400 mt-1">
+                      <div className="text-gray-700 mt-1">{notif.message}</div>
+                      {notif.order_number && (
+                        <div className="text-xs text-purple-700 font-medium mt-1">Order: {notif.order_number}</div>
+                      )}
+                      <div className="text-[10px] text-gray-500 mt-1 font-medium">
                         {new Date(notif.created_at).toLocaleString()}
                       </div>
                     </div>
                     <button
                       onClick={() => markNotificationRead(notif.id)}
-                      className="text-gray-400 hover:text-gray-600 text-xs"
+                      className="text-gray-500 hover:text-gray-700 text-xs font-medium"
                     >
                       Mark read
                     </button>
@@ -12061,21 +12469,21 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         </div>
       )}
 
-      {/* Partner Messages Panel */}
+      {/* Partner Messages Panel - Bright Yellow for Attention */}
       {partnerMessages.filter(m => !m.read).length > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 bg-yellow-300 border-2 border-yellow-500 rounded-lg shadow-lg animate-pulse">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <span className="text-blue-600 mr-2">💬</span>
-              <span className="text-sm font-medium text-blue-800">
-                {partnerMessages.filter(m => !m.read).length} message(s) from partners
+              <span className="text-2xl mr-3">💬</span>
+              <span className="text-base font-bold text-yellow-900">
+                🔔 {partnerMessages.filter(m => !m.read).length} NEW MESSAGE(S) FROM PARTNERS
               </span>
             </div>
             <button
               onClick={() => setShowPartnerMessages(!showPartnerMessages)}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
             >
-              {showPartnerMessages ? 'Hide' : 'View'}
+              {showPartnerMessages ? 'Hide' : 'View Messages'}
             </button>
           </div>
           {showPartnerMessages && (
@@ -12083,42 +12491,47 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {partnerMessages.filter(m => !m.read).map((msg) => (
                 <div
                   key={msg.id}
-                  className="p-3 bg-white rounded border border-blue-200"
+                  className="p-3 bg-white rounded-lg border-2 border-yellow-400 shadow"
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm text-blue-800">
+                        <span className="font-bold text-sm text-yellow-800">
                           {msg.from_partner_name}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">
                           {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
                         </span>
+                        {msg.order_number && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded font-medium">
+                            Order: {msg.order_number}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500 mb-2">
+                      <div className="text-xs text-gray-600 mb-2">
                         {msg.from_partner_email}
                       </div>
-                      <div className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                      <div className="text-sm text-gray-800 bg-yellow-50 p-3 rounded border border-yellow-200">
                         {msg.content}
                       </div>
-                      <div className="text-[10px] text-gray-400 mt-2">
+                      <div className="text-[10px] text-gray-500 mt-2 font-medium">
                         {new Date(msg.created_at).toLocaleString()}
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-2 pt-2 border-t">
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-yellow-200">
                     <button
                       onClick={() => {
                         setReplyingToMessage(msg);
                         setReplyContent('');
                       }}
-                      className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700"
                     >
                       📧 Reply
                     </button>
                     <button
                       onClick={() => markPartnerMessageRead(msg.id)}
-                      className="px-3 py-1 text-gray-600 border rounded text-xs hover:bg-gray-100"
+                      className="px-3 py-1 text-gray-600 border border-gray-300 rounded text-xs hover:bg-gray-100"
                     >
                       Mark as read
                     </button>
@@ -12241,10 +12654,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 )}
               </div>
 
-              {/* Due Date */}
+              {/* Translator Deadline - When translator must return */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Date</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Translator Deadline</label>
                   <input
                     type="date"
                     value={assignmentDetails.due_date}
@@ -12253,7 +12666,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Due Time</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
                   <input
                     type="time"
                     value={assignmentDetails.due_time}
@@ -12570,7 +12983,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             </button>
           )}
           <div className="flex space-x-1">
-            {['all', 'received', 'in_translation', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
+            {['all', 'received', 'review', 'client_review', 'ready', 'delivered', 'final'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-2 py-1 text-[10px] rounded ${statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
                 {s === 'all' ? 'All' : getStatusLabel(s)}
@@ -12960,7 +13373,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               {/* PM column - Admin only */}
               {isAdmin && <th className="px-3 py-3 text-left font-semibold text-gray-700">PM</th>}
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Translator</th>
-              <th className="px-3 py-3 text-left font-semibold text-gray-700">Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Tradutor - Data de retorno da tradução">TR Deadline</th>
+              <th className="px-3 py-3 text-left font-semibold text-gray-700" title="Prazo do Cliente - Data de entrega ao cliente">Client Deadline</th>
               <th className="px-3 py-3 text-left font-semibold text-gray-700">Status</th>
               {/* Translation Ready column - shows when translation is complete */}
               <th className="px-3 py-3 text-center font-semibold text-gray-700">Translation</th>
@@ -12973,8 +13387,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
           <tbody className="divide-y divide-gray-100">
             {filtered.map((order) => {
               const created = new Date(order.created_at);
-              const orderDeadline = order.deadline ? new Date(order.deadline) : new Date(created.getTime() + 5 * 24 * 60 * 60 * 1000);
-              const daysUntil = Math.ceil((orderDeadline - new Date()) / (1000 * 60 * 60 * 24));
+              // Translator deadline - when translator must return
+              const hasTranslatorDeadline = order.translator_deadline ? true : false;
+              const translatorDeadline = hasTranslatorDeadline ? new Date(order.translator_deadline) : null;
+              const translatorDaysUntil = hasTranslatorDeadline ? Math.ceil((translatorDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
+              // Client deadline - when to deliver to client
+              const hasClientDeadline = order.deadline ? true : false;
+              const clientDeadline = hasClientDeadline ? new Date(order.deadline) : null;
+              const clientDaysUntil = hasClientDeadline ? Math.ceil((clientDeadline - new Date()) / (1000 * 60 * 60 * 24)) : null;
               return (
                 <tr key={order.id} className="hover:bg-blue-50/50 transition-colors">
                   {/* Code */}
@@ -13111,21 +13531,55 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         >
                           <AssignIcon className="w-3 h-3" /> Translator
                         </button>
-                        {isAdmin && (
-                          <button
-                            onClick={() => assignTranslator(order.id, 'Admin (Self)')}
-                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
-                            title="Assign to yourself as Admin"
-                          >
-                            👑 Assign to Me
-                          </button>
-                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
                     )}
                   </td>
-                  {/* Deadline with date+time */}
+                  {/* Translator Deadline - When translator must return translation */}
+                  <td className="px-3 py-3">
+                    {editingTranslatorDeadline === order.id && (isAdmin || isPM) ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          type="date"
+                          value={tempTranslatorDeadlineValue.date}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, date: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <input
+                          type="time"
+                          value={tempTranslatorDeadlineValue.time}
+                          onChange={(e) => setTempTranslatorDeadlineValue({...tempTranslatorDeadlineValue, time: e.target.value})}
+                          className="px-2 py-1 text-xs border rounded w-28"
+                        />
+                        <div className="flex gap-1">
+                          <button onClick={() => saveTranslatorDeadlineEdit(order.id)} className="px-2 py-1 bg-green-500 text-white rounded text-xs">✓</button>
+                          <button onClick={() => setEditingTranslatorDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
+                        </div>
+                      </div>
+                    ) : hasTranslatorDeadline ? (
+                      <div
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to edit translator deadline" : ""}
+                      >
+                        {translatorDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{translatorDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {translatorDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${translatorDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({translatorDaysUntil}d)</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span
+                        onClick={() => (isAdmin || isPM) && startEditingTranslatorDeadline(order)}
+                        className={`text-xs text-gray-400 ${(isAdmin || isPM) ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={(isAdmin || isPM) ? "Click to set translator deadline" : ""}
+                      >
+                        -
+                      </span>
+                    )}
+                  </td>
+                  {/* Client Deadline - When to deliver to client */}
                   <td className="px-3 py-3">
                     {editingDeadline === order.id && isAdmin ? (
                       <div className="flex flex-col gap-1">
@@ -13146,18 +13600,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <button onClick={() => setEditingDeadline(null)} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">✕</button>
                         </div>
                       </div>
-                    ) : (
+                    ) : hasClientDeadline ? (
                       <div
                         onClick={() => isAdmin && startEditingDeadline(order)}
                         className={`${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
-                        title={isAdmin ? "Click to edit deadline" : ""}
+                        title={isAdmin ? "Click to edit client deadline" : ""}
                       >
-                        {orderDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
-                        <span className="text-xs text-gray-500 block">{orderDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {daysUntil > 0 && order.translation_status !== 'delivered' && (
-                          <span className={`text-xs font-medium ${daysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({daysUntil}d)</span>
+                        {clientDeadline.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' })}
+                        <span className="text-xs text-gray-500 block">{clientDeadline.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {clientDaysUntil > 0 && order.translation_status !== 'delivered' && (
+                          <span className={`text-xs font-medium ${clientDaysUntil <= 2 ? 'text-red-600' : 'text-yellow-600'}`}>({clientDaysUntil}d)</span>
                         )}
                       </div>
+                    ) : (
+                      <span
+                        onClick={() => isAdmin && startEditingDeadline(order)}
+                        className={`text-xs text-gray-400 ${isAdmin ? 'cursor-pointer hover:text-blue-600' : ''}`}
+                        title={isAdmin ? "Click to set client deadline" : ""}
+                      >
+                        -
+                      </span>
                     )}
                   </td>
                   {/* Status */}
@@ -16425,7 +16887,8 @@ const TranslatorLogin = ({ onLogin }) => {
           role: response.data.role,
           name: response.data.name,
           email: response.data.email,
-          id: response.data.id
+          id: response.data.id,
+          translator_type: response.data.translator_type
         });
       }
     } catch (err) {
@@ -21322,7 +21785,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         htmlContent = content;
       }
       // Word document
-      else if (fileName.endsWith('.docx')) {
+      else if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
         try {
           setProcessingStatus(`Converting Word document: ${file.name}`);
           const arrayBuffer = await file.arrayBuffer();
@@ -21652,29 +22115,35 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .signature-name { font-size: 13px; font-weight: bold; margin-top: 5px; }
         .signature-title { font-size: 11px; color: #666; }
         .signature-date { font-size: 11px; color: #666; margin-top: 5px; }
-        .stamp-container { text-align: right; }
+        .stamp-container { width: 140px; height: 140px; position: relative; }
         .stamp {
-            width: 140px; height: 140px; border: 3px solid #1a365d; border-radius: 50%;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-family: Arial, sans-serif; color: #1a365d;
+            width: 140px; height: 140px; border: 3px solid #2563eb; border-radius: 50%;
+            position: relative; display: flex; align-items: center; justify-content: center; background: white;
         }
-        .stamp-text-top { font-size: 10px; font-weight: bold; letter-spacing: 1px; }
-        .stamp-center { text-align: center; margin: 5px 0; }
-        .stamp-company { font-size: 9px; font-weight: bold; }
-        .stamp-ata { font-size: 8px; }
+        .stamp::before {
+            content: ''; position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+            border: 1px solid #2563eb; border-radius: 50%;
+        }
+        .stamp-text-top {
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            font-size: 9px; font-weight: bold; color: #2563eb; letter-spacing: 2px;
+        }
+        .stamp-center { text-align: center; padding: 0 15px; }
+        .stamp-company { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 2px; }
+        .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-after: always; }
         .translation-text-page { page-break-after: always; }
         .original-documents-page { page-break-after: always; }
         .translation-content { margin-top: 10px; }
-        .translation-image { max-width: 100%; height: auto; }
+        .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
         .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
         .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
-        .page-title { font-size: 18px; font-weight: bold; color: #1a365d; margin-bottom: 15px; text-align: center; }
-        .original-image-container { text-align: center; }
-        .original-image { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
+        .original-image-container { text-align: center; margin-bottom: 10px; }
+        .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
         @page { @top-center { content: element(header); } }
@@ -21803,22 +22272,34 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         });
       } else if (order.translation_html) {
         // Load translation from order's translation_html field
-        setTranslatedContent({
-          filename: 'Translation',
-          html: order.translation_html,
-          contentType: 'text/html'
-        });
+        // Check for corrupted binary content
+        if (order.translation_html.startsWith('PK') || (order.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+          console.warn('Binary content detected in translation_html');
+          alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+        } else {
+          setTranslatedContent({
+            filename: 'Translation',
+            html: order.translation_html,
+            contentType: 'text/html'
+          });
+        }
       } else {
         // Try to fetch order details to get translation_html
         try {
           const orderRes = await axios.get(`${API}/admin/orders/${order.id}?admin_key=${adminKey}`);
           const orderData = orderRes.data.order || orderRes.data;
           if (orderData.translation_html) {
-            setTranslatedContent({
-              filename: 'Translation',
-              html: orderData.translation_html,
-              contentType: 'text/html'
-            });
+            // Check for corrupted binary content
+            if (orderData.translation_html.startsWith('PK') || (orderData.translation_html.slice(0, 100).split('').filter(c => c.charCodeAt(0) < 32 && ![9,10,13].includes(c.charCodeAt(0))).length > 10)) {
+              console.warn('Binary content detected in translation_html');
+              alert('⚠️ Translation data appears corrupted. Please re-upload the translation file.');
+            } else {
+              setTranslatedContent({
+                filename: 'Translation',
+                html: orderData.translation_html,
+                contentType: 'text/html'
+              });
+            }
           }
         } catch (orderErr) {
           console.error('Failed to fetch order details:', orderErr);
@@ -23485,6 +23966,933 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   );
 };
 
+// ==================== SALES CONTROL PAGE ====================
+const SalesControlPage = ({ adminKey }) => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [salespeople, setSalespeople] = useState([]);
+  const [acquisitions, setAcquisitions] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showAddSalesperson, setShowAddSalesperson] = useState(false);
+  const [showAddAcquisition, setShowAddAcquisition] = useState(false);
+  const [showSetGoal, setShowSetGoal] = useState(false);
+  const [editingSalesperson, setEditingSalesperson] = useState(null);
+
+  // Form states
+  const [newSalesperson, setNewSalesperson] = useState({
+    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10
+  });
+  const [newAcquisition, setNewAcquisition] = useState({
+    salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
+  });
+  const [newGoal, setNewGoal] = useState({
+    salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000
+  });
+
+  const API_URL = process.env.REACT_APP_API_URL || '';
+
+  useEffect(() => {
+    fetchAllData();
+  }, []);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [spRes, acqRes, goalsRes, dashRes] = await Promise.all([
+        fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } })
+      ]);
+
+      if (spRes.ok) setSalespeople(await spRes.json());
+      if (acqRes.ok) setAcquisitions(await acqRes.json());
+      if (goalsRes.ok) setGoals(await goalsRes.json());
+      if (dashRes.ok) setDashboard(await dashRes.json());
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+    }
+    setLoading(false);
+  };
+
+  const handleAddSalesperson = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newSalesperson)
+      });
+      if (res.ok) {
+        setShowAddSalesperson(false);
+        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10 });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error adding salesperson:', error);
+    }
+  };
+
+  const handleUpdateSalesperson = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople/${editingSalesperson.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(editingSalesperson)
+      });
+      if (res.ok) {
+        setEditingSalesperson(null);
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error updating salesperson:', error);
+    }
+  };
+
+  const handleDeleteSalesperson = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this salesperson?')) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople/${id}`, {
+        method: 'DELETE',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) fetchAllData();
+    } catch (error) {
+      console.error('Error deleting salesperson:', error);
+    }
+  };
+
+  const handleAddAcquisition = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newAcquisition)
+      });
+      if (res.ok) {
+        setShowAddAcquisition(false);
+        setNewAcquisition({ salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: '' });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error adding acquisition:', error);
+    }
+  };
+
+  const handleSetGoal = async () => {
+    try {
+      const res = await fetch(`${API_URL}/admin/sales-goals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
+        body: JSON.stringify(newGoal)
+      });
+      if (res.ok) {
+        setShowSetGoal(false);
+        setNewGoal({ salesperson_id: '', month: new Date().toISOString().slice(0, 7), target_partners: 10, target_revenue: 5000 });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error setting goal:', error);
+    }
+  };
+
+  const handleUpdateCommissionStatus = async (acquisitionId, status) => {
+    try {
+      const res = await fetch(`${API_URL}/admin/partner-acquisitions/${acquisitionId}/status?status=${status}`, {
+        method: 'PUT',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) fetchAllData();
+    } catch (error) {
+      console.error('Error updating commission status:', error);
+    }
+  };
+
+  const tierColors = {
+    bronze: 'bg-amber-600',
+    silver: 'bg-gray-400',
+    gold: 'bg-yellow-500',
+    platinum: 'bg-purple-500'
+  };
+
+  const statusColors = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    approved: 'bg-blue-100 text-blue-800',
+    paid: 'bg-green-100 text-green-800'
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-full">
+      {/* Header */}
+      <div className="mb-6 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <span className="text-3xl">📈</span> Sales Control & Goals
+          </h1>
+          <p className="text-gray-500 mt-1">Manage salespeople, track acquisitions, and monitor goals</p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href="/docs/PARTNER_PROGRAM_PRESENTATION.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center gap-2 shadow-md"
+          >
+            <span>📊</span> Partner Program Presentation
+          </a>
+          <a
+            href="/docs/COMMISSION_AND_DISCOUNT_STRUCTURE.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
+          >
+            <span>📋</span> Commission Docs
+          </a>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+          { id: 'salespeople', label: 'Salespeople', icon: '👥' },
+          { id: 'acquisitions', label: 'Acquisitions', icon: '🤝' },
+          { id: 'goals', label: 'Goals', icon: '🎯' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <span className="mr-1">{tab.icon}</span> {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Dashboard Tab */}
+      {activeTab === 'dashboard' && dashboard && (
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-blue-500">
+              <p className="text-gray-500 text-sm">Active Salespeople</p>
+              <p className="text-3xl font-bold text-gray-800">{dashboard.total_salespeople}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-green-500">
+              <p className="text-gray-500 text-sm">This Month</p>
+              <p className="text-3xl font-bold text-green-600">{dashboard.month_acquisitions}</p>
+              <p className="text-xs text-gray-400">partners acquired</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-purple-500">
+              <p className="text-gray-500 text-sm">Total Acquisitions</p>
+              <p className="text-3xl font-bold text-gray-800">{dashboard.total_acquisitions}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-yellow-500">
+              <p className="text-gray-500 text-sm">Pending Commissions</p>
+              <p className="text-3xl font-bold text-yellow-600">${dashboard.pending_commissions}</p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-5 border-l-4 border-emerald-500">
+              <p className="text-gray-500 text-sm">Paid This Month</p>
+              <p className="text-3xl font-bold text-emerald-600">${dashboard.paid_commissions}</p>
+            </div>
+          </div>
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Performers */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>🏆</span> Top Performers This Month
+              </h3>
+              {dashboard.top_performers.length > 0 ? (
+                <div className="space-y-3">
+                  {dashboard.top_performers.map((performer, idx) => (
+                    <div key={performer.salesperson_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🏅'}</span>
+                        <div>
+                          <p className="font-medium text-gray-800">{performer.name}</p>
+                          <p className="text-sm text-gray-500">{performer.count} partners</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-green-600">${performer.commission}</p>
+                        <p className="text-xs text-gray-400">commission</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-center py-8">No acquisitions this month yet</p>
+              )}
+            </div>
+
+            {/* Tier Distribution */}
+            <div className="bg-white rounded-xl shadow-sm p-5">
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>📊</span> Partner Tiers Distribution
+              </h3>
+              <div className="space-y-4">
+                {['platinum', 'gold', 'silver', 'bronze'].map(tier => {
+                  const count = dashboard.tier_distribution[tier] || 0;
+                  const total = Object.values(dashboard.tier_distribution).reduce((a, b) => a + b, 0) || 1;
+                  const percentage = Math.round((count / total) * 100);
+                  return (
+                    <div key={tier}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="capitalize font-medium flex items-center gap-2">
+                          {tier === 'platinum' ? '💎' : tier === 'gold' ? '🥇' : tier === 'silver' ? '🥈' : '🥉'}
+                          {tier}
+                        </span>
+                        <span className="text-gray-500">{count} partners ({percentage}%)</span>
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${tierColors[tier]} transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Monthly Trend */}
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>📈</span> Monthly Acquisition Trend
+            </h3>
+            <div className="flex items-end justify-between h-40 gap-2">
+              {dashboard.monthly_trend.map(month => {
+                const maxAcq = Math.max(...dashboard.monthly_trend.map(m => m.acquisitions), 1);
+                const heightPercent = (month.acquisitions / maxAcq) * 100;
+                return (
+                  <div key={month.month} className="flex-1 flex flex-col items-center">
+                    <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '120px' }}>
+                      <div
+                        className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
+                        style={{ height: `${heightPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">{month.month.slice(5)}</p>
+                    <p className="text-sm font-semibold text-gray-700">{month.acquisitions}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Salespeople Tab */}
+      {activeTab === 'salespeople' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Salespeople ({salespeople.length})</h3>
+            <button
+              onClick={() => setShowAddSalesperson(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+            >
+              <span>➕</span> Add Salesperson
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Contact</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Monthly Target</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">This Month</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Total</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {salespeople.map(sp => (
+                  <tr key={sp.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{sp.name}</p>
+                      <p className="text-xs text-gray-400">Since {sp.hired_date}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-sm text-gray-600">{sp.email}</p>
+                      <p className="text-xs text-gray-400">{sp.phone}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium capitalize">
+                        {sp.commission_type}
+                      </span>
+                      {sp.commission_type === 'fixed' && (
+                        <span className="ml-2 text-sm text-gray-500">${sp.commission_rate}/partner</span>
+                      )}
+                      {sp.base_salary > 0 && (
+                        <span className="ml-2 text-xs text-gray-400">Base: ${sp.base_salary}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-lg font-semibold text-gray-700">{sp.monthly_target}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-lg font-semibold ${sp.month_acquisitions >= sp.monthly_target ? 'text-green-600' : 'text-gray-700'}`}>
+                        {sp.month_acquisitions}
+                      </span>
+                      {sp.month_acquisitions >= sp.monthly_target && <span className="ml-1">🎉</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-lg font-semibold text-purple-600">{sp.total_acquisitions}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${sp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {sp.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingSalesperson(sp)}
+                          className="p-1 text-blue-500 hover:bg-blue-50 rounded"
+                          title="Edit"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSalesperson(sp.id)}
+                          className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          title="Delete"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {salespeople.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-4xl mb-2">👥</p>
+                <p>No salespeople yet. Add your first salesperson!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Acquisitions Tab */}
+      {activeTab === 'acquisitions' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Partner Acquisitions ({acquisitions.length})</h3>
+            <button
+              onClick={() => setShowAddAcquisition(true)}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              disabled={salespeople.length === 0}
+            >
+              <span>🤝</span> Record Acquisition
+            </button>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Partner</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {acquisitions.map(acq => (
+                  <tr key={acq.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-600">{acq.acquisition_date}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">{acq.partner_name}</p>
+                      <p className="text-xs text-gray-400">ID: {acq.partner_id}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-3 py-1 rounded-full text-white text-xs font-medium ${tierColors[acq.partner_tier]}`}>
+                        {acq.partner_tier === 'platinum' ? '💎' : acq.partner_tier === 'gold' ? '🥇' : acq.partner_tier === 'silver' ? '🥈' : '🥉'} {acq.partner_tier}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{acq.salesperson_name}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-semibold text-green-600">${acq.commission_paid}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
+                        {acq.commission_status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={acq.commission_status}
+                        onChange={(e) => handleUpdateCommissionStatus(acq.id, e.target.value)}
+                        className="text-xs border rounded px-2 py-1"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="paid">Paid</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {acquisitions.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-4xl mb-2">🤝</p>
+                <p>No acquisitions recorded yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Goals Tab */}
+      {activeTab === 'goals' && (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-gray-700">Sales Goals</h3>
+            <button
+              onClick={() => setShowSetGoal(true)}
+              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
+              disabled={salespeople.length === 0}
+            >
+              <span>🎯</span> Set Goal
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {goals.map(goal => {
+              const progress = Math.min((goal.achieved_partners / goal.target_partners) * 100, 100);
+              const isAchieved = goal.achieved_partners >= goal.target_partners;
+              return (
+                <div key={goal.id} className={`bg-white rounded-xl shadow-sm p-5 border-2 ${isAchieved ? 'border-green-500' : 'border-transparent'}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <p className="font-semibold text-gray-800">{goal.salesperson_name}</p>
+                      <p className="text-sm text-gray-500">{goal.month}</p>
+                    </div>
+                    {isAchieved && <span className="text-2xl">🏆</span>}
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-500">Progress</span>
+                      <span className="font-medium">{goal.achieved_partners} / {goal.target_partners}</span>
+                    </div>
+                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${isAchieved ? 'bg-green-500' : 'bg-blue-500'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Target Revenue</span>
+                    <span className="font-medium text-gray-700">${goal.target_revenue}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {goals.length === 0 && (
+            <div className="text-center py-12 text-gray-400 bg-white rounded-xl">
+              <p className="text-4xl mb-2">🎯</p>
+              <p>No goals set yet. Set goals for your salespeople!</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Salesperson Modal */}
+      {showAddSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>👤</span> Add Salesperson
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={newSalesperson.name}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="John Doe"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={newSalesperson.email}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="john@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={newSalesperson.phone}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                <select
+                  value={newSalesperson.commission_type}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="tier">By Tier ($50-150/partner)</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+              {newSalesperson.commission_type === 'fixed' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Commission ($)</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.commission_rate}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="50"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                <input
+                  type="number"
+                  value={newSalesperson.base_salary}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, base_salary: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target (partners)</label>
+                <input
+                  type="number"
+                  value={newSalesperson.monthly_target}
+                  onChange={(e) => setNewSalesperson({...newSalesperson, monthly_target: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="10"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddSalesperson(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSalesperson}
+                disabled={!newSalesperson.name || !newSalesperson.email}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                Add Salesperson
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Salesperson Modal */}
+      {editingSalesperson && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>✏️</span> Edit Salesperson
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={editingSalesperson.name}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={editingSalesperson.email}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={editingSalesperson.phone}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, phone: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                <select
+                  value={editingSalesperson.commission_type}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_type: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="tier">By Tier ($50-150/partner)</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+              {editingSalesperson.commission_type === 'fixed' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Commission ($)</label>
+                  <input
+                    type="number"
+                    value={editingSalesperson.commission_rate}
+                    onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
+                <input
+                  type="number"
+                  value={editingSalesperson.base_salary}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, base_salary: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Target</label>
+                <input
+                  type="number"
+                  value={editingSalesperson.monthly_target}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, monthly_target: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={editingSalesperson.status}
+                  onChange={(e) => setEditingSalesperson({...editingSalesperson, status: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditingSalesperson(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateSalesperson}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Acquisition Modal */}
+      {showAddAcquisition && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>🤝</span> Record Partner Acquisition
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson *</label>
+                <select
+                  value={newAcquisition.salesperson_id}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, salesperson_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select salesperson...</option>
+                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Name *</label>
+                <input
+                  type="text"
+                  value={newAcquisition.partner_name}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_name: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Immigration Law Office LLC"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner ID</label>
+                <input
+                  type="text"
+                  value={newAcquisition.partner_id}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Optional - Partner system ID"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Partner Tier *</label>
+                <select
+                  value={newAcquisition.partner_tier}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, partner_tier: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="bronze">🥉 Bronze (10-29 pages/month) - $50 commission</option>
+                  <option value="silver">🥈 Silver (30-59 pages/month) - $75 commission</option>
+                  <option value="gold">🥇 Gold (60-99 pages/month) - $100 commission</option>
+                  <option value="platinum">💎 Platinum (100+ pages/month) - $150 commission</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={newAcquisition.notes}
+                  onChange={(e) => setNewAcquisition({...newAcquisition, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                  placeholder="Optional notes..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddAcquisition(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddAcquisition}
+                disabled={!newAcquisition.salesperson_id || !newAcquisition.partner_name}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
+              >
+                Record Acquisition
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Goal Modal */}
+      {showSetGoal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>🎯</span> Set Sales Goal
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Salesperson *</label>
+                <select
+                  value={newGoal.salesperson_id}
+                  onChange={(e) => setNewGoal({...newGoal, salesperson_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select salesperson...</option>
+                  {salespeople.filter(sp => sp.status === 'active').map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Month *</label>
+                <input
+                  type="month"
+                  value={newGoal.month}
+                  onChange={(e) => setNewGoal({...newGoal, month: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Partners</label>
+                <input
+                  type="number"
+                  value={newGoal.target_partners}
+                  onChange={(e) => setNewGoal({...newGoal, target_partners: parseInt(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="10"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Target Revenue ($)</label>
+                <input
+                  type="number"
+                  value={newGoal.target_revenue}
+                  onChange={(e) => setNewGoal({...newGoal, target_revenue: parseFloat(e.target.value)})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="5000"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowSetGoal(false)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSetGoal}
+                disabled={!newGoal.salesperson_id}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50"
+              >
+                Set Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== FLOATING CHAT WIDGET ====================
 const FloatingChatWidget = ({ adminKey, user }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -23811,6 +25219,10 @@ function AdminApp() {
       case 'settings':
         return userRole === 'admin'
           ? <SettingsPage adminKey={adminKey} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'sales-control':
+        return userRole === 'admin'
+          ? <SalesControlPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'mia-bot':
         return userRole === 'admin'
