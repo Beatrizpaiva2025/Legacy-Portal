@@ -603,35 +603,35 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
   // Registration mode - compact single-page layout
   if (!isLogin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-6">
-        <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
-          {/* Left Side - Branding */}
-          <div className="lg:w-2/5 bg-gradient-to-br from-blue-900 to-blue-800 p-6 text-white flex flex-col justify-center">
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center p-6">
+        <div className="w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col lg:flex-row">
+          {/* Left Side - Branding (White background) */}
+          <div className="lg:w-2/5 bg-white p-6 flex flex-col justify-center items-center">
             <img
               src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
               alt="Legacy Translations"
-              className="h-16 mb-4 brightness-0 invert"
+              className="w-48 object-contain mb-6"
             />
-            <h1 className="text-xl font-bold mb-1">{t.createAccount}</h1>
-            <p className="text-blue-200 text-xs mb-4">{t.corporateOnly}</p>
+            <h1 className="text-xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
+            <p className="text-gray-500 text-xs mb-4">{t.corporateOnly}</p>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2 text-xs text-gray-700">
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-green-600">✓</span>
                 <span>{t.benefit1}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-green-600">✓</span>
                 <span>{t.benefit2}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-green-400">✓</span>
+                <span className="text-green-600">✓</span>
                 <span>{t.benefit3}</span>
               </div>
             </div>
 
             {/* Language Selector */}
-            <div className="mt-4 pt-4 border-t border-white/20 flex items-center gap-2">
+            <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-2">
               {UI_LANGUAGES.map((uiLang) => (
                 <button
                   key={uiLang.code}
@@ -645,8 +645,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             </div>
           </div>
 
-          {/* Right Side - Form */}
-          <div className="lg:w-3/5 p-5 lg:p-6">
+          {/* Right Side - Form (Light gray background) */}
+          <div className="lg:w-3/5 p-5 lg:p-6 bg-gray-100">
             {error && (
               <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs">
                 {error}
@@ -796,11 +796,12 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
 
         {/* Content */}
         <div className="relative z-10 text-center max-w-md">
+          {/* Legacy Logo in white box */}
           <div className="bg-white rounded-2xl p-6 mb-8 shadow-xl mx-auto inline-block">
             <img
-              src="/images/legacy-logo.png"
+              src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png"
               alt="Legacy Translations"
-              className="h-16"
+              className="h-16 object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-white mb-4">{isLogin ? 'Business Partner Portal' : t.createAccount}</h1>
