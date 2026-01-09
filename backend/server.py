@@ -1635,6 +1635,7 @@ async def bot_calculate_quote(request: BotQuoteRequest):
             "translation_status": "Quote",  # This makes it appear in Quote filter!
             "payment_status": "pending",
             "source": "whatsapp_bot",
+            "revenue_source": "whatsapp",  # Track as WhatsApp revenue
             "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
             "has_document": bool(request.document_base64 or request.document_url)
@@ -1791,6 +1792,7 @@ async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
         "translation_status": "pending",
         "payment_status": "pending",
         "source": "whatsapp_bot",
+        "revenue_source": "whatsapp",  # Track as WhatsApp revenue
         "bot_quote_id": quote_id,
         "created_at": datetime.utcnow(),
         "notes": quote.get("notes", "")
@@ -7257,8 +7259,8 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         start_date = datetime(now.year, now.month, 1)
         end_date = now
 
-    # Get revenue (paid orders)
-    orders = await db.orders.find({
+    # Get revenue (paid orders) from translation_orders collection
+    orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
@@ -7266,9 +7268,26 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_revenue = sum(o.get("total_price", 0) for o in orders)
 
     # Revenue by source
+    # Handle both revenue_source field and legacy source field (for whatsapp_bot)
+    def get_order_source(order):
+        # First check revenue_source field
+        revenue_source = order.get("revenue_source")
+        if revenue_source and revenue_source in REVENUE_SOURCES:
+            return revenue_source
+        # Check legacy source field for whatsapp_bot
+        source = order.get("source", "")
+        if source == "whatsapp_bot":
+            return "whatsapp"
+        # Check partner_id for whatsapp_bot
+        partner_id = order.get("partner_id", "")
+        if partner_id == "whatsapp_bot":
+            return "whatsapp"
+        # Default to website
+        return "website"
+
     revenue_by_source = {}
     for source in REVENUE_SOURCES.keys():
-        source_orders = [o for o in orders if o.get("revenue_source", "website") == source]
+        source_orders = [o for o in orders if get_order_source(o) == source]
         revenue_by_source[source] = {
             "label": REVENUE_SOURCES[source],
             "amount": sum(o.get("total_price", 0) for o in source_orders),
@@ -7313,7 +7332,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
     total_expenses += translator_payments_total
 
     # Invoices summary
-    all_orders = await db.orders.find({
+    all_orders = await db.translation_orders.find({
         "created_at": {"$gte": start_date, "$lt": end_date}
     }).to_list(1000)
 
@@ -7332,7 +7351,7 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
         prev_start = start_date - (end_date - start_date)
         prev_end = start_date
 
-    prev_orders = await db.orders.find({
+    prev_orders = await db.translation_orders.find({
         "payment_status": "paid",
         "created_at": {"$gte": prev_start, "$lt": prev_end}
     }).to_list(1000)
