@@ -1789,6 +1789,100 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
 
+  // Auto-transfer external translation data when navigating to Review tab
+  useEffect(() => {
+    if (activeSubTab === 'review' && workflowMode === 'external') {
+      // Check if we have external data that needs to be transferred
+      if (externalOriginalImages.length > 0 && (externalTranslationText || externalTranslationImages.length > 0)) {
+        // Only transfer if translationResults is empty (not already transferred)
+        if (translationResults.length === 0) {
+          const results = [];
+
+          if (externalTranslationText) {
+            // Split text by page breaks if present
+            const textPages = externalTranslationText.split(/---\s*Page\s*Break\s*---/i).map(t => t.trim()).filter(t => t);
+
+            externalOriginalImages.forEach((img, idx) => {
+              results.push({
+                original: img.data,
+                translatedText: textPages[idx] || textPages[0] || externalTranslationText,
+                filename: img.filename || `page_${idx + 1}`
+              });
+            });
+          } else if (externalTranslationImages.length > 0) {
+            externalOriginalImages.forEach((origImg, idx) => {
+              const transImg = externalTranslationImages[idx] || externalTranslationImages[0];
+              results.push({
+                original: origImg.data,
+                translatedText: `<div style="text-align:center;"><img src="${transImg.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`,
+                filename: origImg.filename || `page_${idx + 1}`
+              });
+            });
+          }
+
+          if (results.length > 0) {
+            setTranslationResults(results);
+            setProcessingStatus('✅ External translation loaded');
+
+            // Also populate Quick Package data
+            if (externalTranslationText) {
+              const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${externalTranslationText}</div>`;
+              setQuickTranslationHtml(html);
+              setQuickTranslationType('html');
+            }
+          }
+        }
+      }
+    }
+  }, [activeSubTab, workflowMode, externalOriginalImages, externalTranslationText, externalTranslationImages, translationResults.length]);
+
+  // Auto-transfer external translation data when navigating to Proofreading tab
+  useEffect(() => {
+    if (activeSubTab === 'proofreading' && workflowMode === 'external') {
+      // Check if we have external data that needs to be transferred
+      if (externalOriginalImages.length > 0 && (externalTranslationText || externalTranslationImages.length > 0)) {
+        // Only transfer if translationResults is empty (not already transferred)
+        if (translationResults.length === 0) {
+          const results = [];
+
+          if (externalTranslationText) {
+            // Split text by page breaks if present
+            const textPages = externalTranslationText.split(/---\s*Page\s*Break\s*---/i).map(t => t.trim()).filter(t => t);
+
+            externalOriginalImages.forEach((img, idx) => {
+              results.push({
+                original: img.data,
+                translatedText: textPages[idx] || textPages[0] || externalTranslationText,
+                filename: img.filename || `page_${idx + 1}`
+              });
+            });
+          } else if (externalTranslationImages.length > 0) {
+            externalOriginalImages.forEach((origImg, idx) => {
+              const transImg = externalTranslationImages[idx] || externalTranslationImages[0];
+              results.push({
+                original: origImg.data,
+                translatedText: `<div style="text-align:center;"><img src="${transImg.data}" style="max-width:100%; height:auto;" alt="Translation page ${idx + 1}" /></div>`,
+                filename: origImg.filename || `page_${idx + 1}`
+              });
+            });
+          }
+
+          if (results.length > 0) {
+            setTranslationResults(results);
+            setProcessingStatus('✅ External translation loaded for proofreading');
+
+            // Also populate Quick Package data
+            if (externalTranslationText) {
+              const html = `<div style="white-space: pre-wrap; font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6;">${externalTranslationText}</div>`;
+              setQuickTranslationHtml(html);
+              setQuickTranslationType('html');
+            }
+          }
+        }
+      }
+    }
+  }, [activeSubTab, workflowMode, externalOriginalImages, externalTranslationText, externalTranslationImages, translationResults.length]);
+
   // Load saved API key, logos, instructions and resources
   useEffect(() => {
     // Load saved logos from localStorage as fallback
@@ -8457,6 +8551,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       ) : (
                         <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
                       )
+                    ) : translationResults[selectedResultIndex]?.original ? (
+                      // Show original image from external upload
+                      <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
                     ) : (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
                       <div className="text-xs whitespace-pre-wrap p-2">
                         {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
