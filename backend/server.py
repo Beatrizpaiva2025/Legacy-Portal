@@ -10675,6 +10675,7 @@ class ProofreadRequest(BaseModel):
     target_language: str = "English"
     document_type: str = "General Document"
     claude_api_key: str
+    original_image: Optional[str] = None  # Base64 encoded image for vision-based proofreading
 
 # Special characters by language
 LANGUAGE_SPECIAL_CHARS = {
@@ -10991,7 +10992,37 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
             request.document_type
         )
 
-        user_message = f"""=== DOCUMENTO ORIGINAL ({request.source_language}) ===
+        # Build the message content based on whether we have an image or just text
+        if request.original_image:
+            # Use Claude Vision API with image
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"Este é o DOCUMENTO ORIGINAL em {request.source_language} (veja a imagem anexa):"
+                },
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": request.original_image
+                    }
+                },
+                {
+                    "type": "text",
+                    "text": f"""
+=== TRADUÇÃO ({request.target_language}) ===
+{request.translated_text}
+=== FIM DA TRADUÇÃO ===
+
+Compare a imagem do documento original acima com a tradução fornecida.
+Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
+                }
+            ]
+            messages = [{"role": "user", "content": user_content}]
+        else:
+            # Text-only proofreading
+            user_message = f"""=== DOCUMENTO ORIGINAL ({request.source_language}) ===
 {request.original_text}
 === FIM DO DOCUMENTO ORIGINAL ===
 
@@ -11000,6 +11031,7 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
 === FIM DA TRADUÇÃO ===
 
 Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
+            messages = [{"role": "user", "content": user_message}]
 
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
@@ -11013,9 +11045,7 @@ Analise minuciosamente e retorne o JSON com todos os erros encontrados."""
                     "model": "claude-sonnet-4-5-20250929",
                     "max_tokens": 8192,
                     "system": system_prompt,
-                    "messages": [
-                        {"role": "user", "content": user_message}
-                    ]
+                    "messages": messages
                 }
             )
 

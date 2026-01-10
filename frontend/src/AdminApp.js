@@ -3236,9 +3236,28 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       .trim();
 
     // Get original text (from OCR or extracted)
-    const originalText = ocrResults[selectedResultIndex]?.text ||
+    let originalText = ocrResults[selectedResultIndex]?.text ||
                         currentResult.originalText ||
-                        'Original text not available';
+                        '';
+
+    // Check if we have an original image that we can use
+    const originalImage = originalImages[selectedResultIndex];
+    let originalImageBase64 = null;
+
+    if (originalImage?.data) {
+      // Extract base64 from data URL if present
+      if (originalImage.data.startsWith('data:')) {
+        originalImageBase64 = originalImage.data.split(',')[1];
+      } else {
+        originalImageBase64 = originalImage.data;
+      }
+    }
+
+    // If no text and no image, show error
+    if (!originalText && !originalImageBase64) {
+      alert('No original document available for comparison. Please upload the original document in the Original Document section.');
+      return;
+    }
 
     setIsProofreading(true);
     setProofreadingErrorr('');
@@ -3249,7 +3268,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          original_text: originalText,
+          original_text: originalText || 'See attached image',
+          original_image: originalImageBase64,
           translated_text: translatedText,
           source_language: sourceLanguage,
           target_language: targetLanguage,
