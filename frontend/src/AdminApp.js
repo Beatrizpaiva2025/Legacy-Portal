@@ -1547,6 +1547,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
   const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
+  // Rejection modal state (PM/Admin)
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [availableTranslators, setAvailableTranslators] = useState([]);
+  const [loadingTranslators, setLoadingTranslators] = useState(false);
+  const [selectedTranslatorForReject, setSelectedTranslatorForReject] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+
   // Config state - initialize from selectedOrder if available
   const [sourceLanguage, setSourceLanguage] = useState('Portuguese (Brazil)');
   const [targetLanguage, setTargetLanguage] = useState('English');
@@ -2644,36 +2651,79 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
-  // Reject translation (PM/Admin) - returns to translator
-  const rejectTranslation = async () => {
+  // Open rejection modal (PM/Admin) - fetches translators and shows selection
+  const openRejectModal = async () => {
     if (!selectedOrderId) {
       alert('No order selected');
       return;
     }
 
-    const reason = window.prompt(
-      '❌ Reject this translation?\n\n' +
-      'Please provide a reason for rejection (will be sent to translator):'
-    );
+    // Reset modal state
+    setRejectReason('');
+    setSelectedTranslatorForReject('');
+    setShowRejectModal(true);
+    setLoadingTranslators(true);
 
-    if (reason === null) return; // Cancelled
-    if (!reason.trim()) {
+    try {
+      // Fetch all translators
+      const response = await axios.get(`${API}/admin/translators?admin_key=${adminKey}`);
+      const translators = response.data || [];
+
+      // Get current order details to pre-select the original translator
+      const orderResponse = await axios.get(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`);
+      const order = orderResponse.data;
+
+      setAvailableTranslators(translators.filter(t => t.is_active !== false));
+
+      // Pre-select the originally assigned translator if available
+      if (order?.assigned_translator_id) {
+        setSelectedTranslatorForReject(order.assigned_translator_id.toString());
+      } else if (order?.assigned_translator) {
+        const translator = translators.find(t => t.name === order.assigned_translator);
+        if (translator) {
+          setSelectedTranslatorForReject(translator.id.toString());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching translators:', error);
+      setAvailableTranslators([]);
+    } finally {
+      setLoadingTranslators(false);
+    }
+  };
+
+  // Confirm rejection with selected translator
+  const confirmRejectTranslation = async () => {
+    if (!rejectReason.trim()) {
       alert('Please provide a reason for rejection');
       return;
     }
 
+    if (!selectedTranslatorForReject) {
+      alert('Please select a translator to send the work back to');
+      return;
+    }
+
     setSendingToProjects(true);
+    setShowRejectModal(false);
+
     try {
-      // Update order status back to in_translation
+      // Find selected translator details
+      const selectedTranslator = availableTranslators.find(t => t.id.toString() === selectedTranslatorForReject);
+
+      // Update order status back to in_translation and reassign to selected translator
       await axios.put(`${API}/admin/orders/${selectedOrderId}?admin_key=${adminKey}`, {
         translation_status: 'in_translation',
         proofreading_status: 'rejected',
-        proofreading_notes: reason,
+        proofreading_notes: rejectReason,
         proofreading_by: user?.name || 'PM',
-        proofreading_date: new Date().toISOString()
+        proofreading_date: new Date().toISOString(),
+        assigned_translator_id: parseInt(selectedTranslatorForReject),
+        assigned_translator: selectedTranslator?.name || 'Translator',
+        assigned_translator_name: selectedTranslator?.name || 'Translator'
       });
 
-      setProcessingStatus('❌ Translation REJECTED. Returned to translator with feedback.');
+      setProcessingStatus(`❌ Translation REJECTED. Returned to ${selectedTranslator?.name || 'translator'} with feedback.`);
 
       // Refresh lists
       fetchAvailableOrders();
@@ -2684,7 +2734,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setTimeout(() => onBack(), 1500);
       }
     } catch (error) {
-      console.error('Errorr rejecting translation:', error);
+      console.error('Error rejecting translation:', error);
       setProcessingStatus(`❌ Failed to reject: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -8354,149 +8404,96 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {/* Original and Translation Side by Side */}
-              <div className="mb-4 grid grid-cols-2 gap-4">
-                {/* Original Document */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-blue-100 border-b flex justify-between items-center">
-                    <span className="text-xs font-bold text-blue-700">📄 Original Document ({sourceLanguage})</span>
-                    {!(originalImages[selectedResultIndex] || ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) && (
-                      <label className="text-[10px] text-blue-600 cursor-pointer hover:text-blue-800 flex items-center gap-1">
-                        📤 Upload Original
-                        <input
-                          type="file"
-                          accept=".pdf,image/*"
-                          className="hidden"
-                          onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            setProcessingStatus('🔄 Extracting text from original...');
-                            try {
-                              // Convert file to base64 first
-                              const fileBase64 = await fileToBase64(file);
-                              const response = await axios.post(
-                                `${API}/admin/ocr?admin_key=${adminKey}`,
-                                {
-                                  file_base64: fileBase64,
-                                  file_type: file.type,
-                                  filename: file.name,
-                                  use_claude: claudeApiKey ? true : false,
-                                  claude_api_key: claudeApiKey || null,
-                                  preserve_layout: true
-                                }
-                              );
-                              if (response.data.text) {
-                                setOcrResults([{ filename: file.name, text: response.data.text }]);
-                                setTranslationResults(prev => prev.map((r, idx) =>
-                                  idx === selectedResultIndex ? { ...r, originalText: response.data.text } : r
-                                ));
-                                setProcessingStatus('✅ Original text extracted!');
-                              }
-                            } catch (err) {
-                              setProcessingStatus('❌ Failed to extract text: ' + (err.response?.data?.detail || err.message));
-                            }
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                  <div className="p-2 bg-white max-h-64 overflow-y-auto">
-                    {/* Priority 1: Show original images if available */}
-                    {originalImages[selectedResultIndex] ? (
-                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '250px'}} />
-                      ) : (
-                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
-                      )
-                    ) : /* Priority 2: Show original text if available */
-                    (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
-                      <div className="text-xs whitespace-pre-wrap">
-                        {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
-                      </div>
-                    ) : (
-                      /* Priority 3: Show textarea to paste/upload */
-                      <textarea
-                        className="w-full h-56 text-xs p-2 border rounded resize-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Cole o texto original aqui to fazer o proofreading...&#10;&#10;Ou clique em 'Upload Original' acima to extrair texto de PDF/imagem"
+              {/* Original and Translation Side by Side - Same layout as REVIEW tab */}
+              <div className="border rounded mb-4">
+                <div className="grid grid-cols-2 gap-0 bg-gray-100 border-b">
+                  <div className="px-3 py-2 border-r flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">Original Document ({sourceLanguage})</span>
+                    <label className="px-2 py-1 bg-blue-500 text-white text-[10px] rounded cursor-pointer hover:bg-blue-600">
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        className="hidden"
                         onChange={(e) => {
-                          const text = e.target.value;
-                          if (text.trim()) {
-                            setOcrResults([{ filename: 'Original', text: text }]);
-                            setTranslationResults(prev => prev.map((r, idx) =>
-                              idx === selectedResultIndex ? { ...r, originalText: text } : r
-                            ));
+                          if (e.target.files && e.target.files[0]) {
+                            const file = e.target.files[0];
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const newOriginalImages = [...originalImages];
+                              newOriginalImages[selectedResultIndex] = {
+                                data: event.target.result,
+                                filename: file.name
+                              };
+                              setOriginalImages(newOriginalImages);
+                            };
+                            reader.readAsDataURL(file);
                           }
                         }}
                       />
-                    )}
+                    </label>
+                  </div>
+                  <div className="px-3 py-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700">
+                      Translation ({targetLanguage}) - {proofreadingViewMode === 'preview' ? 'Preview' : 'Editing'}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setProofreadingViewMode('preview')}
+                        className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                      >
+                        Preview
+                      </button>
+                      <button
+                        onClick={() => setProofreadingViewMode('edit')}
+                        className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Translation Preview/Edit */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 bg-green-100 border-b flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-green-700">
-                        📄 Translation ({targetLanguage}) {proofreadingViewMode === 'edit' && '- ✏️ Editing'}
-                      </span>
-                      {/* View Mode Toggle */}
-                      <div className="flex items-center gap-1 ml-2">
-                        <button
-                          onClick={() => setProofreadingViewMode('preview')}
-                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'preview' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
-                        >
-                          👁️ Preview
-                        </button>
-                        <button
-                          onClick={() => setProofreadingViewMode('edit')}
-                          className={`px-2 py-0.5 text-[10px] rounded ${proofreadingViewMode === 'edit' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 border'}`}
-                        >
-                          ✏️ Edit
-                        </button>
+                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
+                  {/* Left: Original Document */}
+                  <div className="border-r overflow-auto bg-gray-50 p-2">
+                    {originalImages[selectedResultIndex] ? (
+                      originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
+                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                      ) : (
+                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                      )
+                    ) : (ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText) ? (
+                      <div className="text-xs whitespace-pre-wrap p-2">
+                        {ocrResults[selectedResultIndex]?.text || translationResults[selectedResultIndex]?.originalText}
                       </div>
-                    </div>
-                    {proofreadingViewMode === 'preview' && proofreadingResult?.erros?.length > 0 && (
-                      <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                        <span className="inline-block w-3 h-3 rounded" style={{backgroundColor: '#fee2e2', border: '1px solid #ef4444'}}></span> Crítico
-                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#dbeafe', border: '1px solid #3b82f6'}}></span> Alto
-                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#fef3c7', border: '1px solid #f59e0b'}}></span> Médio
-                        <span className="inline-block w-3 h-3 rounded ml-2" style={{backgroundColor: '#e0e7ff', border: '1px solid #6366f1'}}></span> Baixo
-                      </span>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-gray-400 text-xs">
+                        <div className="text-center">
+                          <p>No original document</p>
+                          <p className="mt-1">Click "Upload" above to add</p>
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  {/* Edit Toolbar - Only visible in edit mode */}
-                  {proofreadingViewMode === 'edit' && (
-                    <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b">
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200" title="Bold">B</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200" title="Italic">I</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200" title="Underline">U</button>
-                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Font Size">A-</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Font Size">A+</button>
-                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Decrease Line Spacing">↕-</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseLineHeight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Increase Line Spacing">↕+</button>
-                      <div className="w-px h-5 bg-gray-300 mx-1"></div>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
-                      <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
-                    </div>
-                  )}
-
-                  <div className="p-4 bg-white max-h-64 overflow-y-auto">
+                  {/* Right: Translation */}
+                  <div className="overflow-auto bg-white">
+                    {proofreadingViewMode === 'edit' && (
+                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b sticky top-0">
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200">B</button>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200">I</button>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200">U</button>
+                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                      </div>
+                    )}
                     {proofreadingViewMode === 'preview' ? (
-                      <>
-                        <div
-                          className="text-xs leading-relaxed"
-                          onClick={handleHighlightedErrorClick}
-                          dangerouslySetInnerHTML={{ __html: getHighlightedTranslation() }}
-                        />
-                        {proofreadingResult?.erros?.length > 0 && (
-                          <p className="text-[10px] text-gray-400 mt-2 italic">💡 Clique no texto destacado para ver o erro na tabela abaixo</p>
-                        )}
-                      </>
+                      <iframe
+                        srcDoc={getHighlightedTranslation()}
+                        title="Translation Preview"
+                        className="w-full h-full border-0"
+                        style={{minHeight: '384px'}}
+                      />
                     ) : (
                       <div
                         contentEditable
@@ -8505,8 +8502,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="text-xs leading-relaxed focus:outline-none min-h-[200px]"
-                        style={{border: '2px solid #10B981', borderRadius: '4px', padding: '8px'}}
+                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -8715,7 +8712,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     {/* Reject Button - Only for Admin and PM */}
                     {(isAdmin || isPM) && (
                       <button
-                        onClick={rejectTranslation}
+                        onClick={openRejectModal}
                         disabled={sendingToProjects}
                         className="px-6 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:bg-gray-300 flex items-center gap-2"
                       >
@@ -9695,8 +9692,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           )}
 
           {/* ============ NORMAL FLOW ============ */}
-          {/* Normal Flow hidden for contractors only - In-house translators can use it */}
-          {!quickPackageMode && translationResults.length > 0 && !isContractor && (
+          {/* Normal Flow - Available for ALL users including Contractors */}
+          {!quickPackageMode && translationResults.length > 0 && (
             <>
               {/* Approval Checklist - ALL REQUIRED */}
               <div className={`p-4 rounded mb-4 ${
@@ -10987,6 +10984,76 @@ translation juramentada | certified translation`}
             <div className="p-4 border-t flex justify-end space-x-2">
               <button onClick={() => setShowGlossaryModal(false)} className="px-4 py-2 text-xs border rounded hover:bg-gray-50">Cancel</button>
               <button onClick={handleSaveGlossary} className="px-4 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Modal - PM/Admin can choose which translator to send back to */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b bg-red-50">
+              <h3 className="font-bold text-red-700">❌ Reject Translation</h3>
+              <p className="text-xs text-red-600 mt-1">Send this translation back for revision</p>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Translator Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Send back to translator: *
+                </label>
+                {loadingTranslators ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">Loading translators...</div>
+                ) : (
+                  <select
+                    value={selectedTranslatorForReject}
+                    onChange={(e) => setSelectedTranslatorForReject(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+                  >
+                    <option value="">-- Select Translator --</option>
+                    {availableTranslators.map((t) => (
+                      <option key={t.id} value={t.id.toString()}>
+                        {t.name} {t.translator_type === 'in_house' ? '(In-House)' : '(Contractor)'}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {availableTranslators.length === 0 && !loadingTranslators && (
+                  <p className="text-xs text-red-500 mt-1">No translators available</p>
+                )}
+              </div>
+
+              {/* Rejection Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for rejection: *
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400 h-32 resize-none"
+                  placeholder="Explain what needs to be corrected..."
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRejectTranslation}
+                disabled={!selectedTranslatorForReject || !rejectReason.trim() || sendingToProjects}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {sendingToProjects ? 'Rejecting...' : '❌ Confirm Reject'}
+              </button>
             </div>
           </div>
         </div>
