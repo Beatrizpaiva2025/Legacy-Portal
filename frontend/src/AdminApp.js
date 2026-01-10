@@ -8292,40 +8292,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </button>
                   )}
 
-                  {/* In-House Translator: Send to PM or Admin (never to client) */}
-                  {isInHouseTranslator && (
-                    <>
-                      <button
-                        onClick={async () => {
-                          await sendToProjects('pm');
-                          alert('Translation sent to PM!');
-                          setTranslationResults([]);
-                          setOriginalImages([]);
-                          fetchAssignedOrders();
-                        }}
-                        disabled={sendingToProjects}
-                        className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300"
-                      >
-                        Send to PM
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await sendToProjects('admin');
-                          alert('Translation sent to Admin!');
-                          setTranslationResults([]);
-                          setOriginalImages([]);
-                          fetchAssignedOrders();
-                        }}
-                        disabled={sendingToProjects}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300"
-                      >
-                        Send to Admin
-                      </button>
-                    </>
-                  )}
-
-                  {/* PM/Admin: Next to Proofreading */}
-                  {(isAdmin || isPM) && (
+                  {/* PM/Admin/In-House Translator: Next to Proofreading - In-House must complete all steps */}
+                  {(isAdmin || isPM || isInHouseTranslator) && (
                     <button
                       onClick={() => setActiveSubTab('proofreading')}
                       className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700"
