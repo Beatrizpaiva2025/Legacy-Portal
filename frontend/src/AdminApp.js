@@ -8,6 +8,33 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== UTC DATE HELPER ====================
+// Parse dates from backend as UTC (backend sends UTC timestamps without 'Z' suffix)
+const parseUTCDate = (dateStr) => {
+  if (!dateStr) return null;
+  // If the string doesn't have timezone info (no Z or +/-offset), treat it as UTC
+  if (typeof dateStr === 'string' && !dateStr.endsWith('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)) {
+    return new Date(dateStr + 'Z');
+  }
+  return new Date(dateStr);
+};
+
+// Format a date string from backend to local display
+const formatDateLocal = (dateStr, options = {}) => {
+  if (!dateStr) return '-';
+  const date = parseUTCDate(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Format a datetime string from backend to local display
+const formatDateTimeLocal = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = parseUTCDate(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-US');
+};
+
 // ==================== CONSTANTS ====================
 const STATUS_COLORS = {
   'Quote': 'bg-slate-100 text-slate-700',
@@ -514,7 +541,7 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
                       <div className="font-medium text-xs">{notif.title}</div>
                       <div className="text-[10px] text-gray-600 mt-0.5">{notif.message}</div>
                       <div className="text-[9px] text-gray-400 mt-1">
-                        {new Date(notif.created_at).toLocaleString()}
+                        {formatDateTimeLocal(notif.created_at)}
                       </div>
                     </div>
                     {!notif.is_read && <span className="w-2 h-2 bg-blue-500 rounded-full"></span>}
@@ -5674,7 +5701,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             {msg.content}
                           </div>
                           <div className="text-[10px] text-gray-400 mt-2">
-                            {new Date(msg.created_at).toLocaleString()}
+                            {formatDateTimeLocal(msg.created_at)}
                           </div>
                         </div>
                       </div>
@@ -8265,40 +8292,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </button>
                   )}
 
-                  {/* In-House Translator: Send to PM or Admin (never to client) */}
-                  {isInHouseTranslator && (
-                    <>
-                      <button
-                        onClick={async () => {
-                          await sendToProjects('pm');
-                          alert('Translation sent to PM!');
-                          setTranslationResults([]);
-                          setOriginalImages([]);
-                          fetchAssignedOrders();
-                        }}
-                        disabled={sendingToProjects}
-                        className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300"
-                      >
-                        Send to PM
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await sendToProjects('admin');
-                          alert('Translation sent to Admin!');
-                          setTranslationResults([]);
-                          setOriginalImages([]);
-                          fetchAssignedOrders();
-                        }}
-                        disabled={sendingToProjects}
-                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300"
-                      >
-                        Send to Admin
-                      </button>
-                    </>
-                  )}
-
-                  {/* PM/Admin: Next to Proofreading */}
-                  {(isAdmin || isPM) && (
+                  {/* PM/Admin/In-House Translator: Next to Proofreading - In-House must complete all steps */}
+                  {(isAdmin || isPM || isInHouseTranslator) && (
                     <button
                       onClick={() => setActiveSubTab('proofreading')}
                       className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700"
@@ -12512,7 +12507,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <div className="text-xs text-purple-700 font-medium mt-1">Order: {notif.order_number}</div>
                       )}
                       <div className="text-[10px] text-gray-500 mt-1 font-medium">
-                        {new Date(notif.created_at).toLocaleString()}
+                        {formatDateTimeLocal(notif.created_at)}
                       </div>
                     </div>
                     <button
@@ -12575,7 +12570,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {msg.content}
                       </div>
                       <div className="text-[10px] text-gray-500 mt-2 font-medium">
-                        {new Date(msg.created_at).toLocaleString()}
+                        {formatDateTimeLocal(msg.created_at)}
                       </div>
                     </div>
                   </div>
@@ -14279,14 +14274,14 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Created</td>
-                              <td className="py-2">{new Date(viewingOrder.created_at).toLocaleString()}</td>
+                              <td className="py-2">{formatDateTimeLocal(viewingOrder.created_at)}</td>
                             </tr>
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Deadline</td>
                               <td className="py-2">
                                 {viewingOrder.deadline ? (
                                   <span className="text-blue-600 font-medium">
-                                    {new Date(viewingOrder.deadline).toLocaleString()}
+                                    {formatDateTimeLocal(viewingOrder.deadline)}
                                   </span>
                                 ) : '-'}
                               </td>
@@ -14676,7 +14671,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="text-xs font-medium text-blue-700 mb-2">📤 Delivery Information</div>
                       {viewingOrder.delivered_at && (
                         <div className="text-xs text-gray-600 mb-2">
-                          Delivered: {new Date(viewingOrder.delivered_at).toLocaleString()}
+                          Delivered: {formatDateTimeLocal(viewingOrder.delivered_at)}
                         </div>
                       )}
                       <div className="text-xs text-gray-600 mb-3">
@@ -14702,7 +14697,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       <div className="text-xs font-medium text-green-700 mb-2">✅ Translation Ready</div>
                       <div className="text-xs text-gray-600 mb-3">
                         {viewingOrder.translation_ready_at && (
-                          <span>Completed: {new Date(viewingOrder.translation_ready_at).toLocaleString()}</span>
+                          <span>Completed: {formatDateTimeLocal(viewingOrder.translation_ready_at)}</span>
                         )}
                       </div>
                       <button
@@ -18628,8 +18623,7 @@ const ProductionPage = ({ adminKey }) => {
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US');
+    return formatDateLocal(dateStr);
   };
 
   const formatCurrency = (amount) => {
@@ -19502,8 +19496,7 @@ const FinancesPage = ({ adminKey }) => {
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US');
+    return formatDateLocal(dateStr);
   };
 
   // Simple Donut Chart Component
@@ -21636,13 +21629,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Fetch orders assigned to this PM
-      const ordersRes = await axios.get(`${API}/admin/orders?admin_key=${adminKey}`);
-      const allOrders = ordersRes.data.orders || [];
-      const myOrders = allOrders.filter(o =>
-        o.assigned_pm_id === user?.id ||
-        o.assigned_pm_name === user?.name
-      );
+      // Fetch orders assigned to this PM using the proper endpoint that filters by role
+      const ordersRes = await axios.get(`${API}/admin/orders/my-projects?admin_key=${adminKey}&token=${user?.token}`);
+      const myOrders = ordersRes.data.orders || [];
       setOrders(myOrders);
 
       // Fetch translators
@@ -22719,7 +22708,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </span>
                       </td>
                       <td className="py-2 px-2">
-                        {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : '-'}
+                        {order.deadline ? formatDateLocal(order.deadline) : '-'}
                       </td>
                     </tr>
                   ))}
@@ -23214,7 +23203,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-gray-600">
-                          {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : 'No deadline'}
+                          {order.deadline ? formatDateLocal(order.deadline) : 'No deadline'}
                         </div>
                         <button className="mt-1 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
                           Review →
@@ -23641,7 +23630,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           <div key={idx} className="flex justify-between text-[10px] py-0.5">
                             <span className="text-blue-600 font-mono">{order.order_number}</span>
                             <span className="text-gray-500">
-                              {order.deadline ? new Date(order.deadline).toLocaleDateString('en-US') : '-'}
+                              {order.deadline ? formatDateLocal(order.deadline) : '-'}
                             </span>
                           </div>
                         ))}
