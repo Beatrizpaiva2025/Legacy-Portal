@@ -3670,9 +3670,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
-    // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
-    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
+    // Handle both field name conventions - traducao_errada is the incorrect English text to find
+    const foundText = (erro.traducao_errada || erro.found || '').trim();
+    const suggestionText = (erro.correcao || erro.sugestao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3719,9 +3719,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     let appliedCount = 0;
 
     const updatedErrors = proofreadingResult.erros.map(erro => {
-      // Handle both field name conventions
-      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
-      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
+      // Handle both field name conventions - traducao_errada is the incorrect English text to find
+      const foundText = (erro.traducao_errada || erro.found || '').trim();
+      const suggestionText = (erro.correcao || erro.sugestao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
         const result = tryReplaceText(updatedHtml, foundText, suggestionText);
@@ -8823,9 +8823,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 // Handle both field name conventions
                                 const severity = erro.severidade || erro.gravidade || 'MÉDIO';
                                 const errorType = erro.tipo || 'Geral';
-                                const originalText = erro.original || erro.traducao_errada || '';
-                                const foundText = erro.found || erro.original || erro.traducao_errada || '';
-                                const suggestionText = erro.sugestao || erro.correcao || '';
+                                const originalText = erro.original || '';  // Portuguese original
+                                const foundText = erro.traducao_errada || erro.found || '';  // Incorrect English found in translation
+                                const suggestionText = erro.correcao || erro.sugestao || '';  // Corrected English suggestion
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
