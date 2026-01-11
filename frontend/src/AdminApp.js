@@ -24328,6 +24328,11 @@ const SalesControlPage = ({ adminKey }) => {
   const [showAddAcquisition, setShowAddAcquisition] = useState(false);
   const [showSetGoal, setShowSetGoal] = useState(false);
   const [editingSalesperson, setEditingSalesperson] = useState(null);
+  const [ranking, setRanking] = useState([]);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(null);
+  const [paymentForm, setPaymentForm] = useState({ method: 'bank_transfer', reference: '', notes: '' });
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
@@ -24349,17 +24354,32 @@ const SalesControlPage = ({ adminKey }) => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [spRes, acqRes, goalsRes, dashRes] = await Promise.all([
+      const [spRes, acqRes, goalsRes, dashRes, rankRes, pendingRes, historyRes] = await Promise.all([
         fetch(`${API_URL}/admin/salespeople`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/admin/partner-acquisitions`, { headers: { 'admin-key': adminKey } }),
         fetch(`${API_URL}/admin/sales-goals`, { headers: { 'admin-key': adminKey } }),
-        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } })
+        fetch(`${API_URL}/admin/sales-dashboard`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/salesperson-ranking`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/pending-commissions`, { headers: { 'admin-key': adminKey } }),
+        fetch(`${API_URL}/admin/payment-history`, { headers: { 'admin-key': adminKey } })
       ]);
 
       if (spRes.ok) setSalespeople(await spRes.json());
       if (acqRes.ok) setAcquisitions(await acqRes.json());
       if (goalsRes.ok) setGoals(await goalsRes.json());
       if (dashRes.ok) setDashboard(await dashRes.json());
+      if (rankRes.ok) {
+        const rankData = await rankRes.json();
+        setRanking(rankData.rankings || []);
+      }
+      if (pendingRes.ok) {
+        const pendingData = await pendingRes.json();
+        setPendingPayments(pendingData.pending_by_salesperson || []);
+      }
+      if (historyRes.ok) {
+        const historyData = await historyRes.json();
+        setPaymentHistory(historyData.payments || []);
+      }
     } catch (error) {
       console.error('Error fetching sales data:', error);
     }
@@ -24373,13 +24393,18 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newSalesperson)
       });
+      const data = await res.json();
       if (res.ok) {
+        alert('Salesperson added successfully!');
         setShowAddSalesperson(false);
         setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10 });
         fetchAllData();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
       }
     } catch (error) {
       console.error('Error adding salesperson:', error);
+      alert('Error adding salesperson. Please try again.');
     }
   };
 
@@ -24390,12 +24415,17 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(editingSalesperson)
       });
+      const data = await res.json();
       if (res.ok) {
+        alert('Salesperson updated successfully!');
         setEditingSalesperson(null);
         fetchAllData();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to update salesperson'}`);
       }
     } catch (error) {
       console.error('Error updating salesperson:', error);
+      alert('Error updating salesperson. Please try again.');
     }
   };
 
@@ -24413,7 +24443,7 @@ const SalesControlPage = ({ adminKey }) => {
   };
 
   const handleInviteSalesperson = async (id) => {
-    if (!window.confirm('Send invitation email to this salesperson?')) return;
+    if (!window.confirm('Enviar email de convite para este vendedor?')) return;
     try {
       const res = await fetch(`${API_URL}/admin/salespeople/${id}/invite`, {
         method: 'POST',
@@ -24421,14 +24451,57 @@ const SalesControlPage = ({ adminKey }) => {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`Invitation sent! Link: ${data.invite_link}`);
+        alert(`Convite enviado! Link: ${data.invite_link}`);
         fetchAllData();
       } else {
-        alert(data.detail || 'Failed to send invitation');
+        alert(data.detail || 'Falha ao enviar convite');
       }
     } catch (error) {
       console.error('Error inviting salesperson:', error);
-      alert('Error sending invitation');
+      alert('Erro ao enviar convite');
+    }
+  };
+
+  const handleApproveCommission = async (acquisitionId) => {
+    try {
+      const res = await fetch(`${API_URL}/admin/acquisitions/${acquisitionId}/approve`, {
+        method: 'PUT',
+        headers: { 'admin-key': adminKey }
+      });
+      if (res.ok) {
+        alert('Comissão aprovada! Vendedor será notificado.');
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error approving commission:', error);
+      alert('Erro ao aprovar comissão');
+    }
+  };
+
+  const handleProcessPayment = async (spData) => {
+    try {
+      const formData = new FormData();
+      formData.append('salesperson_id', spData.salesperson_id);
+      formData.append('acquisition_ids', spData.acquisitions.map(a => a.id).join(','));
+      formData.append('payment_method', paymentForm.method);
+      formData.append('payment_reference', paymentForm.reference);
+      formData.append('notes', paymentForm.notes);
+
+      const res = await fetch(`${API_URL}/admin/commission-payments`, {
+        method: 'POST',
+        headers: { 'admin-key': adminKey },
+        body: formData
+      });
+
+      if (res.ok) {
+        alert(`Pagamento de $${spData.total_amount.toFixed(2)} processado! Vendedor notificado.`);
+        setShowPaymentModal(null);
+        setPaymentForm({ method: 'bank_transfer', reference: '', notes: '' });
+        fetchAllData();
+      }
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      alert('Erro ao processar pagamento');
     }
   };
 
@@ -24530,12 +24603,14 @@ const SalesControlPage = ({ adminKey }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200">
+      <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
         {[
           { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-          { id: 'salespeople', label: 'Salespeople', icon: '👥' },
-          { id: 'acquisitions', label: 'Acquisitions', icon: '🤝' },
-          { id: 'goals', label: 'Goals', icon: '🎯' }
+          { id: 'salespeople', label: 'Vendedores', icon: '👥' },
+          { id: 'acquisitions', label: 'Aquisições', icon: '🤝' },
+          { id: 'goals', label: 'Metas', icon: '🎯' },
+          { id: 'ranking', label: 'Ranking', icon: '🏆' },
+          { id: 'payments', label: 'Pagamentos', icon: '💳' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -24790,13 +24865,13 @@ const SalesControlPage = ({ adminKey }) => {
       {activeTab === 'acquisitions' && (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-gray-700">Partner Acquisitions ({acquisitions.length})</h3>
+            <h3 className="font-semibold text-gray-700">Aquisições de Parceiros ({acquisitions.length})</h3>
             <button
               onClick={() => setShowAddAcquisition(true)}
               className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
               disabled={salespeople.length === 0}
             >
-              <span>🤝</span> Record Acquisition
+              <span>🤝</span> Registrar Aquisição
             </button>
           </div>
 
@@ -24804,13 +24879,13 @@ const SalesControlPage = ({ adminKey }) => {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Partner</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiro</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Salesperson</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Commission</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -24832,19 +24907,31 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[acq.commission_status]}`}>
-                        {acq.commission_status}
+                        {acq.commission_status === 'pending' ? 'Pendente' : acq.commission_status === 'approved' ? 'Aprovado' : 'Pago'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={acq.commission_status}
-                        onChange={(e) => handleUpdateCommissionStatus(acq.id, e.target.value)}
-                        className="text-xs border rounded px-2 py-1"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="paid">Paid</option>
-                      </select>
+                      <div className="flex gap-1">
+                        {acq.commission_status === 'pending' && (
+                          <button
+                            onClick={() => handleApproveCommission(acq.id)}
+                            className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
+                            title="Aprovar e notificar vendedor"
+                          >
+                            ✓ Aprovar
+                          </button>
+                        )}
+                        {acq.commission_status === 'approved' && (
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">
+                            Aguardando pagamento
+                          </span>
+                        )}
+                        {acq.commission_status === 'paid' && (
+                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                            ✓ Pago
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -24853,7 +24940,7 @@ const SalesControlPage = ({ adminKey }) => {
             {acquisitions.length === 0 && (
               <div className="text-center py-12 text-gray-400">
                 <p className="text-4xl mb-2">🤝</p>
-                <p>No acquisitions recorded yet</p>
+                <p>Nenhuma aquisição registrada ainda</p>
               </div>
             )}
           </div>
@@ -24912,9 +24999,239 @@ const SalesControlPage = ({ adminKey }) => {
           {goals.length === 0 && (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl">
               <p className="text-4xl mb-2">🎯</p>
-              <p>No goals set yet. Set goals for your salespeople!</p>
+              <p>Nenhuma meta definida. Defina metas para seus vendedores!</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Ranking Tab */}
+      {activeTab === 'ranking' && (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-yellow-500 via-yellow-400 to-amber-500 rounded-xl p-6 text-white">
+            <h2 className="text-2xl font-bold flex items-center gap-3">
+              <span className="text-4xl">🏆</span> Ranking de Vendedores
+            </h2>
+            <p className="text-yellow-100 mt-2">Desempenho do mês atual</p>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Posição</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Este Mês</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Meta</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Progresso</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Ganho</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Pendente</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ranking.map((r, idx) => (
+                  <tr key={r.id} className={`hover:bg-gray-50 ${idx < 3 ? 'bg-yellow-50' : ''}`}>
+                    <td className="px-4 py-4">
+                      <span className="text-2xl">
+                        {r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <p className="font-semibold text-gray-800">{r.name}</p>
+                      <p className="text-xs text-gray-400">{r.email}</p>
+                      <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded capitalize">{r.commission_type}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-2xl font-bold text-indigo-600">{r.month_acquisitions}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-lg text-gray-600">{r.monthly_target}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className={`h-3 rounded-full transition-all ${r.target_progress >= 100 ? 'bg-green-500' : 'bg-indigo-500'}`}
+                          style={{ width: `${Math.min(r.target_progress, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-center mt-1 text-gray-500">{r.target_progress}%</p>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-lg font-semibold text-green-600">${r.total_earned}</span>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="text-lg font-semibold text-yellow-600">${r.pending_amount}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {ranking.length === 0 && (
+              <div className="text-center py-12 text-gray-400">
+                <p className="text-4xl mb-2">🏆</p>
+                <p>Nenhum vendedor ativo ainda.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payments Tab */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          {/* Pending Payments Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>⏳</span> Comissões Pendentes de Pagamento
+            </h3>
+            {pendingPayments.length > 0 ? (
+              <div className="space-y-4">
+                {pendingPayments.map(sp => (
+                  <div key={sp.salesperson_id} className="border rounded-lg p-4 hover:bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <p className="font-semibold text-gray-800">{sp.salesperson_name}</p>
+                        <p className="text-sm text-gray-500">{sp.salesperson_email}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-green-600">${sp.total_amount.toFixed(2)}</p>
+                        <p className="text-xs text-gray-400">{sp.acquisitions.length} parceiros</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap mb-3">
+                      {sp.acquisitions.map(acq => (
+                        <span key={acq.id} className="px-2 py-1 bg-gray-100 rounded text-xs">
+                          {acq.partner_name} - ${acq.commission_paid}
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowPaymentModal(sp)}
+                      className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
+                    >
+                      💳 Processar Pagamento
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p className="text-4xl mb-2">✅</p>
+                <p>Nenhuma comissão pendente de pagamento!</p>
+                <p className="text-sm">Aprove comissões na aba Aquisições primeiro.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Payment History Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <span>📜</span> Histórico de Pagamentos
+            </h3>
+            {paymentHistory.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Vendedor</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Método</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Referência</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {paymentHistory.map(payment => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-800">{payment.salesperson_name}</td>
+                        <td className="px-4 py-3 font-semibold text-green-600">${payment.total_amount.toFixed(2)}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs capitalize">
+                            {payment.payment_method.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{payment.payment_reference || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p className="text-4xl mb-2">📜</p>
+                <p>Nenhum pagamento realizado ainda.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <span>💳</span> Processar Pagamento
+            </h3>
+            <div className="bg-green-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-600">Vendedor:</p>
+              <p className="font-semibold text-gray-800">{showPaymentModal.salesperson_name}</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">${showPaymentModal.total_amount.toFixed(2)}</p>
+              <p className="text-xs text-gray-500">{showPaymentModal.acquisitions.length} comissões</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pagamento</label>
+                <select
+                  value={paymentForm.method}
+                  onChange={(e) => setPaymentForm({...paymentForm, method: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="bank_transfer">Transferência Bancária</option>
+                  <option value="zelle">Zelle</option>
+                  <option value="paypal">PayPal</option>
+                  <option value="check">Cheque</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Referência/Comprovante</label>
+                <input
+                  type="text"
+                  value={paymentForm.reference}
+                  onChange={(e) => setPaymentForm({...paymentForm, reference: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                  placeholder="ID da transação, número do cheque, etc."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <textarea
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({...paymentForm, notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
+                  rows={2}
+                  placeholder="Notas adicionais..."
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowPaymentModal(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleProcessPayment(showPaymentModal)}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+              >
+                Confirmar Pagamento
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -24957,27 +25274,50 @@ const SalesControlPage = ({ adminKey }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comissão</label>
                 <select
                   value={newSalesperson.commission_type}
                   onChange={(e) => setNewSalesperson({...newSalesperson, commission_type: e.target.value})}
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="tier">By Tier ($50-150/partner)</option>
-                  <option value="fixed">Fixed Amount</option>
-                  <option value="percentage">Percentage</option>
+                  <option value="tier">Por Tier ($50-150/parceiro)</option>
+                  <option value="fixed">Valor Fixo por Parceiro</option>
+                  <option value="percentage">Percentual sobre Vendas</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {newSalesperson.commission_type === 'tier' && 'Comissão baseada no tier do parceiro (Bronze $50, Silver $75, Gold $100, Platinum $150)'}
+                  {newSalesperson.commission_type === 'fixed' && 'Valor fixo por cada parceiro registrado'}
+                  {newSalesperson.commission_type === 'percentage' && 'Percentual sobre todas as vendas geradas pelo parceiro'}
+                </p>
               </div>
               {newSalesperson.commission_type === 'fixed' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Commission ($)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Comissão Fixa ($)</label>
                   <input
                     type="number"
                     value={newSalesperson.commission_rate}
-                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="50"
                   />
+                </div>
+              )}
+              {newSalesperson.commission_type === 'percentage' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Percentual de Comissão (%)</label>
+                  <input
+                    type="number"
+                    value={newSalesperson.commission_rate}
+                    onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="10"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ex: 10% = $50 de comissão para cada $500 em vendas do parceiro
+                  </p>
                 </div>
               )}
               <div>

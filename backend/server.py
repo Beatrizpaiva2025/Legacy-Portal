@@ -16869,6 +16869,31 @@ class PartnerAcquisition(BaseModel):
     acquisition_date: str = None
     commission_paid: float = 0
     commission_status: str = "pending"  # pending, approved, paid
+    partner_monthly_sales: float = 0  # For percentage-based commission tracking
+    notes: str = ""
+    created_at: str = None
+    approved_at: str = None
+    paid_at: str = None
+
+class SalespersonNotification(BaseModel):
+    id: str = None
+    salesperson_id: str
+    type: str  # commission_approved, commission_paid, goal_achieved, welcome
+    title: str
+    message: str
+    amount: float = 0
+    read: bool = False
+    created_at: str = None
+
+class CommissionPayment(BaseModel):
+    id: str = None
+    salesperson_id: str
+    salesperson_name: str = ""
+    acquisition_ids: list = []  # List of acquisition IDs included in this payment
+    total_amount: float
+    payment_method: str = "bank_transfer"  # bank_transfer, paypal, check
+    payment_reference: str = ""
+    paid_at: str = None
     notes: str = ""
     created_at: str = None
 
@@ -17497,6 +17522,28 @@ async def salesperson_register_partner(
             {"$inc": {"achieved_partners": 1}}
         )
 
+        # Check if goal was just achieved - send notification
+        updated_goal = await db.sales_goals.find_one({"id": goal["id"]})
+        if updated_goal and updated_goal["achieved_partners"] == updated_goal["target_partners"]:
+            # Goal just achieved! Create notification
+            goal_notification = {
+                "id": str(uuid.uuid4())[:8],
+                "salesperson_id": salesperson["id"],
+                "type": "goal_achieved",
+                "title": "🏆 Meta Atingida! / Goal Achieved!",
+                "message": f"Parabéns! Você atingiu sua meta de {updated_goal['target_partners']} parceiros este mês! / Congratulations! You reached your goal of {updated_goal['target_partners']} partners this month!",
+                "amount": 100,  # Bonus amount
+                "read": False,
+                "created_at": datetime.now().isoformat()
+            }
+            await db.salesperson_notifications.insert_one(goal_notification)
+
+            # Update goal status
+            await db.sales_goals.update_one(
+                {"id": goal["id"]},
+                {"$set": {"status": "achieved", "bonus_earned": 100}}
+            )
+
     # Send welcome email to new partner with credentials
     try:
         frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
@@ -17568,24 +17615,321 @@ async def get_commission_info(token: str = Header(None, alias="salesperson-token
     if not salesperson:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    commission_type = salesperson.get("commission_type", "tier")
+    commission_rate = salesperson.get("commission_rate", 0)
+
     return {
-        "commission_type": salesperson.get("commission_type", "tier"),
+        "commission_type": commission_type,
+        "commission_rate": commission_rate,
         "tier_commissions": {
-            "bronze": {"pages": "10-29/month", "discount": "10%", "commission": 50},
-            "silver": {"pages": "30-59/month", "discount": "15%", "commission": 75},
-            "gold": {"pages": "60-99/month", "discount": "25%", "commission": 100},
-            "platinum": {"pages": "100+/month", "discount": "35%", "commission": 150}
+            "bronze": {"pages": "1-50/month", "discount": "10%", "commission": 50},
+            "silver": {"pages": "51-150/month", "discount": "15%", "commission": 75},
+            "gold": {"pages": "151-300/month", "discount": "25%", "commission": 100},
+            "platinum": {"pages": "300+/month", "discount": "35%", "commission": 150}
+        },
+        "percentage_commission": {
+            "description": "Percentual sobre as vendas geradas pelo parceiro",
+            "rate": f"{commission_rate}%" if commission_type == "percentage" else "N/A",
+            "example": f"Se o parceiro gastar $500/mês, sua comissão será ${500 * commission_rate / 100:.2f}" if commission_type == "percentage" else "N/A"
         },
         "payment_info": {
             "method": "Zelle / ACH Transfer",
-            "schedule": "Weekly (Fridays) for new partners, Monthly (15th) for recurring",
+            "schedule": "Semanal (Sextas) para novos parceiros, Mensal (dia 15) para recorrentes",
             "minimum_payout": 50
         },
         "bonuses": {
-            "retention_bonus": "$25 extra if partner stays 3+ months active",
-            "platinum_bonus": "$50 extra for signing Platinum tier partners",
-            "monthly_target_bonus": f"$100 bonus for reaching {salesperson.get('monthly_target', 10)} partners/month"
+            "retention_bonus": "$25 extra se o parceiro permanecer 3+ meses ativo",
+            "platinum_bonus": "$50 extra por assinar parceiros Platinum",
+            "monthly_target_bonus": f"$100 bônus por atingir {salesperson.get('monthly_target', 10)} parceiros/mês"
         }
+    }
+
+# Salesperson notifications
+@app.get("/salesperson/notifications")
+async def get_salesperson_notifications(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    notifications = await db.salesperson_notifications.find(
+        {"salesperson_id": salesperson["id"]}
+    ).sort("created_at", -1).to_list(50)
+
+    for n in notifications:
+        n["_id"] = str(n["_id"])
+
+    return {"notifications": notifications}
+
+@app.put("/salesperson/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.salesperson_notifications.update_one(
+        {"id": notification_id, "salesperson_id": salesperson["id"]},
+        {"$set": {"read": True}}
+    )
+
+    return {"success": True}
+
+@app.put("/salesperson/notifications/read-all")
+async def mark_all_notifications_read(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    await db.salesperson_notifications.update_many(
+        {"salesperson_id": salesperson["id"]},
+        {"$set": {"read": True}}
+    )
+
+    return {"success": True}
+
+# Salesperson payment history
+@app.get("/salesperson/payment-history")
+async def get_payment_history(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Get all payments for this salesperson
+    payments = await db.commission_payments.find(
+        {"salesperson_id": salesperson["id"]}
+    ).sort("paid_at", -1).to_list(100)
+
+    for p in payments:
+        p["_id"] = str(p["_id"])
+
+    # Get paid acquisitions with details
+    paid_acquisitions = await db.partner_acquisitions.find(
+        {"salesperson_id": salesperson["id"], "commission_status": "paid"}
+    ).sort("paid_at", -1).to_list(100)
+
+    for a in paid_acquisitions:
+        a["_id"] = str(a["_id"])
+
+    return {
+        "payments": payments,
+        "paid_acquisitions": paid_acquisitions,
+        "total_paid": sum(p.get("total_amount", 0) for p in payments)
+    }
+
+# Admin: Approve commission
+@app.put("/admin/acquisitions/{acquisition_id}/approve")
+async def approve_acquisition(acquisition_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    acquisition = await db.partner_acquisitions.find_one({"id": acquisition_id})
+    if not acquisition:
+        raise HTTPException(status_code=404, detail="Acquisition not found")
+
+    await db.partner_acquisitions.update_one(
+        {"id": acquisition_id},
+        {"$set": {
+            "commission_status": "approved",
+            "approved_at": datetime.now().isoformat()
+        }}
+    )
+
+    # Create notification for salesperson
+    notification = SalespersonNotification(
+        id=str(uuid.uuid4())[:8],
+        salesperson_id=acquisition["salesperson_id"],
+        type="commission_approved",
+        title="Comissão Aprovada!",
+        message=f"Sua comissão de ${acquisition['commission_paid']} pelo parceiro {acquisition['partner_name']} foi aprovada.",
+        amount=acquisition["commission_paid"],
+        created_at=datetime.now().isoformat()
+    )
+    await db.salesperson_notifications.insert_one(notification.dict())
+
+    return {"success": True}
+
+# Admin: Process payment for multiple acquisitions
+@app.post("/admin/commission-payments")
+async def create_commission_payment(
+    salesperson_id: str = Form(...),
+    acquisition_ids: str = Form(...),  # Comma-separated IDs
+    payment_method: str = Form("bank_transfer"),
+    payment_reference: str = Form(""),
+    notes: str = Form(""),
+    admin_key: str = Header(None)
+):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salesperson = await db.salespeople.find_one({"id": salesperson_id})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    # Parse acquisition IDs
+    acq_ids = [aid.strip() for aid in acquisition_ids.split(",") if aid.strip()]
+
+    # Update all acquisitions to paid
+    total_amount = 0
+    for acq_id in acq_ids:
+        acquisition = await db.partner_acquisitions.find_one({"id": acq_id})
+        if acquisition:
+            total_amount += acquisition.get("commission_paid", 0)
+            await db.partner_acquisitions.update_one(
+                {"id": acq_id},
+                {"$set": {
+                    "commission_status": "paid",
+                    "paid_at": datetime.now().isoformat()
+                }}
+            )
+
+    # Create payment record
+    payment = CommissionPayment(
+        id=str(uuid.uuid4())[:8],
+        salesperson_id=salesperson_id,
+        salesperson_name=salesperson["name"],
+        acquisition_ids=acq_ids,
+        total_amount=total_amount,
+        payment_method=payment_method,
+        payment_reference=payment_reference,
+        paid_at=datetime.now().isoformat(),
+        notes=notes,
+        created_at=datetime.now().isoformat()
+    )
+    await db.commission_payments.insert_one(payment.dict())
+
+    # Create notification
+    notification = SalespersonNotification(
+        id=str(uuid.uuid4())[:8],
+        salesperson_id=salesperson_id,
+        type="commission_paid",
+        title="Pagamento Recebido!",
+        message=f"Você recebeu ${total_amount:.2f} via {payment_method}. Ref: {payment_reference}",
+        amount=total_amount,
+        created_at=datetime.now().isoformat()
+    )
+    await db.salesperson_notifications.insert_one(notification.dict())
+
+    return {"success": True, "payment": payment.dict()}
+
+# Admin: Get salesperson ranking
+@app.get("/admin/salesperson-ranking")
+async def get_salesperson_ranking(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salespeople = await db.salespeople.find({"status": "active"}).to_list(100)
+
+    current_month = datetime.now().strftime("%Y-%m")
+    rankings = []
+
+    for sp in salespeople:
+        # Count this month's acquisitions
+        month_acquisitions = await db.partner_acquisitions.count_documents({
+            "salesperson_id": sp["id"],
+            "acquisition_date": {"$regex": f"^{current_month}"}
+        })
+
+        # Total acquisitions
+        total_acquisitions = await db.partner_acquisitions.count_documents({
+            "salesperson_id": sp["id"]
+        })
+
+        # Total commissions earned
+        acquisitions = await db.partner_acquisitions.find({
+            "salesperson_id": sp["id"],
+            "commission_status": "paid"
+        }).to_list(1000)
+        total_earned = sum(a.get("commission_paid", 0) for a in acquisitions)
+
+        # Pending commissions
+        pending_acq = await db.partner_acquisitions.find({
+            "salesperson_id": sp["id"],
+            "commission_status": {"$in": ["pending", "approved"]}
+        }).to_list(1000)
+        pending_amount = sum(a.get("commission_paid", 0) for a in pending_acq)
+
+        rankings.append({
+            "id": sp["id"],
+            "name": sp["name"],
+            "email": sp["email"],
+            "month_acquisitions": month_acquisitions,
+            "total_acquisitions": total_acquisitions,
+            "monthly_target": sp.get("monthly_target", 10),
+            "target_progress": round((month_acquisitions / sp.get("monthly_target", 10)) * 100, 1),
+            "total_earned": total_earned,
+            "pending_amount": pending_amount,
+            "commission_type": sp.get("commission_type", "tier")
+        })
+
+    # Sort by month_acquisitions (descending)
+    rankings.sort(key=lambda x: x["month_acquisitions"], reverse=True)
+
+    # Add rank positions
+    for i, r in enumerate(rankings):
+        r["rank"] = i + 1
+
+    return {
+        "month": current_month,
+        "rankings": rankings
+    }
+
+# Admin: Get pending commissions for payment
+@app.get("/admin/pending-commissions")
+async def get_pending_commissions(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    # Get all approved acquisitions (ready for payment)
+    acquisitions = await db.partner_acquisitions.find({
+        "commission_status": "approved"
+    }).sort("acquisition_date", -1).to_list(500)
+
+    # Group by salesperson
+    by_salesperson = {}
+    for acq in acquisitions:
+        sp_id = acq["salesperson_id"]
+        if sp_id not in by_salesperson:
+            sp = await db.salespeople.find_one({"id": sp_id})
+            by_salesperson[sp_id] = {
+                "salesperson_id": sp_id,
+                "salesperson_name": sp["name"] if sp else "Unknown",
+                "salesperson_email": sp["email"] if sp else "",
+                "acquisitions": [],
+                "total_amount": 0
+            }
+        acq["_id"] = str(acq["_id"])
+        by_salesperson[sp_id]["acquisitions"].append(acq)
+        by_salesperson[sp_id]["total_amount"] += acq.get("commission_paid", 0)
+
+    return {"pending_by_salesperson": list(by_salesperson.values())}
+
+# Admin: Get payment history
+@app.get("/admin/payment-history")
+async def get_admin_payment_history(admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    payments = await db.commission_payments.find().sort("paid_at", -1).to_list(200)
+
+    for p in payments:
+        p["_id"] = str(p["_id"])
+
+    total_paid = sum(p.get("total_amount", 0) for p in payments)
+
+    return {
+        "payments": payments,
+        "total_paid": total_paid
     }
 
 @app.on_event("startup")
