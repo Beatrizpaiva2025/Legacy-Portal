@@ -23970,7 +23970,8 @@ const FloatingChatWidget = ({ adminKey, user }) => {
   const [sending, setSending] = useState(false);
   const [translators, setTranslators] = useState([]);
   const [partners, setPartners] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [partnerUnreadCount, setPartnerUnreadCount] = useState(0);
+  const [externalUnreadCount, setExternalUnreadCount] = useState(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -23982,9 +23983,15 @@ const FloatingChatWidget = ({ adminKey, user }) => {
     // Fetch unread partner messages count
     const fetchUnread = async () => {
       try {
-        const response = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
-        const unread = (response.data.messages || []).filter(m => !m.read).length;
-        setUnreadCount(unread);
+        // Partner messages
+        const partnerResponse = await axios.get(`${API}/admin/partner-messages?admin_key=${adminKey}&limit=100`);
+        const partnerUnread = (partnerResponse.data.messages || []).filter(m => !m.read).length;
+        setPartnerUnreadCount(partnerUnread);
+
+        // External messages (WhatsApp bot quotes pending review)
+        const botResponse = await axios.get(`${API}/bot/quotes?admin_key=${adminKey}&status=pending`);
+        const externalUnread = (botResponse.data.quotes || []).length;
+        setExternalUnreadCount(externalUnread);
       } catch (err) {
         console.error('Failed to fetch unread count:', err);
       }
@@ -24064,9 +24071,16 @@ const FloatingChatWidget = ({ adminKey, user }) => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         )}
-        {unreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-            {unreadCount > 9 ? '9+' : unreadCount}
+        {/* Partner messages badge - top right (red) */}
+        {partnerUnreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center" title="Partner Messages">
+            {partnerUnreadCount > 9 ? '9+' : partnerUnreadCount}
+          </span>
+        )}
+        {/* External/WhatsApp messages badge - top left (blue) */}
+        {externalUnreadCount > 0 && !isOpen && (
+          <span className="absolute -top-1 -left-1 w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center" title="WhatsApp Quotes">
+            {externalUnreadCount > 9 ? '9+' : externalUnreadCount}
           </span>
         )}
       </button>
