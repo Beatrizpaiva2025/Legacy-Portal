@@ -11453,14 +11453,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         setCurrentPage(response.data.pagination.page || 1);
       }
 
-      // PM only sees orders assigned to them (filtered server-side would be better)
-      if (isPM && user?.id) {
-        allOrders = allOrders.filter(order =>
-          order.assigned_pm_id === user.id ||
-          order.assigned_pm_name === user.name
-        );
-      }
-
+      // PM filtering is now handled server-side based on the user token
       setOrders(allOrders);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
