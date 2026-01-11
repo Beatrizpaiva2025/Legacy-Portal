@@ -17406,6 +17406,28 @@ async def salesperson_register_partner(
             {"$inc": {"achieved_partners": 1}}
         )
 
+        # Check if goal was just achieved - send notification
+        updated_goal = await db.sales_goals.find_one({"id": goal["id"]})
+        if updated_goal and updated_goal["achieved_partners"] == updated_goal["target_partners"]:
+            # Goal just achieved! Create notification
+            goal_notification = {
+                "id": str(uuid.uuid4())[:8],
+                "salesperson_id": salesperson["id"],
+                "type": "goal_achieved",
+                "title": "🏆 Meta Atingida! / Goal Achieved!",
+                "message": f"Parabéns! Você atingiu sua meta de {updated_goal['target_partners']} parceiros este mês! / Congratulations! You reached your goal of {updated_goal['target_partners']} partners this month!",
+                "amount": 100,  # Bonus amount
+                "read": False,
+                "created_at": datetime.now().isoformat()
+            }
+            await db.salesperson_notifications.insert_one(goal_notification)
+
+            # Update goal status
+            await db.sales_goals.update_one(
+                {"id": goal["id"]},
+                {"$set": {"status": "achieved", "bonus_earned": 100}}
+            )
+
     # Send welcome email to new partner with credentials
     try:
         frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
