@@ -1,0 +1,392 @@
+<!--
+  LEGACY TRANSLATIONS - SEQUÊNCIA DE BOAS-VINDAS PARA PARCEIROS
+
+  Email 1: Boas-vindas (Dia 1 - Imediato)
+  Email 2: Não perca seus benefícios (Dia 3 - Se não logou)
+  Email 3: Como fazer seu primeiro pedido (Dia 7 - Após primeiro login)
+  Email 4: Precisa de ajuda? (Dia 14 - Se não fez pedido)
+-->
+
+<!-- ============================================
+     EMAIL 1: BEM-VINDO AO PORTAL DE PARCEIROS
+     Trigger: Imediato após registro
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bem-vindo ao Portal de Parceiros Legacy Translations</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">Bem-vindo ao Portal de Parceiros!</h1>
+      <p style="color: #94a3b8; margin: 10px 0 0 0; font-size: 16px;">Seu acesso exclusivo está pronto</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Olá <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Parabéns! Sua conta de parceiro <strong>{{TIER}}</strong> foi criada. Você agora tem acesso a descontos exclusivos e um portal dedicado para gerenciar todas as suas necessidades de tradução.
+      </p>
+
+      <!-- Credentials Box -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 15px 0; font-size: 16px;">Suas Credenciais de Acesso:</h3>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Portal:</strong> <a href="{{PORTAL_URL}}" style="color: #d97706;">{{PORTAL_URL}}</a>
+        </p>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Email:</strong> {{PARTNER_EMAIL}}
+        </p>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Senha Temporária:</strong> <code style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px;">{{TEMP_PASSWORD}}</code>
+        </p>
+        <p style="margin: 15px 0 0 0; color: #64748b; font-size: 13px;">
+          Por favor, altere sua senha após o primeiro login.
+        </p>
+      </div>
+
+      <!-- Benefits -->
+      <div style="margin: 30px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 15px 0;">Seus Benefícios {{TIER}}:</h3>
+        <div style="display: table; width: 100%;">
+          <div style="display: table-row;">
+            <div style="display: table-cell; padding: 10px; background: #fef3c7; border-radius: 8px 0 0 8px; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">{{DISCOUNT}}%</span><br>
+              <span style="color: #92400e; font-size: 12px;">Desconto</span>
+            </div>
+            <div style="display: table-cell; padding: 10px; background: #f0fdfa; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">24h</span><br>
+              <span style="color: #115e59; font-size: 12px;">Prioridade</span>
+            </div>
+            <div style="display: table-cell; padding: 10px; background: #f1f5f9; border-radius: 0 8px 8px 0; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">VIP</span><br>
+              <span style="color: #475569; font-size: 12px;">Suporte</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Tutorial CTA -->
+      <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 12px; padding: 25px; text-align: center; margin: 30px 0;">
+        <p style="color: #f59e0b; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Novo Parceiro?</p>
+        <h3 style="color: #ffffff; margin: 0 0 15px 0;">Assista Nosso Tour de 5 Minutos</h3>
+        <a href="{{VIDEO_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+          Assistir Vídeo Tutorial
+        </a>
+      </div>
+
+      <!-- Schedule Meeting -->
+      <div style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 25px; text-align: center;">
+        <h3 style="color: #1e293b; margin: 0 0 10px 0;">Prefere uma Demo ao Vivo?</h3>
+        <p style="color: #64748b; margin: 0 0 20px 0; font-size: 14px;">
+          Agende uma chamada de 15 minutos com nossa equipe
+        </p>
+        <a href="{{CALENDAR_URL}}" style="display: inline-block; background: #ffffff; color: #1e293b; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 2px solid #1e293b;">
+          Agendar Reunião
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        Dúvidas? Responda este email ou entre em contato:
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services<br>
+        Tradução Certificada de Documentos
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 2: NÃO PERCA SEUS BENEFÍCIOS
+     Trigger: Dia 3 se parceiro não logou
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Não Perca Seus Benefícios de Parceiro</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Seus Benefícios Estão Esperando!</h1>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Olá <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Percebemos que você ainda não acessou seu Portal de Parceiros. Não perca seus benefícios exclusivos de parceiro <strong>{{TIER}}</strong>!
+      </p>
+
+      <!-- What You're Missing -->
+      <div style="background-color: #fef3c7; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #92400e; margin: 0 0 15px 0;">O Que Você Está Perdendo:</h3>
+        <ul style="color: #78350f; margin: 0; padding-left: 20px; line-height: 2;">
+          <li><strong>{{DISCOUNT}}% de desconto</strong> em todas as traduções</li>
+          <li><strong>Processamento prioritário</strong> - entrega em 24h</li>
+          <li><strong>Painel dedicado</strong> para acompanhar pedidos</li>
+          <li><strong>Linha direta de suporte</strong> para urgências</li>
+        </ul>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{PORTAL_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Acessar Meu Portal Agora
+        </a>
+      </div>
+
+      <!-- Quick Login Reminder -->
+      <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; text-align: center;">
+        <p style="color: #64748b; margin: 0; font-size: 14px;">
+          <strong>Email:</strong> {{PARTNER_EMAIL}}<br>
+          Esqueceu a senha? <a href="{{RESET_URL}}" style="color: #d97706;">Redefina aqui</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 15px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 3: COMO FAZER SEU PRIMEIRO PEDIDO
+     Trigger: Dia 7, após primeiro login
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Como Fazer Seu Primeiro Pedido</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Pronto Para Seu Primeiro Pedido?</h1>
+      <p style="color: #94a3b8; margin: 10px 0 0 0;">É mais fácil do que você imagina</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        Olá <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        Que bom ver você logado! Aqui está um guia rápido para fazer seu primeiro pedido de tradução:
+      </p>
+
+      <!-- Steps -->
+      <div style="margin: 30px 0;">
+        <!-- Step 1 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">1</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Clique em "Novo Pedido"</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Encontre o botão no seu painel</p>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">2</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Envie Seu Documento</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Aceitamos PDF, Word ou imagens</p>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">3</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Selecione os Idiomas</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Escolha idioma de origem e destino</p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div style="display: flex; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">4</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Revise e Envie</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Seu desconto de {{DISCOUNT}}% é aplicado automaticamente!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="{{NEW_ORDER_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Iniciar Meu Primeiro Pedido
+        </a>
+      </div>
+
+      <!-- Tip Box -->
+      <div style="background-color: #f0fdfa; border-left: 4px solid #14b8a6; padding: 20px; border-radius: 0 8px 8px 0;">
+        <p style="color: #115e59; margin: 0; font-size: 14px;">
+          <strong>Dica:</strong> Precisa de traduções certificadas para USCIS? Selecione "Tradução Certificada" no checkout para certificação oficial inclusa sem custo extra.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        Precisa de ajuda? Estamos aqui para você!
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 4: PRECISA DE AJUDA?
+     Trigger: Dia 14 se não fez pedido
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Precisa de Ajuda Para Começar?</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Precisa de Ajuda Para Começar?</h1>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Olá <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        Percebemos que você ainda não fez um pedido. Há algo em que possamos ajudar? Aqui estão respostas para perguntas frequentes:
+      </p>
+
+      <!-- FAQ -->
+      <div style="margin: 25px 0;">
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">Quais documentos vocês traduzem?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Certidões de nascimento, diplomas, contratos, documentos de imigração, papéis legais, laudos médicos e mais.</p>
+        </div>
+
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">Qual o prazo de entrega?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Padrão: 2-3 dias úteis. Urgente: 24 horas. Como parceiro {{TIER}}, você tem processamento prioritário!</p>
+        </div>
+
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">As traduções são aceitas pelo USCIS?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Sim! Todas as nossas traduções certificadas são aceitas por USCIS, tribunais e instituições oficiais.</p>
+        </div>
+
+        <div style="padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">Como funciona meu desconto?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Seu desconto de {{DISCOUNT}}% é aplicado automaticamente no checkout. Não precisa de código!</p>
+        </div>
+      </div>
+
+      <!-- Contact Options -->
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 20px 0; text-align: center;">Vamos Conversar</h3>
+        <div style="text-align: center;">
+          <a href="{{CALENDAR_URL}}" style="display: inline-block; background: linear-gradient(135deg, #1e293b, #334155); color: #ffffff; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 5px;">
+            Agendar Ligação
+          </a>
+          <a href="mailto:partners@legacytranslations.com" style="display: inline-block; background: #ffffff; color: #1e293b; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 2px solid #1e293b; margin: 5px;">
+            Enviar Email
+          </a>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #64748b; margin: 0 0 15px 0;">Pronto para experimentar?</p>
+        <a href="{{NEW_ORDER_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Fazer Meu Primeiro Pedido
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        Estamos aqui para ajudar você a ter sucesso!
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>

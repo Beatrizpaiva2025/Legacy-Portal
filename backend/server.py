@@ -3864,9 +3864,31 @@ async def login_partner(login_data: PartnerLogin):
         token_expires = datetime.utcnow() + timedelta(hours=24)
 
         # Store token in database (persists across deploys)
+        # Also track login dates for onboarding automation
+        update_data = {"token": token, "token_expires": token_expires, "last_login_at": datetime.now().isoformat()}
+
+        # Track first login for onboarding emails
+        if not partner.get("first_login_at"):
+            update_data["first_login_at"] = datetime.now().isoformat()
+            # Cancel "no login" reminder emails
+            await db.scheduled_emails.delete_many({
+                "partner_id": partner["id"],
+                "email_type": "partner_no_login_reminder"
+            })
+            # Schedule "first order" reminder for day 7
+            await db.scheduled_emails.insert_one({
+                "id": str(uuid.uuid4())[:8],
+                "partner_id": partner["id"],
+                "partner_email": partner["email"],
+                "email_type": "partner_first_order_guide",
+                "scheduled_for": (datetime.now() + timedelta(days=7)).isoformat(),
+                "sent": False,
+                "created_at": datetime.now().isoformat()
+            })
+
         await db.partners.update_one(
             {"id": partner["id"]},
-            {"$set": {"token": token, "token_expires": token_expires}}
+            {"$set": update_data}
         )
 
         # Also keep in memory for faster lookups
@@ -17371,6 +17393,40 @@ async def salesperson_register_partner(
 
     await db.partners.insert_one(partner.dict())
 
+    # Schedule onboarding email sequence
+    tier_discounts = {"bronze": 10, "silver": 15, "gold": 25, "platinum": 35}
+    discount = tier_discounts.get(partner_tier, 10)
+
+    # Email 2: Day 3 reminder if no login
+    await db.scheduled_emails.insert_one({
+        "id": str(uuid.uuid4())[:8],
+        "partner_id": partner_id,
+        "partner_email": email.lower().strip(),
+        "partner_name": contact_name,
+        "company_name": company_name,
+        "tier": partner_tier,
+        "discount": discount,
+        "email_type": "partner_no_login_reminder",
+        "scheduled_for": (datetime.now() + timedelta(days=3)).isoformat(),
+        "sent": False,
+        "created_at": datetime.now().isoformat()
+    })
+
+    # Email 4: Day 14 reminder if no order
+    await db.scheduled_emails.insert_one({
+        "id": str(uuid.uuid4())[:8],
+        "partner_id": partner_id,
+        "partner_email": email.lower().strip(),
+        "partner_name": contact_name,
+        "company_name": company_name,
+        "tier": partner_tier,
+        "discount": discount,
+        "email_type": "partner_no_order_reminder",
+        "scheduled_for": (datetime.now() + timedelta(days=14)).isoformat(),
+        "sent": False,
+        "created_at": datetime.now().isoformat()
+    })
+
     # Record acquisition
     tier_commissions = {
         "bronze": 50,
@@ -17815,6 +17871,202 @@ async def get_admin_payment_history(admin_key: str = Header(None)):
         "payments": payments,
         "total_paid": total_paid
     }
+
+# ==================== EMAIL AUTOMATION ====================
+
+async def send_partner_onboarding_email(email_data: dict):
+    """Send partner onboarding emails based on type"""
+    try:
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+        portal_url = f"{frontend_url}/#/partner"
+        calendar_url = os.environ.get('CALENDAR_URL', 'https://calendly.com/legacytranslations')
+        new_order_url = f"{portal_url}?action=new-order"
+
+        email_type = email_data.get("email_type")
+        partner_name = email_data.get("partner_name", "Partner")
+        partner_email = email_data.get("partner_email")
+        tier = email_data.get("tier", "bronze").upper()
+        discount = email_data.get("discount", 10)
+
+        if email_type == "partner_no_login_reminder":
+            subject = "Don't Miss Your Partner Benefits! | Nao Perca Seus Beneficios!"
+            html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+                <div style="background: linear-gradient(135deg, #1e293b, #334155); padding: 30px; text-align: center;">
+                    <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 12px 20px; border-radius: 10px;">
+                        <span style="color: #1e293b; font-size: 24px; font-weight: bold;">LT</span>
+                    </div>
+                    <h1 style="color: #fff; margin: 15px 0 0;">Your Benefits Are Waiting!</h1>
+                </div>
+                <div style="padding: 30px;">
+                    <p>Hi <strong>{partner_name}</strong>,</p>
+                    <p>We noticed you haven't accessed your Partner Portal yet. Don't miss out on your exclusive <strong>{tier}</strong> benefits!</p>
+                    <div style="background: #fef3c7; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                        <h3 style="color: #92400e; margin: 0 0 10px;">What You're Missing:</h3>
+                        <ul style="color: #78350f; margin: 0; padding-left: 20px;">
+                            <li><strong>{discount}% discount</strong> on all translations</li>
+                            <li><strong>Priority processing</strong> - 24h turnaround</li>
+                            <li><strong>Dedicated dashboard</strong> to track orders</li>
+                        </ul>
+                    </div>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="{portal_url}" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: bold;">Access Your Portal Now</a>
+                    </div>
+                </div>
+            </div>
+            """
+
+        elif email_type == "partner_first_order_guide":
+            subject = "Ready for Your First Order? | Pronto Para Seu Primeiro Pedido?"
+            html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+                <div style="background: linear-gradient(135deg, #1e293b, #334155); padding: 30px; text-align: center;">
+                    <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 12px 20px; border-radius: 10px;">
+                        <span style="color: #1e293b; font-size: 24px; font-weight: bold;">LT</span>
+                    </div>
+                    <h1 style="color: #fff; margin: 15px 0 0;">Ready for Your First Order?</h1>
+                </div>
+                <div style="padding: 30px;">
+                    <p>Hi <strong>{partner_name}</strong>,</p>
+                    <p>Great to see you've logged in! Here's how to place your first order:</p>
+                    <div style="margin: 20px 0;">
+                        <p><strong>1.</strong> Click "New Order" in your dashboard</p>
+                        <p><strong>2.</strong> Upload your document (PDF, Word, or image)</p>
+                        <p><strong>3.</strong> Select source and target languages</p>
+                        <p><strong>4.</strong> Review - your {discount}% discount is applied automatically!</p>
+                    </div>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="{new_order_url}" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 14px 40px; border-radius: 8px; text-decoration: none; font-weight: bold;">Start Your First Order</a>
+                    </div>
+                </div>
+            </div>
+            """
+
+        elif email_type == "partner_no_order_reminder":
+            subject = "Need Help Getting Started? | Precisa de Ajuda?"
+            html = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+                <div style="background: linear-gradient(135deg, #1e293b, #334155); padding: 30px; text-align: center;">
+                    <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 12px 20px; border-radius: 10px;">
+                        <span style="color: #1e293b; font-size: 24px; font-weight: bold;">LT</span>
+                    </div>
+                    <h1 style="color: #fff; margin: 15px 0 0;">Need Help Getting Started?</h1>
+                </div>
+                <div style="padding: 30px;">
+                    <p>Hi <strong>{partner_name}</strong>,</p>
+                    <p>We noticed you haven't placed an order yet. Is there anything we can help with?</p>
+                    <div style="margin: 20px 0;">
+                        <div style="border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
+                            <strong>What documents can you translate?</strong>
+                            <p style="margin: 5px 0 0; color: #64748b;">Birth certificates, diplomas, contracts, immigration documents, and more.</p>
+                        </div>
+                        <div style="border-bottom: 1px solid #e2e8f0; padding: 12px 0;">
+                            <strong>How fast is delivery?</strong>
+                            <p style="margin: 5px 0 0; color: #64748b;">Standard: 2-3 days. Rush: 24 hours. As a {tier} partner, you get priority!</p>
+                        </div>
+                        <div style="padding: 12px 0;">
+                            <strong>Are translations USCIS accepted?</strong>
+                            <p style="margin: 5px 0 0; color: #64748b;">Yes! All certified translations are accepted by USCIS and courts.</p>
+                        </div>
+                    </div>
+                    <div style="text-align: center; margin: 25px 0;">
+                        <a href="{calendar_url}" style="background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin: 5px;">Schedule a Call</a>
+                        <a href="{new_order_url}" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 10px 20px; border-radius: 6px; text-decoration: none; margin: 5px;">Place First Order</a>
+                    </div>
+                </div>
+            </div>
+            """
+        else:
+            logger.warning(f"Unknown email type: {email_type}")
+            return False
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = EMAIL_USER
+        msg['To'] = partner_email
+        msg.attach(MIMEText(html, 'html'))
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+
+        logger.info(f"Sent {email_type} email to {partner_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error sending onboarding email: {str(e)}")
+        return False
+
+
+@app.post("/admin/process-scheduled-emails")
+async def process_scheduled_emails(admin_key: str = Header(None)):
+    """Process and send scheduled onboarding emails - call via cron job"""
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    now = datetime.now().isoformat()
+    sent_count = 0
+    skipped_count = 0
+
+    pending_emails = await db.scheduled_emails.find({
+        "sent": False,
+        "scheduled_for": {"$lte": now}
+    }).to_list(100)
+
+    for email_data in pending_emails:
+        partner_id = email_data.get("partner_id")
+        email_type = email_data.get("email_type")
+
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            await db.scheduled_emails.delete_one({"id": email_data["id"]})
+            continue
+
+        should_send = True
+
+        if email_type == "partner_no_login_reminder":
+            if partner.get("first_login_at"):
+                should_send = False
+
+        elif email_type in ["partner_first_order_guide", "partner_no_order_reminder"]:
+            order_count = await db.orders.count_documents({"partner_id": partner_id})
+            if order_count > 0:
+                should_send = False
+
+        if should_send:
+            success = await send_partner_onboarding_email(email_data)
+            if success:
+                sent_count += 1
+        else:
+            skipped_count += 1
+
+        await db.scheduled_emails.update_one(
+            {"id": email_data["id"]},
+            {"$set": {"sent": True, "sent_at": datetime.now().isoformat()}}
+        )
+
+    return {
+        "success": True,
+        "sent": sent_count,
+        "skipped": skipped_count,
+        "message": f"Processed {sent_count + skipped_count} emails"
+    }
+
+
+@app.get("/admin/scheduled-emails")
+async def get_scheduled_emails(admin_key: str = Header(None)):
+    """View scheduled and sent onboarding emails"""
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    pending = await db.scheduled_emails.find({"sent": False}).sort("scheduled_for", 1).to_list(100)
+    recent_sent = await db.scheduled_emails.find({"sent": True}).sort("sent_at", -1).to_list(50)
+
+    for e in pending + recent_sent:
+        e["_id"] = str(e["_id"])
+
+    return {"pending": pending, "recent_sent": recent_sent}
+
 
 @app.on_event("startup")
 async def create_default_partner():

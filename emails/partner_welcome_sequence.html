@@ -1,0 +1,392 @@
+<!--
+  LEGACY TRANSLATIONS - PARTNER WELCOME EMAIL SEQUENCE
+
+  Email 1: Welcome (Day 1 - Immediate)
+  Email 2: Don't Miss Out (Day 3 - If no login)
+  Email 3: First Order Guide (Day 7 - After first login)
+  Email 4: Need Help? (Day 14 - If no order)
+-->
+
+<!-- ============================================
+     EMAIL 1: WELCOME TO PARTNER PORTAL
+     Trigger: Immediate after registration
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Legacy Translations Partner Portal</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">Welcome to the Partner Portal!</h1>
+      <p style="color: #94a3b8; margin: 10px 0 0 0; font-size: 16px;">Your exclusive access is ready</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Hi <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Congratulations! Your <strong>{{TIER}}</strong> partner account has been created. You now have access to exclusive discounts and a dedicated portal to manage all your translation needs.
+      </p>
+
+      <!-- Credentials Box -->
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 15px 0; font-size: 16px;">Your Login Credentials:</h3>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Portal:</strong> <a href="{{PORTAL_URL}}" style="color: #d97706;">{{PORTAL_URL}}</a>
+        </p>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Email:</strong> {{PARTNER_EMAIL}}
+        </p>
+        <p style="margin: 8px 0; color: #475569;">
+          <strong>Temporary Password:</strong> <code style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px;">{{TEMP_PASSWORD}}</code>
+        </p>
+        <p style="margin: 15px 0 0 0; color: #64748b; font-size: 13px;">
+          Please change your password after your first login.
+        </p>
+      </div>
+
+      <!-- Benefits -->
+      <div style="margin: 30px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 15px 0;">Your {{TIER}} Benefits:</h3>
+        <div style="display: table; width: 100%;">
+          <div style="display: table-row;">
+            <div style="display: table-cell; padding: 10px; background: #fef3c7; border-radius: 8px 0 0 8px; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">{{DISCOUNT}}%</span><br>
+              <span style="color: #92400e; font-size: 12px;">Discount</span>
+            </div>
+            <div style="display: table-cell; padding: 10px; background: #f0fdfa; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">24h</span><br>
+              <span style="color: #115e59; font-size: 12px;">Priority</span>
+            </div>
+            <div style="display: table-cell; padding: 10px; background: #f1f5f9; border-radius: 0 8px 8px 0; text-align: center; width: 33%;">
+              <span style="font-size: 24px;">VIP</span><br>
+              <span style="color: #475569; font-size: 12px;">Support</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Video Tutorial CTA -->
+      <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 12px; padding: 25px; text-align: center; margin: 30px 0;">
+        <p style="color: #f59e0b; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">New Partner?</p>
+        <h3 style="color: #ffffff; margin: 0 0 15px 0;">Watch Our 5-Minute Portal Tour</h3>
+        <a href="{{VIDEO_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 14px 35px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+          Watch Video Tutorial
+        </a>
+      </div>
+
+      <!-- Schedule Meeting -->
+      <div style="border: 2px dashed #e2e8f0; border-radius: 12px; padding: 25px; text-align: center;">
+        <h3 style="color: #1e293b; margin: 0 0 10px 0;">Prefer a Live Demo?</h3>
+        <p style="color: #64748b; margin: 0 0 20px 0; font-size: 14px;">
+          Schedule a 15-minute onboarding call with our team
+        </p>
+        <a href="{{CALENDAR_URL}}" style="display: inline-block; background: #ffffff; color: #1e293b; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 2px solid #1e293b;">
+          Schedule Meeting
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        Questions? Reply to this email or contact us at
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services<br>
+        Certified Document Translation
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 2: DON'T MISS YOUR BENEFITS
+     Trigger: Day 3 if partner hasn't logged in
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Don't Miss Your Partner Benefits</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Your Benefits Are Waiting!</h1>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Hi <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        We noticed you haven't accessed your Partner Portal yet. Don't miss out on your exclusive <strong>{{TIER}}</strong> benefits!
+      </p>
+
+      <!-- What You're Missing -->
+      <div style="background-color: #fef3c7; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #92400e; margin: 0 0 15px 0;">What You're Missing:</h3>
+        <ul style="color: #78350f; margin: 0; padding-left: 20px; line-height: 2;">
+          <li><strong>{{DISCOUNT}}% discount</strong> on all translations</li>
+          <li><strong>Priority processing</strong> - 24h turnaround</li>
+          <li><strong>Dedicated dashboard</strong> to track orders</li>
+          <li><strong>Direct support line</strong> for urgent needs</li>
+        </ul>
+      </div>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{PORTAL_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Access Your Portal Now
+        </a>
+      </div>
+
+      <!-- Quick Login Reminder -->
+      <div style="background-color: #f8fafc; border-radius: 8px; padding: 20px; text-align: center;">
+        <p style="color: #64748b; margin: 0; font-size: 14px;">
+          <strong>Email:</strong> {{PARTNER_EMAIL}}<br>
+          Forgot your password? <a href="{{RESET_URL}}" style="color: #d97706;">Reset it here</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 15px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 3: HOW TO PLACE YOUR FIRST ORDER
+     Trigger: Day 7, after first login
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How to Place Your First Order</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Ready for Your First Order?</h1>
+      <p style="color: #94a3b8; margin: 10px 0 0 0;">It's easier than you think</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        Hi <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        Great to see you've logged in! Here's a quick guide to placing your first translation order:
+      </p>
+
+      <!-- Steps -->
+      <div style="margin: 30px 0;">
+        <!-- Step 1 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">1</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Click "New Order"</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Find the button in your dashboard</p>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">2</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Upload Your Document</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">PDF, Word, or image files accepted</p>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display: flex; margin-bottom: 20px; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">3</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Select Languages</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Choose source and target languages</p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div style="display: flex; align-items: flex-start;">
+          <div style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; margin-right: 15px;">4</div>
+          <div>
+            <h4 style="color: #1e293b; margin: 0 0 5px 0;">Review & Submit</h4>
+            <p style="color: #64748b; margin: 0; font-size: 14px;">Your {{DISCOUNT}}% discount is applied automatically!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="{{NEW_ORDER_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Start Your First Order
+        </a>
+      </div>
+
+      <!-- Tip Box -->
+      <div style="background-color: #f0fdfa; border-left: 4px solid #14b8a6; padding: 20px; border-radius: 0 8px 8px 0;">
+        <p style="color: #115e59; margin: 0; font-size: 14px;">
+          <strong>Pro Tip:</strong> Need certified translations for USCIS? Select "Certified Translation" at checkout for official certification included at no extra cost.
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        Need help? We're here for you!
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+
+
+<!-- ============================================
+     EMAIL 4: NEED HELP?
+     Trigger: Day 14 if no order placed
+     ============================================ -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Need Help Getting Started?</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 40px 30px; text-align: center;">
+      <div style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); padding: 15px 25px; border-radius: 12px; margin-bottom: 20px;">
+        <span style="color: #1e293b; font-size: 28px; font-weight: bold;">LT</span>
+      </div>
+      <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600;">Need Help Getting Started?</h1>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+        Hi <strong>{{PARTNER_NAME}}</strong>,
+      </p>
+
+      <p style="color: #334155; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
+        We noticed you haven't placed an order yet. Is there anything we can help with? Here are answers to common questions:
+      </p>
+
+      <!-- FAQ -->
+      <div style="margin: 25px 0;">
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">What documents can you translate?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Birth certificates, diplomas, contracts, immigration documents, legal papers, medical records, and more.</p>
+        </div>
+
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">How fast is delivery?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Standard: 2-3 business days. Rush: 24 hours. As a {{TIER}} partner, you get priority processing!</p>
+        </div>
+
+        <div style="border-bottom: 1px solid #e2e8f0; padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">Are translations USCIS accepted?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Yes! All our certified translations are accepted by USCIS, courts, and official institutions.</p>
+        </div>
+
+        <div style="padding: 15px 0;">
+          <h4 style="color: #1e293b; margin: 0 0 8px 0;">How does my discount work?</h4>
+          <p style="color: #64748b; margin: 0; font-size: 14px;">Your {{DISCOUNT}}% partner discount is applied automatically at checkout. No code needed!</p>
+        </div>
+      </div>
+
+      <!-- Contact Options -->
+      <div style="background-color: #f8fafc; border-radius: 12px; padding: 25px; margin: 25px 0;">
+        <h3 style="color: #1e293b; margin: 0 0 20px 0; text-align: center;">Let's Connect</h3>
+        <div style="text-align: center;">
+          <a href="{{CALENDAR_URL}}" style="display: inline-block; background: linear-gradient(135deg, #1e293b, #334155); color: #ffffff; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 5px;">
+            Schedule a Call
+          </a>
+          <a href="mailto:partners@legacytranslations.com" style="display: inline-block; background: #ffffff; color: #1e293b; padding: 12px 25px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 2px solid #1e293b; margin: 5px;">
+            Email Us
+          </a>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #64748b; margin: 0 0 15px 0;">Ready to give it a try?</p>
+        <a href="{{NEW_ORDER_URL}}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b, #d97706); color: #1e293b; padding: 16px 45px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+          Place Your First Order
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; padding: 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+      <p style="color: #64748b; font-size: 14px; margin: 0 0 10px 0;">
+        We're here to help you succeed!
+      </p>
+      <p style="margin: 0;">
+        <a href="mailto:partners@legacytranslations.com" style="color: #d97706; text-decoration: none;">partners@legacytranslations.com</a>
+      </p>
+      <p style="color: #94a3b8; font-size: 12px; margin: 20px 0 0 0;">
+        Legacy Translation Services
+      </p>
+    </div>
+  </div>
+</body>
+</html>
