@@ -567,6 +567,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
     { id: 'finances', label: 'Finances', icon: '💰', roles: ['admin'] },
     { id: 'followups', label: 'Follow-ups', icon: '🔔', roles: ['admin'] },
     { id: 'pm-dashboard', label: 'PM Dashboard', icon: '🎯', roles: ['admin', 'pm'] },
+    { id: 'calendar-todo', label: 'Calendar', icon: '📅', roles: ['admin', 'pm'] },
     { id: 'sales-control', label: 'Sales', icon: '📈', roles: ['admin'] },
     { id: 'users', label: 'Translators', icon: '👥', roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: '⚙️', roles: ['admin'] },
@@ -24108,6 +24109,572 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   );
 };
 
+// ==================== CALENDAR TODO PAGE ====================
+const CalendarTodoPage = ({ adminKey, orders = [] }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [todos, setTodos] = useState([]);
+  const [hoveredDate, setHoveredDate] = useState(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [newTodo, setNewTodo] = useState({ title: '', description: '', priority: 'medium', category: 'task' });
+  const [editingTodo, setEditingTodo] = useState(null);
+  const [viewMode, setViewMode] = useState('month'); // month, week, list
+  const printRef = useRef(null);
+
+  // Load todos from localStorage
+  useEffect(() => {
+    const savedTodos = localStorage.getItem('admin_todos');
+    if (savedTodos) {
+      setTodos(JSON.parse(savedTodos));
+    }
+  }, []);
+
+  // Save todos to localStorage
+  useEffect(() => {
+    localStorage.setItem('admin_todos', JSON.stringify(todos));
+  }, [todos]);
+
+  // Get calendar data
+  const getDaysInMonth = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+    return { daysInMonth, startingDay, year, month };
+  };
+
+  const { daysInMonth, startingDay, year, month } = getDaysInMonth(currentDate);
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Get todos for a specific date
+  const getTodosForDate = (day) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return todos.filter(t => t.date === dateStr);
+  };
+
+  // Get deadlines from orders for a specific date
+  const getDeadlinesForDate = (day) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return orders.filter(o => {
+      if (!o.deadline) return false;
+      const deadline = new Date(o.deadline);
+      return deadline.toISOString().split('T')[0] === dateStr;
+    });
+  };
+
+  // Add new todo
+  const addTodo = () => {
+    if (!newTodo.title.trim() || !selectedDate) return;
+    const todo = {
+      id: Date.now(),
+      ...newTodo,
+      date: selectedDate,
+      completed: false,
+      createdAt: new Date().toISOString()
+    };
+    setTodos([...todos, todo]);
+    setNewTodo({ title: '', description: '', priority: 'medium', category: 'task' });
+    setShowAddModal(false);
+  };
+
+  // Update todo
+  const updateTodo = () => {
+    if (!editingTodo) return;
+    setTodos(todos.map(t => t.id === editingTodo.id ? editingTodo : t));
+    setEditingTodo(null);
+  };
+
+  // Delete todo
+  const deleteTodo = (id) => {
+    setTodos(todos.filter(t => t.id !== id));
+  };
+
+  // Toggle todo completion
+  const toggleTodo = (id) => {
+    setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  };
+
+  // Navigate months
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const goToToday = () => setCurrentDate(new Date());
+
+  // Print calendar
+  const handlePrint = () => {
+    const printContent = printRef.current;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Calendar - ${monthNames[month]} ${year}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: #ddd; }
+            .calendar-cell { background: white; min-height: 80px; padding: 5px; }
+            .calendar-header { background: #f0f0f0; padding: 10px; text-align: center; font-weight: bold; }
+            .day-number { font-weight: bold; margin-bottom: 5px; }
+            .todo-item { font-size: 10px; padding: 2px 4px; margin: 2px 0; border-radius: 3px; }
+            .priority-high { background: #fee2e2; border-left: 3px solid #ef4444; }
+            .priority-medium { background: #fef3c7; border-left: 3px solid #f59e0b; }
+            .priority-low { background: #d1fae5; border-left: 3px solid #10b981; }
+            .deadline-item { background: #dbeafe; border-left: 3px solid #3b82f6; font-size: 10px; padding: 2px 4px; margin: 2px 0; }
+            .completed { text-decoration: line-through; opacity: 0.6; }
+            h1 { text-align: center; margin-bottom: 20px; }
+            .todo-list { margin-top: 30px; page-break-before: always; }
+            .todo-list h2 { margin-bottom: 10px; }
+            .todo-list-item { padding: 8px; border-bottom: 1px solid #eee; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <h1>📅 Calendar - ${monthNames[month]} ${year}</h1>
+          <div class="calendar-grid">
+            ${dayNames.map(d => `<div class="calendar-header">${d}</div>`).join('')}
+            ${Array(startingDay).fill('<div class="calendar-cell" style="background:#f9f9f9"></div>').join('')}
+            ${Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dayTodos = getTodosForDate(day);
+              const dayDeadlines = getDeadlinesForDate(day);
+              return `<div class="calendar-cell">
+                <div class="day-number">${day}</div>
+                ${dayDeadlines.map(d => `<div class="deadline-item">📋 ${d.order_number} - ${d.client_name}</div>`).join('')}
+                ${dayTodos.map(t => `<div class="todo-item priority-${t.priority} ${t.completed ? 'completed' : ''}">${t.title}</div>`).join('')}
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="todo-list">
+            <h2>📝 All Tasks for ${monthNames[month]} ${year}</h2>
+            ${todos.filter(t => t.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .map(t => `<div class="todo-list-item">
+                <strong>${t.date}</strong> - ${t.title}
+                <span style="color: ${t.priority === 'high' ? '#ef4444' : t.priority === 'medium' ? '#f59e0b' : '#10b981'}">
+                  (${t.priority})
+                </span>
+                ${t.completed ? '✓ Completed' : ''}
+                ${t.description ? `<br><small>${t.description}</small>` : ''}
+              </div>`).join('')}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  // Priority colors
+  const priorityColors = {
+    high: 'bg-red-100 border-l-red-500 text-red-800',
+    medium: 'bg-yellow-100 border-l-yellow-500 text-yellow-800',
+    low: 'bg-green-100 border-l-green-500 text-green-800'
+  };
+
+  const categoryIcons = {
+    task: '📝',
+    meeting: '👥',
+    deadline: '⏰',
+    reminder: '🔔',
+    other: '📌'
+  };
+
+  return (
+    <div className="p-4 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-800">📅 Calendar & Todo List</h1>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setViewMode('month')}
+                className={`px-3 py-1 text-xs rounded ${viewMode === 'month' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+              >
+                Month
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 text-xs rounded ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+              >
+                List
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200 flex items-center gap-1"
+            >
+              🖨️ Print
+            </button>
+            <button
+              onClick={() => { setSelectedDate(new Date().toISOString().split('T')[0]); setShowAddModal(true); }}
+              className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 flex items-center gap-1"
+            >
+              + Add Task
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Month Navigation */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded">◀</button>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-gray-800">{monthNames[month]} {year}</h2>
+            <button onClick={goToToday} className="px-2 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">
+              Today
+            </button>
+          </div>
+          <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded">▶</button>
+        </div>
+      </div>
+
+      {/* Calendar View */}
+      {viewMode === 'month' && (
+        <div ref={printRef} className="bg-white rounded-lg shadow overflow-hidden">
+          {/* Day Headers */}
+          <div className="grid grid-cols-7 bg-gray-50 border-b">
+            {dayNames.map(day => (
+              <div key={day} className="p-2 text-center text-xs font-semibold text-gray-600 border-r last:border-r-0">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7">
+            {/* Empty cells for days before month starts */}
+            {Array.from({ length: startingDay }, (_, i) => (
+              <div key={`empty-${i}`} className="min-h-[100px] bg-gray-50 border-r border-b p-1" />
+            ))}
+
+            {/* Days of the month */}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const dayTodos = getTodosForDate(day);
+              const dayDeadlines = getDeadlinesForDate(day);
+              const isToday = new Date().toISOString().split('T')[0] === dateStr;
+              const hasItems = dayTodos.length > 0 || dayDeadlines.length > 0;
+
+              return (
+                <div
+                  key={day}
+                  className={`min-h-[100px] border-r border-b p-1 relative cursor-pointer transition-colors
+                    ${isToday ? 'bg-blue-50' : 'hover:bg-gray-50'}
+                  `}
+                  onMouseEnter={() => setHoveredDate(day)}
+                  onMouseLeave={() => setHoveredDate(null)}
+                  onClick={() => { setSelectedDate(dateStr); setShowAddModal(true); }}
+                >
+                  {/* Day Number */}
+                  <div className={`text-xs font-semibold mb-1 ${isToday ? 'bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700'}`}>
+                    {day}
+                  </div>
+
+                  {/* Deadlines from Orders */}
+                  {dayDeadlines.slice(0, 2).map(deadline => (
+                    <div
+                      key={deadline.id}
+                      className="text-[9px] px-1 py-0.5 mb-0.5 bg-blue-100 text-blue-700 rounded truncate border-l-2 border-l-blue-500"
+                      title={`${deadline.order_number} - ${deadline.client_name}`}
+                    >
+                      📋 {deadline.order_number}
+                    </div>
+                  ))}
+
+                  {/* Todos */}
+                  {dayTodos.slice(0, 2).map(todo => (
+                    <div
+                      key={todo.id}
+                      className={`text-[9px] px-1 py-0.5 mb-0.5 rounded truncate border-l-2 ${priorityColors[todo.priority]} ${todo.completed ? 'line-through opacity-60' : ''}`}
+                      title={todo.title}
+                      onClick={(e) => { e.stopPropagation(); toggleTodo(todo.id); }}
+                    >
+                      {categoryIcons[todo.category]} {todo.title}
+                    </div>
+                  ))}
+
+                  {/* More indicator */}
+                  {(dayTodos.length + dayDeadlines.length > 2) && (
+                    <div className="text-[9px] text-gray-500 text-center">
+                      +{dayTodos.length + dayDeadlines.length - 2} more
+                    </div>
+                  )}
+
+                  {/* Hover Tooltip */}
+                  {hoveredDate === day && hasItems && (
+                    <div className="absolute z-50 left-full top-0 ml-2 w-64 bg-white rounded-lg shadow-xl border p-3"
+                         onClick={(e) => e.stopPropagation()}>
+                      <div className="text-xs font-bold text-gray-800 mb-2 border-b pb-1">
+                        {monthNames[month]} {day}, {year}
+                      </div>
+
+                      {/* Deadlines */}
+                      {dayDeadlines.length > 0 && (
+                        <div className="mb-2">
+                          <div className="text-[10px] font-semibold text-blue-600 mb-1">📋 Deadlines</div>
+                          {dayDeadlines.map(d => (
+                            <div key={d.id} className="text-[10px] p-1.5 bg-blue-50 rounded mb-1">
+                              <div className="font-medium">{d.order_number}</div>
+                              <div className="text-gray-600">{d.client_name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Todos */}
+                      {dayTodos.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-semibold text-gray-600 mb-1">📝 Tasks</div>
+                          {dayTodos.map(t => (
+                            <div key={t.id} className={`text-[10px] p-1.5 rounded mb-1 border-l-2 ${priorityColors[t.priority]}`}>
+                              <div className="flex items-center justify-between">
+                                <span className={t.completed ? 'line-through' : ''}>{t.title}</span>
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => toggleTodo(t.id)}
+                                    className="text-green-600 hover:text-green-800"
+                                  >
+                                    {t.completed ? '↩' : '✓'}
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTodo(t)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => deleteTodo(t.id)}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    🗑
+                                  </button>
+                                </div>
+                              </div>
+                              {t.description && <div className="text-gray-500 mt-0.5">{t.description}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h3 className="text-sm font-bold text-gray-800 mb-3">📝 All Tasks</h3>
+          <div className="space-y-2">
+            {todos
+              .sort((a, b) => a.date.localeCompare(b.date) || b.priority.localeCompare(a.priority))
+              .map(todo => (
+                <div
+                  key={todo.id}
+                  className={`p-3 rounded-lg border-l-4 ${priorityColors[todo.priority]} ${todo.completed ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => toggleTodo(todo.id)}
+                        className="rounded"
+                      />
+                      <span className={`text-sm font-medium ${todo.completed ? 'line-through' : ''}`}>
+                        {categoryIcons[todo.category]} {todo.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-gray-500">{todo.date}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        todo.priority === 'high' ? 'bg-red-200 text-red-800' :
+                        todo.priority === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                        'bg-green-200 text-green-800'
+                      }`}>
+                        {todo.priority}
+                      </span>
+                      <button
+                        onClick={() => setEditingTodo(todo)}
+                        className="text-blue-500 hover:text-blue-700 text-xs"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => deleteTodo(todo.id)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                  {todo.description && (
+                    <div className="text-xs text-gray-600 mt-1 ml-6">{todo.description}</div>
+                  )}
+                </div>
+              ))}
+            {todos.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📝</div>
+                <p>No tasks yet. Click "Add Task" to create one.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Todo Modal */}
+      {(showAddModal || editingTodo) && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+              <h3 className="font-bold">{editingTodo ? '✏️ Edit Task' : '📝 Add New Task'}</h3>
+              <button
+                onClick={() => { setShowAddModal(false); setEditingTodo(null); }}
+                className="text-white hover:text-gray-200 text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Date */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Date *</label>
+                <input
+                  type="date"
+                  value={editingTodo ? editingTodo.date : selectedDate}
+                  onChange={(e) => editingTodo
+                    ? setEditingTodo({ ...editingTodo, date: e.target.value })
+                    : setSelectedDate(e.target.value)
+                  }
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={editingTodo ? editingTodo.title : newTodo.title}
+                  onChange={(e) => editingTodo
+                    ? setEditingTodo({ ...editingTodo, title: e.target.value })
+                    : setNewTodo({ ...newTodo, title: e.target.value })
+                  }
+                  placeholder="Task title..."
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={editingTodo ? editingTodo.description : newTodo.description}
+                  onChange={(e) => editingTodo
+                    ? setEditingTodo({ ...editingTodo, description: e.target.value })
+                    : setNewTodo({ ...newTodo, description: e.target.value })
+                  }
+                  placeholder="Optional description..."
+                  rows="2"
+                  className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Priority & Category */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+                  <select
+                    value={editingTodo ? editingTodo.priority : newTodo.priority}
+                    onChange={(e) => editingTodo
+                      ? setEditingTodo({ ...editingTodo, priority: e.target.value })
+                      : setNewTodo({ ...newTodo, priority: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="high">🔴 High</option>
+                    <option value="medium">🟡 Medium</option>
+                    <option value="low">🟢 Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={editingTodo ? editingTodo.category : newTodo.category}
+                    onChange={(e) => editingTodo
+                      ? setEditingTodo({ ...editingTodo, category: e.target.value })
+                      : setNewTodo({ ...newTodo, category: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="task">📝 Task</option>
+                    <option value="meeting">👥 Meeting</option>
+                    <option value="deadline">⏰ Deadline</option>
+                    <option value="reminder">🔔 Reminder</option>
+                    <option value="other">📌 Other</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => { setShowAddModal(false); setEditingTodo(null); }}
+                className="px-4 py-2 text-gray-600 border rounded text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={editingTodo ? updateTodo : addTodo}
+                className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+              >
+                {editingTodo ? 'Update' : 'Add Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="bg-white rounded-lg shadow p-4 mt-4">
+        <h4 className="text-xs font-bold text-gray-700 mb-2">Legend</h4>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-blue-100 border-l-2 border-l-blue-500 rounded"></div>
+            <span>Order Deadlines</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-red-100 border-l-2 border-l-red-500 rounded"></div>
+            <span>High Priority</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-yellow-100 border-l-2 border-l-yellow-500 rounded"></div>
+            <span>Medium Priority</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 bg-green-100 border-l-2 border-l-green-500 rounded"></div>
+            <span>Low Priority</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ==================== SALES CONTROL PAGE ====================
 const SalesControlPage = ({ adminKey }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -25380,6 +25947,10 @@ function AdminApp() {
       case 'pm-dashboard':
         return ['admin', 'pm'].includes(userRole)
           ? <PMDashboard adminKey={adminKey} user={user} onNavigateToTranslation={navigateToTranslation} />
+          : <div className="p-6 text-center text-gray-500">Access denied</div>;
+      case 'calendar-todo':
+        return ['admin', 'pm'].includes(userRole)
+          ? <CalendarTodoPage adminKey={adminKey} />
           : <div className="p-6 text-center text-gray-500">Access denied</div>;
       case 'projects':
         return userRole !== 'translator'
