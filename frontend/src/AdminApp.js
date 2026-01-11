@@ -14450,47 +14450,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         </table>
                       </div>
 
-                      {/* Financial Section */}
-                      <div>
-                        <h4 className="text-sm font-bold text-blue-600 mb-2">💰 Financial</h4>
-                        <table className="w-full text-xs">
-                          <tbody>
-                            <tr className="border-b">
-                              <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
-                              <td className="py-2">
-                                <span className="text-green-600 font-bold">
-                                  ${(viewingOrder.total_price || 0).toFixed(2)}
-                                </span>
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="py-2 font-medium text-gray-600">Payment Status</td>
-                              <td className="py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                  viewingOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
-                                  viewingOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {viewingOrder.payment_status || 'Pending'}
-                                </span>
-                              </td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="py-2 font-medium text-gray-600">Translation Status</td>
-                              <td className="py-2">
-                                <span className={`px-2 py-0.5 rounded text-[10px] ${
-                                  viewingOrder.translation_status === 'delivered' ? 'bg-green-100 text-green-700' :
-                                  viewingOrder.translation_status === 'in_translation' ? 'bg-blue-100 text-blue-700' :
-                                  viewingOrder.translation_status === 'review' ? 'bg-purple-100 text-purple-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {viewingOrder.translation_status || 'received'}
-                                </span>
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
+                      {/* Financial Section - Admin only (PMs cannot see prices) */}
+                      {isAdmin && (
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-600 mb-2">💰 Financial</h4>
+                          <table className="w-full text-xs">
+                            <tbody>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600 w-1/3">Total Price</td>
+                                <td className="py-2">
+                                  <span className="text-green-600 font-bold">
+                                    ${(viewingOrder.total_price || 0).toFixed(2)}
+                                  </span>
+                                </td>
+                              </tr>
+                              <tr className="border-b">
+                                <td className="py-2 font-medium text-gray-600">Payment Status</td>
+                                <td className="py-2">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                    viewingOrder.payment_status === 'paid' ? 'bg-green-100 text-green-700' :
+                                    viewingOrder.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {viewingOrder.payment_status || 'Pending'}
+                                  </span>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
 
                       {/* Notes Section */}
                       <div>
