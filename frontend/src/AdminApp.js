@@ -8461,8 +8461,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -8714,8 +8714,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
