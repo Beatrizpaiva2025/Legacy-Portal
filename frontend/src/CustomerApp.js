@@ -927,7 +927,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   // Field error states
   const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
-    service_type: 'standard',
+    service_type: 'certified',
     translate_from: 'portuguese',
     translate_to: 'english',
     urgency: 'no',
@@ -1415,7 +1415,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
 
         // Clear form
         setFormData({
-          service_type: 'standard',
+          service_type: 'certified',
           translate_from: 'portuguese',
           translate_to: 'english',
           urgency: 'no',
