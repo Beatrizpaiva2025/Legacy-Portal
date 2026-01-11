@@ -5,6 +5,7 @@ import "./index.css";
 import App from "./App";
 import AdminApp from "./AdminApp";
 import CustomerApp from "./CustomerApp";
+import SalespersonApp from "./SalespersonApp";
 import B2BLandingPage from "./B2BLandingPage";
 import AssignmentPage from "./AssignmentPage";
 
@@ -19,6 +20,9 @@ root.render(
         <Route path="/customer/*" element={<CustomerApp />} />
         {/* Partner Portal - /#/partner (only for registered partners) */}
         <Route path="/partner/*" element={<App />} />
+        {/* Salesperson Portal - /#/sales */}
+        <Route path="/sales/*" element={<SalespersonApp />} />
+        <Route path="/sales-invite" element={<SalespersonApp />} />
         {/* Assignment Accept/Decline - /#/assignment/:token/:action */}
         <Route path="/assignment/:token/:action" element={<AssignmentPage />} />
         {/* B2B Landing Page - Default page for visitors */}
