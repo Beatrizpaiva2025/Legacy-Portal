@@ -12563,133 +12563,129 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
   return (
     <div className="p-4">
-      {/* Notification Banner - Show unread notifications - Bright Yellow */}
+      {/* Notification Bell - Discreet red bell indicator */}
       {(isAdmin || isPM) && notifications.filter(n => !n.is_read).length > 0 && (
-        <div className="mb-4 p-4 bg-yellow-200 border-2 border-yellow-400 rounded-lg shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-2xl mr-3">🔔</span>
-              <span className="text-base font-bold text-yellow-900">
-                {notifications.filter(n => !n.is_read).length} NEW NOTIFICATION(S)
-              </span>
-            </div>
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
-            >
-              {showNotifications ? 'Hide' : 'View'}
-            </button>
-          </div>
+        <div className="fixed bottom-20 right-4 z-40">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 border border-gray-200 transition-all hover:scale-105"
+            title="View notifications"
+          >
+            <span className="text-xl">🔔</span>
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+              {notifications.filter(n => !n.is_read).length}
+            </span>
+          </button>
           {showNotifications && (
-            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-              {notifications.filter(n => !n.is_read).map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`p-3 rounded-lg text-sm border-2 shadow ${
-                    notif.type === 'assignment_declined' ? 'bg-red-100 border-red-300' :
-                    notif.type === 'assignment_accepted' ? 'bg-green-100 border-green-300' :
-                    notif.type === 'payment_proof_received' ? 'bg-yellow-100 border-yellow-400' :
-                    'bg-white border-yellow-300'
-                  }`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-bold">
-                        {notif.type === 'assignment_declined' ? '❌' :
-                         notif.type === 'assignment_accepted' ? '✅' :
-                         notif.type === 'payment_proof_received' ? '💰' : '📋'} {notif.title}
+            <div className="absolute bottom-14 right-0 w-80 bg-white rounded-lg shadow-xl border border-gray-200 max-h-80 overflow-hidden">
+              <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-700">🔔 Notifications</span>
+                <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600">×</button>
+              </div>
+              <div className="overflow-y-auto max-h-64">
+                {notifications.filter(n => !n.is_read).map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-2 border-b text-xs hover:bg-gray-50 ${
+                      notif.type === 'assignment_declined' ? 'border-l-2 border-l-red-500' :
+                      notif.type === 'assignment_accepted' ? 'border-l-2 border-l-green-500' :
+                      notif.type === 'payment_proof_received' ? 'border-l-2 border-l-yellow-500' :
+                      'border-l-2 border-l-blue-500'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-800">
+                          {notif.type === 'assignment_declined' ? '❌' :
+                           notif.type === 'assignment_accepted' ? '✅' :
+                           notif.type === 'payment_proof_received' ? '💰' : '📋'} {notif.title}
+                        </div>
+                        <div className="text-gray-600 mt-0.5">{notif.message}</div>
+                        {notif.order_number && (
+                          <span className="text-[10px] text-purple-600 font-medium">Order: {notif.order_number}</span>
+                        )}
                       </div>
-                      <div className="text-gray-700 mt-1">{notif.message}</div>
-                      {notif.order_number && (
-                        <div className="text-xs text-purple-700 font-medium mt-1">Order: {notif.order_number}</div>
-                      )}
-                      <div className="text-[10px] text-gray-500 mt-1 font-medium">
-                        {formatDateTimeLocal(notif.created_at)}
-                      </div>
+                      <button
+                        onClick={() => markNotificationRead(notif.id)}
+                        className="text-gray-400 hover:text-red-500 text-[10px]"
+                        title="Mark as read"
+                      >
+                        ✓
+                      </button>
                     </div>
-                    <button
-                      onClick={() => markNotificationRead(notif.id)}
-                      className="text-gray-500 hover:text-gray-700 text-xs font-medium"
-                    >
-                      Mark read
-                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Partner Messages Panel - Bright Yellow for Attention */}
+      {/* Partner Messages Bell - Discreet message indicator */}
       {partnerMessages.filter(m => !m.read).length > 0 && (
-        <div className="mb-4 p-4 bg-yellow-300 border-2 border-yellow-500 rounded-lg shadow-lg animate-pulse">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <span className="text-2xl mr-3">💬</span>
-              <span className="text-base font-bold text-yellow-900">
-                🔔 {partnerMessages.filter(m => !m.read).length} NEW MESSAGE(S) FROM PARTNERS
-              </span>
-            </div>
-            <button
-              onClick={() => setShowPartnerMessages(!showPartnerMessages)}
-              className="px-3 py-1 bg-yellow-600 text-white rounded font-bold text-sm hover:bg-yellow-700"
-            >
-              {showPartnerMessages ? 'Hide' : 'View Messages'}
-            </button>
-          </div>
+        <div className="fixed bottom-4 right-4 z-40">
+          <button
+            onClick={() => setShowPartnerMessages(!showPartnerMessages)}
+            className="relative bg-white shadow-lg rounded-full p-3 hover:bg-gray-50 border border-gray-200 transition-all hover:scale-105"
+            title="View partner messages"
+          >
+            <span className="text-xl">💬</span>
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
+              {partnerMessages.filter(m => !m.read).length}
+            </span>
+          </button>
           {showPartnerMessages && (
-            <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
-              {partnerMessages.filter(m => !m.read).map((msg) => (
-                <div
-                  key={msg.id}
-                  className="p-3 bg-white rounded-lg border-2 border-yellow-400 shadow"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-bold text-sm text-yellow-800">
-                          {msg.from_partner_name}
+            <div className="absolute bottom-14 right-0 w-96 bg-white rounded-lg shadow-xl border border-gray-200 max-h-96 overflow-hidden">
+              <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-700">💬 Partner Messages</span>
+                <button onClick={() => setShowPartnerMessages(false)} className="text-gray-400 hover:text-gray-600">×</button>
+              </div>
+              <div className="overflow-y-auto max-h-80">
+                {partnerMessages.filter(m => !m.read).map((msg) => (
+                  <div
+                    key={msg.id}
+                    className="p-3 border-b border-l-2 border-l-blue-500 hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-xs text-gray-800">
+                        {msg.from_partner_name}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded">
+                        {msg.recipient_type === 'pm' ? `→ ${msg.recipient_name}` : '→ Admin'}
+                      </span>
+                      {msg.order_number && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                          {msg.order_number}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 bg-yellow-200 text-yellow-800 rounded font-medium">
-                          {msg.recipient_type === 'pm' ? `To: ${msg.recipient_name}` : 'To: Admin'}
-                        </span>
-                        {msg.order_number && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-purple-200 text-purple-800 rounded font-medium">
-                            Order: {msg.order_number}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-600 mb-2">
-                        {msg.from_partner_email}
-                      </div>
-                      <div className="text-sm text-gray-800 bg-yellow-50 p-3 rounded border border-yellow-200">
-                        {msg.content}
-                      </div>
-                      <div className="text-[10px] text-gray-500 mt-2 font-medium">
-                        {formatDateTimeLocal(msg.created_at)}
+                      )}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mb-1">{msg.from_partner_email}</div>
+                    <div className="text-xs text-gray-700 bg-gray-50 p-2 rounded mb-2">
+                      {msg.content.length > 100 ? msg.content.substring(0, 100) + '...' : msg.content}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-400">{formatDateTimeLocal(msg.created_at)}</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => {
+                            setReplyingToMessage(msg);
+                            setReplyContent('');
+                          }}
+                          className="px-2 py-0.5 bg-green-500 text-white rounded text-[10px] hover:bg-green-600"
+                        >
+                          Reply
+                        </button>
+                        <button
+                          onClick={() => markPartnerMessageRead(msg.id)}
+                          className="px-2 py-0.5 text-gray-500 border border-gray-300 rounded text-[10px] hover:bg-gray-100"
+                        >
+                          ✓
+                        </button>
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2 mt-2 pt-2 border-t border-yellow-200">
-                    <button
-                      onClick={() => {
-                        setReplyingToMessage(msg);
-                        setReplyContent('');
-                      }}
-                      className="px-3 py-1 bg-green-600 text-white rounded text-xs font-bold hover:bg-green-700"
-                    >
-                      📧 Reply
-                    </button>
-                    <button
-                      onClick={() => markPartnerMessageRead(msg.id)}
-                      className="px-3 py-1 text-gray-600 border border-gray-300 rounded text-xs hover:bg-gray-100"
-                    >
-                      Mark as read
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
