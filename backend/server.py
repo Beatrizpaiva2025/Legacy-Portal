@@ -16718,14 +16718,19 @@ class Salesperson(BaseModel):
     name: str
     email: str
     phone: str = ""
-    commission_type: str = "percentage"  # percentage, fixed, hybrid
+    commission_type: str = "tier"  # tier, fixed, percentage
     commission_rate: float = 0  # percentage or fixed amount per partner
     base_salary: float = 0
     monthly_target: int = 10  # partners per month
-    status: str = "active"  # active, inactive
+    status: str = "active"  # active, inactive, pending
     hired_date: str = None
     notes: str = ""
     created_at: str = None
+    # Authentication fields
+    password_hash: str = None
+    token: str = None
+    invite_token: str = None
+    invite_sent_at: str = None
 
 class SalesGoal(BaseModel):
     id: str = None
@@ -17046,6 +17051,425 @@ async def get_sales_dashboard(admin_key: str = Header(None)):
             "platinum": tier_dict.get("platinum", 0)
         },
         "current_month": current_month
+    }
+
+# ==================== SALESPERSON PORTAL ENDPOINTS ====================
+
+# Send invite to salesperson
+@app.post("/admin/salespeople/{salesperson_id}/invite")
+async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None)):
+    if not admin_key:
+        raise HTTPException(status_code=401, detail="Admin key required")
+
+    salesperson = await db.salespeople.find_one({"id": salesperson_id})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Salesperson not found")
+
+    # Generate invite token
+    invite_token = str(uuid.uuid4())
+
+    await db.salespeople.update_one(
+        {"id": salesperson_id},
+        {"$set": {
+            "invite_token": invite_token,
+            "invite_sent_at": datetime.now().isoformat(),
+            "status": "pending"
+        }}
+    )
+
+    # Send invite email
+    try:
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+        invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
+
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 10px;">
+                <h1 style="color: white; margin: 0;">🎉 Welcome to the Team!</h1>
+            </div>
+
+            <div style="padding: 30px 20px;">
+                <p>Hi <strong>{salesperson['name']}</strong>,</p>
+
+                <p>You've been invited to join <strong>Legacy Translations</strong> as a Sales Partner!</p>
+
+                <p>As a sales partner, you'll be able to:</p>
+                <ul>
+                    <li>✅ Register new partners and earn commissions</li>
+                    <li>📊 Track your performance and earnings</li>
+                    <li>💰 View your monthly commission reports</li>
+                </ul>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                        Set Up Your Account
+                    </a>
+                </div>
+
+                <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
+            </div>
+
+            <div style="text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;">
+                <p style="margin: 0; color: #666;">Legacy Translation Services</p>
+            </div>
+        </div>
+        """
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = "🎉 You're Invited to Join Legacy Translations Sales Team!"
+        msg['From'] = EMAIL_USER
+        msg['To'] = salesperson['email']
+        msg.attach(MIMEText(email_html, 'html'))
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+
+        logger.info(f"Invite sent to salesperson: {salesperson['email']}")
+
+    except Exception as e:
+        logger.error(f"Error sending invite email: {str(e)}")
+        # Don't fail the request, invite token is still set
+
+    return {"success": True, "message": "Invitation sent", "invite_link": invite_link}
+
+# Salesperson set password (from invite)
+@app.post("/salesperson/set-password")
+async def salesperson_set_password(invite_token: str = Form(...), password: str = Form(...)):
+    salesperson = await db.salespeople.find_one({"invite_token": invite_token})
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid or expired invite token")
+
+    # Check if invite is expired (7 days)
+    if salesperson.get("invite_sent_at"):
+        invite_date = datetime.fromisoformat(salesperson["invite_sent_at"])
+        if datetime.now() - invite_date > timedelta(days=7):
+            raise HTTPException(status_code=400, detail="Invite token has expired")
+
+    # Set password and activate
+    token = str(uuid.uuid4())
+    await db.salespeople.update_one(
+        {"id": salesperson["id"]},
+        {"$set": {
+            "password_hash": hash_password(password),
+            "token": token,
+            "status": "active",
+            "invite_token": None
+        }}
+    )
+
+    return {"success": True, "token": token, "salesperson": {
+        "id": salesperson["id"],
+        "name": salesperson["name"],
+        "email": salesperson["email"]
+    }}
+
+# Salesperson login
+@app.post("/salesperson/login")
+async def salesperson_login(email: str = Form(...), password: str = Form(...)):
+    salesperson = await db.salespeople.find_one({"email": email.lower().strip()})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not salesperson.get("password_hash"):
+        raise HTTPException(status_code=401, detail="Account not set up. Please use your invite link.")
+
+    if not verify_password(password, salesperson["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if salesperson.get("status") != "active":
+        raise HTTPException(status_code=401, detail="Account is not active")
+
+    # Generate new token
+    token = str(uuid.uuid4())
+    await db.salespeople.update_one(
+        {"id": salesperson["id"]},
+        {"$set": {"token": token}}
+    )
+
+    return {
+        "success": True,
+        "token": token,
+        "salesperson": {
+            "id": salesperson["id"],
+            "name": salesperson["name"],
+            "email": salesperson["email"],
+            "commission_type": salesperson.get("commission_type", "tier"),
+            "monthly_target": salesperson.get("monthly_target", 10)
+        }
+    }
+
+# Get salesperson dashboard (for salesperson portal)
+@app.get("/salesperson/dashboard")
+async def get_salesperson_dashboard(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    current_month = datetime.now().strftime("%Y-%m")
+
+    # My acquisitions this month
+    month_acquisitions = await db.partner_acquisitions.find({
+        "salesperson_id": salesperson["id"],
+        "acquisition_date": {"$regex": f"^{current_month}"}
+    }).to_list(100)
+
+    # Total acquisitions
+    total_acquisitions = await db.partner_acquisitions.count_documents({
+        "salesperson_id": salesperson["id"]
+    })
+
+    # Pending commissions (my acquisitions not yet paid)
+    pending_pipeline = [
+        {"$match": {
+            "salesperson_id": salesperson["id"],
+            "commission_status": {"$in": ["pending", "approved"]}
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    pending_result = await db.partner_acquisitions.aggregate(pending_pipeline).to_list(1)
+    pending_commission = pending_result[0]["total"] if pending_result else 0
+
+    # Paid commissions all time
+    paid_pipeline = [
+        {"$match": {
+            "salesperson_id": salesperson["id"],
+            "commission_status": "paid"
+        }},
+        {"$group": {"_id": None, "total": {"$sum": "$commission_paid"}}}
+    ]
+    paid_result = await db.partner_acquisitions.aggregate(paid_pipeline).to_list(1)
+    total_paid = paid_result[0]["total"] if paid_result else 0
+
+    # Monthly breakdown (last 6 months)
+    monthly_breakdown = []
+    for i in range(5, -1, -1):
+        month_date = datetime.now() - timedelta(days=30*i)
+        month_str = month_date.strftime("%Y-%m")
+
+        month_pipeline = [
+            {"$match": {
+                "salesperson_id": salesperson["id"],
+                "acquisition_date": {"$regex": f"^{month_str}"}
+            }},
+            {"$group": {
+                "_id": None,
+                "count": {"$sum": 1},
+                "commission": {"$sum": "$commission_paid"}
+            }}
+        ]
+        result = await db.partner_acquisitions.aggregate(month_pipeline).to_list(1)
+
+        monthly_breakdown.append({
+            "month": month_str,
+            "acquisitions": result[0]["count"] if result else 0,
+            "commission": result[0]["commission"] if result else 0
+        })
+
+    # My recent acquisitions
+    recent_acquisitions = await db.partner_acquisitions.find({
+        "salesperson_id": salesperson["id"]
+    }).sort("acquisition_date", -1).limit(10).to_list(10)
+
+    for acq in recent_acquisitions:
+        acq["_id"] = str(acq["_id"])
+
+    # Current goal
+    current_goal = await db.sales_goals.find_one({
+        "salesperson_id": salesperson["id"],
+        "month": current_month
+    })
+
+    return {
+        "salesperson": {
+            "id": salesperson["id"],
+            "name": salesperson["name"],
+            "email": salesperson["email"],
+            "commission_type": salesperson.get("commission_type", "tier"),
+            "monthly_target": salesperson.get("monthly_target", 10),
+            "base_salary": salesperson.get("base_salary", 0)
+        },
+        "stats": {
+            "month_acquisitions": len(month_acquisitions),
+            "total_acquisitions": total_acquisitions,
+            "pending_commission": pending_commission,
+            "total_paid": total_paid,
+            "current_month": current_month
+        },
+        "monthly_breakdown": monthly_breakdown,
+        "recent_acquisitions": recent_acquisitions,
+        "current_goal": {
+            "target": current_goal["target_partners"] if current_goal else salesperson.get("monthly_target", 10),
+            "achieved": current_goal["achieved_partners"] if current_goal else len(month_acquisitions)
+        }
+    }
+
+# Salesperson register a new partner
+@app.post("/salesperson/register-partner")
+async def salesperson_register_partner(
+    token: str = Header(None, alias="salesperson-token"),
+    company_name: str = Form(...),
+    contact_name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(""),
+    partner_tier: str = Form("bronze"),
+    notes: str = Form("")
+):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Check if partner already exists
+    existing = await db.partners.find_one({"email": email.lower().strip()})
+    if existing:
+        raise HTTPException(status_code=400, detail="A partner with this email already exists")
+
+    # Create partner
+    partner_id = str(uuid.uuid4())[:8]
+    temp_password = str(uuid.uuid4())[:8]  # Temporary password
+
+    partner = Partner(
+        id=partner_id,
+        company_name=company_name,
+        contact_name=contact_name,
+        email=email.lower().strip(),
+        phone=phone,
+        password_hash=hash_password(temp_password),
+        referred_by=salesperson["id"]
+    )
+
+    await db.partners.insert_one(partner.dict())
+
+    # Record acquisition
+    tier_commissions = {
+        "bronze": 50,
+        "silver": 75,
+        "gold": 100,
+        "platinum": 150
+    }
+
+    acquisition = PartnerAcquisition(
+        id=str(uuid.uuid4())[:8],
+        salesperson_id=salesperson["id"],
+        partner_id=partner_id,
+        partner_name=company_name,
+        partner_tier=partner_tier,
+        acquisition_date=datetime.now().strftime("%Y-%m-%d"),
+        commission_paid=tier_commissions.get(partner_tier, 50),
+        commission_status="pending",
+        notes=notes,
+        created_at=datetime.now().isoformat()
+    )
+
+    await db.partner_acquisitions.insert_one(acquisition.dict())
+
+    # Update sales goal if exists
+    current_month = datetime.now().strftime("%Y-%m")
+    goal = await db.sales_goals.find_one({
+        "salesperson_id": salesperson["id"],
+        "month": current_month
+    })
+    if goal:
+        await db.sales_goals.update_one(
+            {"id": goal["id"]},
+            {"$inc": {"achieved_partners": 1}}
+        )
+
+    # Send welcome email to new partner with credentials
+    try:
+        frontend_url = os.environ.get('FRONTEND_URL', 'https://portal.legacytranslations.com')
+        login_link = f"{frontend_url}/#/partner"
+
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #2563EB, #7C3AED); border-radius: 10px;">
+                <h1 style="color: white; margin: 0;">Welcome to Legacy Translations!</h1>
+            </div>
+
+            <div style="padding: 30px 20px;">
+                <p>Hi <strong>{contact_name}</strong>,</p>
+
+                <p>Your partner account has been created by {salesperson['name']}!</p>
+
+                <p>Here are your login credentials:</p>
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <p><strong>Email:</strong> {email}</p>
+                    <p><strong>Temporary Password:</strong> {temp_password}</p>
+                </div>
+
+                <p>Please change your password after your first login.</p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{login_link}" style="background: linear-gradient(135deg, #2563EB, #7C3AED); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                        Access Partner Portal
+                    </a>
+                </div>
+
+                <p>As a <strong>{partner_tier.upper()}</strong> partner, you'll enjoy exclusive discounts on all translation services!</p>
+            </div>
+        </div>
+        """
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = "🎉 Welcome to Legacy Translations Partner Program!"
+        msg['From'] = EMAIL_USER
+        msg['To'] = email
+        msg.attach(MIMEText(email_html, 'html'))
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_USER, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+
+    except Exception as e:
+        logger.error(f"Error sending partner welcome email: {str(e)}")
+
+    return {
+        "success": True,
+        "partner": {
+            "id": partner_id,
+            "company_name": company_name,
+            "email": email
+        },
+        "acquisition": {
+            "tier": partner_tier,
+            "commission": tier_commissions.get(partner_tier, 50)
+        }
+    }
+
+# Get commission structure explanation
+@app.get("/salesperson/commission-info")
+async def get_commission_info(token: str = Header(None, alias="salesperson-token")):
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    salesperson = await db.salespeople.find_one({"token": token})
+    if not salesperson:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return {
+        "commission_type": salesperson.get("commission_type", "tier"),
+        "tier_commissions": {
+            "bronze": {"pages": "10-29/month", "discount": "10%", "commission": 50},
+            "silver": {"pages": "30-59/month", "discount": "15%", "commission": 75},
+            "gold": {"pages": "60-99/month", "discount": "25%", "commission": 100},
+            "platinum": {"pages": "100+/month", "discount": "35%", "commission": 150}
+        },
+        "payment_info": {
+            "method": "Zelle / ACH Transfer",
+            "schedule": "Weekly (Fridays) for new partners, Monthly (15th) for recurring",
+            "minimum_payout": 50
+        },
+        "bonuses": {
+            "retention_bonus": "$25 extra if partner stays 3+ months active",
+            "platinum_bonus": "$50 extra for signing Platinum tier partners",
+            "monthly_target_bonus": f"$100 bonus for reaching {salesperson.get('monthly_target', 10)} partners/month"
+        }
     }
 
 @app.on_event("startup")

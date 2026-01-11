@@ -24088,6 +24088,26 @@ const SalesControlPage = ({ adminKey }) => {
     }
   };
 
+  const handleInviteSalesperson = async (id) => {
+    if (!window.confirm('Send invitation email to this salesperson?')) return;
+    try {
+      const res = await fetch(`${API_URL}/admin/salespeople/${id}/invite`, {
+        method: 'POST',
+        headers: { 'admin-key': adminKey }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Invitation sent! Link: ${data.invite_link}`);
+        fetchAllData();
+      } else {
+        alert(data.detail || 'Failed to send invitation');
+      }
+    } catch (error) {
+      console.error('Error inviting salesperson:', error);
+      alert('Error sending invitation');
+    }
+  };
+
   const handleAddAcquisition = async () => {
     try {
       const res = await fetch(`${API_URL}/admin/partner-acquisitions`, {
@@ -24398,6 +24418,20 @@ const SalesControlPage = ({ adminKey }) => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
+                        {!sp.password_hash && (
+                          <button
+                            onClick={() => handleInviteSalesperson(sp.id)}
+                            className="p-1 text-purple-500 hover:bg-purple-50 rounded"
+                            title="Send Invite"
+                          >
+                            📧
+                          </button>
+                        )}
+                        {sp.password_hash && (
+                          <span className="p-1 text-green-500" title="Account Active">
+                            ✅
+                          </span>
+                        )}
                         <button
                           onClick={() => setEditingSalesperson(sp)}
                           className="p-1 text-blue-500 hover:bg-blue-50 rounded"
