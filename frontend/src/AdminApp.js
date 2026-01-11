@@ -24049,13 +24049,18 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(newSalesperson)
       });
+      const data = await res.json();
       if (res.ok) {
+        alert('Salesperson added successfully!');
         setShowAddSalesperson(false);
         setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10 });
         fetchAllData();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
       }
     } catch (error) {
       console.error('Error adding salesperson:', error);
+      alert('Error adding salesperson. Please try again.');
     }
   };
 
@@ -24066,12 +24071,17 @@ const SalesControlPage = ({ adminKey }) => {
         headers: { 'Content-Type': 'application/json', 'admin-key': adminKey },
         body: JSON.stringify(editingSalesperson)
       });
+      const data = await res.json();
       if (res.ok) {
+        alert('Salesperson updated successfully!');
         setEditingSalesperson(null);
         fetchAllData();
+      } else {
+        alert(`Error: ${data.detail || 'Failed to update salesperson'}`);
       }
     } catch (error) {
       console.error('Error updating salesperson:', error);
+      alert('Error updating salesperson. Please try again.');
     }
   };
 
