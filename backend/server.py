@@ -6142,8 +6142,27 @@ async def admin_get_all_orders(
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
+    # Get user info for role-based filtering
+    user_role = None
+    user_id = None
+    if admin_key != expected_key:
+        # It's a user token, get their role
+        if admin_key in active_admin_tokens:
+            user_role = active_admin_tokens[admin_key].get("role")
+            user_id = active_admin_tokens[admin_key].get("user_id")
+        else:
+            user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+            if user:
+                user_role = user.get("role")
+                user_id = user.get("id")
+
     # Build query filter
     query = {}
+
+    # PM only sees their assigned projects
+    if user_role == "pm" and user_id:
+        query["assigned_pm_id"] = user_id
+
     if status and status != "all":
         # Map status groups for filtering (include all case variations)
         status_mappings = {
