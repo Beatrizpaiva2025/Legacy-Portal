@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo  # For New York timezone support
 import aiofiles
 import pytesseract
 from PIL import Image
@@ -1638,6 +1639,7 @@ async def bot_calculate_quote(request: BotQuoteRequest):
             "revenue_source": "whatsapp",  # Track as WhatsApp revenue
             "notes": request.notes or f"📱 WhatsApp Bot Quote\nPhone: {request.client_phone}",
             "created_at": datetime.utcnow(),
+            "deadline": calculate_client_deadline("whatsapp", datetime.utcnow()),  # 3 business days
             "has_document": bool(request.document_base64 or request.document_url)
         }
 
@@ -1795,6 +1797,7 @@ async def convert_bot_quote_to_order(quote_id: str, admin_key: str):
         "revenue_source": "whatsapp",  # Track as WhatsApp revenue
         "bot_quote_id": quote_id,
         "created_at": datetime.utcnow(),
+        "deadline": calculate_client_deadline("whatsapp", datetime.utcnow()),  # 3 business days
         "notes": quote.get("notes", "")
     }
 
@@ -2078,6 +2081,59 @@ REVENUE_SOURCES = {
     'partner': 'Parceiro',
     'other': 'Outros'
 }
+
+# New York timezone for deadline calculations
+NY_TIMEZONE = ZoneInfo("America/New_York")
+
+def calculate_client_deadline(source_type: str = "website", created_at: datetime = None) -> datetime:
+    """
+    Calculate client deadline based on source type using business days (excluding weekends).
+
+    Args:
+        source_type: "website", "whatsapp", or "partner"
+        created_at: Order creation time (UTC). If None, uses current time.
+
+    Returns:
+        Deadline datetime in UTC (but calculated based on NY timezone business days)
+
+    Business days:
+        - Website/WhatsApp: 3 business days
+        - Partner Portal: 2 business days
+    """
+    if created_at is None:
+        created_at = datetime.utcnow()
+
+    # Convert to New York timezone for business day calculation
+    ny_time = created_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(NY_TIMEZONE)
+
+    # Determine number of business days based on source
+    if source_type == "partner":
+        business_days = 2
+    else:  # website, whatsapp, or other
+        business_days = 3
+
+    # Calculate deadline by adding business days (skip weekends)
+    deadline_ny = ny_time
+    days_added = 0
+
+    while days_added < business_days:
+        deadline_ny += timedelta(days=1)
+        # Monday = 0, Sunday = 6; skip Saturday (5) and Sunday (6)
+        if deadline_ny.weekday() < 5:  # It's a weekday
+            days_added += 1
+
+    # Keep the same time as the original request
+    deadline_ny = deadline_ny.replace(
+        hour=ny_time.hour,
+        minute=ny_time.minute,
+        second=ny_time.second,
+        microsecond=0
+    )
+
+    # Convert back to UTC for storage
+    deadline_utc = deadline_ny.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+
+    return deadline_utc
 
 # Helper function to create notifications
 async def create_notification(user_id: str, notif_type: str, title: str, message: str, order_id: str = None, order_number: str = None):
@@ -5754,7 +5810,10 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
             zelle_receipt_url = f"{backend_url}/api/download-document/{order_data.zelle_receipt_id}"
 
-        # Create order
+        # Create order with automatic client deadline (2 business days for partner portal)
+        created_at = datetime.utcnow()
+        client_deadline = calculate_client_deadline("partner", created_at)
+
         order = TranslationOrder(
             partner_id=partner["id"],
             partner_company=partner["company_name"],
@@ -5774,6 +5833,8 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
             urgency_fee=urgency_fee,
             total_price=total_price,
             due_date=due_date,
+            deadline=client_deadline,  # 2 business days for partner portal
+            revenue_source="partner",
             document_filename=order_data.document_filename,
             payment_method=order_data.payment_method,
             payment_status=payment_status,
@@ -6274,13 +6335,23 @@ async def admin_create_manual_order(project_data: ManualProjectCreate, admin_key
             if translator:
                 translator_name = translator.get("name", "")
 
-        # Parse deadline if provided
+        # Parse deadline if provided, otherwise auto-calculate based on revenue source
         deadline = None
+        created_at = datetime.utcnow()
         if project_data.deadline:
             try:
                 deadline = datetime.fromisoformat(project_data.deadline.replace('Z', '+00:00'))
             except:
                 pass
+        # Auto-calculate deadline if not provided
+        if deadline is None:
+            source_type = project_data.revenue_source or "website"
+            if source_type == "partner":
+                deadline = calculate_client_deadline("partner", created_at)  # 2 business days
+            elif source_type == "whatsapp":
+                deadline = calculate_client_deadline("whatsapp", created_at)  # 3 business days
+            else:
+                deadline = calculate_client_deadline("website", created_at)  # 3 business days
 
         # Calculate price if not provided
         base_price = project_data.base_price or 0.0
@@ -6413,8 +6484,9 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
 
         # Turnaround: 2-3 business days
         turnaround_days = 3
+        created_at = datetime.utcnow()
 
-        # Create the order as a quote
+        # Create the order as a quote with auto-calculated deadline (3 business days for website)
         order_data = {
             "id": str(uuid.uuid4()),
             "order_number": order_number,
@@ -6434,10 +6506,12 @@ async def admin_create_quote(quote_data: CreateQuoteRequest, admin_key: str):
             "translation_status": "Quote",
             "payment_status": "pending",
             "source_type": "admin_quote",
+            "revenue_source": "website",
             "created_by": quote_data.created_by,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
-            "due_date": datetime.utcnow() + timedelta(days=turnaround_days)
+            "created_at": created_at,
+            "updated_at": created_at,
+            "due_date": created_at + timedelta(days=turnaround_days),
+            "deadline": calculate_client_deadline("website", created_at)  # 3 business days
         }
 
         # Insert order
@@ -12257,9 +12331,11 @@ async def convert_partner_budget_to_order(budget_id: str, token: str, client_nam
         if not budget:
             raise HTTPException(status_code=404, detail="Budget not found")
 
-        # Create order from budget
+        # Create order from budget with automatic client deadline (2 business days for partner portal)
         page_count = max(1, math.ceil(budget["word_count"] / 250))
-        due_date = datetime.utcnow() + timedelta(days=30)
+        created_at = datetime.utcnow()
+        due_date = created_at + timedelta(days=30)
+        client_deadline = calculate_client_deadline("partner", created_at)
 
         order = TranslationOrder(
             partner_id=partner["id"],
@@ -12276,7 +12352,9 @@ async def convert_partner_budget_to_order(budget_id: str, token: str, client_nam
             base_price=budget["base_price"],
             urgency_fee=budget["urgency_fee"],
             total_price=budget["total_price"],
-            due_date=due_date
+            due_date=due_date,
+            deadline=client_deadline,  # 2 business days for partner portal
+            revenue_source="partner"
         )
 
         await db.translation_orders.insert_one(order.dict())
