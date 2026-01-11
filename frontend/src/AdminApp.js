@@ -772,6 +772,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [translatorMessages, setTranslatorMessages] = useState([]);
   const [showTranslatorMessages, setShowTranslatorMessages] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Translator Chat Widget state (for sending messages to Admin/PM)
+  const [showTranslatorChat, setShowTranslatorChat] = useState(false);
+  const [translatorChatMessage, setTranslatorChatMessage] = useState('');
+  const [sendingTranslatorMessage, setSendingTranslatorMessage] = useState(false);
+  const [adminPmList, setAdminPmList] = useState([]);
+  const [selectedAdminPm, setSelectedAdminPm] = useState('');
   const [selectedCoverLetter, setSelectedCoverLetter] = useState('default');
   const [customCoverLetters, setCustomCoverLetters] = useState(() => {
     const saved = localStorage.getItem('custom_cover_letters');
@@ -2136,6 +2143,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Fetch Admin/PM list for translator chat
+  const fetchAdminPmList = async () => {
+    try {
+      const [adminsRes, pmsRes] = await Promise.all([
+        axios.get(`${API}/admin/users/by-role/admin?admin_key=${adminKey}`),
+        axios.get(`${API}/admin/users/by-role/pm?admin_key=${adminKey}`)
+      ]);
+      const admins = (adminsRes.data || []).map(u => ({ ...u, roleLabel: 'Admin' }));
+      const pms = (pmsRes.data || []).map(u => ({ ...u, roleLabel: 'PM' }));
+      setAdminPmList([...admins, ...pms]);
+    } catch (err) {
+      console.error('Failed to fetch admin/pm list:', err);
+    }
+  };
+
+  // Send message from translator to Admin/PM
+  const sendTranslatorMessageToAdmin = async () => {
+    if (!translatorChatMessage.trim() || !selectedAdminPm) {
+      alert('Please select a recipient and enter a message');
+      return;
+    }
+    setSendingTranslatorMessage(true);
+    try {
+      const recipient = adminPmList.find(u => u.id === selectedAdminPm);
+      await axios.post(`${API}/translator/send-message?admin_key=${adminKey}`, {
+        translator_id: user?.id,
+        translator_name: user?.name || 'Translator',
+        recipient_id: selectedAdminPm,
+        recipient_name: recipient?.name || 'Admin/PM',
+        recipient_role: recipient?.role || 'admin',
+        content: translatorChatMessage
+      });
+      alert('✅ Message sent successfully!');
+      setTranslatorChatMessage('');
+      setShowTranslatorChat(false);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Error sending message. Please try again.');
+    } finally {
+      setSendingTranslatorMessage(false);
+    }
+  };
+
   useEffect(() => {
     // Fetch assigned orders for all roles (admin, pm, translator)
     if (user?.role) {
@@ -2333,25 +2383,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
           setProcessingStatus('Converting PDF to images...');
 
-          // Convert base64 to blob/file for processing
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          try {
+            // Convert base64 to Uint8Array directly for PDF.js
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            // Use PDF.js directly
+            const pdf = await pdfjsLib.getDocument(bytes).promise;
+            const images = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              setProcessingStatus(`Converting PDF: page ${pageNum} of ${pdf.numPages}...`);
+
+              const page = await pdf.getPage(pageNum);
+              const scale = 2; // Higher scale = better quality
+              const viewport = page.getViewport({ scale });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+
+              // Convert canvas to base64 PNG
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              images.push({
+                filename: `${filename || 'document'}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png'
+              });
+            }
+
+            // Load images into workspace
+            setOriginalImages(images);
+            setProcessingStatus('');
+            alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
+
+          } catch (pdfErr) {
+            console.error('PDF conversion error:', pdfErr);
+            setProcessingStatus('');
+            alert('Error converting PDF. The file may be corrupted or password-protected.');
           }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/pdf' });
-          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
-
-          // Convert PDF to images using existing function
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
-          });
-
-          // Load images into workspace
-          setOriginalImages(images);
-          setProcessingStatus('');
-          alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
 
         } else if (contentType.startsWith('image/')) {
           // Image file - load directly
@@ -5725,18 +5799,64 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </label>
             </div>
 
-            {/* Show loaded files count */}
+            {/* Show loaded files list with delete option */}
             {(originalImages.length > 0 || translationResults.length > 0) && (
-              <div className="mt-3 p-2 bg-green-100 rounded-lg flex items-center justify-between">
-                <span className="text-xs text-green-700 font-medium">
-                  ✅ {originalImages.length + translationResults.length} document(s) loaded
-                </span>
-                <button
-                  onClick={() => setActiveSubTab('translate')}
-                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                >
-                  Go to Translation →
-                </button>
+              <div className="mt-3 p-3 bg-green-100 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-green-700 font-medium">
+                    ✅ {originalImages.length + translationResults.length} document(s) loaded
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Remove all files?')) {
+                          setOriginalImages([]);
+                          setTranslationResults([]);
+                        }
+                      }}
+                      className="px-2 py-1 bg-red-500 text-white text-[10px] rounded hover:bg-red-600"
+                    >
+                      🗑️ Clear All
+                    </button>
+                    <button
+                      onClick={() => setActiveSubTab('translate')}
+                      className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                    >
+                      Go to Translation →
+                    </button>
+                  </div>
+                </div>
+                {/* File list */}
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {originalImages.map((img, idx) => (
+                    <div key={idx} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
+                      <span className="truncate flex-1" title={img.filename}>
+                        📄 {img.filename || `Page ${idx + 1}`}
+                      </span>
+                      <button
+                        onClick={() => setOriginalImages(prev => prev.filter((_, i) => i !== idx))}
+                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-[10px]"
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {translationResults.map((result, idx) => (
+                    <div key={`tr-${idx}`} className="flex items-center justify-between bg-white px-2 py-1 rounded text-xs">
+                      <span className="truncate flex-1" title={result.filename}>
+                        📝 {result.filename || `Document ${idx + 1}`}
+                      </span>
+                      <button
+                        onClick={() => setTranslationResults(prev => prev.filter((_, i) => i !== idx))}
+                        className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded hover:bg-red-200 text-[10px]"
+                        title="Remove file"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -11149,6 +11269,77 @@ translation juramentada | certified translation`}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Chat Widget for Translator - Send messages to Admin/PM */}
+      {isTranslator && (
+        <>
+          {/* Floating Button */}
+          <button
+            onClick={() => {
+              setShowTranslatorChat(!showTranslatorChat);
+              if (!showTranslatorChat && adminPmList.length === 0) {
+                fetchAdminPmList();
+              }
+            }}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-full shadow-lg hover:from-purple-700 hover:to-purple-800 flex items-center justify-center z-50 transition-all hover:scale-105"
+            title="Send message to Admin/PM"
+          >
+            {showTranslatorChat ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            )}
+          </button>
+
+          {/* Chat Panel */}
+          {showTranslatorChat && (
+            <div className="fixed bottom-24 right-6 w-80 bg-white rounded-lg shadow-2xl border z-50 overflow-hidden">
+              <div className="p-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white">
+                <h3 className="font-bold text-sm">💬 Send Message to Admin/PM</h3>
+                <p className="text-xs opacity-80">Contact administration</p>
+              </div>
+              <div className="p-3 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Send to:</label>
+                  <select
+                    value={selectedAdminPm}
+                    onChange={(e) => setSelectedAdminPm(e.target.value)}
+                    className="w-full px-2 py-1.5 border rounded text-sm"
+                  >
+                    <option value="">-- Select recipient --</option>
+                    {adminPmList.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.roleLabel})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Message:</label>
+                  <textarea
+                    value={translatorChatMessage}
+                    onChange={(e) => setTranslatorChatMessage(e.target.value)}
+                    placeholder="Type your message..."
+                    rows="3"
+                    className="w-full px-2 py-1.5 border rounded text-sm resize-none"
+                  />
+                </div>
+                <button
+                  onClick={sendTranslatorMessageToAdmin}
+                  disabled={sendingTranslatorMessage || !selectedAdminPm || !translatorChatMessage.trim()}
+                  className="w-full px-3 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {sendingTranslatorMessage ? 'Sending...' : '📤 Send Message'}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       </div>

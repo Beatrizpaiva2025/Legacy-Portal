@@ -9647,10 +9647,52 @@ async def mark_translator_message_read(message_id: str, admin_key: str):
         {"$set": {"read": True, "read_at": datetime.utcnow()}}
     )
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Message not found")
-
     return {"status": "success"}
+
+
+@api_router.post("/translator/send-message")
+async def translator_send_message_to_admin(admin_key: str, request: dict = Body(...)):
+    """Translator sends a message to Admin/PM"""
+    # Allow translator token or admin key
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+        if user:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    message_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+
+    translator_message = {
+        "id": message_id,
+        "type": "translator_to_admin",
+        "from_translator_id": request.get("translator_id"),
+        "from_translator_name": request.get("translator_name", "Translator"),
+        "to_recipient_id": request.get("recipient_id"),
+        "to_recipient_name": request.get("recipient_name", "Admin"),
+        "to_recipient_role": request.get("recipient_role", "admin"),
+        "content": request.get("content", ""),
+        "read": False,
+        "created_at": now
+    }
+
+    await db.translator_messages.insert_one(translator_message)
+
+    # Also create a notification for the recipient
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": request.get("recipient_id"),
+        "type": "translator_message",
+        "title": f"Message from {request.get('translator_name', 'Translator')}",
+        "message": request.get("content", "")[:100] + ("..." if len(request.get("content", "")) > 100 else ""),
+        "read": False,
+        "created_at": now
+    })
+
+    return {"status": "success", "message_id": message_id}
 
 
 @api_router.get("/messages/unread-count")
