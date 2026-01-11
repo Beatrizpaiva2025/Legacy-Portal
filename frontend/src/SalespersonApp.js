@@ -204,8 +204,12 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dashboard, setDashboard] = useState(null);
   const [commissionInfo, setCommissionInfo] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState({ payments: [], paid_acquisitions: [], total_paid: 0 });
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showRegisterPartner, setShowRegisterPartner] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Register partner form
   const [newPartner, setNewPartner] = useState({
@@ -223,6 +227,8 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
   useEffect(() => {
     fetchDashboard();
     fetchCommissionInfo();
+    fetchNotifications();
+    fetchPaymentHistory();
   }, []);
 
   const fetchDashboard = async () => {
@@ -249,6 +255,58 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
       }
     } catch (err) {
       console.error('Error fetching commission info:', err);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`${API_URL}/salesperson/notifications`, {
+        headers: { 'salesperson-token': token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount((data.notifications || []).filter(n => !n.read).length);
+      }
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    }
+  };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const res = await fetch(`${API_URL}/salesperson/payment-history`, {
+        headers: { 'salesperson-token': token }
+      });
+      if (res.ok) {
+        setPaymentHistory(await res.json());
+      }
+    } catch (err) {
+      console.error('Error fetching payment history:', err);
+    }
+  };
+
+  const markNotificationRead = async (id) => {
+    try {
+      await fetch(`${API_URL}/salesperson/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: { 'salesperson-token': token }
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking notification read:', err);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await fetch(`${API_URL}/salesperson/notifications/read-all`, {
+        method: 'PUT',
+        headers: { 'salesperson-token': token }
+      });
+      fetchNotifications();
+    } catch (err) {
+      console.error('Error marking all notifications read:', err);
     }
   };
 
@@ -325,11 +383,75 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
           <div className="flex items-center gap-3">
             <span className="text-3xl">💼</span>
             <div>
-              <h1 className="text-xl font-bold">Sales Portal</h1>
+              <h1 className="text-xl font-bold">Portal do Vendedor</h1>
               <p className="text-indigo-200 text-sm">Legacy Translation Services</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {/* Notification Bell */}
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors relative"
+              >
+                <span className="text-xl">🔔</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications Dropdown */}
+              {showNotifications && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl z-50 max-h-96 overflow-y-auto">
+                  <div className="p-3 border-b flex justify-between items-center">
+                    <h4 className="font-semibold text-gray-800">Notificações</h4>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllNotificationsRead}
+                        className="text-xs text-indigo-600 hover:text-indigo-800"
+                      >
+                        Marcar todas como lidas
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length > 0 ? (
+                    <div className="divide-y">
+                      {notifications.slice(0, 10).map(notif => (
+                        <div
+                          key={notif.id}
+                          onClick={() => !notif.read && markNotificationRead(notif.id)}
+                          className={`p-3 cursor-pointer hover:bg-gray-50 ${!notif.read ? 'bg-indigo-50' : ''}`}
+                        >
+                          <div className="flex gap-3">
+                            <span className="text-2xl">
+                              {notif.type === 'commission_approved' ? '✅' : notif.type === 'commission_paid' ? '💰' : '🔔'}
+                            </span>
+                            <div>
+                              <p className="font-medium text-gray-800 text-sm">{notif.title}</p>
+                              <p className="text-xs text-gray-500">{notif.message}</p>
+                              {notif.amount > 0 && (
+                                <p className="text-sm font-semibold text-green-600 mt-1">${notif.amount}</p>
+                              )}
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(notif.created_at).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-gray-400">
+                      <p className="text-3xl mb-2">🔔</p>
+                      <p className="text-sm">Nenhuma notificação</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="text-right">
               <p className="font-medium">{salesperson.name}</p>
               <p className="text-indigo-200 text-sm">{salesperson.email}</p>
@@ -338,24 +460,25 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
               onClick={onLogout}
               className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors"
             >
-              Logout
+              Sair
             </button>
           </div>
         </div>
 
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-              { id: 'register', label: 'Register Partner', icon: '➕' },
-              { id: 'commissions', label: 'My Commissions', icon: '💰' },
-              { id: 'howto', label: 'How It Works', icon: '📖' }
+              { id: 'register', label: 'Registrar Parceiro', icon: '➕' },
+              { id: 'commissions', label: 'Minhas Comissões', icon: '💰' },
+              { id: 'payments', label: 'Histórico de Pagamentos', icon: '📜' },
+              { id: 'howto', label: 'Como Funciona', icon: '📖' }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 font-medium transition-colors rounded-t-lg ${
+                className={`px-5 py-3 font-medium transition-colors rounded-t-lg whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-gray-100 text-indigo-600'
                     : 'text-white/80 hover:text-white hover:bg-white/10'
@@ -633,14 +756,138 @@ const SalespersonPortal = ({ token, salesperson, onLogout }) => {
           </div>
         )}
 
+        {/* Payment History Tab */}
+        {activeTab === 'payments' && (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 text-white">
+                <h4 className="text-green-100 mb-2">Total Recebido</h4>
+                <p className="text-4xl font-bold">${paymentHistory.total_paid?.toFixed(2) || '0.00'}</p>
+                <p className="text-green-100 text-sm mt-2">desde o início</p>
+              </div>
+              <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-6 text-white">
+                <h4 className="text-blue-100 mb-2">Pagamentos</h4>
+                <p className="text-4xl font-bold">{paymentHistory.payments?.length || 0}</p>
+                <p className="text-blue-100 text-sm mt-2">transações realizadas</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-6 text-white">
+                <h4 className="text-purple-100 mb-2">Parceiros Pagos</h4>
+                <p className="text-4xl font-bold">{paymentHistory.paid_acquisitions?.length || 0}</p>
+                <p className="text-purple-100 text-sm mt-2">comissões pagas</p>
+              </div>
+            </div>
+
+            {/* Payment History Table */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>📜</span> Histórico de Pagamentos Recebidos
+              </h3>
+              {paymentHistory.payments?.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Método</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Referência</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiros</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paymentHistory.payments.map(payment => (
+                        <tr key={payment.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {new Date(payment.paid_at).toLocaleDateString('pt-BR')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-lg font-semibold text-green-600">${payment.total_amount?.toFixed(2)}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs capitalize">
+                              {payment.payment_method?.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{payment.payment_reference || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{payment.acquisition_ids?.length || 0} parceiros</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-4xl mb-2">📜</p>
+                  <p>Nenhum pagamento recebido ainda.</p>
+                  <p className="text-sm mt-2">Seus pagamentos aparecerão aqui quando forem processados.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Paid Acquisitions Detail */}
+            {paymentHistory.paid_acquisitions?.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                  <span>✅</span> Detalhamento de Comissões Pagas
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Parceiro</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tier</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Comissão</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data Aquisição</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data Pagamento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paymentHistory.paid_acquisitions.map(acq => (
+                        <tr key={acq.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">{acq.partner_name}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-white text-xs ${tierColors[acq.partner_tier]}`}>
+                              {acq.partner_tier}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-green-600">${acq.commission_paid}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{acq.acquisition_date}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {acq.paid_at ? new Date(acq.paid_at).toLocaleDateString('pt-BR') : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* How It Works Tab */}
         {activeTab === 'howto' && commissionInfo && (
           <div className="space-y-6">
             {/* Commission Structure */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-6 flex items-center gap-2">
-                <span>💰</span> Commission Structure
+                <span>💰</span> Estrutura de Comissões
               </h2>
+
+              {/* Your Commission Type */}
+              <div className="bg-indigo-50 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-indigo-800 mb-2">Seu Tipo de Comissão:</h4>
+                <p className="text-indigo-600 text-lg font-bold capitalize">
+                  {commissionInfo.commission_type === 'tier' && 'Por Tier do Parceiro'}
+                  {commissionInfo.commission_type === 'fixed' && `Valor Fixo: $${commissionInfo.commission_rate} por parceiro`}
+                  {commissionInfo.commission_type === 'percentage' && `Percentual: ${commissionInfo.commission_rate}% das vendas`}
+                </p>
+                {commissionInfo.commission_type === 'percentage' && commissionInfo.percentage_commission && (
+                  <p className="text-indigo-500 text-sm mt-1">{commissionInfo.percentage_commission.example}</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {Object.entries(commissionInfo.tier_commissions).map(([tier, info]) => (
                   <div key={tier} className={`p-5 rounded-xl text-white ${tierColors[tier]}`}>
