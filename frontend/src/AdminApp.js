@@ -11204,6 +11204,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [fileTranslatorAssignments, setFileTranslatorAssignments] = useState({}); // { docId: translatorId }
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState({ client: '', internal: '' });
+  const [editingModalDeadline, setEditingModalDeadline] = useState(false);
+  const [tempModalDeadline, setTempModalDeadline] = useState({ date: '', time: '' });
   const [editingProject, setEditingProject] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [savingProject, setSavingProject] = useState(false);
@@ -11982,6 +11984,26 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     } catch (err) {
       console.error('Failed to update notes:', err);
       alert('Errorr updating notes');
+    }
+  };
+
+  // Save deadline from modal
+  const saveModalDeadline = async () => {
+    if (!viewingOrder) return;
+    try {
+      let newDeadline = null;
+      if (tempModalDeadline.date) {
+        newDeadline = `${tempModalDeadline.date}T${tempModalDeadline.time || '17:00'}:00`;
+      }
+      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+        deadline: newDeadline
+      });
+      setViewingOrder(prev => ({ ...prev, deadline: newDeadline }));
+      setEditingModalDeadline(false);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update deadline:', err);
+      alert('Error updating deadline');
     }
   };
 
@@ -14094,7 +14116,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                     </button>
                   </>
                 )}
-                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingProject(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
+                <button onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingProject(false); setEditingModalDeadline(false); }} className="text-white hover:text-gray-200 text-xl">×</button>
               </div>
             </div>
 
@@ -14365,11 +14387,63 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <tr className="border-b">
                               <td className="py-2 font-medium text-gray-600">Deadline</td>
                               <td className="py-2">
-                                {viewingOrder.deadline ? (
-                                  <span className="text-blue-600 font-medium">
-                                    {formatDateTimeLocal(viewingOrder.deadline)}
-                                  </span>
-                                ) : '-'}
+                                {editingModalDeadline ? (
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="date"
+                                        value={tempModalDeadline.date}
+                                        onChange={(e) => setTempModalDeadline(prev => ({ ...prev, date: e.target.value }))}
+                                        className="px-2 py-1 border rounded text-xs"
+                                      />
+                                      <input
+                                        type="time"
+                                        value={tempModalDeadline.time}
+                                        onChange={(e) => setTempModalDeadline(prev => ({ ...prev, time: e.target.value }))}
+                                        className="px-2 py-1 border rounded text-xs"
+                                      />
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={saveModalDeadline}
+                                        className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                                      >
+                                        ✓ Save
+                                      </button>
+                                      <button
+                                        onClick={() => setEditingModalDeadline(false)}
+                                        className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
+                                      >
+                                        ✕ Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    {viewingOrder.deadline ? (
+                                      <span className="text-blue-600 font-medium">
+                                        {formatDateTimeLocal(viewingOrder.deadline)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">Not set</span>
+                                    )}
+                                    {(isAdmin || isPM) && (
+                                      <button
+                                        onClick={() => {
+                                          const deadline = viewingOrder.deadline ? new Date(viewingOrder.deadline) : null;
+                                          setTempModalDeadline({
+                                            date: deadline ? deadline.toISOString().split('T')[0] : '',
+                                            time: deadline ? deadline.toTimeString().slice(0, 5) : '17:00'
+                                          });
+                                          setEditingModalDeadline(true);
+                                        }}
+                                        className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] hover:bg-blue-200"
+                                      >
+                                        ✏️ {viewingOrder.deadline ? 'Edit' : 'Set Deadline'}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           </tbody>
@@ -14804,7 +14878,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
             {/* Footer */}
             <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
               <button
-                onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); }}
+                onClick={() => { setViewingOrder(null); setProjectModalTab('details'); setEditingNotes(false); setEditingModalDeadline(false); }}
                 className="px-4 py-1.5 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
               >
                 Close
