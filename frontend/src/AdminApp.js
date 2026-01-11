@@ -2333,25 +2333,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (fileNameLower.endsWith('.pdf') || contentType === 'application/pdf') {
           setProcessingStatus('Converting PDF to images...');
 
-          // Convert base64 to blob/file for processing
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          try {
+            // Convert base64 to Uint8Array directly for PDF.js
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            // Use PDF.js directly
+            const pdf = await pdfjsLib.getDocument(bytes).promise;
+            const images = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              setProcessingStatus(`Converting PDF: page ${pageNum} of ${pdf.numPages}...`);
+
+              const page = await pdf.getPage(pageNum);
+              const scale = 2; // Higher scale = better quality
+              const viewport = page.getViewport({ scale });
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.height = viewport.height;
+              canvas.width = viewport.width;
+              await page.render({ canvasContext: context, viewport }).promise;
+
+              // Convert canvas to base64 PNG
+              const base64Image = canvas.toDataURL('image/png').split(',')[1];
+              images.push({
+                filename: `${filename || 'document'}_page_${pageNum}.png`,
+                data: base64Image,
+                type: 'image/png'
+              });
+            }
+
+            // Load images into workspace
+            setOriginalImages(images);
+            setProcessingStatus('');
+            alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
+
+          } catch (pdfErr) {
+            console.error('PDF conversion error:', pdfErr);
+            setProcessingStatus('');
+            alert('Error converting PDF. The file may be corrupted or password-protected.');
           }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/pdf' });
-          const file = new File([blob], filename || 'document.pdf', { type: 'application/pdf' });
-
-          // Convert PDF to images using existing function
-          const images = await convertPdfToImages(file, (page, total) => {
-            setProcessingStatus(`Converting PDF: page ${page} of ${total}...`);
-          });
-
-          // Load images into workspace
-          setOriginalImages(images);
-          setProcessingStatus('');
-          alert(`✅ PDF converted! ${images.length} page(s) loaded to workspace.`);
 
         } else if (contentType.startsWith('image/')) {
           // Image file - load directly
