@@ -21518,6 +21518,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
 
+  // Translator Assignment Modal state (for email invites)
+  const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
+  const [assignmentDetails, setAssignmentDetails] = useState({
+    translator_id: '',
+    due_date: '',
+    due_time: '17:00',
+    project_notes: '',
+    language_pair: ''
+  });
+  const [sendingAssignment, setSendingAssignment] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -21828,6 +21839,52 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         delete newState[docId];
         return newState;
       });
+    }
+  };
+
+  // Open translator assignment modal (for email invites)
+  const openAssignTranslatorModal = (order) => {
+    setAssigningTranslatorModal(order);
+    setAssignmentDetails({
+      translator_id: '',
+      due_date: order.deadline ? order.deadline.split('T')[0] : '',
+      due_time: '17:00',
+      project_notes: order.internal_notes || '',
+      language_pair: `${order.translate_from} → ${order.translate_to}`
+    });
+  };
+
+  // Send translator assignment with email invitation
+  const sendTranslatorAssignment = async () => {
+    if (!assignmentDetails.translator_id) {
+      alert('Please select a translator');
+      return;
+    }
+    setSendingAssignment(true);
+    try {
+      const selectedTranslator = translators.find(t => t.id === assignmentDetails.translator_id);
+
+      let translatorDeadline = null;
+      if (assignmentDetails.due_date) {
+        translatorDeadline = `${assignmentDetails.due_date}T${assignmentDetails.due_time}:00`;
+      }
+
+      // Update order with translator assignment (triggers email in backend)
+      await axios.put(`${API}/admin/orders/${assigningTranslatorModal.id}?admin_key=${adminKey}`, {
+        assigned_translator_id: assignmentDetails.translator_id,
+        assigned_translator: selectedTranslator?.name,
+        translator_deadline: translatorDeadline,
+        internal_notes: assignmentDetails.project_notes
+      });
+
+      alert(`📧 Email invitation sent to ${selectedTranslator?.name || 'translator'}! They will receive an email to accept or decline the project.`);
+      setAssigningTranslatorModal(null);
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Failed to send translator assignment:', err);
+      alert('Error sending assignment. Please try again.');
+    } finally {
+      setSendingAssignment(false);
     }
   };
 
@@ -22794,7 +22851,43 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </td>
                       <td className="py-2 px-2">{order.client_name}</td>
                       <td className="py-2 px-2">{order.translate_from} → {order.translate_to}</td>
-                      <td className="py-2 px-2">{order.assigned_translator || '-'}</td>
+                      <td className="py-2 px-2">
+                        {(order.assigned_translator_name || order.assigned_translator) ? (
+                          <div className="flex flex-col gap-1">
+                            <span
+                              onClick={() => openAssignTranslatorModal(order)}
+                              className="text-xs text-green-700 font-medium cursor-pointer hover:text-green-900 hover:underline"
+                              title="Click to change translator"
+                            >
+                              {order.assigned_translator_name || order.assigned_translator}
+                            </span>
+                            {order.translator_assignment_status === 'pending' && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200">Pending</span>
+                            )}
+                            {order.translator_assignment_status === 'accepted' && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit">✓ Accepted</span>
+                            )}
+                            {order.translator_assignment_status === 'declined' && (
+                              <div className="flex flex-col gap-1">
+                                <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded w-fit">✕ Declined</span>
+                                <button
+                                  onClick={() => openAssignTranslatorModal(order)}
+                                  className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 flex items-center gap-1 w-fit"
+                                >
+                                  🔄 Reassign
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openAssignTranslatorModal(order)}
+                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] hover:bg-blue-200 flex items-center gap-1"
+                          >
+                            📧 Email Invite
+                          </button>
+                        )}
+                      </td>
                       <td className="py-2 px-2">
                         <span className={`px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
                           {order.translation_status}
@@ -24008,6 +24101,112 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TRANSLATOR ASSIGNMENT MODAL - For sending email invites */}
+      {assigningTranslatorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-600 text-white rounded-t-lg">
+              <div>
+                <h3 className="font-bold">📧 Email Invite to Translator</h3>
+                <p className="text-xs opacity-80">{assigningTranslatorModal.order_number} - {assigningTranslatorModal.client_name}</p>
+              </div>
+              <button onClick={() => setAssigningTranslatorModal(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Project Info */}
+              <div className="p-3 bg-gray-50 rounded border text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-gray-500">Language:</span>
+                    <span className="ml-1 font-medium">{assignmentDetails.language_pair}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Pages:</span>
+                    <span className="ml-1 font-medium">{assigningTranslatorModal.page_count || 1}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Select Translator */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Select Translator *</label>
+                <select
+                  value={assignmentDetails.translator_id}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, translator_id: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                >
+                  <option value="">-- Choose Translator --</option>
+                  {translators.filter(t => t.is_active !== false).map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} {t.language_pairs ? `(${t.language_pairs})` : ''} {t.rate_per_page ? `- $${t.rate_per_page}/pg` : ''}
+                    </option>
+                  ))}
+                </select>
+                {translators.length === 0 && (
+                  <p className="text-[10px] text-blue-600 mt-1">No translators found. Register translators in the Users tab first.</p>
+                )}
+              </div>
+
+              {/* Translator Deadline */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Translator Deadline</label>
+                  <input
+                    type="date"
+                    value={assignmentDetails.due_date}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_date: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time</label>
+                  <input
+                    type="time"
+                    value={assignmentDetails.due_time}
+                    onChange={(e) => setAssignmentDetails({...assignmentDetails, due_time: e.target.value})}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notes for Translator</label>
+                <textarea
+                  value={assignmentDetails.project_notes}
+                  onChange={(e) => setAssignmentDetails({...assignmentDetails, project_notes: e.target.value})}
+                  className="w-full px-3 py-2 border rounded text-sm"
+                  rows="2"
+                  placeholder="Special instructions for the translator..."
+                />
+              </div>
+
+              {/* Info */}
+              <div className="p-2 bg-blue-50 rounded text-xs text-blue-700">
+                <span className="font-medium">📧 Email Invitation:</span> The translator will receive an email with accept/decline links. You will be notified of their response.
+              </div>
+            </div>
+
+            <div className="p-3 border-t bg-gray-50 flex justify-end gap-2 rounded-b-lg">
+              <button
+                onClick={() => setAssigningTranslatorModal(null)}
+                className="px-4 py-1.5 text-gray-600 text-sm hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={sendTranslatorAssignment}
+                disabled={sendingAssignment || !assignmentDetails.translator_id}
+                className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {sendingAssignment ? 'Sending...' : '📤 Send Invitation'}
+              </button>
             </div>
           </div>
         </div>
