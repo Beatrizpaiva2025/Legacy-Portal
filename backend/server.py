@@ -9513,6 +9513,76 @@ class TranslatorMessageRequest(BaseModel):
     admin_name: Optional[str] = "Admin"
 
 
+@api_router.post("/admin/send-file-assignment-email")
+async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
+    """Send email invitation to translator for a specific file assignment"""
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    translator_email = request.get("translator_email")
+    translator_name = request.get("translator_name", "Translator")
+    document_name = request.get("document_name", "Document")
+    order_number = request.get("order_number", "")
+    language_pair = request.get("language_pair", "")
+    pm_name = request.get("pm_name", "Project Manager")
+
+    if not translator_email:
+        raise HTTPException(status_code=400, detail="Translator email is required")
+
+    # Create email content
+    email_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">📄 New Document Assignment</h1>
+        </div>
+        <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
+            <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
+            <p>You have been assigned a new document to translate:</p>
+
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
+                <p style="margin: 5px 0;"><strong>📄 Document:</strong> {document_name}</p>
+                <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
+                <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
+            </div>
+
+            <p>Please log in to your translator portal to view and work on this document.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')}/#/admin"
+                   style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                    Open Translator Portal
+                </a>
+            </div>
+
+            <p style="color: #64748b; font-size: 14px;">If you have any questions, please contact your project manager.</p>
+        </div>
+        <div style="background: #1e293b; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
+            <p style="color: #94a3b8; margin: 0; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
+        </div>
+    </div>
+    """
+
+    try:
+        await email_service.send_email(
+            translator_email,
+            f"📄 New Document Assignment - {order_number}",
+            email_html
+        )
+        logger.info(f"Sent file assignment email to {translator_name} ({translator_email}) for {document_name}")
+        return {"status": "success", "message": f"Email sent to {translator_name}"}
+    except Exception as e:
+        logger.error(f"Failed to send file assignment email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
 @api_router.post("/admin/translator-messages")
 async def send_translator_message(request: TranslatorMessageRequest, admin_key: str):
     """Admin/PM sends a message to a translator"""

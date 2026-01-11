@@ -22131,6 +22131,39 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
+  // Send email invite for file-level translator assignment
+  const [sendingFileInvite, setSendingFileInvite] = useState({});
+  const sendFileTranslatorInvite = async (doc, translatorId, translatorName) => {
+    if (!translatorId) {
+      alert('Please select a translator first');
+      return;
+    }
+    setSendingFileInvite(prev => ({ ...prev, [doc.id]: true }));
+    try {
+      const translator = translators.find(t => t.id === translatorId);
+
+      // Send email invite via the order update endpoint
+      await axios.post(`${API}/admin/send-file-assignment-email?admin_key=${adminKey}`, {
+        document_id: doc.id,
+        document_name: doc.filename,
+        translator_id: translatorId,
+        translator_name: translatorName,
+        translator_email: translator?.email,
+        order_id: selectedProject?.id,
+        order_number: selectedProject?.order_number,
+        language_pair: `${selectedProject?.translate_from} → ${selectedProject?.translate_to}`,
+        pm_name: user?.name || 'PM'
+      });
+
+      alert(`📧 Email invitation sent to ${translatorName}!`);
+    } catch (err) {
+      console.error('Failed to send invite:', err);
+      alert('Error sending email invitation');
+    } finally {
+      setSendingFileInvite(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
+
   // Open translator assignment modal (for email invites)
   const openAssignTranslatorModal = (order) => {
     setAssigningTranslatorModal(order);
@@ -24565,8 +24598,22 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
-                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
-                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        {(fileAssignments[doc.id]?.id || doc.assigned_translator_id) && (
+                          <>
+                            <button
+                              onClick={() => sendFileTranslatorInvite(
+                                doc,
+                                fileAssignments[doc.id]?.id || doc.assigned_translator_id,
+                                fileAssignments[doc.id]?.name || doc.assigned_translator_name
+                              )}
+                              disabled={sendingFileInvite[doc.id]}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
+                              title="Send email invitation to translator"
+                            >
+                              {sendingFileInvite[doc.id] ? '...' : '📧 Send'}
+                            </button>
+                            <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                          </>
                         )}
                       </div>
                     </div>
