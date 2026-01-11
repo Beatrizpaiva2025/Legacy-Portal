@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guia de Comissões e Descontos - Legacy Translations</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #0f3460 0%, #533483 100%);
+            border-radius: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .section-title {
+            font-size: 1.5em;
+            color: #ffd700;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ffd700;
+        }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card {
+            background: linear-gradient(135deg, rgba(83,52,131,0.5) 0%, rgba(15,52,96,0.5) 100%);
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 4px solid #ffd700;
+        }
+        .card h3 { color: #ffd700; margin-bottom: 15px; }
+        .card p { color: #a0a0a0; font-size: 0.9em; margin-bottom: 10px; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        th {
+            background: rgba(255,215,0,0.2);
+            color: #ffd700;
+            font-weight: 600;
+        }
+        tr:hover { background: rgba(255,255,255,0.05); }
+
+        .highlight {
+            background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+            color: #000;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .highlight h3 { font-size: 1.3em; }
+
+        .tier-bronze { color: #cd7f32; }
+        .tier-silver { color: #c0c0c0; }
+        .tier-gold { color: #ffd700; }
+        .tier-platinum { color: #e5e4e2; }
+
+        .example-box {
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            margin: 15px 0;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin: 5px;
+        }
+        .badge-green { background: #4CAF50; color: white; }
+        .badge-blue { background: #2196F3; color: white; }
+        .badge-purple { background: #9c27b0; color: white; }
+        .badge-orange { background: #ff9800; color: white; }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .nav-tab {
+            padding: 12px 25px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+        .nav-tab:hover, .nav-tab.active {
+            background: #ffd700;
+            color: #000;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        @media (max-width: 768px) {
+            .header h1 { font-size: 1.8em; }
+            .cards { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Guia de Comissões e Descontos</h1>
+            <p style="color: #a0a0a0; margin-top: 10px;">Legacy Translations - Programa de Parceiros</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('vendedor')">👤 Vendedor</button>
+            <button class="nav-tab" onclick="showTab('partner')">🤝 Desconto Partner</button>
+            <button class="nav-tab" onclick="showTab('pagamento')">💳 Pagamento</button>
+            <button class="nav-tab" onclick="showTab('simulacao')">📊 Simulações</button>
+        </div>
+
+        <!-- TAB: VENDEDOR -->
+        <div id="vendedor" class="tab-content active">
+            <div class="section">
+                <h2 class="section-title">👤 Opções de Comissão para Vendedor</h2>
+
+                <div class="cards">
+                    <div class="card">
+                        <h3>🎯 Opção A: 100% Comissão</h3>
+                        <p><strong>Ideal para:</strong> Freelancers, representantes</p>
+                        <table>
+                            <tr><td>Bônus por Partner</td><td><strong>$50 - $150</strong></td></tr>
+                            <tr><td>🥉 Bronze</td><td>$50</td></tr>
+                            <tr><td>🥈 Silver</td><td>$75</td></tr>
+                            <tr><td>🥇 Gold</td><td>$100</td></tr>
+                            <tr><td>💎 Platinum</td><td>$150</td></tr>
+                        </table>
+                        <p style="color: #4CAF50; margin-top: 10px;">+ Bônus $25 se partner ficar 3+ meses</p>
+                    </div>
+
+                    <div class="card" style="border-left-color: #4CAF50;">
+                        <h3>⭐ Opção B: Base + Comissão</h3>
+                        <p><strong>Ideal para:</strong> Vendedor tempo integral</p>
+                        <table>
+                            <tr><td>Salário Base</td><td><strong>$1,500/mês</strong></td></tr>
+                            <tr><td>Por Partner</td><td>$30</td></tr>
+                            <tr><td>Meta</td><td>15 partners/mês</td></tr>
+                            <tr><td>Bônus Meta</td><td>$500</td></tr>
+                        </table>
+                        <p style="color: #4CAF50; margin-top: 10px;">Potencial: $2,450/mês</p>
+                    </div>
+
+                    <div class="card" style="border-left-color: #9c27b0;">
+                        <h3>📈 Opção C: Escalonada</h3>
+                        <p><strong>Ideal para:</strong> Renda passiva</p>
+                        <table>
+                            <tr><td>Primeiros 6 meses</td><td><strong>2%</strong> da receita</td></tr>
+                            <tr><td>Mês 7-12</td><td><strong>3%</strong> da receita</td></tr>
+                            <tr><td>Após 12 meses</td><td><strong>5%</strong> da receita</td></tr>
+                        </table>
+                        <p style="color: #9c27b0; margin-top: 10px;">Renda vitalícia enquanto partner ativo!</p>
+                    </div>
+                </div>
+
+                <div class="highlight" style="margin-top: 30px;">
+                    <h3>💡 Recomendação: Opção A (Por Tier)</h3>
+                    <p>Sem risco de salário fixo • Incentiva fechar partners maiores • Simples de calcular</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PARTNER -->
+        <div id="partner" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">🤝 Descontos por Volume (Partner)</h2>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tier</th>
+                            <th>Volume Mensal</th>
+                            <th>Desconto</th>
+                            <th>Preço/Página</th>
+                            <th>Economia/Mês</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="tier-bronze">🥉 Bronze</span></td>
+                            <td>10-29 páginas</td>
+                            <td>10%</td>
+                            <td>$22.49</td>
+                            <td>até $72</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tier-silver">🥈 Silver</span></td>
+                            <td>30-59 páginas</td>
+                            <td>15%</td>
+                            <td>$21.24</td>
+                            <td>até $225</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tier-gold">🥇 Gold</span></td>
+                            <td>60-99 páginas</td>
+                            <td>25%</td>
+                            <td>$18.74</td>
+                            <td>até $618</td>
+                        </tr>
+                        <tr>
+                            <td><span class="tier-platinum">💎 Platinum</span></td>
+                            <td>100+ páginas</td>
+                            <td>35%</td>
+                            <td>$16.24</td>
+                            <td>$875+</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="highlight">
+                    <h3>Preço Base: $24.99/página</h3>
+                    <p>Desconto máximo: 35% (Platinum) = $16.24/página</p>
+                </div>
+
+                <h3 style="color: #ffd700; margin: 30px 0 15px;">📋 Regras de Tier</h3>
+                <div class="cards">
+                    <div class="card">
+                        <h3>⬆️ Upgrade</h3>
+                        <p>Imediato quando atinge volume</p>
+                        <p style="color: #4CAF50;">Partner fez 60 páginas → Gold na hora!</p>
+                    </div>
+                    <div class="card">
+                        <h3>⬇️ Downgrade</h3>
+                        <p>Proteção de 2 meses</p>
+                        <p style="color: #ff9800;">Só cai de tier após 2 meses abaixo</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PAGAMENTO -->
+        <div id="pagamento" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">💳 Forma de Pagamento</h2>
+
+                <h3 style="color: #ffd700; margin-bottom: 15px;">Para Vendedor</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th>Frequência</th>
+                            <th>Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge badge-green">Zelle</span></td>
+                            <td>Semanal</td>
+                            <td>Recomendado - Sem taxas</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-blue">ACH</span></td>
+                            <td>Quinzenal</td>
+                            <td>Transferência bancária</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-purple">PayPal</span></td>
+                            <td>Semanal</td>
+                            <td>Para freelancers</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="example-box">
+                    <strong>📅 Calendário:</strong><br>
+                    • Bônus por partner: Toda sexta-feira<br>
+                    • Comissão recorrente: Dia 15 de cada mês<br>
+                    • Bônus de performance: Final do trimestre
+                </div>
+
+                <h3 style="color: #ffd700; margin: 30px 0 15px;">Para Partner (Prazo de Pagamento)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tier</th>
+                            <th>Prazo</th>
+                            <th>Limite Crédito</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Novo</td><td>Prepaid</td><td>$0</td></tr>
+                        <tr><td class="tier-bronze">Bronze</td><td>Net 15</td><td>$500</td></tr>
+                        <tr><td class="tier-silver">Silver</td><td>Net 30</td><td>$2,000</td></tr>
+                        <tr><td class="tier-gold">Gold</td><td>Net 30</td><td>$5,000</td></tr>
+                        <tr><td class="tier-platinum">Platinum</td><td>Net 45</td><td>$15,000</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: SIMULAÇÃO -->
+        <div id="simulacao" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">📊 Simulações de Ganhos</h2>
+
+                <div class="cards">
+                    <div class="card">
+                        <h3>🏛️ Escritório de Imigração</h3>
+                        <p>40 documentos/mês</p>
+                        <div class="example-box">
+                            Preço público: 40 × $24.99 = <strong>$999.60</strong><br>
+                            Com desconto (18%): 40 × $20.49 = <strong>$819.60</strong><br><br>
+                            <span style="color: #4CAF50;">Economia: $180/mês = $2,160/ano</span>
+                        </div>
+                        <p><strong>Seu lucro:</strong> ~$442/mês por partner</p>
+                    </div>
+
+                    <div class="card">
+                        <h3>💼 Firma de Contabilidade</h3>
+                        <p>15 documentos/mês (picos em tax season)</p>
+                        <div class="example-box">
+                            Normal: 15 × $21.24 = <strong>$318.60</strong><br>
+                            Tax Season: 45 × $20.49 = <strong>$922.05</strong><br><br>
+                            <span style="color: #4CAF50;">Média anual: ~$5,200</span>
+                        </div>
+                        <p><strong>Seu lucro:</strong> ~$2,548/ano por partner</p>
+                    </div>
+                </div>
+
+                <div class="highlight" style="margin-top: 30px;">
+                    <h3>🎯 Meta: 50 Partners Ativos</h3>
+                    <table style="color: #000; margin-top: 15px;">
+                        <tr><td>Receita Mensal</td><td><strong>$24,750</strong></td></tr>
+                        <tr><td>Custos (40%)</td><td>-$9,900</td></tr>
+                        <tr><td>Comissão Vendedor (6%)</td><td>-$1,485</td></tr>
+                        <tr><td>Operacional (10%)</td><td>-$2,475</td></tr>
+                        <tr style="font-size: 1.2em;"><td><strong>Lucro Líquido</strong></td><td><strong>$10,890/mês</strong></td></tr>
+                    </table>
+                    <p style="margin-top: 15px; font-size: 1.3em;"><strong>= $130,680/ano</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

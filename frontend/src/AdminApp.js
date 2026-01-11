@@ -24118,7 +24118,16 @@ const SalesControlPage = ({ adminKey }) => {
   const [salespeople, setSalespeople] = useState([]);
   const [acquisitions, setAcquisitions] = useState([]);
   const [goals, setGoals] = useState([]);
-  const [dashboard, setDashboard] = useState(null);
+  const [dashboard, setDashboard] = useState({
+    total_salespeople: 0,
+    month_acquisitions: 0,
+    total_acquisitions: 0,
+    pending_commissions: 0,
+    paid_commissions: 0,
+    top_performers: [],
+    monthly_trend: [],
+    tier_distribution: { bronze: 0, silver: 0, gold: 0, platinum: 0 }
+  });
   const [loading, setLoading] = useState(true);
   const [showAddSalesperson, setShowAddSalesperson] = useState(false);
   const [showAddAcquisition, setShowAddAcquisition] = useState(false);
@@ -24295,7 +24304,7 @@ const SalesControlPage = ({ adminKey }) => {
             <span>📊</span> Partner Program Presentation
           </a>
           <a
-            href="/docs/COMMISSION_AND_DISCOUNT_STRUCTURE.md"
+            href="/docs/COMMISSION_GUIDE.html"
             target="_blank"
             rel="noopener noreferrer"
             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
@@ -24422,24 +24431,30 @@ const SalesControlPage = ({ adminKey }) => {
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <span>📈</span> Monthly Acquisition Trend
             </h3>
-            <div className="flex items-end justify-between h-40 gap-2">
-              {dashboard.monthly_trend.map(month => {
-                const maxAcq = Math.max(...dashboard.monthly_trend.map(m => m.acquisitions), 1);
-                const heightPercent = (month.acquisitions / maxAcq) * 100;
-                return (
-                  <div key={month.month} className="flex-1 flex flex-col items-center">
-                    <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '120px' }}>
-                      <div
-                        className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
-                        style={{ height: `${heightPercent}%` }}
-                      />
+            {dashboard.monthly_trend.length > 0 ? (
+              <div className="flex items-end justify-between h-40 gap-2">
+                {dashboard.monthly_trend.map(month => {
+                  const maxAcq = Math.max(...dashboard.monthly_trend.map(m => m.acquisitions), 1);
+                  const heightPercent = (month.acquisitions / maxAcq) * 100;
+                  return (
+                    <div key={month.month} className="flex-1 flex flex-col items-center">
+                      <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '120px' }}>
+                        <div
+                          className="absolute bottom-0 w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
+                          style={{ height: `${heightPercent}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">{month.month.slice(5)}</p>
+                      <p className="text-sm font-semibold text-gray-700">{month.acquisitions}</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">{month.month.slice(5)}</p>
-                    <p className="text-sm font-semibold text-gray-700">{month.acquisitions}</p>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400">
+                <p>No data yet. Add salespeople and record acquisitions to see trends.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
