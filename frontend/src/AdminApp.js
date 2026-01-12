@@ -1606,7 +1606,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
   const [includeCertification, setIncludeCertification] = useState(true);
-  const [includeAuthenticityStatement, setIncludeAuthenticityStatement] = useState(true); // Atestado de Autenticidade
   const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
 
@@ -4480,122 +4479,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     setTimeout(() => setQuickPackageProgress(''), 3000);
   };
 
-  // Generate Authenticity Statement HTML (Atestado de Autenticidade) - follows US legal requirements
-  const generateAuthenticityStatementHtml = (config = {}) => {
-    const {
-      orderNum = orderNumber || 'P0000',
-      docType = documentType,
-      srcLang = sourceLanguage,
-      tgtLang = targetLanguage,
-      translatorData = TRANSLATORS.find(t => t.name === selectedTranslator),
-      dateStr = translationDate
-    } = config;
-
-    // Generate document hash (SHA-256 simulation for display)
-    const generateHash = () => {
-      const data = `${orderNum}-${docType}-${srcLang}-${tgtLang}-${dateStr}-${Date.now()}`;
-      let hash = '';
-      for (let i = 0; i < 64; i++) {
-        hash += '0123456789ABCDEF'[Math.floor(Math.random() * 16)];
-      }
-      return hash;
-    };
-
-    // Generate verification code
-    const generateVerificationCode = () => {
-      const chars = '0123456789ABCDEF';
-      let code = '';
-      for (let i = 0; i < 4; i++) {
-        if (i > 0) code += '-';
-        for (let j = 0; j < 4; j++) {
-          code += chars[Math.floor(Math.random() * chars.length)];
-        }
-      }
-      return code;
-    };
-
-    const documentHash = generateHash();
-    const verificationCode = generateVerificationCode();
-    const verificationUrl = `https://portal.legacytranslations.com/verify/${verificationCode}`;
-
-    return `
-    <!-- STATEMENT OF AUTHENTICITY PAGE -->
-    <div class="authenticity-page" style="page-break-before: always; padding: 40px 50px; font-family: 'Times New Roman', Georgia, serif; max-width: 800px; margin: 0 auto;">
-        <!-- Header -->
-        <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #1a365d; padding-bottom: 20px;">
-            <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 10px;">
-                ${logoLeft
-                  ? `<img src="${logoLeft}" alt="Logo" style="max-height: 50px; object-fit: contain;" />`
-                  : `<div style="font-weight: bold; color: #1a365d; font-size: 18px;">LEGACY TRANSLATIONS</div>`
-                }
-            </div>
-            <div style="font-size: 11px; color: #4a5568;">
-                867 Boylston Street · 5th Floor · #2073 · Boston, MA · 02116<br>
-                (857) 316-7770 · contact@legacytranslations.com
-            </div>
-        </div>
-
-        <!-- Title -->
-        <h1 style="text-align: center; font-size: 22px; color: #1a365d; margin: 30px 0 10px 0; font-weight: bold; letter-spacing: 2px;">
-            STATEMENT OF AUTHENTICITY
-        </h1>
-        <h2 style="text-align: center; font-size: 14px; color: #4a5568; margin: 0 0 30px 0; font-weight: normal;">
-            Authentication Protocol for Certified Translation
-        </h2>
-
-        <!-- Document Reference -->
-        <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 25px;">
-            <p style="margin: 0 0 15px 0; font-size: 12px; line-height: 1.8; text-align: justify;">
-                The document <strong>${orderNum} - ${docType.toUpperCase()}</strong> has been translated by
-                <strong>Legacy Translations Inc.</strong>, a professional translation services company and
-                <strong>American Translators Association (ATA) Member (No. 275993)</strong>.
-            </p>
-            <p style="margin: 0; font-size: 12px; line-height: 1.8; text-align: justify;">
-                Translation performed from <strong>${srcLang}</strong> to <strong>${tgtLang}</strong>.
-            </p>
-        </div>
-
-        <!-- Verification Code -->
-        <div style="text-align: center; margin: 30px 0;">
-            <div style="font-size: 13px; color: #4a5568; margin-bottom: 10px;">Verification Code:</div>
-            <div style="font-size: 24px; font-family: 'Courier New', monospace; font-weight: bold; color: #1a365d; letter-spacing: 3px;">
-                ${verificationCode}
-            </div>
-        </div>
-
-        <!-- Barcode placeholder -->
-        <div style="text-align: center; margin: 20px 0;">
-            <div style="display: inline-block; padding: 10px 30px; background: linear-gradient(90deg, #000 2px, transparent 2px) 0 0 / 4px 100%, linear-gradient(90deg, #000 1px, transparent 1px) 0 0 / 2px 100%; background-color: #fff; height: 50px; width: 250px; border: 1px solid #e2e8f0;"></div>
-        </div>
-
-        <!-- Document Hash -->
-        <div style="text-align: center; margin: 25px 0;">
-            <div style="font-size: 12px; font-weight: bold; color: #1a365d; margin-bottom: 8px;">Document Hash</div>
-            <div style="font-size: 9px; font-family: 'Courier New', monospace; color: #4a5568; word-break: break-all; max-width: 500px; margin: 0 auto;">
-                ${documentHash}
-            </div>
-        </div>
-
-        <!-- QR Code -->
-        <div style="text-align: center; margin: 40px 0;">
-            <div style="display: inline-block;">
-                <div style="width: 120px; height: 120px; border: 2px solid #1a365d; display: flex; align-items: center; justify-content: center; background: #f7fafc; margin: 0 auto;">
-                    <div style="font-size: 8px; color: #4a5568; text-align: center;">
-                        QR CODE<br/>
-                        <span style="font-size: 7px;">Scan to verify</span>
-                    </div>
-                </div>
-                <div style="font-size: 10px; color: #4a5568; margin-top: 8px;">Scan to verify authenticity</div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="text-align: center; margin-top: 40px; font-size: 9px; color: #a0aec0;">
-            This document is digitally generated and forms an integral part of the certified translation package.
-        </div>
-    </div>`;
-  };
-
   // Quick Package Download - generates complete certified translation package (same layout as normal flow)
   const handleQuickPackageDownload = async () => {
     setQuickPackageLoading(true);
@@ -5009,7 +4892,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${translationPagesHTML}
     ${originalPagesHTML}
     ${certificationPageHTML}
-    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -5592,7 +5474,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
-    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -6623,7 +6504,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {/* Order Number */}
                 <div className="text-right mb-6 text-sm">
                   <span>Order # </span>
-                  <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-20 text-center focus:outline-none focus:border-blue-600" placeholder="P6287" />
+                  <input type="text" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} className="font-bold border-b-2 border-blue-400 bg-blue-50 px-2 py-0.5 w-48 text-center focus:outline-none focus:border-blue-600" placeholder="P6287 or ORD-..." />
                 </div>
 
                 {/* Main Title */}
@@ -9410,16 +9291,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 {/* Order Number */}
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Order #</label>
-                  <div className="flex items-center">
-                    <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l text-sm">P</span>
-                    <input
-                      type="text"
-                      value={orderNumber.replace('P', '')}
-                      onChange={(e) => setOrderNumber('P' + e.target.value.replace(/\D/g, ''))}
-                      placeholder="0000"
-                      className="flex-1 px-3 py-2 text-sm border rounded-r"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={orderNumber}
+                    onChange={(e) => setOrderNumber(e.target.value)}
+                    placeholder="P0000 or ORD-20260111-241CFA"
+                    className="w-full px-3 py-2 text-sm border rounded"
+                  />
                 </div>
 
                 {/* Document Type - REQUIRED */}
@@ -9646,17 +9524,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                       <span>🔐 Include Verification Page (QR Code)</span>
                     </label>
-                    {isAdmin && (
-                      <label className="flex items-center text-xs cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={includeAuthenticityStatement}
-                          onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
-                          className="mr-3 w-4 h-4"
-                        />
-                        <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
-                      </label>
-                    )}
                   </div>
                 </div>
               )}
@@ -9685,12 +9552,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <>
                         <span className="text-gray-400">→</span>
                         <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
-                      </>
-                    )}
-                    {includeAuthenticityStatement && (
-                      <>
-                        <span className="text-gray-400">→</span>
-                        <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded">📋 Authenticity Statement</span>
                       </>
                     )}
                   </div>
@@ -10127,17 +9988,6 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
-                  {isAdmin && (
-                    <label className="flex items-center text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={!includeAuthenticityStatement}
-                        onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
-                        className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
-                    </label>
-                  )}
                 </div>
               </div>
 
