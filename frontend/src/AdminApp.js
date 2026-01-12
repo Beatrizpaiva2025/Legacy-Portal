@@ -4665,8 +4665,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
+                <div class="signature-name">Beatriz Paiva</div>
+                <div class="signature-title">Managing Director</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -5224,8 +5224,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
+                <div class="signature-name">Beatriz Paiva</div>
+                <div class="signature-title">Managing Director</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -22459,8 +22459,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${user?.full_name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">Legal Representative (Legacy Translations)</div>
+                <div class="signature-name">Beatriz Paiva</div>
+                <div class="signature-title">Managing Director</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
