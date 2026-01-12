@@ -22061,6 +22061,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [isProofreading, setIsProofreading] = useState(false);
   const [proofreadingErrorr, setProofreadingErrorr] = useState('');
 
+  // PM Approval state - PM must approve after proofreading before sending to Admin
+  const [pmApprovalStatus, setPmApprovalStatus] = useState(null); // null, 'approved', 'rejected'
+  const [processingStatus, setProcessingStatus] = useState('');
+
   // Translator Assignment Modal state (for email invites)
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
   const [assignmentDetails, setAssignmentDetails] = useState({
@@ -23138,6 +23142,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setSelectedReview(null);
       setOriginalContents([]);
       setTranslatedContent(null);
+      setPmApprovalStatus(null);
+      setProofreadingResult(null);
+      setProofreadingErrorr('');
 
       alert(alertMessage);
     } catch (err) {
@@ -23193,6 +23200,9 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setOriginalContents([]);
       setTranslatedContent(null);
       setCorrectionNotes('');
+      setPmApprovalStatus(null);
+      setProofreadingResult(null);
+      setProofreadingErrorr('');
 
       alert('📨 Correction request sent to translator!');
     } catch (err) {
@@ -24006,7 +24016,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="flex justify-between items-center mb-2">
                   <div>
                     <button
-                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
+                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmApprovalStatus(null); setProofreadingResult(null); setProofreadingErrorr(''); }}
                       className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                     >
                       ← Back to queue
@@ -24018,28 +24028,58 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       Client: {selectedReview.client_name} • {selectedReview.translate_from} → {selectedReview.translate_to}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={requestCorrection}
-                      disabled={sendingAction}
-                      className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
-                    >
-                      ❌ Request Correction
-                    </button>
-                    <button
-                      onClick={() => approveTranslation('pending_admin_approval')}
-                      disabled={sendingAction}
-                      className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
-                    >
-                      {sendingAction ? '⏳ Sending...' : '📤 Send to Admin'}
-                    </button>
-                    <button
-                      onClick={handlePmPackageDownload}
-                      disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
-                    >
-                      {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
-                    </button>
+                  {/* Workflow Status Indicator */}
+                  <div className="flex flex-col items-end gap-2">
+                    {/* Workflow Steps */}
+                    <div className="flex items-center gap-1 text-[10px] text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                      <span className={`px-1 py-0.5 rounded ${!proofreadingResult ? 'bg-blue-500 text-white' : 'bg-green-100 text-green-700'}`}>
+                        1. Review
+                      </span>
+                      <span>→</span>
+                      <span className={`px-1 py-0.5 rounded ${proofreadingResult && !pmApprovalStatus ? 'bg-blue-500 text-white' : proofreadingResult ? 'bg-green-100 text-green-700' : 'bg-gray-200'}`}>
+                        2. Proofreading
+                      </span>
+                      <span>→</span>
+                      <span className={`px-1 py-0.5 rounded ${pmApprovalStatus === 'approved' ? 'bg-green-500 text-white' : pmApprovalStatus === 'rejected' ? 'bg-red-500 text-white' : proofreadingResult ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                        3. PM Approve
+                      </span>
+                      <span>→</span>
+                      <span className={`px-1 py-0.5 rounded ${pmApprovalStatus === 'approved' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+                        4. Send to Admin
+                      </span>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={requestCorrection}
+                        disabled={sendingAction}
+                        className="px-3 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
+                        title="Send back to translator for corrections"
+                      >
+                        ❌ Reject & Request Correction
+                      </button>
+                      <button
+                        onClick={handlePmPackageDownload}
+                        disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
+                        className="px-3 py-2 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1"
+                      >
+                        {pmPackageGenerating ? '⏳...' : '📦 Package'}
+                      </button>
+                      {/* Send to Admin - Only enabled after PM approval */}
+                      <button
+                        onClick={() => approveTranslation('pending_admin_approval')}
+                        disabled={sendingAction || pmApprovalStatus !== 'approved'}
+                        className={`px-4 py-2 rounded text-xs flex items-center gap-1 ${
+                          pmApprovalStatus === 'approved'
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={pmApprovalStatus !== 'approved' ? 'Run proofreading and approve first' : 'Send approved translation to Admin'}
+                      >
+                        {sendingAction ? '⏳ Sending...' : '📤 Send to Admin'}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 {/* Processing Status for PM */}
@@ -24225,24 +24265,38 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 />
               </div>
 
-              {/* Proofreading Section */}
-              <div className="p-4 border-t bg-white">
+              {/* Proofreading Section - Step 2: Required before PM Approval */}
+              <div className={`p-4 border-t ${!proofreadingResult ? 'bg-yellow-50 border-l-4 border-l-yellow-400' : 'bg-white'}`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-bold text-blue-700 flex items-center gap-2">
-                    🔍 Proofreading (Revisão de Qualidade)
-                  </h4>
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                      🔍 Step 2: Proofreading Analysis
+                      {proofreadingResult && <span className="text-green-600 text-xs">✓ Complete</span>}
+                    </h4>
+                    {!proofreadingResult && (
+                      <p className="text-xs text-yellow-700 mt-1">
+                        ⚠️ Required: Run proofreading before you can approve the translation
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={executeProofreading}
                     disabled={isProofreading || !translatedContent}
-                    className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+                    className={`px-4 py-2 rounded text-xs flex items-center gap-2 ${
+                      !proofreadingResult
+                        ? 'bg-yellow-500 text-white hover:bg-yellow-600 animate-pulse'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    } disabled:bg-gray-400 disabled:animate-none`}
                   >
                     {isProofreading ? (
                       <>
                         <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Analisando...
+                        Analyzing...
                       </>
+                    ) : proofreadingResult ? (
+                      <>🔄 Re-run Proofreading</>
                     ) : (
-                      <>🔍 Run Proofreading</>
+                      <>🔍 Run Proofreading (Next Step)</>
                     )}
                   </button>
                 </div>
@@ -24346,13 +24400,97 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         </ul>
                       </div>
                     )}
+
+                    {/* PM APPROVAL SECTION - Required step after proofreading */}
+                    <div className={`mt-4 p-4 rounded-lg border-2 ${
+                      pmApprovalStatus === 'approved' ? 'bg-green-50 border-green-400' :
+                      pmApprovalStatus === 'rejected' ? 'bg-red-50 border-red-400' :
+                      'bg-yellow-50 border-yellow-400'
+                    }`}>
+                      <h5 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        ✅ PM Approval Decision
+                        {pmApprovalStatus === 'approved' && <span className="text-green-600 text-xs font-normal">(Approved - Ready to send)</span>}
+                        {pmApprovalStatus === 'rejected' && <span className="text-red-600 text-xs font-normal">(Rejected - Send back to translator)</span>}
+                      </h5>
+
+                      {!pmApprovalStatus ? (
+                        <div>
+                          <p className="text-xs text-gray-600 mb-3">
+                            Review the proofreading analysis above. As PM, you must approve or reject this translation before it can be sent to Admin.
+                          </p>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => {
+                                setPmApprovalStatus('approved');
+                                setProcessingStatus('✅ Translation APPROVED by PM. Ready to send to Admin.');
+                                setTimeout(() => setProcessingStatus(''), 3000);
+                              }}
+                              disabled={(proofreadingResult.resumo?.criticos || 0) > 0}
+                              className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${
+                                (proofreadingResult.resumo?.criticos || 0) > 0
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                  : 'bg-green-600 text-white hover:bg-green-700'
+                              }`}
+                              title={(proofreadingResult.resumo?.criticos || 0) > 0 ? 'Cannot approve - Critical errors found' : 'Approve translation'}
+                            >
+                              ✅ APPROVE TRANSLATION
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPmApprovalStatus('rejected');
+                                setProcessingStatus('❌ Translation REJECTED by PM. Use "Request Correction" to send back to translator.');
+                                setTimeout(() => setProcessingStatus(''), 5000);
+                              }}
+                              className="flex-1 py-3 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 flex items-center justify-center gap-2"
+                            >
+                              ❌ REJECT TRANSLATION
+                            </button>
+                          </div>
+                          {(proofreadingResult.resumo?.criticos || 0) > 0 && (
+                            <p className="text-xs text-red-600 mt-2">
+                              ⚠️ Cannot approve: {proofreadingResult.resumo?.criticos} critical error(s) found. Request corrections or review manually.
+                            </p>
+                          )}
+                        </div>
+                      ) : pmApprovalStatus === 'approved' ? (
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">✅</div>
+                          <p className="text-green-700 font-medium">Translation Approved by PM</p>
+                          <p className="text-xs text-gray-600 mt-1">Click "Send to Admin" button above to proceed.</p>
+                          <button
+                            onClick={() => setPmApprovalStatus(null)}
+                            className="mt-3 text-xs text-gray-500 hover:text-gray-700 underline"
+                          >
+                            ↩ Undo approval
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">❌</div>
+                          <p className="text-red-700 font-medium">Translation Rejected by PM</p>
+                          <p className="text-xs text-gray-600 mt-1">Use "Request Correction" button to send feedback to translator.</p>
+                          <button
+                            onClick={() => setPmApprovalStatus(null)}
+                            className="mt-3 text-xs text-gray-500 hover:text-gray-700 underline"
+                          >
+                            ↩ Undo rejection
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
                 {/* No review yet message */}
                 {!proofreadingResult && !proofreadingErrorr && !isProofreading && (
-                  <div className="text-center py-4 text-gray-400 text-xs">
-                    Click em "Run Proofreading" to analyze a translation automatically
+                  <div className="text-center py-6 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="text-3xl mb-2">🔍</div>
+                    <p className="text-sm text-yellow-800 font-medium">Proofreading Required</p>
+                    <p className="text-xs text-yellow-600 mt-1">
+                      Click "Run Proofreading" above to analyze the translation quality.
+                      <br />
+                      You must complete this step before you can approve the translation.
+                    </p>
                   </div>
                 )}
               </div>
