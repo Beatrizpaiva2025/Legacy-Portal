@@ -9045,15 +9045,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </button>
                     )}
 
-                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
+                    {/* Approve Button - Different behavior for Admin, PM, and Translators */}
                     <button
-                      onClick={() => approveTranslation(false)}
+                      onClick={() => (isInHouseTranslator || isContractor) ? sendToProjects('pm') : approveTranslation(false)}
                       disabled={sendingToProjects}
                       className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
+                        (isPM && !isAdmin) ? 'bg-blue-600 hover:bg-blue-700' :
+                        (isInHouseTranslator || isContractor) ? 'bg-purple-600 hover:bg-purple-700' : 'bg-green-600 hover:bg-green-700'
                       }`}
                     >
-                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
+                      {(isInHouseTranslator || isContractor) ? '📤 Send to PM' : (isPM && !isAdmin) ? '📤 Send to Admin' : '✅ Approve'}
                     </button>
 
                     {/* Admin: Go directly to Deliver */}
@@ -9068,9 +9069,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isInHouseTranslator ? (
+                  {(isInHouseTranslator || isContractor) ? (
                     <>
-                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
                     </>
                   ) : isPM && !isAdmin ? (
                     <>
