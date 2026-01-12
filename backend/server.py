@@ -519,7 +519,7 @@ def generate_translation_html_for_email(order: dict) -> str:
     """Generate a formatted HTML document from translation_html for email attachment"""
     translation_text = order.get("translation_html", "")
     translator_name = order.get("translation_translator_name", "Legacy Translations")
-    translation_date = order.get("translation_date", datetime.utcnow().strftime("%m/%d/%Y"))
+    translation_date = order.get("translation_date", datetime.now(ZoneInfo("America/New_York")).strftime("%m/%d/%Y"))
     document_type = order.get("translation_document_type") or order.get("document_type", "Document")
     source_lang = order.get("translation_source_language") or order.get("translate_from", "Portuguese")
     target_lang = order.get("translation_target_language") or order.get("translate_to", "English")
@@ -2082,8 +2082,34 @@ REVENUE_SOURCES = {
     'other': 'Outros'
 }
 
-# New York timezone for deadline calculations
+# New York timezone for deadline calculations and display
 NY_TIMEZONE = ZoneInfo("America/New_York")
+
+def get_ny_now():
+    """Get current datetime in New York timezone"""
+    return datetime.now(NY_TIMEZONE)
+
+def get_ny_date_str(fmt="%m/%d/%Y"):
+    """Get current date string in New York timezone"""
+    return get_ny_now().strftime(fmt)
+
+def get_ny_datetime_str(fmt="%m/%d/%Y %I:%M %p"):
+    """Get current datetime string in New York timezone"""
+    return get_ny_now().strftime(fmt)
+
+def format_date_ny(dt, fmt="%m/%d/%Y"):
+    """Format a datetime to New York timezone string"""
+    if dt is None:
+        return "-"
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except:
+            return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    ny_dt = dt.astimezone(NY_TIMEZONE)
+    return ny_dt.strftime(fmt)
 
 def calculate_client_deadline(source_type: str = "website", created_at: datetime = None) -> datetime:
     """
@@ -7859,7 +7885,7 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                             "translator_id": translator_id,
                             "translator_name": translator_name,
                             "pages": page_count,
-                            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                            "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
                             "note": f"Auto: Project {order.get('order_number', order_id)} - {order.get('document_type', 'Document')}",
                             "order_id": order_id,
                             "order_number": order.get("order_number"),
@@ -15489,7 +15515,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
         source_currency=request.source_currency,
         target_currency=request.target_currency,
         exchange_rate=request.exchange_rate,
-        rate_date=request.rate_date or datetime.utcnow().strftime("%Y-%m-%d"),
+        rate_date=request.rate_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
         add_translator_note=request.add_translator_note,
         page_format=request.page_format,
         use_glossary=request.use_glossary,
@@ -17111,8 +17137,8 @@ async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(N
         raise HTTPException(status_code=401, detail="Admin key required")
 
     salesperson.id = str(uuid.uuid4())[:8]
-    salesperson.created_at = datetime.now().isoformat()
-    salesperson.hired_date = salesperson.hired_date or datetime.now().strftime("%Y-%m-%d")
+    salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+    salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     await db.salespeople.insert_one(salesperson.dict())
 

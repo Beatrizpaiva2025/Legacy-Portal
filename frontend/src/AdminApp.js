@@ -8,7 +8,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-// ==================== UTC DATE HELPER ====================
+// ==================== UTC DATE HELPER - NEW YORK TIMEZONE ====================
+// All dates/times displayed in EST/EDT (America/New_York)
+const NY_TIMEZONE = 'America/New_York';
+
 // Parse dates from backend as UTC (backend sends UTC timestamps without 'Z' suffix)
 const parseUTCDate = (dateStr) => {
   if (!dateStr) return null;
@@ -19,20 +22,40 @@ const parseUTCDate = (dateStr) => {
   return new Date(dateStr);
 };
 
-// Format a date string from backend to local display
+// Format a date string from backend to New York timezone display
 const formatDateLocal = (dateStr, options = {}) => {
   if (!dateStr) return '-';
   const date = parseUTCDate(dateStr);
   if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-US', options);
+  return date.toLocaleDateString('en-US', { ...options, timeZone: NY_TIMEZONE });
 };
 
-// Format a datetime string from backend to local display
+// Format a datetime string from backend to New York timezone display
 const formatDateTimeLocal = (dateStr) => {
   if (!dateStr) return '-';
   const date = parseUTCDate(dateStr);
   if (isNaN(date.getTime())) return '-';
-  return date.toLocaleString('en-US');
+  return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current date in New York timezone (for form inputs)
+const getNYDate = () => {
+  return new Date().toLocaleDateString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current datetime in New York timezone
+const getNYDateTime = () => {
+  return new Date().toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current date as ISO string in NY timezone (YYYY-MM-DD format)
+const getNYDateISO = () => {
+  const options = { timeZone: NY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' };
+  const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
 };
 
 // ==================== CONSTANTS ====================
@@ -894,7 +917,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div style="font-size: 12px; margin-top: 8px;">Authorized Representative</div>
               <div style="font-size: 12px;">Legacy Translations Inc.</div>
               <div style="font-size: 12px; margin-top: 12px;">
-                Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US')}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
+                Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
               </div>
             </div>
             <div style="text-align: center;">
@@ -1597,7 +1620,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
   const [savedTranslatorName, setSavedTranslatorName] = useState(''); // Saved translator name from database - DO NOT change on UI selection
-  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
+  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }));
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
   const [translationType, setTranslationType] = useState('certified'); // 'certified' or 'sworn'
@@ -2769,7 +2792,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     <div class="footer">
         This is a certified translation by Legacy Translations Inc.<br>
-        Approved on: ${new Date().toLocaleDateString()}
+        Approved on: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
     </div>
 </body>
 </html>`;
@@ -4958,7 +4981,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Create TM entry
     const tmEntry = {
       id: Date.now(),
-      name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString()}`,
+      name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`,
       sourceLang: sourceLanguage,
       targetLang: targetLanguage,
       field: typeLabels[documentCategory] || 'General',
@@ -5040,7 +5063,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
           .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
           .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
-          .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))}
+          .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))}
       </div>
     ` : `
       <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 32px; background: white;">
@@ -5091,7 +5114,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
             <div style="font-size: 14px; color: #333;">Authorized Representative</div>
             <div style="font-size: 14px; color: #333;">Legacy Translations Inc.</div>
-            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US')}</div>
+            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
             ${logoStamp
@@ -6033,7 +6056,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         {file.deadline && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US')}
+                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {file.internal_notes && (
@@ -6142,7 +6165,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         {order.deadline && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
+                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {order.internal_notes && (
@@ -6575,7 +6598,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
                   .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
                   .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
-                  .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))
+                  .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))
                 }}
               />
             ) : (
@@ -13485,7 +13508,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <div key={idx} className="flex justify-between items-center text-[10px] py-0.5">
                               <span className="text-blue-600 font-mono">{proj.code}</span>
                               <span className="text-gray-500">
-                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US') : 'No deadline'}
+                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'No deadline'}
                               </span>
                             </div>
                           ))}
@@ -15088,7 +15111,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                                 <div className="text-[10px] text-gray-500">
                                   {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
-                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
                             </div>
@@ -15127,7 +15150,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
                                 <div className="text-[10px] text-green-600">
                                   Approved translation
-                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
                             </div>
@@ -15311,7 +15334,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
                   <div className="text-[10px] text-blue-700">
                     <strong>ℹ️ Resending:</strong> Delivered
-                    {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString()}`}.
+                    {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}.
                     Upload new file below if needed.
                   </div>
                 </div>
@@ -17415,7 +17438,7 @@ const SettingsPage = ({ adminKey }) => {
                           )}
                         </div>
                         <div className="text-[10px] text-gray-500 mt-1">
-                          {new Date(rp.created_at).toLocaleString()} |
+                          {new Date(rp.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })} |
                           {rp.stats?.orders_count || 0} orders, {rp.stats?.users_count || 0} users
                         </div>
                       </div>
@@ -18081,7 +18104,7 @@ const ReviewPage = ({ adminKey, user }) => {
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
-                      {new Date(sub.submitted_at).toLocaleDateString()}
+                      {new Date(sub.submitted_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </div>
                   </div>
                 ))}
@@ -18110,7 +18133,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   <div className="space-y-2 text-xs">
                     <div><span className="text-gray-500">Translator:</span> {selectedSubmission.translator_name}</div>
                     <div><span className="text-gray-500">Client:</span> {selectedSubmission.client_name || 'N/A'}</div>
-                    <div><span className="text-gray-500">Submitted:</span> {new Date(selectedSubmission.submitted_at).toLocaleString()}</div>
+                    <div><span className="text-gray-500">Submitted:</span> {new Date(selectedSubmission.submitted_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div><span className="text-gray-500">Pages:</span> {selectedSubmission.pages_count || 'N/A'}</div>
@@ -18248,7 +18271,7 @@ const ReviewPage = ({ adminKey, user }) => {
                     <div key={idx} className="p-2 border rounded text-xs">
                       <div className="font-mono">{entry.ip}</div>
                       <div className="text-gray-500">{entry.user_agent}</div>
-                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString()}</div>
+                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                   ))}
                 </div>
@@ -18267,7 +18290,7 @@ const ReviewPage = ({ adminKey, user }) => {
                         <span className={`px-2 py-0.5 rounded ${attempt.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {attempt.success ? 'OK' : 'Failed'}
                         </span>
-                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString()}</div>
+                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                       </div>
                     </div>
                   ))}
@@ -18948,7 +18971,7 @@ const UsersPage = ({ adminKey, user }) => {
                             <div>
                               <span className="text-gray-500 text-xs">Data de Cadastro:</span>
                               <div className="font-medium">
-                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US') : '-'}
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : '-'}
                               </div>
                             </div>
                           </div>
@@ -19012,7 +19035,7 @@ const UsersPage = ({ adminKey, user }) => {
                                       <div className="font-medium">{doc.filename}</div>
                                       <div className="text-gray-400">
                                         {TRANSLATOR_DOC_TYPES.find(dt => dt.value === doc.document_type)?.label || doc.document_type}
-                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US')}`}
+                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                       </div>
                                     </div>
                                   </div>
@@ -19478,8 +19501,8 @@ const ProductionPage = ({ adminKey }) => {
                       </div>
                       <div className="text-sm text-gray-700">{msg.content}</div>
                       <div className="text-[10px] text-gray-400 mt-2">
-                        Sent: {msg.created_at ? new Date(msg.created_at).toLocaleString() : '-'}
-                        {msg.replied_at && ` • Replied: ${new Date(msg.replied_at).toLocaleString()}`}
+                        Sent: {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '-'}
+                        {msg.replied_at && ` • Replied: ${new Date(msg.replied_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}`}
                       </div>
                     </div>
                   ))}
@@ -20681,7 +20704,7 @@ const FinancesPage = ({ adminKey }) => {
                               )}
                             </div>
                             <span className="text-xs text-gray-500">
-                              {new Date(payment.paid_at).toLocaleDateString('en-US')}
+                              {new Date(payment.paid_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </span>
                           </div>
                           {payment.note && (
@@ -20927,7 +20950,7 @@ const FinancesPage = ({ adminKey }) => {
                           {log.translator_name || log.translator_id}
                           {log.auto_generated && <span className="ml-1 text-xs text-green-600">✓ Auto</span>}
                         </td>
-                        <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US')}</td>
+                        <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</td>
                         <td className="p-3 text-right font-bold text-blue-600">{log.pages}</td>
                         <td className="p-3 text-gray-500 text-xs">
                           {log.note || '-'}
@@ -22178,8 +22201,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           ...quoteForm,
           ...prices,
           quoteNumber,
-          date: new Date().toLocaleDateString(),
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+          date: new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { timeZone: 'America/New_York' })
         }
       });
 
@@ -24563,7 +24586,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             }`}
                           >
                             <div className="font-medium text-[10px] text-gray-500 mb-1">
-                              {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US')}
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
                           </div>

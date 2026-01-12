@@ -5,6 +5,25 @@ import './App.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== NEW YORK TIMEZONE HELPERS ====================
+const NY_TIMEZONE = 'America/New_York';
+
+// Format date to New York timezone
+const formatDateNY = (dateStr, options = {}) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', { ...options, timeZone: NY_TIMEZONE });
+};
+
+// Format datetime to New York timezone
+const formatDateTimeNY = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
 // Translation stages
 const TRANSLATION_STAGES = {
   'received': { id: 1, name: 'Received', icon: '📥' },
@@ -2453,7 +2472,7 @@ const CustomerOrdersPage = ({ token, t }) => {
                   <div className="text-right">
                     <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
                     <div className="text-sm text-gray-500">
-                      {new Date(order.created_at).toLocaleDateString()}
+                      {new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </div>
                   </div>
                 </div>
@@ -2468,7 +2487,7 @@ const CustomerOrdersPage = ({ token, t }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.created}</div>
-                      <div className="font-medium">{new Date(order.created_at).toLocaleDateString()}</div>
+                      <div className="font-medium">{new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">{t.basePrice}</div>
