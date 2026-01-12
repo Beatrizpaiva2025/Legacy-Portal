@@ -14397,7 +14397,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Deliver to Client (quick) */}
-                          {isAdmin && order.translation_status === 'ready' && (
+                          {isAdmin && (order.translation_status === 'ready' || order.translation_status === 'final') && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
@@ -15259,7 +15259,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {/* Action Buttons when translations exist */}
                         {(isAdmin || isPM) && (
                           <div className="mt-3 pt-3 border-t border-green-200 flex flex-wrap gap-2">
-                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && (
+                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && viewingOrder.translation_status !== 'final' && (
                               <button
                                 onClick={async () => {
                                   if (confirm('Mark this project as Ready for delivery?')) {
@@ -15282,7 +15282,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 ✅ Mark as Ready
                               </button>
                             )}
-                            {viewingOrder.translation_status === 'ready' && (
+                            {(viewingOrder.translation_status === 'ready' || viewingOrder.translation_status === 'final') && (
                               <div className="flex flex-col gap-2 w-full">
                                 <div className="flex items-center gap-2">
                                   <input
