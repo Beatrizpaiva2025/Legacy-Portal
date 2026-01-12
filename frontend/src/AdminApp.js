@@ -9637,6 +9637,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                       <span>Include Original Documents</span>
                     </label>
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={includeCertification}
+                        onChange={(e) => setIncludeCertification(e.target.checked)}
+                        className="mr-3 w-4 h-4"
+                      />
+                      <span>🔐 Include Verification Page (QR Code)</span>
+                    </label>
                     {isAdmin && (
                       <label className="flex items-center text-xs cursor-pointer">
                         <input
@@ -9670,6 +9679,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <>
                         <span className="text-gray-400">→</span>
                         <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📑 Original ({quickOriginalFiles.length} pages)</span>
+                      </>
+                    )}
+                    {includeCertification && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
                       </>
                     )}
                     {includeAuthenticityStatement && (
