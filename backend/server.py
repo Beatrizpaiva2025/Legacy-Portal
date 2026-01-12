@@ -8290,9 +8290,6 @@ class TranslationData(BaseModel):
     submitted_by: Optional[str] = None
     submitted_by_role: Optional[str] = None
     translator_notes: Optional[str] = None  # Notes from translator to PM
-    # Digitally signed package mode
-    digitally_signed_mode: bool = False
-    digitally_signed_package: Optional[dict] = None  # {filename, data, size}
 
 @api_router.post("/admin/orders/{order_id}/translation")
 async def admin_save_translation(order_id: str, data: TranslationData, admin_key: str):
@@ -8370,10 +8367,7 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             "translation_ready_at": datetime.utcnow().isoformat(),
             "translation_submitted_by": data.submitted_by or (current_user.get("name") if current_user else "Admin"),
             "translation_submitted_by_role": data.submitted_by_role or (current_user.get("role") if current_user else "admin"),
-            "translator_notes": data.translator_notes or "",
-            # Digitally signed package
-            "digitally_signed_mode": data.digitally_signed_mode,
-            "digitally_signed_package": data.digitally_signed_package
+            "translator_notes": data.translator_notes or ""
         }}
     )
 
