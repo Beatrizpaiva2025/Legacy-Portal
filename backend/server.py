@@ -10111,6 +10111,30 @@ async def admin_replace_order_document(doc_id: str, admin_key: str, document_dat
 
     return {"success": True, "message": "Document replaced successfully", "filename": filename}
 
+@api_router.delete("/admin/order-documents/{doc_id}")
+async def admin_delete_order_document(doc_id: str, admin_key: str):
+    """Admin/PM: Delete a document from an order"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only allow admin or PM to delete
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can delete documents")
+
+    # Try order_documents first
+    result = await db.order_documents.delete_one({"id": doc_id})
+
+    if result.deleted_count == 0:
+        # Try main documents collection
+        result = await db.documents.delete_one({"id": doc_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    logger.info(f"Document {doc_id} deleted by {user_info.get('name', 'Unknown')}")
+    return {"success": True, "message": "Document deleted successfully"}
+
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
 

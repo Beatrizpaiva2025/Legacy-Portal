@@ -5935,28 +5935,48 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'}`}>
                   {user?.role === 'admin' ? '👑 Admin Translation' : '📋 My Assigned Work'}
                 </h3>
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 border">
-                  <button
-                    onClick={() => setViewMode('files')}
-                    className={`px-3 py-1 text-xs rounded-md transition-all ${
-                      viewMode === 'files'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    📄 Files
-                  </button>
-                  <button
-                    onClick={() => setViewMode('projects')}
-                    className={`px-3 py-1 text-xs rounded-md transition-all ${
-                      viewMode === 'projects'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    📁 Projects
-                  </button>
+                <div className="flex items-center gap-2">
+                  {/* Admin/PM: Add Document Button */}
+                  {(isAdmin || isPM) && selectedOrderId && (
+                    <label className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Add document to selected project">
+                      ➕ Add
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            uploadDocumentsToOrder(selectedOrderId, Array.from(e.target.files));
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 border">
+                    <button
+                      onClick={() => setViewMode('files')}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        viewMode === 'files'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      📄 Files
+                    </button>
+                    <button
+                      onClick={() => setViewMode('projects')}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        viewMode === 'projects'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      📁 Projects
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -6025,7 +6045,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
                         )}
                         {/* Action buttons */}
-                        <div className="mt-2 flex gap-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -6034,18 +6054,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
                             title="Load PDF/Image to workspace (PDF auto-converts to images)"
                           >
-                            📥 Load to Workspace
+                            📥 Load
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               downloadProjectDocument(file.id, file.filename);
                             }}
-                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                            className="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                             title={`Download original file: ${file.filename}`}
                           >
-                            ⬇️ Download
+                            ⬇️
                           </button>
+                          {/* Admin/PM: Replace and Delete buttons */}
+                          {(isAdmin || isPM) && (
+                            <>
+                              <label className="px-2 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Replace document">
+                                🔄
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    if (e.target.files[0]) {
+                                      replaceOrderDocument(file.id, e.target.files[0], file.filename);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </label>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteOrderDocument(file.id, file.filename);
+                                }}
+                                className="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                title="Delete document"
+                              >
+                                🗑️
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -6057,6 +6108,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <p className="text-xs mt-1">Files from assigned projects will appear here</p>
                   </div>
                 )
+                /* Admin/PM: Add new document button */
               ) : (
                 /* PROJECTS VIEW - Original behavior */
                 assignedOrders.length > 0 ? (
@@ -6133,9 +6185,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {/* Project Files Download Section - Show when project is selected */}
           {selectedOrderId && viewMode === 'projects' && (
             <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                📂 Project Files
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  📂 Project Files
+                </h3>
+                {/* Admin/PM: Add new document button */}
+                {(isAdmin || isPM) && (
+                  <label className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Add new document">
+                    ➕ Add Document
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          uploadDocumentsToOrder(selectedOrderId, Array.from(e.target.files));
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
               {allProjectFiles.filter(f => f.order_id === selectedOrderId).length > 0 ? (
                 <div className="space-y-2">
                   {allProjectFiles.filter(f => f.order_id === selectedOrderId).map((file, idx) => (
@@ -6156,18 +6228,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div className="flex gap-1 ml-3">
                         <button
                           onClick={() => loadFileToWorkspace(file.id, file.filename)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
+                          className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
                           title="Load PDF/Image to workspace (PDF auto-converts to images)"
                         >
-                          📥 Load to Workspace
+                          📥 Load
                         </button>
                         <button
                           onClick={() => downloadProjectDocument(file.id, file.filename)}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                          className="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                           title={`Download original file: ${file.filename}`}
                         >
-                          ⬇️ Download
+                          ⬇️
                         </button>
+                        {/* Admin/PM: Replace and Delete buttons */}
+                        {(isAdmin || isPM) && (
+                          <>
+                            <label className="px-2 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Replace document">
+                              🔄
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => {
+                                  if (e.target.files[0]) {
+                                    replaceOrderDocument(file.id, e.target.files[0], file.filename);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                            </label>
+                            <button
+                              onClick={() => deleteOrderDocument(file.id, file.filename)}
+                              className="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                              title="Delete document"
+                            >
+                              🗑️
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -12138,6 +12236,105 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('Errorr uploading documents');
     } finally {
       setUploadingProjectDoc(false);
+    }
+  };
+
+  // Delete order document (Admin/PM only)
+  const deleteOrderDocument = async (docId, filename) => {
+    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
+      alert(`Document "${filename}" deleted successfully`);
+      // Refresh files list
+      if (viewingOrder) {
+        viewOrderDocuments(viewingOrder);
+      }
+      // Refresh all project files for Files view
+      if (assignedOrders && assignedOrders.length > 0) {
+        const allFiles = [];
+        for (const order of assignedOrders) {
+          try {
+            const res = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+            if (res.data?.documents) {
+              res.data.documents.forEach(doc => {
+                allFiles.push({
+                  ...doc,
+                  order_id: order.id,
+                  order_number: order.order_number,
+                  translate_from: order.translate_from,
+                  translate_to: order.translate_to,
+                  deadline: order.deadline,
+                  internal_notes: order.internal_notes
+                });
+              });
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setAllProjectFiles(allFiles);
+      }
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      alert('Error deleting document');
+    }
+  };
+
+  // Replace order document (Admin/PM only)
+  const replaceOrderDocument = async (docId, file, oldFilename) => {
+    if (!file) return;
+    if (!confirm(`Replace "${oldFilename}" with "${file.name}"?`)) {
+      return;
+    }
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
+
+      await axios.put(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        filename: file.name,
+        file_data: base64Data,
+        content_type: file.type || 'application/octet-stream'
+      });
+
+      alert(`Document replaced successfully with "${file.name}"`);
+      // Refresh files list
+      if (viewingOrder) {
+        viewOrderDocuments(viewingOrder);
+      }
+      // Refresh all project files for Files view
+      if (assignedOrders && assignedOrders.length > 0) {
+        const allFiles = [];
+        for (const order of assignedOrders) {
+          try {
+            const res = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+            if (res.data?.documents) {
+              res.data.documents.forEach(doc => {
+                allFiles.push({
+                  ...doc,
+                  order_id: order.id,
+                  order_number: order.order_number,
+                  translate_from: order.translate_from,
+                  translate_to: order.translate_to,
+                  deadline: order.deadline,
+                  internal_notes: order.internal_notes
+                });
+              });
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setAllProjectFiles(allFiles);
+      }
+    } catch (err) {
+      console.error('Failed to replace document:', err);
+      alert('Error replacing document');
     }
   };
 
@@ -26053,13 +26250,13 @@ const FloatingChatWidget = ({ adminKey, user }) => {
         )}
         {/* Partner messages badge - top right (red) */}
         {partnerUnreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center" title="Partner Messages">
+          <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white" title="Partner Messages">
             {partnerUnreadCount > 9 ? '9+' : partnerUnreadCount}
           </span>
         )}
-        {/* External/WhatsApp messages badge - top left (blue) */}
+        {/* External/WhatsApp messages badge - bottom right (green) - separated from partner badge */}
         {externalUnreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -left-1 w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center" title="WhatsApp Quotes">
+          <span className="absolute -bottom-2 -right-2 w-6 h-6 bg-green-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white" title="WhatsApp Quotes">
             {externalUnreadCount > 9 ? '9+' : externalUnreadCount}
           </span>
         )}
