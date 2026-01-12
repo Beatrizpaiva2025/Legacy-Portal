@@ -1743,7 +1743,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [signatureImage, setSignatureImage] = useState('');
 
   // Certificate Header Info
-  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations, LLC');
+  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations Inc.');
   const [certCompanyAddress, setCertCompanyAddress] = useState('123 Business St, Suite 100');
   const [certCompanyPhone, setCertCompanyPhone] = useState('+1 (555) 123-4567');
   const [certCompanyEmail, setCertCompanyEmail] = useState('contact@legacytranslations.com');
@@ -5027,7 +5027,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         certifier_name: translator?.name || 'Beatriz Paiva',
         certifier_title: 'Legal Representative',
         certifier_credentials: 'ATA Member # 275993',
-        company_name: certCompanyName || 'Legacy Translations, LLC',
+        company_name: certCompanyName || 'Legacy Translations Inc.',
         company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
         company_phone: certCompanyPhone || '(857) 316-7770',
         company_email: certCompanyEmail || 'contact@legacytranslations.com',
@@ -5334,7 +5334,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             <div class="cert-footer">
                 <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
-                <p class="cert-notice">This document has been digitally certified by Legacy Translations, LLC. Any alterations to this document will invalidate this certification.</p>
+                <p class="cert-notice">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
             </div>
         </div>
     </div>
@@ -6627,7 +6627,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       localStorage.setItem('cert_company_name', e.target.value);
                     }}
                     className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
-                    placeholder="Legacy Translations, LLC"
+                    placeholder="Legacy Translations Inc."
                   />
                 </div>
                 <div>

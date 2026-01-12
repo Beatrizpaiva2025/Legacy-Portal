@@ -1375,7 +1375,7 @@ class DocumentCertification(BaseModel):
     certifier_name: str
     certifier_title: str = "Certified Translator"
     certifier_credentials: Optional[str] = None  # ATA # 275993
-    company_name: str = "Legacy Translations, LLC"
+    company_name: str = "Legacy Translations Inc."
     company_address: Optional[str] = None
     company_phone: Optional[str] = None
     company_email: Optional[str] = None
@@ -1403,7 +1403,7 @@ class CertificationCreate(BaseModel):
     certifier_name: str
     certifier_title: str = "Certified Translator"
     certifier_credentials: Optional[str] = None
-    company_name: str = "Legacy Translations, LLC"
+    company_name: str = "Legacy Translations Inc."
     company_address: Optional[str] = None
     company_phone: Optional[str] = None
     company_email: Optional[str] = None
@@ -16472,7 +16472,7 @@ async def verify_certification(certification_id: str):
             certifier_credentials=certification.get("certifier_credentials"),
             company_name=certification.get("company_name"),
             client_name=certification.get("client_name"),
-            message="✓ This document has been certified by Legacy Translations, LLC"
+            message="✓ This document has been certified by Legacy Translations Inc."
         )
 
     except Exception as e:
