@@ -9045,42 +9045,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </button>
                     )}
 
-                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
-                    <button
-                      onClick={() => approveTranslation(false)}
-                      disabled={sendingToProjects}
-                      className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
-                      }`}
-                    >
-                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
-                    </button>
+                    {/* Translators: Send to PM */}
+                    {(isInHouseTranslator || isContractor) && (
+                      <button
+                        onClick={() => sendToProjects('pm')}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+                      >
+                        📤 Send to PM
+                      </button>
+                    )}
 
-                    {/* Admin: Go directly to Deliver */}
+                    {/* PM: Approve and Send to Admin for delivery */}
+                    {(isPM && !isAdmin) && (
+                      <button
+                        onClick={() => approveTranslation(false)}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                      >
+                        ✅ Approve
+                      </button>
+                    )}
+
+                    {/* Admin: Send to Client (Deliver) */}
                     {isAdmin && (
                       <button
-                        onClick={() => setActiveSubTab('deliver')}
-                        className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center gap-2"
+                        onClick={() => sendToProjects('deliver')}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
                       >
-                        📤 Go to Deliver
+                        📤 Send to Client
                       </button>
                     )}
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isInHouseTranslator ? (
+                  {(isInHouseTranslator || isContractor) ? (
                     <>
-                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
                     </>
                   ) : isPM && !isAdmin ? (
                     <>
-                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      ✅ <strong>Approve:</strong> Approves translation and sends to Admin for client delivery
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
                     </>
                   ) : (
                     <>
-                      ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery"
+                      📤 <strong>Send to Client:</strong> Delivers the approved translation to the client
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
                     </>
