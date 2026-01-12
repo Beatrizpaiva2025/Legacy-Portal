@@ -1789,6 +1789,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [quickPackageLoading, setQuickPackageLoading] = useState(false); // Loading state for uploads
   const [quickPackageProgress, setQuickPackageProgress] = useState(''); // Progress message
 
+  // Digitally Signed Package state (for ready packages with digital signature)
+  const [digitallySignedMode, setDigitallySignedMode] = useState(false);
+  const [digitallySignedPackage, setDigitallySignedPackage] = useState(null); // The uploaded signed PDF
+
   // Review view mode: 'preview' shows rendered HTML, 'edit' shows raw code
   const [reviewViewMode, setReviewViewMode] = useState('preview');
 
@@ -2595,12 +2599,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
 
     // Check for translation content - in Quick Package mode check those variables
-    const hasTranslation = quickPackageMode
-      ? (quickTranslationFiles.length > 0 || quickTranslationHtml)
-      : translationResults.length > 0;
+    // In digitally signed mode, check for the uploaded PDF
+    const hasTranslation = digitallySignedMode
+      ? !!digitallySignedPackage
+      : quickPackageMode
+        ? (quickTranslationFiles.length > 0 || quickTranslationHtml)
+        : translationResults.length > 0;
 
     if (!hasTranslation) {
-      alert('No translation to save. Please translate the document first.');
+      alert(digitallySignedMode
+        ? 'Please upload a digitally signed PDF package first.'
+        : 'No translation to save. Please translate the document first.');
       return;
     }
 
@@ -2656,7 +2665,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         signature_image: signatureImage,  // Preserve signature with order
         send_to: destination, // 'save', 'pm', 'ready', 'deliver'
         submitted_by: user?.name || 'Unknown',
-        submitted_by_role: user?.role || 'unknown'
+        submitted_by_role: user?.role || 'unknown',
+        // Digitally signed package mode
+        digitally_signed_mode: digitallySignedMode,
+        digitally_signed_package: digitallySignedMode ? digitallySignedPackage : null
       });
 
       const destinationLabels = {
@@ -2688,6 +2700,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setOrderNumber('');
               setTranslationResults([]);
               setOriginalImages([]);
+              setDigitallySignedPackage(null);
+              setDigitallySignedMode(false);
               setActiveSubTab('start');
               setProcessingStatus('');
               // Refresh assigned orders list
@@ -2706,6 +2720,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               setOrderNumber('');
               setTranslationResults([]);
               setOriginalImages([]);
+              setDigitallySignedPackage(null);
+              setDigitallySignedMode(false);
               setActiveSubTab('start');
               setProcessingStatus('');
               fetchAssignedOrders();
@@ -9259,40 +9275,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         <div className="bg-white rounded shadow p-4">
           <h2 className="text-sm font-bold mb-2">✅ Approval & Delivery</h2>
 
-          {/* Mode Switch: Normal vs Quick Package - Hidden for contractors only */}
+          {/* Mode Switch: Normal vs Quick Package vs Digitally Signed - Hidden for contractors only */}
           {(isAdmin || isPM || isInHouseTranslator) && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg">
-              <div className="flex items-center justify-center gap-3">
-                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${!quickPackageMode && !digitallySignedMode ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   <input
                     type="radio"
-                    checked={!quickPackageMode}
-                    onChange={() => setQuickPackageMode(false)}
+                    checked={!quickPackageMode && !digitallySignedMode}
+                    onChange={() => { setQuickPackageMode(false); setDigitallySignedMode(false); }}
                     className="sr-only"
                   />
-                  <span className="mr-2">📝</span>
-                  <span className="text-sm font-medium">Normal Flow</span>
+                  <span className="mr-1">📝</span>
+                  <span className="text-xs font-medium">Normal Flow</span>
                 </label>
-                <label className={`flex items-center px-4 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${quickPackageMode && !digitallySignedMode ? 'bg-green-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
                   <input
                     type="radio"
-                    checked={quickPackageMode}
-                    onChange={() => setQuickPackageMode(true)}
+                    checked={quickPackageMode && !digitallySignedMode}
+                    onChange={() => { setQuickPackageMode(true); setDigitallySignedMode(false); }}
                     className="sr-only"
                   />
-                  <span className="mr-2">📦</span>
-                  <span className="text-sm font-medium">Quick Package</span>
+                  <span className="mr-1">📦</span>
+                  <span className="text-xs font-medium">Quick Package</span>
+                </label>
+                <label className={`flex items-center px-3 py-2 rounded-lg cursor-pointer transition-all ${digitallySignedMode ? 'bg-purple-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                  <input
+                    type="radio"
+                    checked={digitallySignedMode}
+                    onChange={() => { setQuickPackageMode(false); setDigitallySignedMode(true); }}
+                    className="sr-only"
+                  />
+                  <span className="mr-1">📦</span>
+                  <span className="text-xs font-medium">Quick Package + Final Translation (Digitally signed)</span>
                 </label>
               </div>
               <p className="text-[10px] text-gray-500 text-center mt-2">
-                {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
+                {!quickPackageMode && !digitallySignedMode
+                  ? 'Use translation from previous flow'
+                  : digitallySignedMode
+                    ? 'Upload complete package with digital signature (PDF)'
+                    : 'Build package with ready translation (upload)'}
               </p>
             </div>
           )}
 
           {/* ============ QUICK PACKAGE MODE ============ */}
           {/* Contractors always use Quick Package mode, In-house translators can choose */}
-          {(quickPackageMode || isContractor) && (
+          {((quickPackageMode && !digitallySignedMode) || isContractor) && (
             <>
               {/* Certificate Fields */}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
@@ -9907,9 +9937,286 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </>
           )}
 
+          {/* ============ DIGITALLY SIGNED PACKAGE MODE ============ */}
+          {/* Upload complete package with digital signature (PM and In-house translators only) */}
+          {digitallySignedMode && (isAdmin || isPM || isInHouseTranslator) && (
+            <>
+              {/* Upload Signed Package */}
+              <div className="p-4 bg-purple-50 border border-purple-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-purple-700 mb-2">📦 Upload Digitally Signed Package</h3>
+                <p className="text-[10px] text-purple-600 mb-3">Upload your complete translation package with digital signature (PDF only)</p>
+
+                <div className={`border-2 border-dashed border-purple-300 rounded-lg p-4 text-center transition-colors ${quickPackageLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-purple-500'}`}>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        if (!file.name.toLowerCase().endsWith('.pdf')) {
+                          alert('Please upload a PDF file only');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setDigitallySignedPackage({
+                            filename: file.name,
+                            data: event.target.result,
+                            size: file.size
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="digitally-signed-upload"
+                    disabled={quickPackageLoading}
+                  />
+                  <label htmlFor="digitally-signed-upload" className={quickPackageLoading ? 'cursor-not-allowed' : 'cursor-pointer'}>
+                    <UploadIcon className="w-6 h-6 mx-auto mb-1 text-purple-600" />
+                    <span className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700">
+                      Upload Signed PDF
+                    </span>
+                    <p className="text-[10px] text-gray-500 mt-1">PDF files only (with digital signature)</p>
+                  </label>
+                </div>
+
+                {/* Show uploaded file */}
+                {digitallySignedPackage && (
+                  <div className="mt-3 p-3 bg-white rounded border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-600">📄</span>
+                        <span className="text-xs font-medium text-purple-700">{digitallySignedPackage.filename}</span>
+                        <span className="text-[10px] text-gray-500">({(digitallySignedPackage.size / 1024).toFixed(1)} KB)</span>
+                      </div>
+                      <button
+                        onClick={() => setDigitallySignedPackage(null)}
+                        className="text-red-500 hover:text-red-700 text-xs"
+                      >
+                        ✕ Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Certificate Info for reference */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-blue-700 mb-3">📜 Certificate Information</h3>
+
+                {/* Order Number */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Order #</label>
+                  <div className="flex items-center">
+                    <span className="px-3 py-2 bg-gray-100 border border-r-0 rounded-l text-sm">P</span>
+                    <input
+                      type="text"
+                      value={orderNumber.replace('P', '')}
+                      onChange={(e) => setOrderNumber('P' + e.target.value.replace(/\D/g, ''))}
+                      placeholder="0000"
+                      className="flex-1 px-3 py-2 text-sm border rounded-r"
+                    />
+                  </div>
+                </div>
+
+                {/* Document Type - REQUIRED */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Translation of <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={documentType}
+                    onChange={(e) => setDocumentType(e.target.value)}
+                    placeholder="Birth Certificate, Marriage Certificate, Diploma..."
+                    className={`w-full px-3 py-2 text-sm border rounded ${
+                      !documentType.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
+                  />
+                  {!documentType.trim() && (
+                    <p className="text-[10px] text-red-500 mt-1">⚠️ Document type is required</p>
+                  )}
+                </div>
+
+                {/* Language Pair */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+                    <select
+                      value={sourceLanguage}
+                      onChange={(e) => setSourceLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">To</label>
+                    <select
+                      value={targetLanguage}
+                      onChange={(e) => setTargetLanguage(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded"
+                    >
+                      {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Approval Checklist */}
+              <div className={`p-4 rounded mb-4 ${
+                isApprovalComplete
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-blue-50 border-2 border-purple-300'
+              }`}>
+                <h3 className="text-sm font-bold text-blue-700 mb-1">
+                  📋 Translation Checklist <span className="text-red-500">*</span>
+                </h3>
+                <p className="text-[10px] text-blue-600 mb-3">⚠️ Complete all items before submitting</p>
+                <div className="space-y-2">
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.projectNumber ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.projectNumber}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, projectNumber: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you include the correct project number?</span>
+                    {approvalChecks.projectNumber && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.languageCorrect ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.languageCorrect}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, languageCorrect: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Is the source and target language correct?</span>
+                    {approvalChecks.languageCorrect && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                  <label className={`flex items-center text-xs cursor-pointer p-2 rounded ${
+                    approvalChecks.proofread ? 'bg-green-100' : 'bg-white'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={approvalChecks.proofread}
+                      onChange={(e) => setApprovalChecks({...approvalChecks, proofread: e.target.checked})}
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="font-medium">Did you proofread the entire document carefully?</span>
+                    {approvalChecks.proofread && <span className="ml-auto text-green-600">✓</span>}
+                  </label>
+                </div>
+                {!isApprovalComplete && (
+                  <p className="text-[10px] text-red-500 mt-3 font-medium">
+                    ⚠️ Complete all checklist items to enable submission
+                  </p>
+                )}
+                {isApprovalComplete && (
+                  <p className="text-[10px] text-green-600 mt-3 font-medium">
+                    ✅ All checks completed - Ready to submit!
+                  </p>
+                )}
+              </div>
+
+              {/* Send to Projects Section */}
+              <div className={`p-4 rounded mb-4 ${
+                isApprovalComplete && documentType.trim() && digitallySignedPackage
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <h3 className="text-sm font-bold text-green-700 mb-3">📤 Send to Projects</h3>
+                <p className="text-[10px] text-gray-600 mb-3">Send digitally signed package for approval.</p>
+
+                {/* Validation warnings */}
+                {(!isApprovalComplete || !documentType.trim() || !digitallySignedPackage) && (
+                  <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <p className="text-[10px] text-yellow-700 font-medium">⚠️ Before sending, please complete:</p>
+                    <ul className="text-[10px] text-yellow-600 mt-1 ml-4 list-disc">
+                      {!digitallySignedPackage && <li>Upload your digitally signed PDF</li>}
+                      {!documentType.trim() && <li>Fill in Document Type</li>}
+                      {!isApprovalComplete && <li>Complete all Approval Checklist items</li>}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="flex flex-col space-y-2">
+                  <select
+                    value={selectedOrderId}
+                    onChange={(e) => setSelectedOrderId(e.target.value)}
+                    className="w-full px-2 py-1.5 text-xs border rounded"
+                  >
+                    <option value="">-- Select Order --</option>
+                    {availableOrders.map(order => (
+                      <option key={order.id} value={order.id}>
+                        {order.order_number} - {order.client_name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex space-x-2">
+                    {/* Role-based delivery options */}
+                    <select
+                      value={sendDestination}
+                      onChange={(e) => setSendDestination(e.target.value)}
+                      className="px-2 py-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
+                      disabled={sendingToProjects}
+                    >
+                      {/* Admin only can send to client */}
+                      {isAdmin && <option value="client">📧 Send to Client</option>}
+                      {/* PM sends to Admin for final approval */}
+                      {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
+                      {/* In-House Translator: Send to PM or Finalize to Admin */}
+                      {isInHouseTranslator && (
+                        <>
+                          <option value="pm">📤 Send to PM (for review)</option>
+                          <option value="finalize_admin">✅ Finalize & Send to Admin</option>
+                        </>
+                      )}
+                    </select>
+                    <button
+                      onClick={() => sendToProjects(sendDestination)}
+                      disabled={
+                        sendingToProjects ||
+                        !selectedOrderId ||
+                        !isApprovalComplete ||
+                        !documentType.trim() ||
+                        !digitallySignedPackage
+                      }
+                      className="flex-1 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {sendingToProjects ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        '📤 Send Signed Package'
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {processingStatus && (
+                  <div className={`mt-3 p-2 rounded text-xs ${
+                    processingStatus.includes('❌') ? 'bg-red-100 text-red-700' :
+                    processingStatus.includes('✅') ? 'bg-green-100 text-green-700' :
+                    'bg-blue-100 text-blue-700'
+                  }`}>
+                    {processingStatus}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           {/* ============ NORMAL FLOW ============ */}
           {/* Normal Flow - Available for ALL users including Contractors */}
-          {!quickPackageMode && translationResults.length > 0 && (
+          {!quickPackageMode && !digitallySignedMode && translationResults.length > 0 && (
             <>
               {/* Approval Checklist - ALL REQUIRED */}
               <div className={`p-4 rounded mb-4 ${
