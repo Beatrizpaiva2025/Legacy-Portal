@@ -14409,7 +14409,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Deliver to Client (quick) */}
-                          {isAdmin && order.translation_status === 'ready' && (
+                          {isAdmin && (order.translation_status === 'ready' || order.translation_status === 'final') && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
@@ -15004,11 +15004,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <td className="py-2">
                             {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
                             {viewingOrder.translator_assignment_status && (
-                              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
-                                viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
+                              <span
+                                onClick={() => {
+                                  if (isAdmin || isPM) {
+                                    const newStatus = viewingOrder.translator_assignment_status === 'accepted' ? 'pending' : 'accepted';
+                                    if (confirm(`Change translator status to "${newStatus}"?`)) {
+                                      updateTranslatorAssignmentStatus(viewingOrder.id, newStatus);
+                                      setViewingOrder(prev => ({ ...prev, translator_assignment_status: newStatus }));
+                                    }
+                                  }
+                                }}
+                                className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                                  viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                  viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                } ${(isAdmin || isPM) ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                title={(isAdmin || isPM) ? "Click to change status" : ""}
+                              >
                                 {viewingOrder.translator_assignment_status}
                               </span>
                             )}
@@ -15271,7 +15283,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         {/* Action Buttons when translations exist */}
                         {(isAdmin || isPM) && (
                           <div className="mt-3 pt-3 border-t border-green-200 flex flex-wrap gap-2">
-                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && (
+                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && viewingOrder.translation_status !== 'final' && (
                               <button
                                 onClick={async () => {
                                   if (confirm('Mark this project as Ready for delivery?')) {
@@ -15294,25 +15306,43 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 ✅ Mark as Ready
                               </button>
                             )}
-                            {viewingOrder.translation_status === 'ready' && (
-                              <button
-                                onClick={async () => {
-                                  if (confirm('Send translation to client via email?')) {
-                                    try {
-                                      await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`);
-                                      alert('Translation sent to client!');
-                                      setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
-                                      fetchOrders();
-                                    } catch (err) {
-                                      console.error('Failed to deliver:', err);
-                                      alert('Error sending to client');
-                                    }
-                                  }
-                                }}
-                                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
-                              >
-                                📤 Send to Client
-                              </button>
+                            {(viewingOrder.translation_status === 'ready' || viewingOrder.translation_status === 'final') && (
+                              <div className="flex flex-col gap-2 w-full">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="email"
+                                    placeholder="BCC email (optional)"
+                                    id="bcc-email-input"
+                                    className="flex-1 px-2 py-1.5 border rounded text-xs"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      const bccInput = document.getElementById('bcc-email-input');
+                                      const bccEmail = bccInput?.value?.trim() || null;
+
+                                      if (confirm(`Send translation to ${viewingOrder.client_email}?${bccEmail ? `\n\nBCC: ${bccEmail}` : ''}`)) {
+                                        try {
+                                          await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
+                                            bcc_email: bccEmail
+                                          });
+                                          alert('Translation sent to client!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
+                                          setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
+                                          fetchOrders();
+                                        } catch (err) {
+                                          console.error('Failed to deliver:', err);
+                                          alert('Error sending to client');
+                                        }
+                                      }
+                                    }}
+                                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                                  >
+                                    📤 Send to Client
+                                  </button>
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  Will send to: {viewingOrder.client_email}
+                                </div>
+                              </div>
                             )}
                             {viewingOrder.translation_status === 'delivered' && (
                               <span className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1">
