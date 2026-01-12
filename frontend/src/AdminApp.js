@@ -15179,7 +15179,49 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Translated Documents Section */}
                   <div className="mt-4 pt-4 border-t">
-                    <div className="text-xs font-medium text-green-700 mb-2">📗 Translated Documents</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-medium text-green-700">📗 Translated Documents</div>
+                      {/* Upload Translated Document Button */}
+                      {(isAdmin || isPM) && (
+                        <label className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1">
+                          ⬆️ Upload Translation
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            multiple
+                            onChange={async (e) => {
+                              if (e.target.files && e.target.files.length > 0) {
+                                for (const file of e.target.files) {
+                                  try {
+                                    const reader = new FileReader();
+                                    const base64Promise = new Promise((resolve, reject) => {
+                                      reader.onload = () => resolve(reader.result.split(',')[1]);
+                                      reader.onerror = reject;
+                                    });
+                                    reader.readAsDataURL(file);
+                                    const base64Data = await base64Promise;
+
+                                    await axios.post(`${API}/admin/orders/${viewingOrder.id}/documents?admin_key=${adminKey}`, {
+                                      filename: file.name,
+                                      file_data: base64Data,
+                                      content_type: file.type || 'application/octet-stream',
+                                      source: 'translated_document'
+                                    });
+                                  } catch (err) {
+                                    console.error('Failed to upload translation:', err);
+                                    alert(`Error uploading ${file.name}`);
+                                  }
+                                }
+                                alert('Translation(s) uploaded successfully!');
+                                viewOrderDocuments(viewingOrder);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     {orderDocuments.filter(doc => doc.source === 'translated_document').length > 0 ? (
                       <div className="space-y-2">
                         {orderDocuments.filter(doc => doc.source === 'translated_document').map((doc, idx) => (
@@ -15194,19 +15236,85 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 </div>
                               </div>
                             </div>
-                            <button
-                              onClick={() => downloadDocument(doc.id, doc.filename)}
-                              className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
-                            >
-                              <span>⬇️</span> Download
-                            </button>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => downloadDocument(doc.id, doc.filename)}
+                                className="px-2 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
+                              >
+                                ⬇️
+                              </button>
+                              {(isAdmin || isPM) && (
+                                <button
+                                  onClick={() => deleteOrderDocument(doc.id, doc.filename)}
+                                  className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                                  title="Delete translation"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
+
+                        {/* Action Buttons when translations exist */}
+                        {(isAdmin || isPM) && (
+                          <div className="mt-3 pt-3 border-t border-green-200 flex flex-wrap gap-2">
+                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && (
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Mark this project as Ready for delivery?')) {
+                                    try {
+                                      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+                                        translation_status: 'ready',
+                                        translation_ready_at: new Date().toISOString()
+                                      });
+                                      alert('Project marked as Ready!');
+                                      setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
+                                      fetchOrders();
+                                    } catch (err) {
+                                      console.error('Failed to update status:', err);
+                                      alert('Error updating status');
+                                    }
+                                  }
+                                }}
+                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1"
+                              >
+                                ✅ Mark as Ready
+                              </button>
+                            )}
+                            {viewingOrder.translation_status === 'ready' && (
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Send translation to client via email?')) {
+                                    try {
+                                      await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`);
+                                      alert('Translation sent to client!');
+                                      setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
+                                      fetchOrders();
+                                    } catch (err) {
+                                      console.error('Failed to deliver:', err);
+                                      alert('Error sending to client');
+                                    }
+                                  }
+                                }}
+                                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                              >
+                                📤 Send to Client
+                              </button>
+                            )}
+                            {viewingOrder.translation_status === 'delivered' && (
+                              <span className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1">
+                                ✅ Delivered to client
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-4 text-gray-400">
                         <div className="text-2xl mb-1">📝</div>
-                        <div className="text-xs">No translations approved yet</div>
+                        <div className="text-xs">No translations uploaded yet</div>
+                        <div className="text-[10px] mt-1 text-gray-400">Use "Upload Translation" button above to add completed translations</div>
                       </div>
                     )}
                   </div>
