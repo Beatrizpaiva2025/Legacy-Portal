@@ -4900,7 +4900,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
-    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
+    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -5483,7 +5483,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
-    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
+    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
