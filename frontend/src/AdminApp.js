@@ -2391,8 +2391,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               bytes[i] = binaryString.charCodeAt(i);
             }
 
-            // Use PDF.js directly
-            const pdf = await pdfjsLib.getDocument(bytes).promise;
+            // Use PDF.js directly - v5.x requires object with data property
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
             const images = [];
 
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -3670,9 +3670,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   // Apply a single proofreading correction
   const applyProofreadingCorrection = (erro, index) => {
-    // Handle both field name conventions (found/original and sugestao/correcao)
-    const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
-    const suggestionText = (erro.sugestao || erro.correcao || '').trim();
+    // Handle both field name conventions - traducao_errada is the incorrect English text to find
+    const foundText = (erro.traducao_errada || erro.found || '').trim();
+    const suggestionText = (erro.correcao || erro.sugestao || '').trim();
 
     if (!foundText || !suggestionText) {
       alert('Cannot apply correction: missing original text or suggestion');
@@ -3719,9 +3719,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     let appliedCount = 0;
 
     const updatedErrors = proofreadingResult.erros.map(erro => {
-      // Handle both field name conventions
-      const foundText = (erro.found || erro.original || erro.traducao_errada || '').trim();
-      const suggestionText = (erro.sugestao || erro.correcao || '').trim();
+      // Handle both field name conventions - traducao_errada is the incorrect English text to find
+      const foundText = (erro.traducao_errada || erro.found || '').trim();
+      const suggestionText = (erro.correcao || erro.sugestao || '').trim();
 
       if (foundText && suggestionText && !erro.applied) {
         const result = tryReplaceText(updatedHtml, foundText, suggestionText);
@@ -3863,7 +3863,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       reader.onload = async (e) => {
         try {
           const typedArray = new Uint8Array(e.target.result);
-          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
           const images = [];
 
           for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -8461,8 +8461,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -8714,8 +8714,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="w-full h-full p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto"
+                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -8823,9 +8823,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                                 // Handle both field name conventions
                                 const severity = erro.severidade || erro.gravidade || 'MÉDIO';
                                 const errorType = erro.tipo || 'Geral';
-                                const originalText = erro.original || erro.traducao_errada || '';
-                                const foundText = erro.found || erro.original || erro.traducao_errada || '';
-                                const suggestionText = erro.sugestao || erro.correcao || '';
+                                const originalText = erro.original || '';  // Portuguese original
+                                const foundText = erro.traducao_errada || erro.found || '';  // Incorrect English found in translation
+                                const suggestionText = erro.correcao || erro.sugestao || '';  // Corrected English suggestion
                                 const explanation = erro.explicacao || erro.descricao || '';
 
                                 return (
@@ -22131,6 +22131,39 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
+  // Send email invite for file-level translator assignment
+  const [sendingFileInvite, setSendingFileInvite] = useState({});
+  const sendFileTranslatorInvite = async (doc, translatorId, translatorName) => {
+    if (!translatorId) {
+      alert('Please select a translator first');
+      return;
+    }
+    setSendingFileInvite(prev => ({ ...prev, [doc.id]: true }));
+    try {
+      const translator = translators.find(t => t.id === translatorId);
+
+      // Send email invite via the order update endpoint
+      await axios.post(`${API}/admin/send-file-assignment-email?admin_key=${adminKey}`, {
+        document_id: doc.id,
+        document_name: doc.filename,
+        translator_id: translatorId,
+        translator_name: translatorName,
+        translator_email: translator?.email,
+        order_id: selectedProject?.id,
+        order_number: selectedProject?.order_number,
+        language_pair: `${selectedProject?.translate_from} → ${selectedProject?.translate_to}`,
+        pm_name: user?.name || 'PM'
+      });
+
+      alert(`📧 Email invitation sent to ${translatorName}!`);
+    } catch (err) {
+      console.error('Failed to send invite:', err);
+      alert('Error sending email invitation');
+    } finally {
+      setSendingFileInvite(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
+
   // Open translator assignment modal (for email invites)
   const openAssignTranslatorModal = (order) => {
     setAssigningTranslatorModal(order);
@@ -22703,7 +22736,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   bytes[i] = binaryString.charCodeAt(i);
                 }
 
-                const pdf = await pdfjsLib.getDocument(bytes).promise;
+                const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                   const page = await pdf.getPage(pageNum);
                   const scale = 2;
@@ -24565,8 +24598,22 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
-                        {(fileAssignments[doc.id] || doc.assigned_translator_name) && (
-                          <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                        {(fileAssignments[doc.id]?.id || doc.assigned_translator_id) && (
+                          <>
+                            <button
+                              onClick={() => sendFileTranslatorInvite(
+                                doc,
+                                fileAssignments[doc.id]?.id || doc.assigned_translator_id,
+                                fileAssignments[doc.id]?.name || doc.assigned_translator_name
+                              )}
+                              disabled={sendingFileInvite[doc.id]}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
+                              title="Send email invitation to translator"
+                            >
+                              {sendingFileInvite[doc.id] ? '...' : '📧 Send'}
+                            </button>
+                            <span className="text-xs text-green-600 font-medium">✓ Atribuído</span>
+                          </>
                         )}
                       </div>
                     </div>
