@@ -851,7 +851,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           <!-- Order Number -->
           <div style="text-align: right; margin-bottom: 24px; font-size: 14px;">
             <span>Order # </span>
-            <input type="text" id="rmv-order-number" value="P6287" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 80px; text-align: center; font-size: 14px; font-family: Georgia, serif;" />
+            <input type="text" id="rmv-order-number" value="P6287" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 180px; text-align: center; font-size: 14px; font-family: Georgia, serif;" />
           </div>
 
           <!-- Main Title -->
