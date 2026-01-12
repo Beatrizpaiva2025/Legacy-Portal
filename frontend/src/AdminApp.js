@@ -14992,11 +14992,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <td className="py-2">
                             {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
                             {viewingOrder.translator_assignment_status && (
-                              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
-                                viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
+                              <span
+                                onClick={() => {
+                                  if (isAdmin || isPM) {
+                                    const newStatus = viewingOrder.translator_assignment_status === 'accepted' ? 'pending' : 'accepted';
+                                    if (confirm(`Change translator status to "${newStatus}"?`)) {
+                                      updateTranslatorAssignmentStatus(viewingOrder.id, newStatus);
+                                      setViewingOrder(prev => ({ ...prev, translator_assignment_status: newStatus }));
+                                    }
+                                  }
+                                }}
+                                className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                                  viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                  viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                } ${(isAdmin || isPM) ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                title={(isAdmin || isPM) ? "Click to change status" : ""}
+                              >
                                 {viewingOrder.translator_assignment_status}
                               </span>
                             )}
