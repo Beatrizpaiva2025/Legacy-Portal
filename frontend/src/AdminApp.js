@@ -48,6 +48,8 @@ const STATUS_COLORS = {
   'review': 'bg-blue-100 text-blue-700',
   'pending_pm_review': 'bg-sky-100 text-sky-700',
   'pending_admin_approval': 'bg-blue-100 text-blue-700',
+  'pending_admin_review': 'bg-indigo-100 text-indigo-700',
+  'finalized_pending_admin': 'bg-purple-100 text-purple-700',
   'client_review': 'bg-sky-100 text-sky-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-blue-100 text-blue-700',
@@ -9768,7 +9770,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           {/* Admin only can send to client */}
                           {isAdmin && <option value="client">📧 Send to Client</option>}
                           {/* PM sends to Admin for final approval */}
-                          {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                          {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                           {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
                           {isInHouseTranslator && (
                             <>
@@ -10229,7 +10231,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {/* Admin only can send to client */}
                       {isAdmin && <option value="client">📧 Send to Client</option>}
                       {/* PM sends to Admin for final approval */}
-                      {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                      {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                       {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
                       {isInHouseTranslator && (
                         <>
@@ -12759,6 +12761,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
       'pending_admin_approval': 'Pending Admin',
+      'pending_admin_review': 'Admin Review',
+      'finalized_pending_admin': 'Ready (Admin)',
       'client_review': 'Client Review',
       'ready': 'Ready',
       'delivered': 'Delivered',
@@ -13778,7 +13782,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
                       {/* Send translation button - Admin only - shows when ready, review, or delivered (for resend) */}
-                      {['ready', 'review', 'delivered', 'pending_admin_approval'].includes(order.translation_status) && isAdmin && (
+                      {['ready', 'review', 'delivered', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
                           className={`px-1 py-0.5 rounded text-[9px] ${
@@ -14087,8 +14091,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
-                          {/* Admin only: Approve from PM (pending_admin_approval) */}
-                          {isAdmin && order.translation_status === 'pending_admin_approval' && (
+                          {/* Admin only: Approve from PM/Translator */}
+                          {isAdmin && ['pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
@@ -14148,7 +14152,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Preview & Send Translation */}
-                          {isAdmin && ['ready', 'pending_admin_approval', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
+                          {isAdmin && ['ready', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
                             <button
                               onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
