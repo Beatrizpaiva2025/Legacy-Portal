@@ -1743,7 +1743,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [signatureImage, setSignatureImage] = useState('');
 
   // Certificate Header Info
-  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations, LLC');
+  const [certCompanyName, setCertCompanyName] = useState('Legacy Translations Inc.');
   const [certCompanyAddress, setCertCompanyAddress] = useState('123 Business St, Suite 100');
   const [certCompanyPhone, setCertCompanyPhone] = useState('+1 (555) 123-4567');
   const [certCompanyEmail, setCertCompanyEmail] = useState('contact@legacytranslations.com');
@@ -4604,6 +4604,41 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Small delay to let UI update
     await new Promise(resolve => setTimeout(resolve, 100));
 
+    // Create certification with QR code if enabled
+    let certData = certificationData;
+    if (includeCertification && !certData) {
+      setQuickPackageProgress('Creating certification...');
+      // For Quick Package, we need to create certification with available content
+      try {
+        const translationContent = quickTranslationHtml || 'Quick Package Translation';
+        const translator = TRANSLATORS.find(t => t.name === selectedTranslator);
+
+        const response = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+          order_id: selectedOrderId,
+          order_number: orderNumber,
+          document_type: documentType,
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          page_count: quickTranslationFiles.length || 1,
+          document_content: translationContent,
+          certifier_name: translator?.name || 'Beatriz Paiva',
+          certifier_title: 'Legal Representative',
+          certifier_credentials: 'ATA Member # 275993',
+          company_name: certCompanyName || 'Legacy Translations Inc.',
+          company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
+          company_phone: certCompanyPhone || '(857) 316-7770',
+          company_email: certCompanyEmail || 'contact@legacytranslations.com',
+          client_name: selectedOrder?.client_name || ''
+        });
+
+        certData = response.data;
+        setCertificationData(certData);
+      } catch (err) {
+        console.error('Failed to create certification for Quick Package:', err);
+      }
+      setQuickPackageProgress('Generating package...');
+    }
+
     // Use saved translator name from database if available, otherwise fall back to UI selection
     const translatorNameForCert = savedTranslatorName || selectedTranslator;
     const translator = TRANSLATORS.find(t => t.name === translatorNameForCert);
@@ -4750,6 +4785,55 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
     </div>`).join('') : '';
 
+    // Certification verification page HTML (with QR code and serial number)
+    const certificationPageHTML = (includeCertification && certData) ? `
+    <div class="certification-verification-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="certification-box">
+            <div class="cert-header">
+                <div class="cert-icon">🔐</div>
+                <h2 class="cert-title">Document Verification</h2>
+                <p class="cert-subtitle">This certified translation can be verified online</p>
+            </div>
+
+            <div class="cert-content">
+                <div class="cert-info">
+                    <div class="cert-row">
+                        <span class="cert-label">Certification ID:</span>
+                        <span class="cert-value cert-id">${certData.certification_id}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Document Type:</span>
+                        <span class="cert-value">${documentType}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Translation:</span>
+                        <span class="cert-value">${sourceLanguage} → ${targetLanguage}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Certified Date:</span>
+                        <span class="cert-value">${new Date(certData.certified_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    <div class="cert-row">
+                        <span class="cert-label">Document Hash:</span>
+                        <span class="cert-value cert-hash">${certData.document_hash?.substring(0, 16)}...</span>
+                    </div>
+                </div>
+
+                <div class="cert-qr">
+                    ${certData.qr_code_data ? `<img src="data:image/png;base64,${certData.qr_code_data}" alt="QR Code" class="qr-image" />` : '<div class="qr-placeholder">QR Code</div>'}
+                    <p class="qr-instruction">Scan to verify</p>
+                </div>
+            </div>
+
+            <div class="cert-footer">
+                <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
+                <p class="cert-notice">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
+            </div>
+        </div>
+    </div>
+    ` : '';
+
     // Complete HTML with SAME styles as handleDownload
     const fullHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -4894,13 +4978,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 page-break-before: auto;
             }
         }
+        /* Certification Verification Page Styles */
+        .certification-verification-page { page-break-before: always; padding-top: 20px; }
+        .certification-box {
+            max-width: 500px; margin: 60px auto; padding: 30px;
+            border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc;
+        }
+        .cert-header { text-align: center; margin-bottom: 25px; }
+        .cert-icon { font-size: 48px; margin-bottom: 10px; }
+        .cert-title { font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 5px; }
+        .cert-subtitle { font-size: 12px; color: #64748b; }
+        .cert-content { display: flex; gap: 30px; align-items: flex-start; }
+        .cert-info { flex: 1; }
+        .cert-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; }
+        .cert-label { font-size: 11px; color: #64748b; }
+        .cert-value { font-size: 11px; font-weight: 600; color: #1e293b; text-align: right; }
+        .cert-id { font-family: monospace; color: #2563eb; }
+        .cert-hash { font-family: monospace; font-size: 10px; }
+        .cert-qr { text-align: center; }
+        .qr-image { width: 120px; height: 120px; border: 1px solid #e2e8f0; border-radius: 8px; }
+        .qr-placeholder { width: 120px; height: 120px; border: 2px dashed #cbd5e1; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 12px; }
+        .qr-instruction { font-size: 10px; color: #64748b; margin-top: 5px; }
+        .cert-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+        .verify-url { font-size: 11px; color: #1e40af; margin-bottom: 10px; }
+        .cert-notice { font-size: 9px; color: #64748b; line-height: 1.4; }
     </style>
 </head>
 <body>
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
-    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
+    ${certificationPageHTML}
+    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -5011,7 +5120,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         certifier_name: translator?.name || 'Beatriz Paiva',
         certifier_title: 'Legal Representative',
         certifier_credentials: 'ATA Member # 275993',
-        company_name: certCompanyName || 'Legacy Translations, LLC',
+        company_name: certCompanyName || 'Legacy Translations Inc.',
         company_address: certCompanyAddress || '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
         company_phone: certCompanyPhone || '(857) 316-7770',
         company_email: certCompanyEmail || 'contact@legacytranslations.com',
@@ -5318,7 +5427,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
             <div class="cert-footer">
                 <p class="verify-url">Verify at: <strong>${certData.verification_url}</strong></p>
-                <p class="cert-notice">This document has been digitally certified by Legacy Translations, LLC. Any alterations to this document will invalidate this certification.</p>
+                <p class="cert-notice">This document has been digitally certified by Legacy Translations Inc. Any alterations to this document will invalidate this certification.</p>
             </div>
         </div>
     </div>
@@ -5483,7 +5592,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
-    ${includeAuthenticityStatement ? generateAuthenticityStatementHtml() : ''}
+    ${includeAuthenticityStatement && isAdmin ? generateAuthenticityStatementHtml() : ''}
 </body>
 </html>`;
 
@@ -6611,7 +6720,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       localStorage.setItem('cert_company_name', e.target.value);
                     }}
                     className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-blue-500"
-                    placeholder="Legacy Translations, LLC"
+                    placeholder="Legacy Translations Inc."
                   />
                 </div>
                 <div>
@@ -9285,7 +9394,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </label>
               </div>
               <p className="text-[10px] text-gray-500 text-center mt-2">
-                {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload)'}
+                {!quickPackageMode ? 'Use translation from previous flow' : 'Build package with ready translation (upload) - includes verification QR code'}
               </p>
             </div>
           )}

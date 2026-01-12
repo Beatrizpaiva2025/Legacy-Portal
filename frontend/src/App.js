@@ -3215,7 +3215,7 @@ const VerificationPage = ({ certificationId }) => {
         {/* Footer */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-400">
-            Legacy Translations, LLC • Certified Translation Services
+            Legacy Translations Inc. • Certified Translation Services
           </p>
           <a href="https://legacytranslations.com" className="text-xs text-blue-600 hover:underline">
             www.legacytranslations.com
