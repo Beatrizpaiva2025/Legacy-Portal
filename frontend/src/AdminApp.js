@@ -21783,6 +21783,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [pmTranslationFiles, setPmTranslationFiles] = useState([]);  // Images for translation
   const [pmTranslationHtml, setPmTranslationHtml] = useState('');    // HTML content for translation
   const [pmPackageGenerating, setPmPackageGenerating] = useState(false);
+  const [pmEditMode, setPmEditMode] = useState(false);  // PM translation editing mode
+  const [pmEditableHtml, setPmEditableHtml] = useState('');  // Editable HTML content for PM
 
   // Proofreading state
   const [proofreadingResult, setProofreadingResult] = useState(null);
@@ -22851,12 +22853,20 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         translationReady = true;
       }
 
-      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, {
+      // Build update payload - include edited HTML if PM made changes
+      const updatePayload = {
         translation_status: newStatus,
         translation_ready: translationReady,
         pm_approved_at: new Date().toISOString(),
         pm_approved_by: user?.name || 'PM'
-      });
+      };
+
+      // If PM edited the translation, include the updated HTML
+      if (pmEditableHtml) {
+        updatePayload.translation_html = pmEditableHtml;
+      }
+
+      await axios.put(`${API}/admin/orders/${selectedReview.id}?admin_key=${adminKey}`, updatePayload);
 
       // Update local state
       setOrders(prev => prev.map(o =>
@@ -22866,6 +22876,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setSelectedReview(null);
       setOriginalContents([]);
       setTranslatedContent(null);
+      setPmEditMode(false);
+      setPmEditableHtml('');
 
       alert(alertMessage);
     } catch (err) {
@@ -22933,8 +22945,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
   // Execute automatic proofreading
   const executeProofreading = async () => {
-    if (!selectedReview || !translatedContent) {
-      setProofreadingErrorr('Noa translation selected to review.');
+    // Check if we have any translation content (either from order or PM edits)
+    const hasTranslationContent = translatedContent || pmEditableHtml || pmTranslationHtml;
+
+    if (!selectedReview || !hasTranslationContent) {
+      setProofreadingErrorr('No translation selected to review.');
       return;
     }
 
@@ -22944,13 +22959,16 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       : 'Texto original não disponível';
 
     // Get translated text (extract from HTML if needed)
+    // Priority: PM edited content > translatedContent.html > translatedContent.data
     let translatedText = '';
-    if (translatedContent.html) {
+    const htmlContent = pmEditableHtml || pmTranslationHtml || translatedContent?.html;
+
+    if (htmlContent) {
       // Strip HTML tags for proofreading
       const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = translatedContent.html;
+      tempDiv.innerHTML = htmlContent;
       translatedText = tempDiv.textContent || tempDiv.innerText || '';
-    } else if (translatedContent.data) {
+    } else if (translatedContent?.data) {
       try {
         translatedText = atob(translatedContent.data);
       } catch (e) {
@@ -23712,7 +23730,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <div className="flex justify-between items-center mb-2">
                   <div>
                     <button
-                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); }}
+                      onClick={() => { setSelectedReview(null); setOriginalContents([]); setTranslatedContent(null); setPmEditMode(false); setPmEditableHtml(''); }}
                       className="text-gray-500 hover:text-gray-700 text-sm mb-1"
                     >
                       ← Back to queue
@@ -23730,21 +23748,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       disabled={sendingAction}
                       className="px-4 py-2 bg-red-500 text-white rounded text-xs hover:bg-red-600 disabled:bg-gray-400 flex items-center gap-1"
                     >
-                      ❌ Request Correction
+                      Reject
                     </button>
                     <button
                       onClick={() => approveTranslation('pending_admin_approval')}
                       disabled={sendingAction}
-                      className="px-4 py-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-1"
+                      className="px-4 py-2 bg-green-500 text-white rounded text-xs hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-1"
                     >
-                      {sendingAction ? '⏳ Sending...' : '📤 Send to Admin'}
+                      {sendingAction ? 'Sending...' : 'Send to Admin'}
                     </button>
                     <button
                       onClick={handlePmPackageDownload}
-                      disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml)}
+                      disabled={pmPackageGenerating || (!translatedContent && pmTranslationFiles.length === 0 && !pmTranslationHtml && !pmEditableHtml)}
                       className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-1"
                     >
-                      {pmPackageGenerating ? '⏳ Generating...' : '📦 Generate Package'}
+                      {pmPackageGenerating ? 'Generating...' : 'Generate Package'}
                     </button>
                   </div>
                 </div>
@@ -23842,29 +23860,101 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   <div className="sticky top-0 bg-white py-1 z-10">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-bold text-gray-700">
-                        ✍️ Translation {(pmTranslationFiles.length > 0 || pmTranslationHtml) &&
+                        ✍️ Translation {pmEditMode && <span className="text-blue-600 text-xs ml-1">(Editing)</span>}
+                        {(pmTranslationFiles.length > 0 || pmTranslationHtml || pmEditableHtml) &&
                           <span className="text-green-600 text-xs ml-2">
-                            ({pmTranslationFiles.length} images{pmTranslationHtml ? ' + HTML' : ''})
+                            ({pmTranslationFiles.length} images{(pmTranslationHtml || pmEditableHtml) ? ' + HTML' : ''})
                           </span>
                         }
                       </h4>
-                      <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
-                        📤 Upload Translation
-                        <input
-                          type="file"
-                          accept="image/*,.pdf,.docx,.html,.htm,.txt"
-                          multiple
-                          onChange={handlePmTranslationUpload}
-                          className="hidden"
-                        />
-                      </label>
+                      <div className="flex items-center gap-2">
+                        {/* Edit/Preview Toggle - only show if there's HTML content */}
+                        {(translatedContent?.html || pmTranslationHtml || pmEditableHtml) && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setPmEditMode(false)}
+                              className={`px-2 py-1 text-[10px] rounded ${!pmEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                            >
+                              Preview
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPmEditMode(true);
+                                // Initialize editable content if not set
+                                if (!pmEditableHtml) {
+                                  setPmEditableHtml(translatedContent?.html || pmTranslationHtml || '');
+                                }
+                              }}
+                              className={`px-2 py-1 text-[10px] rounded ${pmEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        )}
+                        <label className="px-2 py-1 bg-green-500 text-white text-xs rounded cursor-pointer hover:bg-green-600">
+                          Upload
+                          <input
+                            type="file"
+                            accept="image/*,.pdf,.docx,.html,.htm,.txt"
+                            multiple
+                            onChange={handlePmTranslationUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
-                  {translatedContent ? (
+
+                  {/* Edit Mode - Editable Content */}
+                  {pmEditMode && (translatedContent?.html || pmTranslationHtml || pmEditableHtml) ? (
+                    <div>
+                      {/* Formatting Toolbar */}
+                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border rounded-t sticky top-8">
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold', false, null); }}
+                          className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200"
+                        >B</button>
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic', false, null); }}
+                          className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200"
+                        >I</button>
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('underline', false, null); }}
+                          className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200"
+                        >U</button>
+                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyLeft', false, null); }}
+                          className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200"
+                        >Left</button>
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyCenter', false, null); }}
+                          className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200"
+                        >Center</button>
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); document.execCommand('justifyRight', false, null); }}
+                          className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200"
+                        >Right</button>
+                      </div>
+                      {/* Editable Content Area */}
+                      <div
+                        contentEditable
+                        suppressContentEditableWarning
+                        dangerouslySetInnerHTML={{ __html: pmEditableHtml || translatedContent?.html || pmTranslationHtml || '' }}
+                        onBlur={(e) => {
+                          setPmEditableHtml(e.target.innerHTML);
+                          setPmTranslationHtml(e.target.innerHTML);
+                        }}
+                        className="border border-t-0 rounded-b p-4 bg-white min-h-[300px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{ minHeight: '300px' }}
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1">Changes are saved automatically when you click outside the editor</p>
+                    </div>
+                  ) : translatedContent ? (
                     translatedContent.html ? (
                       <div
                         className="border rounded p-4 bg-white"
-                        dangerouslySetInnerHTML={{ __html: translatedContent.html }}
+                        dangerouslySetInnerHTML={{ __html: pmEditableHtml || translatedContent.html }}
                       />
                     ) : translatedContent.contentType?.includes('image') ? (
                       <img
@@ -23887,19 +23977,19 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         {atob(translatedContent.data)}
                       </div>
                     )
-                  ) : (pmTranslationFiles.length > 0 || pmTranslationHtml) ? (
+                  ) : (pmTranslationFiles.length > 0 || pmTranslationHtml || pmEditableHtml) ? (
                     <div>
-                      {/* Show PM uploaded HTML content */}
-                      {pmTranslationHtml && (
+                      {/* Show PM uploaded/edited HTML content */}
+                      {(pmEditableHtml || pmTranslationHtml) && (
                         <div
                           className="border rounded p-4 bg-white mb-4"
-                          dangerouslySetInnerHTML={{ __html: pmTranslationHtml }}
+                          dangerouslySetInnerHTML={{ __html: pmEditableHtml || pmTranslationHtml }}
                         />
                       )}
                       {/* Show PM uploaded images */}
                       {pmTranslationFiles.map((file, idx) => (
                         <div key={idx} className="mb-4">
-                          <p className="text-xs text-gray-500 mb-1">📎 {file.filename}</p>
+                          <p className="text-xs text-gray-500 mb-1">{file.filename}</p>
                           <img
                             src={`data:${file.type || 'image/png'};base64,${file.data}`}
                             alt={`Translation page ${idx + 1}`}
@@ -23918,10 +24008,25 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 </div>
               </div>
 
+              {/* Next: Proofreading Navigation */}
+              <div className="p-3 border-t bg-blue-50 flex justify-center">
+                <button
+                  onClick={() => {
+                    const proofSection = document.getElementById('pm-proofreading-section');
+                    if (proofSection) {
+                      proofSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
+                >
+                  Next: Proofreading
+                </button>
+              </div>
+
               {/* Correction Notes */}
               <div className="p-4 border-t bg-gray-50">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  📝 Correction Notes (to send to translator):
+                  Correction Notes (to send to translator):
                 </label>
                 <textarea
                   value={correctionNotes}
@@ -23932,14 +24037,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               </div>
 
               {/* Proofreading Section */}
-              <div className="p-4 border-t bg-white">
+              <div id="pm-proofreading-section" className="p-4 border-t bg-white">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-blue-700 flex items-center gap-2">
                     🔍 Proofreading (Revisão de Qualidade)
                   </h4>
                   <button
                     onClick={executeProofreading}
-                    disabled={isProofreading || !translatedContent}
+                    disabled={isProofreading || (!translatedContent && !pmEditableHtml && !pmTranslationHtml)}
                     className="px-4 py-2 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
                   >
                     {isProofreading ? (
