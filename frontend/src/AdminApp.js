@@ -2391,8 +2391,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               bytes[i] = binaryString.charCodeAt(i);
             }
 
-            // Use PDF.js directly
-            const pdf = await pdfjsLib.getDocument(bytes).promise;
+            // Use PDF.js directly - v5.x requires object with data property
+            const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
             const images = [];
 
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -3863,7 +3863,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       reader.onload = async (e) => {
         try {
           const typedArray = new Uint8Array(e.target.result);
-          const pdf = await pdfjsLib.getDocument(typedArray).promise;
+          const pdf = await pdfjsLib.getDocument({ data: typedArray }).promise;
           const images = [];
 
           for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -22736,7 +22736,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   bytes[i] = binaryString.charCodeAt(i);
                 }
 
-                const pdf = await pdfjsLib.getDocument(bytes).promise;
+                const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
                 for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                   const page = await pdf.getPage(pageNum);
                   const scale = 2;
