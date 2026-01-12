@@ -6298,6 +6298,17 @@ async def get_my_projects(token: str, admin_key: str):
     elif user_role == "translator":
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
+
+        # Auto-accept: When translator accesses their projects, auto-accept any pending assignments
+        # This fixes the issue where translator can work but status is stuck on "pending"
+        for order in orders:
+            if order.get("translator_assignment_status") == "pending":
+                await db.translation_orders.update_one(
+                    {"id": order["id"]},
+                    {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
+                )
+                order["translator_assignment_status"] = "accepted"
+                logger.info(f"Auto-accepted assignment for translator {user_id} on order {order.get('order_number', order['id'])}")
     else:
         orders = []
 

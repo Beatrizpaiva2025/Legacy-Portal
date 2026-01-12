@@ -12796,6 +12796,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Update translator assignment status (Admin/PM can manually change Pending to Accepted)
+  const updateTranslatorAssignmentStatus = async (orderId, newStatus) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_assignment_status: newStatus
+      });
+      alert(`Translator status updated to: ${newStatus}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update translator assignment status:', err);
+      alert('Failed to update status');
+    }
+  };
+
   // Start translation - navigate to Translation Tool with order
   const startTranslation = (order) => {
     if (onTranslate) {
@@ -14060,10 +14074,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {order.assigned_translator_name || order.assigned_translator}
                         </span>
                         {order.translator_assignment_status === 'pending' && (
-                          <span className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200">Pending</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin || isPM) {
+                                if (confirm('Mark translator as Accepted? (Use this if translator is already working but status is stuck on Pending)')) {
+                                  updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                }
+                              }
+                            }}
+                            className={`text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200 ${(isAdmin || isPM) ? 'cursor-pointer hover:bg-yellow-100' : ''}`}
+                            title={(isAdmin || isPM) ? "Click to mark as Accepted" : ""}
+                          >
+                            Pending
+                          </span>
                         )}
                         {order.translator_assignment_status === 'accepted' && (
-                          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit">✓ Accepted</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin || isPM) {
+                                if (confirm('Change status back to Pending?')) {
+                                  updateTranslatorAssignmentStatus(order.id, 'pending');
+                                }
+                              }
+                            }}
+                            className={`text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit ${(isAdmin || isPM) ? 'cursor-pointer hover:bg-green-200' : ''}`}
+                            title={(isAdmin || isPM) ? "Click to change status" : ""}
+                          >
+                            ✓ Accepted
+                          </span>
                         )}
                         {order.translator_assignment_status === 'declined' && (
                           <div className="flex flex-col gap-1">
@@ -23386,10 +23426,32 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               {order.assigned_translator_name || order.assigned_translator}
                             </span>
                             {order.translator_assignment_status === 'pending' && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200">Pending</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Mark translator as Accepted?')) {
+                                    updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                  }
+                                }}
+                                className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
+                                title="Click to mark as Accepted"
+                              >
+                                Pending
+                              </span>
                             )}
                             {order.translator_assignment_status === 'accepted' && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit">✓ Accepted</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Change status back to Pending?')) {
+                                    updateTranslatorAssignmentStatus(order.id, 'pending');
+                                  }
+                                }}
+                                className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
+                                title="Click to change status"
+                              >
+                                ✓ Accepted
+                              </span>
                             )}
                             {order.translator_assignment_status === 'declined' && (
                               <div className="flex flex-col gap-1">
