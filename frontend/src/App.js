@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 import './App.css';
@@ -2754,20 +2754,11 @@ const MessagesPage = ({ token }) => {
   const [systemMessages, setSystemMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('conversations');
+  const [expandedThreads, setExpandedThreads] = useState({});
 
   useEffect(() => {
     fetchAllMessages();
   }, []);
-
-  // Auto-mark unread conversations as read when viewing conversation tab
-  useEffect(() => {
-    if (activeTab === 'conversations' && conversations.length > 0) {
-      const unreadConvs = conversations.filter(c => c.direction === 'received' && !c.read);
-      unreadConvs.forEach(conv => {
-        markConversationAsRead(conv.id);
-      });
-    }
-  }, [activeTab, conversations.length]);
 
   // Auto-mark unread system messages as read when viewing notifications tab
   useEffect(() => {
@@ -2820,6 +2811,21 @@ const MessagesPage = ({ token }) => {
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const isThisYear = date.getFullYear() === now.getFullYear();
+
+    if (isToday) {
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    } else if (isThisYear) {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatFullDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -2838,6 +2844,68 @@ const MessagesPage = ({ token }) => {
       case 'partner_message': return '📤';
       default: return '✉️';
     }
+  };
+
+  // Group conversations by order_number or thread
+  const groupedConversations = useMemo(() => {
+    const groups = {};
+
+    conversations.forEach(conv => {
+      // Use order_number as key, or 'general' for messages without order
+      const key = conv.order_number || 'general';
+      if (!groups[key]) {
+        groups[key] = {
+          order_number: conv.order_number,
+          messages: [],
+          hasUnread: false,
+          lastMessage: null,
+          lastDate: null
+        };
+      }
+      groups[key].messages.push(conv);
+
+      // Track unread status
+      if (conv.direction === 'received' && !conv.read) {
+        groups[key].hasUnread = true;
+      }
+
+      // Track last message date
+      const msgDate = new Date(conv.created_at);
+      if (!groups[key].lastDate || msgDate > groups[key].lastDate) {
+        groups[key].lastDate = msgDate;
+        groups[key].lastMessage = conv;
+      }
+    });
+
+    // Sort messages within each group by date (newest first for display, oldest first for thread)
+    Object.values(groups).forEach(group => {
+      group.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    });
+
+    // Convert to array and sort by last message date (newest first)
+    return Object.entries(groups)
+      .map(([key, group]) => ({ key, ...group }))
+      .sort((a, b) => b.lastDate - a.lastDate);
+  }, [conversations]);
+
+  const toggleThread = (key) => {
+    setExpandedThreads(prev => {
+      const newExpanded = { ...prev, [key]: !prev[key] };
+
+      // Mark unread messages as read when expanding
+      if (newExpanded[key]) {
+        const group = groupedConversations.find(g => g.key === key);
+        if (group) {
+          group.messages.forEach(msg => {
+            if (msg.direction === 'received' && !msg.read) {
+              markConversationAsRead(msg.id);
+            }
+          });
+        }
+      }
+
+      return newExpanded;
+    });
   };
 
   const unreadConversations = conversations.filter(c => c.direction === 'received' && !c.read).length;
@@ -2890,78 +2958,151 @@ const MessagesPage = ({ token }) => {
         </button>
       </div>
 
-      {/* Conversations Tab */}
+      {/* Conversations Tab - Compact Inbox Style */}
       {activeTab === 'conversations' && (
         <>
-          {conversations.length === 0 ? (
+          {groupedConversations.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-4xl mb-4">💬</div>
               <h2 className="text-xl font-semibold text-gray-800 mb-2">No conversations</h2>
               <p className="text-gray-600">Your messages with Legacy Translations will appear here</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className={`bg-white rounded-lg shadow-sm p-6 border-l-4 ${
-                    conv.direction === 'sent'
-                      ? 'border-blue-400'
-                      : conv.read
-                        ? 'border-gray-300'
-                        : 'border-teal-500'
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-1">
-                      <div className="text-2xl">
-                        {conv.direction === 'sent' ? '📤' : '📥'}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 flex-wrap">
-                          <span className={`px-2 py-0.5 text-xs rounded-full ${
-                            conv.direction === 'sent'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {conv.direction === 'sent' ? 'Sent' : 'Received'}
-                          </span>
-                          {conv.direction === 'received' && !conv.read && (
-                            <span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-xs rounded-full">New</span>
-                          )}
-                          {conv.order_number && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
-                              Order: {conv.order_number}
-                            </span>
-                          )}
-                          {conv.replied && (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                              Replied
-                            </span>
-                          )}
-                        </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              {groupedConversations.map((group) => (
+                <div key={group.key} className="border-b last:border-b-0">
+                  {/* Compact Row - One line per conversation thread */}
+                  <div
+                    onClick={() => toggleThread(group.key)}
+                    className={`flex items-center px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${
+                      group.hasUnread ? 'bg-teal-50' : ''
+                    }`}
+                  >
+                    {/* Unread indicator */}
+                    <div className="w-2 mr-3">
+                      {group.hasUnread && (
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                      )}
+                    </div>
 
-                        {conv.direction === 'sent' ? (
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">To: {conv.recipient_name || 'Admin'}</p>
-                            <p className="text-gray-700 mt-1">{conv.content}</p>
-                          </div>
+                    {/* Direction icon */}
+                    <div className="text-lg mr-3">
+                      {group.lastMessage?.direction === 'sent' ? '📤' : '📥'}
+                    </div>
+
+                    {/* Order/Project badge */}
+                    <div className="w-28 flex-shrink-0 mr-3">
+                      {group.order_number ? (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                          #{group.order_number}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                          General
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Message preview */}
+                    <div className="flex-1 min-w-0 mr-3">
+                      <p className={`text-sm truncate ${group.hasUnread ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                        {group.lastMessage?.direction === 'sent' ? (
+                          <span className="text-gray-400">You: </span>
                         ) : (
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">From: {conv.from_admin_name || 'Admin'}</p>
-                            {conv.original_message_content && (
-                              <div className="bg-gray-50 border-l-2 border-gray-300 pl-3 py-2 my-2 text-sm text-gray-500">
-                                <span className="font-medium">Your message:</span> {conv.original_message_content}
-                              </div>
-                            )}
-                            <p className="text-gray-700 mt-1">{conv.content}</p>
-                          </div>
+                          <span className="text-gray-400">Admin: </span>
                         )}
+                        {group.lastMessage?.content}
+                      </p>
+                    </div>
 
-                        <p className="text-sm text-gray-400 mt-2">{formatDate(conv.created_at)}</p>
-                      </div>
+                    {/* Message count */}
+                    <div className="flex-shrink-0 mr-3">
+                      <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                        {group.messages.length} msg{group.messages.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+
+                    {/* Status badges */}
+                    <div className="flex-shrink-0 mr-3 flex items-center space-x-1">
+                      {group.lastMessage?.replied && (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                          Replied
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Date */}
+                    <div className="w-20 text-right flex-shrink-0 mr-2">
+                      <span className="text-xs text-gray-400">
+                        {formatDate(group.lastMessage?.created_at)}
+                      </span>
+                    </div>
+
+                    {/* Expand/Collapse icon */}
+                    <div className="flex-shrink-0 text-gray-400">
+                      <svg
+                        className={`w-4 h-4 transition-transform ${expandedThreads[group.key] ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
                     </div>
                   </div>
+
+                  {/* Expanded Thread View */}
+                  {expandedThreads[group.key] && (
+                    <div className="bg-gray-50 px-4 py-3 border-t">
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {group.messages.map((msg, idx) => (
+                          <div
+                            key={msg.id}
+                            className={`flex ${msg.direction === 'sent' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            <div
+                              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                                msg.direction === 'sent'
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white border border-gray-200'
+                              }`}
+                            >
+                              {/* Show original message context for replies */}
+                              {msg.direction === 'received' && msg.original_message_content && (
+                                <div className="text-xs text-gray-400 border-l-2 border-gray-300 pl-2 mb-2 italic">
+                                  Re: {msg.original_message_content.substring(0, 50)}...
+                                </div>
+                              )}
+                              <p className={`text-sm ${msg.direction === 'sent' ? 'text-white' : 'text-gray-700'}`}>
+                                {msg.content}
+                              </p>
+                              <div className={`flex items-center justify-between mt-1 text-xs ${
+                                msg.direction === 'sent' ? 'text-blue-100' : 'text-gray-400'
+                              }`}>
+                                <span>{formatFullDate(msg.created_at)}</span>
+                                {msg.direction === 'sent' && msg.replied && (
+                                  <span className="ml-2 flex items-center">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Replied
+                                  </span>
+                                )}
+                                {msg.direction === 'received' && msg.read && (
+                                  <span className="ml-2 flex items-center text-green-500">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                    Read
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2969,7 +3110,7 @@ const MessagesPage = ({ token }) => {
         </>
       )}
 
-      {/* System Notifications Tab */}
+      {/* System Notifications Tab - Compact Style */}
       {activeTab === 'notifications' && (
         <>
           {systemMessages.length === 0 ? (
@@ -2979,25 +3120,38 @@ const MessagesPage = ({ token }) => {
               <p className="text-gray-600">System notifications will appear here</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               {systemMessages.map((message) => (
                 <div
                   key={message.id}
-                  className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-gray-300"
+                  className={`flex items-center px-4 py-3 border-b last:border-b-0 hover:bg-gray-50 ${
+                    !message.read ? 'bg-blue-50' : ''
+                  }`}
                 >
-                  <div className="flex items-start">
-                    <div className="flex items-start space-x-4">
-                      <div className="text-2xl">{getMessageIcon(message.type)}</div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-semibold text-gray-800">
-                            {message.title}
-                          </h3>
-                        </div>
-                        <p className="text-gray-600 mt-1">{message.content}</p>
-                        <p className="text-sm text-gray-400 mt-2">{formatDate(message.created_at)}</p>
-                      </div>
-                    </div>
+                  {/* Unread indicator */}
+                  <div className="w-2 mr-3">
+                    {!message.read && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    )}
+                  </div>
+
+                  {/* Icon */}
+                  <div className="text-lg mr-3">{getMessageIcon(message.type)}</div>
+
+                  {/* Title and content */}
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className={`text-sm ${!message.read ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                      <span className="font-medium">{message.title}</span>
+                      <span className="text-gray-400 mx-2">-</span>
+                      <span className="text-gray-500 truncate">{message.content}</span>
+                    </p>
+                  </div>
+
+                  {/* Date */}
+                  <div className="flex-shrink-0">
+                    <span className="text-xs text-gray-400">
+                      {formatDate(message.created_at)}
+                    </span>
                   </div>
                 </div>
               ))}
