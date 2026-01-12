@@ -2,6 +2,25 @@ import React, { useState, useEffect } from 'react';
 
 const API_URL = process.env.REACT_APP_API_URL || '';
 
+// ==================== NEW YORK TIMEZONE HELPERS ====================
+const NY_TIMEZONE = 'America/New_York';
+
+// Format date to New York timezone
+const formatDateNY = (dateStr, options = {}) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', { ...options, timeZone: NY_TIMEZONE });
+};
+
+// Format datetime to New York timezone
+const formatDateTimeNY = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
 // ==================== TRANSLATIONS ====================
 const translations = {
   en: {
@@ -1046,7 +1065,7 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
                     <tbody className="divide-y divide-slate-100">
                       {paymentHistory.payments.map(payment => (
                         <tr key={payment.id} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 text-sm text-slate-600">{new Date(payment.paid_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{new Date(payment.paid_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</td>
                           <td className="px-4 py-3 text-lg font-semibold text-teal-600">${payment.total_amount?.toFixed(2)}</td>
                           <td className="px-4 py-3"><span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">{payment.payment_method?.replace('_', ' ')}</span></td>
                           <td className="px-4 py-3 text-sm text-slate-500">{payment.payment_reference || '-'}</td>

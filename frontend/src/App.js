@@ -5,6 +5,25 @@ import './App.css';
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// ==================== NEW YORK TIMEZONE HELPERS ====================
+const NY_TIMEZONE = 'America/New_York';
+
+// Format date to New York timezone
+const formatDateNY = (dateStr, options = {}) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-US', { ...options, timeZone: NY_TIMEZONE });
+};
+
+// Format datetime to New York timezone
+const formatDateTimeNY = (dateStr) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
 // ==================== INTERNATIONALIZATION ====================
 const TRANSLATIONS = {
   en: {
@@ -2533,7 +2552,7 @@ const OrdersPage = ({ token }) => {
                   <div className="text-right">
                     <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
                     <div className="text-sm text-gray-500">
-                      Due: {order.due_date ? new Date(order.due_date).toLocaleDateString() : 'N/A'}
+                      Due: {order.due_date ? new Date(order.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -2554,7 +2573,7 @@ const OrdersPage = ({ token }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Created</div>
-                      <div className="font-medium">{new Date(order.created_at).toLocaleDateString()}</div>
+                      <div className="font-medium">{new Date(order.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Base Price</div>
@@ -2581,7 +2600,7 @@ const OrdersPage = ({ token }) => {
                           </div>
                           {order.quickbooks_synced_at && (
                             <div className="text-xs text-gray-400 mt-1">
-                              Created: {new Date(order.quickbooks_synced_at).toLocaleDateString()}
+                              Created: {new Date(order.quickbooks_synced_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                           )}
                         </div>
@@ -3424,7 +3443,7 @@ const PartnerFloatingChatWidget = ({ token, partner, onNavigateToMessages }) => 
                       )}
                       <p className="text-sm text-gray-700">{conv.content}</p>
                       <p className="text-[10px] text-gray-400 mt-1">
-                        {conv.created_at ? new Date(conv.created_at).toLocaleString() : ''}
+                        {conv.created_at ? new Date(conv.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) : ''}
                       </p>
                     </div>
                   ))

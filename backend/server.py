@@ -519,7 +519,7 @@ def generate_translation_html_for_email(order: dict) -> str:
     """Generate a formatted HTML document from translation_html for email attachment"""
     translation_text = order.get("translation_html", "")
     translator_name = order.get("translation_translator_name", "Legacy Translations")
-    translation_date = order.get("translation_date", datetime.utcnow().strftime("%m/%d/%Y"))
+    translation_date = order.get("translation_date", datetime.now(ZoneInfo("America/New_York")).strftime("%m/%d/%Y"))
     document_type = order.get("translation_document_type") or order.get("document_type", "Document")
     source_lang = order.get("translation_source_language") or order.get("translate_from", "Portuguese")
     target_lang = order.get("translation_target_language") or order.get("translate_to", "English")
@@ -2082,8 +2082,34 @@ REVENUE_SOURCES = {
     'other': 'Outros'
 }
 
-# New York timezone for deadline calculations
+# New York timezone for deadline calculations and display
 NY_TIMEZONE = ZoneInfo("America/New_York")
+
+def get_ny_now():
+    """Get current datetime in New York timezone"""
+    return datetime.now(NY_TIMEZONE)
+
+def get_ny_date_str(fmt="%m/%d/%Y"):
+    """Get current date string in New York timezone"""
+    return get_ny_now().strftime(fmt)
+
+def get_ny_datetime_str(fmt="%m/%d/%Y %I:%M %p"):
+    """Get current datetime string in New York timezone"""
+    return get_ny_now().strftime(fmt)
+
+def format_date_ny(dt, fmt="%m/%d/%Y"):
+    """Format a datetime to New York timezone string"""
+    if dt is None:
+        return "-"
+    if isinstance(dt, str):
+        try:
+            dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
+        except:
+            return dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    ny_dt = dt.astimezone(NY_TIMEZONE)
+    return ny_dt.strftime(fmt)
 
 def calculate_client_deadline(source_type: str = "website", created_at: datetime = None) -> datetime:
     """
@@ -6272,6 +6298,17 @@ async def get_my_projects(token: str, admin_key: str):
     elif user_role == "translator":
         # Translator sees projects assigned to them
         orders = await db.translation_orders.find({"assigned_translator_id": user_id}).sort("created_at", -1).to_list(500)
+
+        # Auto-accept: When translator accesses their projects, auto-accept any pending assignments
+        # This fixes the issue where translator can work but status is stuck on "pending"
+        for order in orders:
+            if order.get("translator_assignment_status") == "pending":
+                await db.translation_orders.update_one(
+                    {"id": order["id"]},
+                    {"$set": {"translator_assignment_status": "accepted", "translator_accepted_at": datetime.utcnow().isoformat()}}
+                )
+                order["translator_assignment_status"] = "accepted"
+                logger.info(f"Auto-accepted assignment for translator {user_id} on order {order.get('order_number', order['id'])}")
     else:
         orders = []
 
@@ -7859,7 +7896,7 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                             "translator_id": translator_id,
                             "translator_name": translator_name,
                             "pages": page_count,
-                            "date": datetime.utcnow().strftime("%Y-%m-%d"),
+                            "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
                             "note": f"Auto: Project {order.get('order_number', order_id)} - {order.get('document_type', 'Document')}",
                             "order_id": order_id,
                             "order_number": order.get("order_number"),
@@ -10110,6 +10147,30 @@ async def admin_replace_order_document(doc_id: str, admin_key: str, document_dat
         raise HTTPException(status_code=404, detail="Document not found")
 
     return {"success": True, "message": "Document replaced successfully", "filename": filename}
+
+@api_router.delete("/admin/order-documents/{doc_id}")
+async def admin_delete_order_document(doc_id: str, admin_key: str):
+    """Admin/PM: Delete a document from an order"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Only allow admin or PM to delete
+    if user_info.get("role") not in ["admin", "pm"]:
+        raise HTTPException(status_code=403, detail="Only admin or PM can delete documents")
+
+    # Try order_documents first
+    result = await db.order_documents.delete_one({"id": doc_id})
+
+    if result.deleted_count == 0:
+        # Try main documents collection
+        result = await db.documents.delete_one({"id": doc_id})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    logger.info(f"Document {doc_id} deleted by {user_info.get('name', 'Unknown')}")
+    return {"success": True, "message": "Document deleted successfully"}
 
 
 # ==================== TRANSLATION WORKSPACE ENDPOINTS ====================
@@ -15465,7 +15526,7 @@ async def start_ai_pipeline(request: AIPipelineCreate, admin_key: str):
         source_currency=request.source_currency,
         target_currency=request.target_currency,
         exchange_rate=request.exchange_rate,
-        rate_date=request.rate_date or datetime.utcnow().strftime("%Y-%m-%d"),
+        rate_date=request.rate_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
         add_translator_note=request.add_translator_note,
         page_format=request.page_format,
         use_glossary=request.use_glossary,
@@ -17087,8 +17148,8 @@ async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(N
         raise HTTPException(status_code=401, detail="Admin key required")
 
     salesperson.id = str(uuid.uuid4())[:8]
-    salesperson.created_at = datetime.now().isoformat()
-    salesperson.hired_date = salesperson.hired_date or datetime.now().strftime("%Y-%m-%d")
+    salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+    salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     await db.salespeople.insert_one(salesperson.dict())
 

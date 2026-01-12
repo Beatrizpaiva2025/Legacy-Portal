@@ -8,7 +8,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-// ==================== UTC DATE HELPER ====================
+// ==================== UTC DATE HELPER - NEW YORK TIMEZONE ====================
+// All dates/times displayed in EST/EDT (America/New_York)
+const NY_TIMEZONE = 'America/New_York';
+
 // Parse dates from backend as UTC (backend sends UTC timestamps without 'Z' suffix)
 const parseUTCDate = (dateStr) => {
   if (!dateStr) return null;
@@ -19,20 +22,40 @@ const parseUTCDate = (dateStr) => {
   return new Date(dateStr);
 };
 
-// Format a date string from backend to local display
+// Format a date string from backend to New York timezone display
 const formatDateLocal = (dateStr, options = {}) => {
   if (!dateStr) return '-';
   const date = parseUTCDate(dateStr);
   if (isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('en-US', options);
+  return date.toLocaleDateString('en-US', { ...options, timeZone: NY_TIMEZONE });
 };
 
-// Format a datetime string from backend to local display
+// Format a datetime string from backend to New York timezone display
 const formatDateTimeLocal = (dateStr) => {
   if (!dateStr) return '-';
   const date = parseUTCDate(dateStr);
   if (isNaN(date.getTime())) return '-';
-  return date.toLocaleString('en-US');
+  return date.toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current date in New York timezone (for form inputs)
+const getNYDate = () => {
+  return new Date().toLocaleDateString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current datetime in New York timezone
+const getNYDateTime = () => {
+  return new Date().toLocaleString('en-US', { timeZone: NY_TIMEZONE });
+};
+
+// Get current date as ISO string in NY timezone (YYYY-MM-DD format)
+const getNYDateISO = () => {
+  const options = { timeZone: NY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' };
+  const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
 };
 
 // ==================== CONSTANTS ====================
@@ -894,7 +917,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <div style="font-size: 12px; margin-top: 8px;">Authorized Representative</div>
               <div style="font-size: 12px;">Legacy Translations Inc.</div>
               <div style="font-size: 12px; margin-top: 12px;">
-                Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US')}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
+                Dated: <input type="text" id="rmv-date" value="${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}" style="font-weight: bold; border: 2px solid #60a5fa; background: #eff6ff; padding: 2px 8px; width: 100px; font-size: 12px; font-family: Georgia, serif;" />
               </div>
             </div>
             <div style="text-align: center;">
@@ -1597,7 +1620,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(TRANSLATORS[0].name);
   const [savedTranslatorName, setSavedTranslatorName] = useState(''); // Saved translator name from database - DO NOT change on UI selection
-  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US'));
+  const [translationDate, setTranslationDate] = useState(new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }));
   const [claudeApiKey, setClaudeApiKey] = useState('');
   const [pageFormat, setPageFormat] = useState('letter'); // 'letter' or 'a4'
   const [translationType, setTranslationType] = useState('certified'); // 'certified' or 'sworn'
@@ -2769,7 +2792,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>
     <div class="footer">
         This is a certified translation by Legacy Translations Inc.<br>
-        Approved on: ${new Date().toLocaleDateString()}
+        Approved on: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
     </div>
 </body>
 </html>`;
@@ -4958,7 +4981,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     // Create TM entry
     const tmEntry = {
       id: Date.now(),
-      name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString()}`,
+      name: `TM - ${documentType || 'Document'} - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`,
       sourceLang: sourceLanguage,
       targetLang: targetLanguage,
       field: typeLabels[documentCategory] || 'General',
@@ -5040,7 +5063,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
           .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
           .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
-          .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))}
+          .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))}
       </div>
     ` : `
       <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 12px; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 32px; background: white;">
@@ -5091,7 +5114,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             <div style="font-size: 14px; font-style: italic; font-weight: bold; color: #1a365d;">Beatriz Paiva</div>
             <div style="font-size: 14px; color: #333;">Authorized Representative</div>
             <div style="font-size: 14px; color: #333;">Legacy Translations Inc.</div>
-            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US')}</div>
+            <div style="font-size: 14px; color: #666; margin-top: 4px;">Dated: ${new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</div>
           </div>
           <div style="text-align: center;">
             ${logoStamp
@@ -5935,28 +5958,48 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <h3 className={`text-sm font-bold ${user?.role === 'admin' ? 'text-blue-800' : 'text-blue-800'}`}>
                   {user?.role === 'admin' ? '👑 Admin Translation' : '📋 My Assigned Work'}
                 </h3>
-                {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 border">
-                  <button
-                    onClick={() => setViewMode('files')}
-                    className={`px-3 py-1 text-xs rounded-md transition-all ${
-                      viewMode === 'files'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    📄 Files
-                  </button>
-                  <button
-                    onClick={() => setViewMode('projects')}
-                    className={`px-3 py-1 text-xs rounded-md transition-all ${
-                      viewMode === 'projects'
-                        ? 'bg-blue-600 text-white shadow'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    📁 Projects
-                  </button>
+                <div className="flex items-center gap-2">
+                  {/* Admin/PM: Add Document Button */}
+                  {(isAdmin || isPM) && selectedOrderId && (
+                    <label className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Add document to selected project">
+                      ➕ Add
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                        multiple
+                        onChange={(e) => {
+                          if (e.target.files && e.target.files.length > 0) {
+                            uploadDocumentsToOrder(selectedOrderId, Array.from(e.target.files));
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 border">
+                    <button
+                      onClick={() => setViewMode('files')}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        viewMode === 'files'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      📄 Files
+                    </button>
+                    <button
+                      onClick={() => setViewMode('projects')}
+                      className={`px-3 py-1 text-xs rounded-md transition-all ${
+                        viewMode === 'projects'
+                          ? 'bg-blue-600 text-white shadow'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      📁 Projects
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -6013,7 +6056,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         {file.deadline && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US')}
+                            ⏰ Due: {new Date(file.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {file.internal_notes && (
@@ -6025,7 +6068,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           <div className="mt-2 text-[10px] text-blue-600 font-medium">✓ File loaded</div>
                         )}
                         {/* Action buttons */}
-                        <div className="mt-2 flex gap-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -6034,18 +6077,49 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                             className="flex-1 px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center justify-center gap-1 transition-colors"
                             title="Load PDF/Image to workspace (PDF auto-converts to images)"
                           >
-                            📥 Load to Workspace
+                            📥 Load
                           </button>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               downloadProjectDocument(file.id, file.filename);
                             }}
-                            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                            className="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                             title={`Download original file: ${file.filename}`}
                           >
-                            ⬇️ Download
+                            ⬇️
                           </button>
+                          {/* Admin/PM: Replace and Delete buttons */}
+                          {(isAdmin || isPM) && (
+                            <>
+                              <label className="px-2 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Replace document">
+                                🔄
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    if (e.target.files[0]) {
+                                      replaceOrderDocument(file.id, e.target.files[0], file.filename);
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </label>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteOrderDocument(file.id, file.filename);
+                                }}
+                                className="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                                title="Delete document"
+                              >
+                                🗑️
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -6057,6 +6131,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <p className="text-xs mt-1">Files from assigned projects will appear here</p>
                   </div>
                 )
+                /* Admin/PM: Add new document button */
               ) : (
                 /* PROJECTS VIEW - Original behavior */
                 assignedOrders.length > 0 ? (
@@ -6090,7 +6165,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         </div>
                         {order.deadline && (
                           <div className="text-[10px] text-blue-600 mt-1">
-                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US')}
+                            ⏰ Due: {new Date(order.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                           </div>
                         )}
                         {order.internal_notes && (
@@ -6133,9 +6208,29 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           {/* Project Files Download Section - Show when project is selected */}
           {selectedOrderId && viewMode === 'projects' && (
             <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                📂 Project Files
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  📂 Project Files
+                </h3>
+                {/* Admin/PM: Add new document button */}
+                {(isAdmin || isPM) && (
+                  <label className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Add new document">
+                    ➕ Add Document
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          uploadDocumentsToOrder(selectedOrderId, Array.from(e.target.files));
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
               {allProjectFiles.filter(f => f.order_id === selectedOrderId).length > 0 ? (
                 <div className="space-y-2">
                   {allProjectFiles.filter(f => f.order_id === selectedOrderId).map((file, idx) => (
@@ -6156,18 +6251,44 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <div className="flex gap-1 ml-3">
                         <button
                           onClick={() => loadFileToWorkspace(file.id, file.filename)}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
+                          className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1 transition-colors"
                           title="Load PDF/Image to workspace (PDF auto-converts to images)"
                         >
-                          📥 Load to Workspace
+                          📥 Load
                         </button>
                         <button
                           onClick={() => downloadProjectDocument(file.id, file.filename)}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
+                          className="px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center gap-1"
                           title={`Download original file: ${file.filename}`}
                         >
-                          ⬇️ Download
+                          ⬇️
                         </button>
+                        {/* Admin/PM: Replace and Delete buttons */}
+                        {(isAdmin || isPM) && (
+                          <>
+                            <label className="px-2 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1" title="Replace document">
+                              🔄
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                onChange={(e) => {
+                                  if (e.target.files[0]) {
+                                    replaceOrderDocument(file.id, e.target.files[0], file.filename);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                            </label>
+                            <button
+                              onClick={() => deleteOrderDocument(file.id, file.filename)}
+                              className="px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors flex items-center gap-1"
+                              title="Delete document"
+                            >
+                              🗑️
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -6477,7 +6598,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   .replace(/\{\{LOGO_RIGHT\}\}/g, logoRight ? `<img src="${logoRight}" alt="ATA" style="max-height: 40px;" />` : '<div style="font-size: 9px; color: #666; font-style: italic;">ata<br/><span style="font-size: 8px;">MEMBER</span><br/><span style="font-size: 7px;">American Translators Association</span></div>')
                   .replace(/\{\{LOGO_STAMP\}\}/g, logoStamp ? `<img src="${logoStamp}" alt="Stamp" style="width: 100px; height: 100px; object-fit: contain;" />` : '')
                   .replace(/\{\{SIGNATURE\}\}/g, signatureImage ? `<img src="${signatureImage}" alt="Signature" style="max-height: 32px; max-width: 150px;" />` : '')
-                  .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US'))
+                  .replace(/\{\{TODAY_DATE\}\}/g, new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }))
                 }}
               />
             ) : (
@@ -12141,6 +12262,105 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     }
   };
 
+  // Delete order document (Admin/PM only)
+  const deleteOrderDocument = async (docId, filename) => {
+    if (!confirm(`Are you sure you want to delete "${filename}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
+      alert(`Document "${filename}" deleted successfully`);
+      // Refresh files list
+      if (viewingOrder) {
+        viewOrderDocuments(viewingOrder);
+      }
+      // Refresh all project files for Files view
+      if (assignedOrders && assignedOrders.length > 0) {
+        const allFiles = [];
+        for (const order of assignedOrders) {
+          try {
+            const res = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+            if (res.data?.documents) {
+              res.data.documents.forEach(doc => {
+                allFiles.push({
+                  ...doc,
+                  order_id: order.id,
+                  order_number: order.order_number,
+                  translate_from: order.translate_from,
+                  translate_to: order.translate_to,
+                  deadline: order.deadline,
+                  internal_notes: order.internal_notes
+                });
+              });
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setAllProjectFiles(allFiles);
+      }
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      alert('Error deleting document');
+    }
+  };
+
+  // Replace order document (Admin/PM only)
+  const replaceOrderDocument = async (docId, file, oldFilename) => {
+    if (!file) return;
+    if (!confirm(`Replace "${oldFilename}" with "${file.name}"?`)) {
+      return;
+    }
+    try {
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(file);
+      const base64Data = await base64Promise;
+
+      await axios.put(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`, {
+        filename: file.name,
+        file_data: base64Data,
+        content_type: file.type || 'application/octet-stream'
+      });
+
+      alert(`Document replaced successfully with "${file.name}"`);
+      // Refresh files list
+      if (viewingOrder) {
+        viewOrderDocuments(viewingOrder);
+      }
+      // Refresh all project files for Files view
+      if (assignedOrders && assignedOrders.length > 0) {
+        const allFiles = [];
+        for (const order of assignedOrders) {
+          try {
+            const res = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
+            if (res.data?.documents) {
+              res.data.documents.forEach(doc => {
+                allFiles.push({
+                  ...doc,
+                  order_id: order.id,
+                  order_number: order.order_number,
+                  translate_from: order.translate_from,
+                  translate_to: order.translate_to,
+                  deadline: order.deadline,
+                  internal_notes: order.internal_notes
+                });
+              });
+            }
+          } catch (e) { /* ignore */ }
+        }
+        setAllProjectFiles(allFiles);
+      }
+    } catch (err) {
+      console.error('Failed to replace document:', err);
+      alert('Error replacing document');
+    }
+  };
+
   // Update order notes
   const updateOrderNotes = async (orderId, clientNotes, internalNotes) => {
     try {
@@ -12573,6 +12793,20 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to assign PM:', err);
+    }
+  };
+
+  // Update translator assignment status (Admin/PM can manually change Pending to Accepted)
+  const updateTranslatorAssignmentStatus = async (orderId, newStatus) => {
+    try {
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_assignment_status: newStatus
+      });
+      alert(`Translator status updated to: ${newStatus}`);
+      fetchOrders();
+    } catch (err) {
+      console.error('Failed to update translator assignment status:', err);
+      alert('Failed to update status');
     }
   };
 
@@ -13288,7 +13522,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             <div key={idx} className="flex justify-between items-center text-[10px] py-0.5">
                               <span className="text-blue-600 font-mono">{proj.code}</span>
                               <span className="text-gray-500">
-                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US') : 'No deadline'}
+                                {proj.deadline ? new Date(proj.deadline).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'No deadline'}
                               </span>
                             </div>
                           ))}
@@ -13840,10 +14074,36 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           {order.assigned_translator_name || order.assigned_translator}
                         </span>
                         {order.translator_assignment_status === 'pending' && (
-                          <span className="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200">Pending</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin || isPM) {
+                                if (confirm('Mark translator as Accepted? (Use this if translator is already working but status is stuck on Pending)')) {
+                                  updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                }
+                              }
+                            }}
+                            className={`text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded mt-1 inline-block w-fit border border-yellow-200 ${(isAdmin || isPM) ? 'cursor-pointer hover:bg-yellow-100' : ''}`}
+                            title={(isAdmin || isPM) ? "Click to mark as Accepted" : ""}
+                          >
+                            Pending
+                          </span>
                         )}
                         {order.translator_assignment_status === 'accepted' && (
-                          <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit">✓ Accepted</span>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isAdmin || isPM) {
+                                if (confirm('Change status back to Pending?')) {
+                                  updateTranslatorAssignmentStatus(order.id, 'pending');
+                                }
+                              }
+                            }}
+                            className={`text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded mt-1 inline-block w-fit ${(isAdmin || isPM) ? 'cursor-pointer hover:bg-green-200' : ''}`}
+                            title={(isAdmin || isPM) ? "Click to change status" : ""}
+                          >
+                            ✓ Accepted
+                          </span>
                         )}
                         {order.translator_assignment_status === 'declined' && (
                           <div className="flex flex-col gap-1">
@@ -14891,7 +15151,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="text-sm font-medium">{doc.filename || 'Document'}</div>
                                 <div className="text-[10px] text-gray-500">
                                   {doc.source === 'manual_upload' ? 'Manual upload' : 'Partner portal'}
-                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
                             </div>
@@ -14930,7 +15190,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 <div className="text-sm font-medium text-green-800">{doc.filename || 'Translated Document'}</div>
                                 <div className="text-[10px] text-green-600">
                                   Approved translation
-                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString()}`}
+                                  {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                 </div>
                               </div>
                             </div>
@@ -15114,7 +15374,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded">
                   <div className="text-[10px] text-blue-700">
                     <strong>ℹ️ Resending:</strong> Delivered
-                    {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString()}`}.
+                    {sendingOrder.delivered_at && ` on ${new Date(sendingOrder.delivered_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}.
                     Upload new file below if needed.
                   </div>
                 </div>
@@ -17218,7 +17478,7 @@ const SettingsPage = ({ adminKey }) => {
                           )}
                         </div>
                         <div className="text-[10px] text-gray-500 mt-1">
-                          {new Date(rp.created_at).toLocaleString()} |
+                          {new Date(rp.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })} |
                           {rp.stats?.orders_count || 0} orders, {rp.stats?.users_count || 0} users
                         </div>
                       </div>
@@ -17884,7 +18144,7 @@ const ReviewPage = ({ adminKey, user }) => {
                       </span>
                     </div>
                     <div className="text-xs text-gray-400 mt-1">
-                      {new Date(sub.submitted_at).toLocaleDateString()}
+                      {new Date(sub.submitted_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                     </div>
                   </div>
                 ))}
@@ -17913,7 +18173,7 @@ const ReviewPage = ({ adminKey, user }) => {
                   <div className="space-y-2 text-xs">
                     <div><span className="text-gray-500">Translator:</span> {selectedSubmission.translator_name}</div>
                     <div><span className="text-gray-500">Client:</span> {selectedSubmission.client_name || 'N/A'}</div>
-                    <div><span className="text-gray-500">Submitted:</span> {new Date(selectedSubmission.submitted_at).toLocaleString()}</div>
+                    <div><span className="text-gray-500">Submitted:</span> {new Date(selectedSubmission.submitted_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                   </div>
                   <div className="space-y-2 text-xs">
                     <div><span className="text-gray-500">Pages:</span> {selectedSubmission.pages_count || 'N/A'}</div>
@@ -18051,7 +18311,7 @@ const ReviewPage = ({ adminKey, user }) => {
                     <div key={idx} className="p-2 border rounded text-xs">
                       <div className="font-mono">{entry.ip}</div>
                       <div className="text-gray-500">{entry.user_agent}</div>
-                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString()}</div>
+                      <div className="text-gray-400">{new Date(entry.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                   ))}
                 </div>
@@ -18070,7 +18330,7 @@ const ReviewPage = ({ adminKey, user }) => {
                         <span className={`px-2 py-0.5 rounded ${attempt.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {attempt.success ? 'OK' : 'Failed'}
                         </span>
-                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString()}</div>
+                        <div className="text-gray-400 mt-1">{new Date(attempt.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                       </div>
                     </div>
                   ))}
@@ -18751,7 +19011,7 @@ const UsersPage = ({ adminKey, user }) => {
                             <div>
                               <span className="text-gray-500 text-xs">Data de Cadastro:</span>
                               <div className="font-medium">
-                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US') : '-'}
+                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : '-'}
                               </div>
                             </div>
                           </div>
@@ -18815,7 +19075,7 @@ const UsersPage = ({ adminKey, user }) => {
                                       <div className="font-medium">{doc.filename}</div>
                                       <div className="text-gray-400">
                                         {TRANSLATOR_DOC_TYPES.find(dt => dt.value === doc.document_type)?.label || doc.document_type}
-                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US')}`}
+                                        {doc.uploaded_at && ` • ${new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}`}
                                       </div>
                                     </div>
                                   </div>
@@ -19281,8 +19541,8 @@ const ProductionPage = ({ adminKey }) => {
                       </div>
                       <div className="text-sm text-gray-700">{msg.content}</div>
                       <div className="text-[10px] text-gray-400 mt-2">
-                        Sent: {msg.created_at ? new Date(msg.created_at).toLocaleString() : '-'}
-                        {msg.replied_at && ` • Replied: ${new Date(msg.replied_at).toLocaleString()}`}
+                        Sent: {msg.created_at ? new Date(msg.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' }) : '-'}
+                        {msg.replied_at && ` • Replied: ${new Date(msg.replied_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}`}
                       </div>
                     </div>
                   ))}
@@ -20484,7 +20744,7 @@ const FinancesPage = ({ adminKey }) => {
                               )}
                             </div>
                             <span className="text-xs text-gray-500">
-                              {new Date(payment.paid_at).toLocaleDateString('en-US')}
+                              {new Date(payment.paid_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                             </span>
                           </div>
                           {payment.note && (
@@ -20730,7 +20990,7 @@ const FinancesPage = ({ adminKey }) => {
                           {log.translator_name || log.translator_id}
                           {log.auto_generated && <span className="ml-1 text-xs text-green-600">✓ Auto</span>}
                         </td>
-                        <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US')}</td>
+                        <td className="p-3 text-gray-600">{new Date(log.date).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</td>
                         <td className="p-3 text-right font-bold text-blue-600">{log.pages}</td>
                         <td className="p-3 text-gray-500 text-xs">
                           {log.note || '-'}
@@ -21981,8 +22241,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           ...quoteForm,
           ...prices,
           quoteNumber,
-          date: new Date().toLocaleDateString(),
-          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
+          date: new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York' }),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { timeZone: 'America/New_York' })
         }
       });
 
@@ -23166,10 +23426,32 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                               {order.assigned_translator_name || order.assigned_translator}
                             </span>
                             {order.translator_assignment_status === 'pending' && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200">Pending</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Mark translator as Accepted?')) {
+                                    updateTranslatorAssignmentStatus(order.id, 'accepted');
+                                  }
+                                }}
+                                className="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded w-fit border border-yellow-200 cursor-pointer hover:bg-yellow-100"
+                                title="Click to mark as Accepted"
+                              >
+                                Pending
+                              </span>
                             )}
                             {order.translator_assignment_status === 'accepted' && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit">✓ Accepted</span>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm('Change status back to Pending?')) {
+                                    updateTranslatorAssignmentStatus(order.id, 'pending');
+                                  }
+                                }}
+                                className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded w-fit cursor-pointer hover:bg-green-200"
+                                title="Click to change status"
+                              >
+                                ✓ Accepted
+                              </span>
                             )}
                             {order.translator_assignment_status === 'declined' && (
                               <div className="flex flex-col gap-1">
@@ -24366,7 +24648,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             }`}
                           >
                             <div className="font-medium text-[10px] text-gray-500 mb-1">
-                              {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US')}
+                              {msg.from} • {new Date(msg.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York' })}
                             </div>
                             <div className="whitespace-pre-wrap">{msg.content}</div>
                           </div>
@@ -26053,13 +26335,13 @@ const FloatingChatWidget = ({ adminKey, user }) => {
         )}
         {/* Partner messages badge - top right (red) */}
         {partnerUnreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center" title="Partner Messages">
+          <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white" title="Partner Messages">
             {partnerUnreadCount > 9 ? '9+' : partnerUnreadCount}
           </span>
         )}
-        {/* External/WhatsApp messages badge - top left (blue) */}
+        {/* External/WhatsApp messages badge - bottom right (green) - separated from partner badge */}
         {externalUnreadCount > 0 && !isOpen && (
-          <span className="absolute -top-1 -left-1 w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center" title="WhatsApp Quotes">
+          <span className="absolute -bottom-2 -right-2 w-6 h-6 bg-green-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white" title="WhatsApp Quotes">
             {externalUnreadCount > 9 ? '9+' : externalUnreadCount}
           </span>
         )}
