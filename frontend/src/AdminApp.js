@@ -9526,15 +9526,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                       <span>Include Original Documents</span>
                     </label>
-                    <label className="flex items-center text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeAuthenticityStatement}
-                        onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
-                        className="mr-3 w-4 h-4"
-                      />
-                      <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
-                    </label>
+                    {isAdmin && (
+                      <label className="flex items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeAuthenticityStatement}
+                          onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                          className="mr-3 w-4 h-4"
+                        />
+                        <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                      </label>
+                    )}
                   </div>
                 </div>
               )}
@@ -9999,15 +10001,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!includeAuthenticityStatement}
-                      onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
-                  </label>
+                  {isAdmin && (
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!includeAuthenticityStatement}
+                        onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
+                        className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
+                    </label>
+                  )}
                 </div>
               </div>
 
