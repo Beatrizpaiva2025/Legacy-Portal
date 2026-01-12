@@ -15283,24 +15283,42 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                               </button>
                             )}
                             {viewingOrder.translation_status === 'ready' && (
-                              <button
-                                onClick={async () => {
-                                  if (confirm('Send translation to client via email?')) {
-                                    try {
-                                      await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`);
-                                      alert('Translation sent to client!');
-                                      setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
-                                      fetchOrders();
-                                    } catch (err) {
-                                      console.error('Failed to deliver:', err);
-                                      alert('Error sending to client');
-                                    }
-                                  }
-                                }}
-                                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
-                              >
-                                📤 Send to Client
-                              </button>
+                              <div className="flex flex-col gap-2 w-full">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="email"
+                                    placeholder="BCC email (optional)"
+                                    id="bcc-email-input"
+                                    className="flex-1 px-2 py-1.5 border rounded text-xs"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      const bccInput = document.getElementById('bcc-email-input');
+                                      const bccEmail = bccInput?.value?.trim() || null;
+
+                                      if (confirm(`Send translation to ${viewingOrder.client_email}?${bccEmail ? `\n\nBCC: ${bccEmail}` : ''}`)) {
+                                        try {
+                                          await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
+                                            bcc_email: bccEmail
+                                          });
+                                          alert('Translation sent to client!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
+                                          setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
+                                          fetchOrders();
+                                        } catch (err) {
+                                          console.error('Failed to deliver:', err);
+                                          alert('Error sending to client');
+                                        }
+                                      }
+                                    }}
+                                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                                  >
+                                    📤 Send to Client
+                                  </button>
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  Will send to: {viewingOrder.client_email}
+                                </div>
+                              </div>
                             )}
                             {viewingOrder.translation_status === 'delivered' && (
                               <span className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1">

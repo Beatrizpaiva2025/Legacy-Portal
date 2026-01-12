@@ -8624,16 +8624,25 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             attachment_filenames.append(f"Translation_{order['order_number']}.html")
             logger.info(f"Added workspace translation to attachments")
 
-        # Get ALL documents from the project and include them as attachments
-        # Fetch from both order_documents and documents collections
+        # Get ALL documents from the project
+        # Priority: translated documents first, then original documents
         project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
         project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
 
-        # Add all project documents as attachments
-        for doc in project_docs + project_docs_main:
+        # Separate translated documents from original documents
+        translated_docs = [doc for doc in project_docs if doc.get("source") == "translated_document"]
+        original_docs = [doc for doc in project_docs if doc.get("source") != "translated_document"]
+
+        logger.info(f"Found {len(translated_docs)} translated documents and {len(original_docs)} original documents")
+
+        # PRIORITY: If we have translated documents, send ONLY those (not original documents)
+        docs_to_send = translated_docs if translated_docs else []
+
+        # Add translated documents as attachments
+        for doc in docs_to_send:
             doc_data = doc.get("file_data") or doc.get("data")
             if doc_data:
-                filename = doc.get("filename", "document.pdf")
+                filename = doc.get("filename", "translated_document.pdf")
                 # Avoid duplicates
                 if filename not in attachment_filenames:
                     all_attachments.append({
@@ -8642,7 +8651,24 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                         "content_type": doc.get("content_type", "application/pdf")
                     })
                     attachment_filenames.append(filename)
-                    logger.info(f"Added project document to attachments: {filename}")
+                    logger.info(f"Added translated document to attachments: {filename}")
+            else:
+                logger.warning(f"Translated document {doc.get('id')} has no data!")
+
+        # Also check documents collection for translated files
+        for doc in project_docs_main:
+            if doc.get("source") == "translated_document":
+                doc_data = doc.get("file_data") or doc.get("data")
+                if doc_data:
+                    filename = doc.get("filename", "document.pdf")
+                    if filename not in attachment_filenames:
+                        all_attachments.append({
+                            "content": doc_data,
+                            "filename": filename,
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(filename)
+                        logger.info(f"Added translated document from main collection: {filename}")
 
         # Also add any additional documents explicitly selected (for backwards compatibility)
         if additional_doc_ids:
