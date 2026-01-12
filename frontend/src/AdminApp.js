@@ -48,6 +48,8 @@ const STATUS_COLORS = {
   'review': 'bg-blue-100 text-blue-700',
   'pending_pm_review': 'bg-sky-100 text-sky-700',
   'pending_admin_approval': 'bg-blue-100 text-blue-700',
+  'pending_admin_review': 'bg-indigo-100 text-indigo-700',
+  'finalized_pending_admin': 'bg-purple-100 text-purple-700',
   'client_review': 'bg-sky-100 text-sky-700',
   'ready': 'bg-green-100 text-green-700',
   'delivered': 'bg-blue-100 text-blue-700',
@@ -4665,8 +4667,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
+                <div class="signature-name">Authorized Representative</div>
+                <div class="signature-title">Legacy Translations Inc.</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -5224,8 +5226,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${translator?.name || translatorNameForCert || 'Beatriz Paiva'}</div>
-                <div class="signature-title">${translator?.title || 'Authorized Representative'}</div>
+                <div class="signature-name">Authorized Representative</div>
+                <div class="signature-title">Legacy Translations Inc.</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">
@@ -9526,15 +9528,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       />
                       <span>Include Original Documents</span>
                     </label>
-                    <label className="flex items-center text-xs cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeAuthenticityStatement}
-                        onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
-                        className="mr-3 w-4 h-4"
-                      />
-                      <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
-                    </label>
+                    {isAdmin && (
+                      <label className="flex items-center text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={includeAuthenticityStatement}
+                          onChange={(e) => setIncludeAuthenticityStatement(e.target.checked)}
+                          className="mr-3 w-4 h-4"
+                        />
+                        <span>📋 Include Authenticity Statement (Atestado de Autenticidade)</span>
+                      </label>
+                    )}
                   </div>
                 </div>
               )}
@@ -9766,7 +9770,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           {/* Admin only can send to client */}
                           {isAdmin && <option value="client">📧 Send to Client</option>}
                           {/* PM sends to Admin for final approval */}
-                          {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                          {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                           {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
                           {isInHouseTranslator && (
                             <>
@@ -9999,15 +10003,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!includeAuthenticityStatement}
-                      onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
-                  </label>
+                  {isAdmin && (
+                    <label className="flex items-center text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!includeAuthenticityStatement}
+                        onChange={(e) => setIncludeAuthenticityStatement(!e.target.checked)}
+                        className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="font-medium">Exclude STATEMENT OF AUTHENTICITY</span>
+                    </label>
+                  )}
                 </div>
               </div>
 
@@ -10225,7 +10231,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       {/* Admin only can send to client */}
                       {isAdmin && <option value="client">📧 Send to Client</option>}
                       {/* PM sends to Admin for final approval */}
-                      {isPM && !isAdmin && <option value="admin">📤 Send to Admin (Approved)</option>}
+                      {isPM && !isAdmin && <option value="pending_admin_approval">📤 Send to Admin (Ready for Client)</option>}
                       {/* In-House Translator: Send to PM or Finalize to Admin (never to client) */}
                       {isInHouseTranslator && (
                         <>
@@ -12755,6 +12761,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       'review': 'PM Review',
       'pending_pm_review': 'PM Review',
       'pending_admin_approval': 'Pending Admin',
+      'pending_admin_review': 'Admin Review',
+      'finalized_pending_admin': 'Ready (Admin)',
       'client_review': 'Client Review',
       'ready': 'Ready',
       'delivered': 'Delivered',
@@ -13774,7 +13782,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                         <span className="text-gray-400 text-xs block">{order.client_email}</span>
                       </div>
                       {/* Send translation button - Admin only - shows when ready, review, or delivered (for resend) */}
-                      {['ready', 'review', 'delivered', 'pending_admin_approval'].includes(order.translation_status) && isAdmin && (
+                      {['ready', 'review', 'delivered', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && isAdmin && (
                         <button
                           onClick={() => openSendToClientModal(order)}
                           className={`px-1 py-0.5 rounded text-[9px] ${
@@ -14083,8 +14091,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                             </button>
                           )}
 
-                          {/* Admin only: Approve from PM (pending_admin_approval) */}
-                          {isAdmin && order.translation_status === 'pending_admin_approval' && (
+                          {/* Admin only: Approve from PM/Translator */}
+                          {isAdmin && ['pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin'].includes(order.translation_status) && (
                             <>
                               <button
                                 onClick={() => { updateStatus(order.id, 'ready'); setOpenActionsDropdown(null); }}
@@ -14144,7 +14152,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Preview & Send Translation */}
-                          {isAdmin && ['ready', 'pending_admin_approval', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
+                          {isAdmin && ['ready', 'pending_admin_approval', 'pending_admin_review', 'finalized_pending_admin', 'review', 'pending_pm_review'].includes(order.translation_status) && order.translation_html && (
                             <button
                               onClick={() => { openDeliveryModal(order); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
@@ -22459,8 +22467,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 ${signatureImage
                   ? `<img src="${signatureImage}" alt="Signature" style="max-height: 45px; max-width: 210px; object-fit: contain; margin-bottom: 2px;" />`
                   : `<div style="font-family: 'Rage Italic', cursive; font-size: 20px; color: #1a365d; margin-bottom: 2px;">Beatriz Paiva</div>`}
-                <div class="signature-name">${user?.full_name || 'Beatriz Paiva'}</div>
-                <div class="signature-title">Legal Representative (Legacy Translations)</div>
+                <div class="signature-name">Authorized Representative</div>
+                <div class="signature-title">Legacy Translations Inc.</div>
                 <div class="signature-date">Dated: ${translationDate}</div>
             </div>
             <div class="stamp-container">

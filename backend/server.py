@@ -8451,10 +8451,10 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
     if destination == "pm":
         # Get the assigned PM for this order
         assigned_pm_id = order.get("assigned_pm_id")
+        translator_name = data.submitted_by or (current_user.get("name") if current_user else "Translator")
+        order_number = order.get("order_number", order_id)
         if assigned_pm_id:
-            # Create notification for the PM
-            translator_name = data.submitted_by or (current_user.get("name") if current_user else "Translator")
-            order_number = order.get("order_number", order_id)
+            # Create notification for the assigned PM
             await create_notification(
                 user_id=assigned_pm_id,
                 notif_type="translation_submitted",
@@ -8465,8 +8465,19 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
             )
             logger.info(f"Notification sent to PM {assigned_pm_id} for order {order_id}")
         else:
-            # No PM assigned - notify all admins/PMs
-            logger.info(f"No PM assigned to order {order_id}, skipping PM notification")
+            # No PM assigned - notify all PMs and admins so someone can review
+            logger.info(f"No PM assigned to order {order_id}, notifying all PMs and admins")
+            pm_and_admin_users = await db.admin_users.find({"role": {"$in": ["pm", "admin"]}}).to_list(length=100)
+            for user in pm_and_admin_users:
+                await create_notification(
+                    user_id=user.get("id"),
+                    notif_type="translation_submitted",
+                    title="Translation Ready for Review",
+                    message=f"Translator {translator_name} has submitted a translation for order {order_number}. Please review and approve.",
+                    order_id=order_id,
+                    order_number=order_number
+                )
+            logger.info(f"Notification sent to {len(pm_and_admin_users)} PMs/admins for order {order_id}")
 
     # Send notification to Admin when PM approves and sends translation
     if destination == "pending_admin_approval":
@@ -8484,6 +8495,23 @@ async def admin_save_translation(order_id: str, data: TranslationData, admin_key
                 order_number=order_number
             )
         logger.info(f"Notification sent to admins for PM-approved order {order_id}")
+
+    # Send notification to Admin when in-house translator finalizes and sends directly
+    if destination == "finalize_admin":
+        # Get all admin users and notify them
+        admin_users = await db.admin_users.find({"role": "admin"}).to_list(length=100)
+        translator_name = data.submitted_by or (current_user.get("name") if current_user else "Translator")
+        order_number = order.get("order_number", order_id)
+        for admin_user in admin_users:
+            await create_notification(
+                user_id=admin_user.get("id"),
+                notif_type="translation_finalized",
+                title="Translation Finalized by Translator",
+                message=f"Translator {translator_name} has finalized translation for order {order_number}. Ready for client delivery.",
+                order_id=order_id,
+                order_number=order_number
+            )
+        logger.info(f"Notification sent to admins for finalized order {order_id}")
 
     return {"success": True, "message": status_message}
 
