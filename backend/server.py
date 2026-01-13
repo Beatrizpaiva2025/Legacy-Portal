@@ -7812,6 +7812,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                 update_dict["translator_assignment_status"] = "none"
         if update_data.deadline:
             update_dict["deadline"] = update_data.deadline
+        if update_data.translator_deadline is not None:
+            update_dict["translator_deadline"] = update_data.translator_deadline
         if update_data.internal_notes is not None:
             update_dict["internal_notes"] = update_data.internal_notes
 
