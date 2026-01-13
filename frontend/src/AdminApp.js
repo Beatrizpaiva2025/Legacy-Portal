@@ -22519,7 +22519,6 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         translator_email: translator.email,
         order_id: selectedProject?.id,
         order_number: selectedProject?.order_number,
-        client_name: selectedProject?.client_name,
         language_pair: `${selectedProject?.translate_from} → ${selectedProject?.translate_to}`,
         documents: projectDocuments.map(d => ({
           id: d.id,
@@ -22540,7 +22539,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         return newState;
       });
 
-      alert(`📧 Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
+      alert(`Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
       setProjectTranslatorId('');
     } catch (err) {
       console.error('Failed to send complete project:', err);
@@ -25401,7 +25400,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <button
                       onClick={sendCompleteProject}
                       disabled={!projectTranslatorId || sendingCompleteProject}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {sendingCompleteProject ? (
                         <>
@@ -25409,7 +25408,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                           Sending...
                         </>
                       ) : (
-                        <>📧 Send All {projectDocuments.length} Files</>
+                        <>Send All {projectDocuments.length} Files</>
                       )}
                     </button>
                   </div>
