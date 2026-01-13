@@ -1595,6 +1595,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
   const [files, setFiles] = useState([]);
   const [ocrResults, setOcrResults] = useState([]);
+  const [ocrViewMode, setOcrViewMode] = useState('text'); // 'text' or 'html' for layout view
   const [translationResults, setTranslationResults] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
@@ -3979,7 +3980,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (response.data.status === 'success' || response.data.text) {
           setOcrResults(prev => [...prev, {
             filename: file.name,
-            text: response.data.text
+            text: response.data.text,
+            html: response.data.html || null  // HTML with visual layout preservation
           }]);
         } else {
           throw new Error(response.data.error || response.data.detail || 'OCR failed');
@@ -7886,11 +7888,43 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                           </button>
                         </div>
                       </div>
-                      <textarea
-                        value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
-                        readOnly
-                        className="w-full h-40 text-xs font-mono border rounded p-2 bg-gray-50"
-                      />
+                      {/* View Mode Toggle */}
+                      {ocrResults.some(r => r.html) && (
+                        <div className="flex items-center gap-2 mb-2 text-xs">
+                          <span className="text-gray-600">View:</span>
+                          <button
+                            onClick={() => setOcrViewMode('text')}
+                            className={`px-2 py-1 rounded ${ocrViewMode === 'text' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          >
+                            Plain Text
+                          </button>
+                          <button
+                            onClick={() => setOcrViewMode('html')}
+                            className={`px-2 py-1 rounded ${ocrViewMode === 'html' ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+                          >
+                            Visual Layout
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Text View */}
+                      {ocrViewMode === 'text' && (
+                        <textarea
+                          value={ocrResults.map(r => r.text).join('\n\n---\n\n')}
+                          readOnly
+                          className="w-full h-40 text-xs font-mono border rounded p-2 bg-gray-50"
+                        />
+                      )}
+
+                      {/* HTML Visual Layout View */}
+                      {ocrViewMode === 'html' && ocrResults.some(r => r.html) && (
+                        <div
+                          className="w-full h-80 overflow-auto border rounded p-2 bg-white text-xs"
+                          dangerouslySetInnerHTML={{
+                            __html: ocrResults.map(r => r.html || `<pre>${r.text}</pre>`).join('<hr style="border: 2px dashed #ccc; margin: 20px 0;">')
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

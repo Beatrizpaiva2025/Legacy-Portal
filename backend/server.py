@@ -2497,6 +2497,323 @@ def extract_tables_from_textract(blocks: list) -> list:
     return tables
 
 
+def reconstruct_layout_html_from_textract(blocks: list, page_width: int = 800, page_height: int = 1100) -> str:
+    """
+    Reconstruct the original page layout from Textract blocks using HTML with CSS positioning.
+    This preserves the visual layout of the document by using absolute positioning.
+
+    Returns HTML that visually represents the document layout.
+    """
+    block_map = {block['Id']: block for block in blocks if 'Id' in block}
+
+    # Collect all elements with their positions
+    elements = []
+    table_regions = []  # Track table bounding boxes to avoid duplicating text
+
+    # First, identify table regions
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            if bbox:
+                table_regions.append({
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'width': bbox.get('Width', 0),
+                    'height': bbox.get('Height', 0),
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
+                })
+
+    def is_in_table_region(top, left):
+        """Check if a position is inside any table region"""
+        for tr in table_regions:
+            if (tr['top'] <= top <= tr['bottom'] and
+                tr['left'] <= left <= tr['right']):
+                return True
+        return False
+
+    # Process LINE blocks for text
+    for block in blocks:
+        if block['BlockType'] == 'LINE' and 'Geometry' in block:
+            bbox = block['Geometry']['BoundingBox']
+            top = bbox.get('Top', 0)
+            left = bbox.get('Left', 0)
+
+            # Skip lines inside table regions
+            if is_in_table_region(top, left):
+                continue
+
+            elements.append({
+                'type': 'text',
+                'text': block.get('Text', ''),
+                'top': top,
+                'left': left,
+                'width': bbox.get('Width', 0),
+                'height': bbox.get('Height', 0),
+                'confidence': block.get('Confidence', 100)
+            })
+
+    # Process TABLE blocks
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+
+            # Find all cells for this table
+            cells = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child_block = block_map.get(child_id)
+                            if child_block and child_block['BlockType'] == 'CELL':
+                                cells.append(child_block)
+
+            if not cells:
+                continue
+
+            # Determine table dimensions
+            max_row = max(cell.get('RowIndex', 1) for cell in cells)
+            max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+            # Create table grid
+            table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
+
+            for cell in cells:
+                row_idx = cell.get('RowIndex', 1) - 1
+                col_idx = cell.get('ColumnIndex', 1) - 1
+
+                # Get cell text
+                cell_text = ''
+                if 'Relationships' in cell:
+                    for rel in cell['Relationships']:
+                        if rel['Type'] == 'CHILD':
+                            for child_id in rel['Ids']:
+                                child_block = block_map.get(child_id)
+                                if child_block and child_block['BlockType'] == 'WORD':
+                                    cell_text += child_block.get('Text', '') + ' '
+
+                if row_idx < max_row and col_idx < max_col:
+                    table_grid[row_idx][col_idx] = cell_text.strip()
+
+            # Build HTML table
+            table_html = '<table style="border-collapse: collapse; width: 100%; font-size: inherit;">\n'
+            for row_idx, row in enumerate(table_grid):
+                table_html += '  <tr>\n'
+                for col_idx, cell_text in enumerate(row):
+                    tag = 'th' if row_idx == 0 else 'td'
+                    style = 'border: 1px solid #666; padding: 4px 8px; text-align: left;'
+                    if row_idx == 0:
+                        style += ' background-color: #e8e8e8; font-weight: bold;'
+                    table_html += f'    <{tag} style="{style}">{cell_text}</{tag}>\n'
+                table_html += '  </tr>\n'
+            table_html += '</table>'
+
+            elements.append({
+                'type': 'table',
+                'html': table_html,
+                'top': bbox.get('Top', 0),
+                'left': bbox.get('Left', 0),
+                'width': bbox.get('Width', 1),
+                'height': bbox.get('Height', 0)
+            })
+
+    # Sort elements by vertical position then horizontal
+    elements.sort(key=lambda x: (x['top'], x['left']))
+
+    # Build HTML output with visual positioning
+    html_parts = []
+    html_parts.append(f'''<div style="position: relative; width: 100%; min-height: {page_height}px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; background: white; padding: 20px; box-sizing: border-box;">''')
+
+    for elem in elements:
+        top_px = int(elem['top'] * page_height)
+        left_px = int(elem['left'] * page_width)
+        width_percent = elem['width'] * 100
+
+        if elem['type'] == 'text':
+            # Text element with absolute positioning
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'white-space: nowrap;">{elem["text"]}</div>'
+            )
+        elif elem['type'] == 'table':
+            # Table with calculated width
+            table_width_px = int(elem['width'] * page_width)
+            html_parts.append(
+                f'<div style="position: absolute; top: {top_px}px; left: {left_px}px; '
+                f'width: {table_width_px}px;">{elem["html"]}</div>'
+            )
+
+    html_parts.append('</div>')
+
+    return '\n'.join(html_parts)
+
+
+def reconstruct_layout_text_from_textract(blocks: list, page_width_chars: int = 100) -> str:
+    """
+    Reconstruct the original page layout from Textract blocks as plain text.
+    Uses bounding box coordinates to preserve spatial positioning with spaces.
+    Better for text-only output with maintained positioning.
+    """
+    block_map = {block['Id']: block for block in blocks if 'Id' in block}
+
+    # Collect table regions to avoid duplicating text
+    table_regions = []
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+            if bbox:
+                table_regions.append({
+                    'top': bbox.get('Top', 0),
+                    'left': bbox.get('Left', 0),
+                    'bottom': bbox.get('Top', 0) + bbox.get('Height', 0),
+                    'right': bbox.get('Left', 0) + bbox.get('Width', 0)
+                })
+
+    def is_in_table(top, left):
+        for tr in table_regions:
+            if (tr['top'] - 0.01 <= top <= tr['bottom'] + 0.01 and
+                tr['left'] - 0.01 <= left <= tr['right'] + 0.01):
+                return True
+        return False
+
+    # Collect all lines with positions
+    lines = []
+    for block in blocks:
+        if block['BlockType'] == 'LINE' and 'Geometry' in block:
+            bbox = block['Geometry']['BoundingBox']
+            top = bbox.get('Top', 0)
+            left = bbox.get('Left', 0)
+
+            if not is_in_table(top, left):
+                lines.append({
+                    'text': block.get('Text', ''),
+                    'top': top,
+                    'left': left
+                })
+
+    # Collect tables
+    tables = []
+    for block in blocks:
+        if block['BlockType'] == 'TABLE':
+            bbox = block.get('Geometry', {}).get('BoundingBox', {})
+
+            cells = []
+            if 'Relationships' in block:
+                for rel in block['Relationships']:
+                    if rel['Type'] == 'CHILD':
+                        for child_id in rel['Ids']:
+                            child_block = block_map.get(child_id)
+                            if child_block and child_block['BlockType'] == 'CELL':
+                                cells.append(child_block)
+
+            if cells:
+                max_row = max(cell.get('RowIndex', 1) for cell in cells)
+                max_col = max(cell.get('ColumnIndex', 1) for cell in cells)
+
+                # Calculate column widths
+                col_widths = [15] * max_col  # Default width
+                table_grid = [['' for _ in range(max_col)] for _ in range(max_row)]
+
+                for cell in cells:
+                    row_idx = cell.get('RowIndex', 1) - 1
+                    col_idx = cell.get('ColumnIndex', 1) - 1
+
+                    cell_text = ''
+                    if 'Relationships' in cell:
+                        for rel in cell['Relationships']:
+                            if rel['Type'] == 'CHILD':
+                                for child_id in rel['Ids']:
+                                    child_block = block_map.get(child_id)
+                                    if child_block and child_block['BlockType'] == 'WORD':
+                                        cell_text += child_block.get('Text', '') + ' '
+
+                    cell_text = cell_text.strip()
+                    if row_idx < max_row and col_idx < max_col:
+                        table_grid[row_idx][col_idx] = cell_text
+                        col_widths[col_idx] = max(col_widths[col_idx], len(cell_text) + 2)
+
+                # Build text table
+                table_lines = []
+                separator = '+' + '+'.join(['-' * w for w in col_widths]) + '+'
+                table_lines.append(separator)
+
+                for row_idx, row in enumerate(table_grid):
+                    row_text = '|'
+                    for col_idx, cell_text in enumerate(row):
+                        row_text += cell_text.ljust(col_widths[col_idx]) + '|'
+                    table_lines.append(row_text)
+                    if row_idx == 0:
+                        table_lines.append(separator)
+
+                table_lines.append(separator)
+
+                tables.append({
+                    'text': '\n'.join(table_lines),
+                    'top': bbox.get('Top', 0)
+                })
+
+    # Sort all elements by position
+    all_elements = []
+    for line in lines:
+        all_elements.append({'type': 'line', 'top': line['top'], 'left': line['left'], 'text': line['text']})
+    for table in tables:
+        all_elements.append({'type': 'table', 'top': table['top'], 'left': 0, 'text': table['text']})
+
+    all_elements.sort(key=lambda x: (round(x['top'], 2), x['left']))
+
+    # Group by rows (similar Y position)
+    row_threshold = 0.015
+    output_rows = []
+    current_row_elements = []
+    current_top = None
+
+    for elem in all_elements:
+        if elem['type'] == 'table':
+            # Tables are added as their own "row"
+            if current_row_elements:
+                output_rows.append({'elements': current_row_elements, 'is_table': False})
+                current_row_elements = []
+                current_top = None
+            output_rows.append({'elements': [elem], 'is_table': True})
+        else:
+            if current_top is None:
+                current_top = elem['top']
+                current_row_elements = [elem]
+            elif abs(elem['top'] - current_top) <= row_threshold:
+                current_row_elements.append(elem)
+            else:
+                if current_row_elements:
+                    output_rows.append({'elements': current_row_elements, 'is_table': False})
+                current_row_elements = [elem]
+                current_top = elem['top']
+
+    if current_row_elements:
+        output_rows.append({'elements': current_row_elements, 'is_table': False})
+
+    # Build output
+    output_lines = []
+    for row in output_rows:
+        if row['is_table']:
+            output_lines.append(row['elements'][0]['text'])
+        else:
+            elements = sorted(row['elements'], key=lambda x: x['left'])
+            if len(elements) == 1:
+                indent = int(elements[0]['left'] * page_width_chars)
+                indent = min(indent, 50)
+                output_lines.append(' ' * indent + elements[0]['text'])
+            else:
+                line_chars = [' '] * page_width_chars
+                for elem in elements:
+                    start_pos = int(elem['left'] * page_width_chars)
+                    for i, char in enumerate(elem['text']):
+                        pos = start_pos + i
+                        if pos < page_width_chars:
+                            line_chars[pos] = char
+                output_lines.append(''.join(line_chars).rstrip())
+
+    return '\n'.join(output_lines)
+
+
 def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120, include_tables: bool = True) -> str:
     """
     Reconstruct the original page layout from Textract blocks using geometry.
@@ -2611,7 +2928,7 @@ def reconstruct_layout_from_textract(blocks: list, page_width_chars: int = 120, 
     return '\n'.join(output_parts)
 
 
-def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True, detect_tables: bool = True) -> str:
+def extract_text_with_textract(content: bytes, file_extension: str, preserve_layout: bool = True, detect_tables: bool = True) -> dict:
     """
     Extract text using AWS Textract (best quality OCR) with layout preservation and table support.
 
@@ -2620,6 +2937,9 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
         file_extension: File extension (jpg, png, pdf, etc.)
         preserve_layout: Whether to preserve document layout
         detect_tables: Whether to detect and format tables (uses analyze_document instead of detect_document_text)
+
+    Returns:
+        dict with 'text' (plain text) and 'html' (HTML with visual layout) or None if Textract unavailable
     """
     if not textract_client:
         return None
@@ -2640,26 +2960,32 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                     Document={'Bytes': content}
                 )
 
-            # Extract text - try layout preservation first, fallback to simple extraction
+            blocks = response.get('Blocks', [])
+
+            # Generate HTML with visual layout (best for preserving document appearance)
+            html = reconstruct_layout_html_from_textract(blocks)
+
+            # Generate plain text with layout preservation
             text = ""
             if preserve_layout:
-                text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
+                text = reconstruct_layout_text_from_textract(blocks)
 
             # Fallback to simple extraction if layout reconstruction returned empty
             if not text or len(text.strip()) < 10:
                 text_parts = []
-                for block in response.get('Blocks', []):
+                for block in blocks:
                     if block['BlockType'] == 'LINE':
                         text_parts.append(block['Text'])
                 text = '\n'.join(text_parts)
                 logger.info(f"AWS Textract: layout reconstruction empty, using simple extraction")
 
             logger.info(f"AWS Textract extracted {len(text)} characters from image (tables: {detect_tables})")
-            return text
+            return {'text': text, 'html': html}
 
         # For PDFs, convert pages to images first
         elif file_extension == 'pdf':
             all_pages_text = []
+            all_pages_html = []
             TEXTRACT_MAX_SIZE = 5 * 1024 * 1024  # 5MB max for Textract
             try:
                 pdf_document = fitz.open(stream=content, filetype="pdf")
@@ -2699,15 +3025,21 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                             Document={'Bytes': img_data}
                         )
 
-                    # Extract text - try layout preservation first, fallback to simple extraction
+                    blocks = response.get('Blocks', [])
+
+                    # Generate HTML for this page
+                    page_html = reconstruct_layout_html_from_textract(blocks)
+                    all_pages_html.append(f'<div style="margin-bottom: 20px; border-bottom: 2px dashed #ccc; padding-bottom: 20px;"><h4 style="color: #666; margin-bottom: 10px;">--- Page {page_num + 1} ---</h4>{page_html}</div>')
+
+                    # Generate plain text for this page
                     page_text = ""
                     if preserve_layout:
-                        page_text = reconstruct_layout_from_textract(response.get('Blocks', []), include_tables=detect_tables)
+                        page_text = reconstruct_layout_text_from_textract(blocks)
 
                     # Fallback to simple extraction if layout reconstruction returned empty
                     if not page_text or len(page_text.strip()) < 5:
                         page_text = ""
-                        for block in response.get('Blocks', []):
+                        for block in blocks:
                             if block['BlockType'] == 'LINE':
                                 page_text += block['Text'] + '\n'
 
@@ -2718,8 +3050,9 @@ def extract_text_with_textract(content: bytes, file_extension: str, preserve_lay
                 pdf_document.close()
 
                 text = '\n\n'.join(all_pages_text)
+                html = '\n'.join(all_pages_html)
                 logger.info(f"AWS Textract extracted {len(text)} characters from PDF ({num_pages} pages, layout: {preserve_layout}, tables: {detect_tables})")
-                return text
+                return {'text': text, 'html': html}
 
             except Exception as e:
                 logger.warning(f"Textract PDF processing failed: {e}")
@@ -11109,15 +11442,20 @@ CRITICAL INSTRUCTIONS:
                 logger.error(f"Claude OCR failed: {str(e)}, falling back to standard OCR")
                 # Fall through to standard OCR methods
 
+        html_content = ""  # Will store HTML version for visual layout
+
         if is_image:
             # Try AWS Textract first for images
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
-                text = extract_text_with_textract(file_content, file_extension)
-                if text and len(text.strip()) > 10:
-                    logger.info(f"Textract extracted {len(text)} characters")
-                else:
-                    text = ""
+                textract_result = extract_text_with_textract(file_content, file_extension)
+                if textract_result:
+                    text = textract_result.get('text', '')
+                    html_content = textract_result.get('html', '')
+                    if text and len(text.strip()) > 10:
+                        logger.info(f"Textract extracted {len(text)} characters")
+                    else:
+                        text = ""
 
             # Fallback to Tesseract if Textract didn't work
             if not text:
@@ -11188,9 +11526,12 @@ CRITICAL INSTRUCTIONS:
                 # Try Textract first
                 if textract_client:
                     logger.info("Using AWS Textract for PDF OCR...")
-                    text = extract_text_with_textract(file_content, 'pdf')
-                    if text and len(text.strip()) > 10:
-                        logger.info(f"Textract extracted {len(text)} characters from PDF")
+                    textract_result = extract_text_with_textract(file_content, 'pdf')
+                    if textract_result:
+                        text = textract_result.get('text', '')
+                        html_content = textract_result.get('html', '')
+                        if text and len(text.strip()) > 10:
+                            logger.info(f"Textract extracted {len(text)} characters from PDF")
 
                 # Fallback to Tesseract with multiple configs
                 if not text or len(text.strip()) < 10:
@@ -11249,12 +11590,18 @@ CRITICAL INSTRUCTIONS:
         # Count words
         word_count = count_words(text)
 
-        return {
+        response = {
             "status": "success",
             "text": text.strip(),
             "word_count": word_count,
             "filename": request.filename
         }
+
+        # Include HTML if available (for visual layout preservation)
+        if html_content:
+            response["html"] = html_content
+
+        return response
 
     except HTTPException:
         raise
