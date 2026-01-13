@@ -14671,31 +14671,54 @@ class DiscountCodeCreate(BaseModel):
 
 @api_router.get("/discount-codes/validate")
 async def validate_discount_code(code: str):
-    """Validate a discount code"""
+    """Validate a discount code (checks both internal database and Stripe promotion codes)"""
     try:
+        # First, check internal database
         discount = await db.discount_codes.find_one({
             "code": code.upper(),
             "is_active": True
         })
 
-        if not discount:
-            return {"valid": False, "message": "Invalid discount code"}
+        if discount:
+            # Check if expired
+            if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+                return {"valid": False, "message": "Discount code has expired"}
 
-        # Check if expired
-        if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
-            return {"valid": False, "message": "Discount code has expired"}
+            # Check max uses
+            if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+                return {"valid": False, "message": "Discount code has reached maximum uses"}
 
-        # Check max uses
-        if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
-            return {"valid": False, "message": "Discount code has reached maximum uses"}
-
-        return {
-            "valid": True,
-            "discount": {
+            return {
+                "valid": True,
                 "type": discount["type"],
                 "value": discount["value"]
             }
-        }
+
+        # If not found in internal database, check Stripe promotion codes
+        try:
+            promo_codes = stripe.PromotionCode.list(code=code.upper(), active=True, limit=1)
+            if promo_codes.data:
+                promo_code = promo_codes.data[0]
+                coupon = promo_code.coupon
+
+                # Get discount type and value from Stripe coupon
+                if coupon.percent_off:
+                    return {
+                        "valid": True,
+                        "type": "percentage",
+                        "value": coupon.percent_off
+                    }
+                elif coupon.amount_off:
+                    # Stripe stores amount in cents
+                    return {
+                        "valid": True,
+                        "type": "fixed",
+                        "value": coupon.amount_off / 100
+                    }
+        except Exception as stripe_error:
+            logger.error(f"Error checking Stripe promotion code: {str(stripe_error)}")
+
+        return {"valid": False, "message": "Invalid discount code"}
 
     except Exception as e:
         logger.error(f"Error validating discount code: {str(e)}")
