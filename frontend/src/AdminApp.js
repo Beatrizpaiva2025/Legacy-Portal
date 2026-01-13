@@ -22067,6 +22067,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Send Complete Project state
   const [projectTranslatorId, setProjectTranslatorId] = useState('');
   const [sendingCompleteProject, setSendingCompleteProject] = useState(false);
+  const [projectTrDeadline, setProjectTrDeadline] = useState({ date: '', time: '17:00' });
 
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
@@ -22389,6 +22390,14 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     setSelectedProject(order);
     setLoadingProjectDocs(true);
     setProjectDocuments([]);
+    // Pre-populate TR deadline if already set on the order
+    if (order.translator_deadline) {
+      const trDate = order.translator_deadline.split('T')[0];
+      const trTime = order.translator_deadline.split('T')[1]?.substring(0, 5) || '17:00';
+      setProjectTrDeadline({ date: trDate, time: trTime });
+    } else {
+      setProjectTrDeadline({ date: '', time: '17:00' });
+    }
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/documents?admin_key=${adminKey}`);
       setProjectDocuments(response.data.documents || []);
@@ -22498,6 +22507,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     try {
       const fileList = projectDocuments.map(d => d.filename).join(', ');
 
+      // Build the translator deadline if provided
+      const newTrDeadline = projectTrDeadline.date
+        ? `${projectTrDeadline.date}T${projectTrDeadline.time || '17:00'}:00`
+        : null;
+
       // 1. Update all documents with the same translator
       for (const doc of projectDocuments) {
         await axios.patch(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
@@ -22506,13 +22520,27 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         });
       }
 
-      // 2. Update the order with the translator assignment
-      await axios.put(`${API}/admin/orders/${selectedProject.id}?admin_key=${adminKey}`, {
+      // 2. Update the order with the translator assignment and TR deadline (if set)
+      const orderUpdate = {
         assigned_translator_id: translator.id,
         assigned_translator: translator.name
-      });
+      };
+      if (newTrDeadline) {
+        orderUpdate.translator_deadline = newTrDeadline;
+      }
+      await axios.put(`${API}/admin/orders/${selectedProject.id}?admin_key=${adminKey}`, orderUpdate);
+
+      // Update local state for orders (if TR deadline was set)
+      if (newTrDeadline) {
+        setOrders(prev => prev.map(o =>
+          o.id === selectedProject.id ? { ...o, translator_deadline: newTrDeadline } : o
+        ));
+      }
 
       // 3. Send single email with all files
+      // Use the new TR deadline if set, otherwise fall back to existing deadline
+      const deadlineForEmail = newTrDeadline || selectedProject?.translator_deadline || selectedProject?.deadline;
+
       await axios.post(`${API}/admin/send-project-assignment-email?admin_key=${adminKey}`, {
         translator_id: translator.id,
         translator_name: translator.name,
@@ -22527,7 +22555,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         })),
         total_files: projectDocuments.length,
         pm_name: user?.name || 'PM',
-        deadline: selectedProject?.translator_deadline || selectedProject?.deadline
+        deadline: deadlineForEmail
       });
 
       // Update local state
@@ -22541,6 +22569,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
       alert(`Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
       setProjectTranslatorId('');
+      setProjectTrDeadline({ date: '', time: '17:00' });
     } catch (err) {
       console.error('Failed to send complete project:', err);
       const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
@@ -25369,7 +25398,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 <h3 className="font-bold">📁 Project Files {selectedProject.order_number}</h3>
                 <p className="text-xs opacity-80">{selectedProject.client_name} • {selectedProject.translate_from} → {selectedProject.translate_to}</p>
               </div>
-              <button onClick={() => setSelectedProject(null)} className="text-white hover:text-gray-200 text-xl">×</button>
+              <button onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); }} className="text-white hover:text-gray-200 text-xl">×</button>
             </div>
 
             {/* Content */}
@@ -25386,21 +25415,45 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     Send all {projectDocuments.length} file(s) to a single translator with ONE invitation.
                     The translator will receive a single email with all files listed.
                   </p>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={projectTranslatorId}
-                      onChange={(e) => setProjectTranslatorId(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border-2 border-green-300 rounded-lg bg-white focus:border-green-500 focus:outline-none"
-                    >
-                      <option value="">-- Select Translator for Entire Project --</option>
-                      {translators.map(t => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.email})</option>
-                      ))}
-                    </select>
+                  <div className="space-y-3">
+                    {/* Translator Selection */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={projectTranslatorId}
+                        onChange={(e) => setProjectTranslatorId(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border-2 border-green-300 rounded-lg bg-white focus:border-green-500 focus:outline-none"
+                      >
+                        <option value="">-- Select Translator for Entire Project --</option>
+                        {translators.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} ({t.email})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* TR Deadline Selection */}
+                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-green-200">
+                      <span className="text-sm text-green-700 font-medium whitespace-nowrap">TR Deadline:</span>
+                      <input
+                        type="date"
+                        value={projectTrDeadline.date}
+                        onChange={(e) => setProjectTrDeadline(prev => ({ ...prev, date: e.target.value }))}
+                        className="flex-1 px-2 py-1.5 text-sm border border-green-300 rounded bg-white focus:border-green-500 focus:outline-none"
+                        placeholder="Select date"
+                      />
+                      <input
+                        type="time"
+                        value={projectTrDeadline.time}
+                        onChange={(e) => setProjectTrDeadline(prev => ({ ...prev, time: e.target.value }))}
+                        className="w-24 px-2 py-1.5 text-sm border border-green-300 rounded bg-white focus:border-green-500 focus:outline-none"
+                      />
+                      <span className="text-xs text-gray-500">(Optional)</span>
+                    </div>
+
+                    {/* Send Button */}
                     <button
                       onClick={sendCompleteProject}
                       disabled={!projectTranslatorId || sendingCompleteProject}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {sendingCompleteProject ? (
                         <>
@@ -25506,7 +25559,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
             {/* Footer */}
             <div className="p-4 border-t bg-gray-50 rounded-b-lg flex justify-end">
               <button
-                onClick={() => setSelectedProject(null)}
+                onClick={() => { setSelectedProject(null); setProjectTrDeadline({ date: '', time: '17:00' }); }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
               >
                 Fechar
