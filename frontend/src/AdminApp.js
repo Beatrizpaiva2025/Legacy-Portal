@@ -19881,6 +19881,11 @@ const FinancesPage = ({ adminKey }) => {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   const [showInvoicesModal, setShowInvoicesModal] = useState(false);
   const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  // Invoice payment management state
+  const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [invoiceNotifications, setInvoiceNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   // Quick add vendor modal state
   const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
   const [quickVendorForm, setQuickVendorForm] = useState({ name: '', email: '', role: 'translator', rate_per_page: '' });
@@ -20172,6 +20177,71 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Invoice Payment Management Functions
+  const fetchPendingZelleInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-payments/pending-zelle?admin_key=${adminKey}`);
+      setPendingZelleInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch pending Zelle invoices:', err);
+    }
+  };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-payments/history?admin_key=${adminKey}`);
+      setPaymentHistory(response.data.payments || []);
+    } catch (err) {
+      console.error('Failed to fetch payment history:', err);
+    }
+  };
+
+  const fetchInvoiceNotifications = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}`);
+      setInvoiceNotifications(response.data.notifications || []);
+      setUnreadNotifCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch invoice notifications:', err);
+    }
+  };
+
+  const handleApproveZellePayment = async (invoiceId) => {
+    if (!window.confirm('Are you sure you want to approve this Zelle payment?')) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
+      alert('Payment approved successfully!');
+      fetchPendingZelleInvoices();
+      fetchPaymentHistory();
+      fetchPartnerStats();
+      fetchInvoiceNotifications();
+    } catch (err) {
+      alert('Error approving payment: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRejectZellePayment = async (invoiceId) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    if (reason === null) return; // User cancelled
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
+      alert('Payment rejected');
+      fetchPendingZelleInvoices();
+      fetchInvoiceNotifications();
+    } catch (err) {
+      alert('Error rejecting payment: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkNotificationRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
+      fetchInvoiceNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
   // Quick add vendor
   const handleQuickAddVendor = async () => {
     if (!quickVendorForm.name || !quickVendorForm.email) {
@@ -20342,6 +20412,9 @@ const FinancesPage = ({ adminKey }) => {
     if (activeView === 'partners') {
       fetchPartnerStats();
       fetchPartnerInvoices();
+      fetchPendingZelleInvoices();
+      fetchPaymentHistory();
+      fetchInvoiceNotifications();
     }
     if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
@@ -21664,6 +21737,160 @@ const FinancesPage = ({ adminKey }) => {
                         <td className="px-4 py-3 text-xs">
                           {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Zelle Verifications */}
+          {pendingZelleInvoices.length > 0 && (
+            <div className="bg-white rounded-lg shadow border-l-4 border-purple-500">
+              <div className="p-4 border-b bg-purple-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-purple-800">🏦 Pending Zelle Verifications</h2>
+                    <p className="text-xs text-purple-600 mt-1">Invoices awaiting Zelle payment verification</p>
+                  </div>
+                  <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {pendingZelleInvoices.length}
+                  </span>
+                </div>
+              </div>
+              <div className="divide-y">
+                {pendingZelleInvoices.map((invoice) => (
+                  <div key={invoice.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-mono font-medium text-sm">{invoice.invoice_number}</div>
+                        <div className="text-sm text-gray-600">{invoice.partner_company}</div>
+                        <div className="text-xs text-gray-500">
+                          Submitted: {invoice.zelle_submitted_at ? new Date(invoice.zelle_submitted_at).toLocaleString() : '-'}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <div className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</div>
+                          {invoice.zelle_receipt_url && (
+                            <a
+                              href={invoice.zelle_receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              View Receipt
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <button
+                            onClick={() => handleApproveZellePayment(invoice.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectZellePayment(invoice.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Notifications */}
+          {invoiceNotifications.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700">🔔 Payment Notifications</h2>
+                    <p className="text-xs text-gray-500 mt-1">Recent invoice payment activity</p>
+                  </div>
+                  {unreadNotifCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {unreadNotifCount} new
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="divide-y max-h-64 overflow-y-auto">
+                {invoiceNotifications.slice(0, 10).map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-3 hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                    onClick={() => !notif.is_read && handleMarkNotificationRead(notif.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium flex items-center">
+                          {notif.type === 'invoice_stripe_paid' && <span className="mr-2">💳</span>}
+                          {notif.type === 'invoice_zelle_receipt' && <span className="mr-2">🏦</span>}
+                          {notif.type === 'invoice_payment_approved' && <span className="mr-2">✅</span>}
+                          {notif.title}
+                        </div>
+                        <div className="text-xs text-gray-500">{notif.message}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Payment History */}
+          {paymentHistory.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <h2 className="text-sm font-bold text-gray-700">💰 Payment History</h2>
+                <p className="text-xs text-gray-500 mt-1">Completed invoice payments</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Partner</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Method</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {paymentHistory.slice(0, 15).map((payment) => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs">
+                          {payment.paid_at ? new Date(payment.paid_at).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">{payment.invoice_number}</td>
+                        <td className="px-4 py-3">{payment.partner_company}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            payment.payment_method === 'stripe' ? 'bg-blue-100 text-blue-700' :
+                            payment.payment_method === 'zelle' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {payment.payment_method === 'stripe' ? '💳 Card' :
+                             payment.payment_method === 'zelle' ? '🏦 Zelle' :
+                             payment.payment_method}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-green-600">
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-500">{payment.order_count}</td>
                       </tr>
                     ))}
                   </tbody>
