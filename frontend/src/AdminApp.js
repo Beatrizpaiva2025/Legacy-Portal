@@ -22828,6 +22828,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   });
   const [sendingAssignment, setSendingAssignment] = useState(false);
 
+  // TR Deadline editing state
+  const [editingTrDeadline, setEditingTrDeadline] = useState(null);
+  const [tempTrDeadline, setTempTrDeadline] = useState({ date: '', time: '17:00' });
+  const [savingTrDeadline, setSavingTrDeadline] = useState(false);
+
   const [stats, setStats] = useState({
     totalProjects: 0,
     inProgress: 0,
@@ -23965,6 +23970,36 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
+  // Save TR Deadline
+  const saveTrDeadline = async (orderId) => {
+    if (!tempTrDeadline.date) {
+      alert('Please select a date');
+      return;
+    }
+
+    setSavingTrDeadline(true);
+    try {
+      const translatorDeadline = `${tempTrDeadline.date}T${tempTrDeadline.time || '17:00'}:00`;
+
+      await axios.put(`${API}/admin/orders/${orderId}?admin_key=${adminKey}`, {
+        translator_deadline: translatorDeadline
+      });
+
+      // Update local state
+      setOrders(prev => prev.map(o =>
+        o.id === orderId ? { ...o, translator_deadline: translatorDeadline } : o
+      ));
+
+      setEditingTrDeadline(null);
+      setTempTrDeadline({ date: '', time: '17:00' });
+    } catch (err) {
+      console.error('Failed to save TR deadline:', err);
+      alert('❌ Error saving TR deadline');
+    } finally {
+      setSavingTrDeadline(false);
+    }
+  };
+
   // Execute automatic proofreading
   const executeProofreading = async () => {
     if (!selectedReview || !translatedContent) {
@@ -24033,24 +24068,70 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
   };
 
-  // Get upcoming deadlines for calendar
+  // Get upcoming deadlines for calendar (both client and translator deadlines)
   const getUpcomingDeadlines = () => {
     const now = new Date();
-    const upcoming = orders
-      .filter(o => o.deadline && !['delivered', 'ready'].includes(o.translation_status))
+    const allDeadlines = [];
+
+    orders.forEach(o => {
+      if (['delivered', 'ready'].includes(o.translation_status)) return;
+
+      // Client deadline
+      if (o.deadline) {
+        allDeadlines.push({
+          ...o,
+          deadlineType: 'client',
+          deadlineLabel: 'Client Deadline',
+          deadlineDate: new Date(o.deadline),
+          daysLeft: Math.ceil((new Date(o.deadline) - now) / (1000 * 60 * 60 * 24))
+        });
+      }
+
+      // Translator deadline (TR deadline)
+      if (o.translator_deadline) {
+        allDeadlines.push({
+          ...o,
+          deadlineType: 'translator',
+          deadlineLabel: 'TR Deadline',
+          deadlineDate: new Date(o.translator_deadline),
+          daysLeft: Math.ceil((new Date(o.translator_deadline) - now) / (1000 * 60 * 60 * 24))
+        });
+      }
+    });
+
+    return allDeadlines.sort((a, b) => a.deadlineDate - b.deadlineDate);
+  };
+
+  // Get orders with TR deadlines for the dedicated section
+  const getOrdersWithTrDeadlines = () => {
+    const now = new Date();
+    return orders
+      .filter(o => !['delivered', 'ready'].includes(o.translation_status))
       .map(o => ({
         ...o,
-        deadlineDate: new Date(o.deadline),
-        daysLeft: Math.ceil((new Date(o.deadline) - now) / (1000 * 60 * 60 * 24))
+        trDeadlineDate: o.translator_deadline ? new Date(o.translator_deadline) : null,
+        trDaysLeft: o.translator_deadline
+          ? Math.ceil((new Date(o.translator_deadline) - now) / (1000 * 60 * 60 * 24))
+          : null,
+        clientDeadlineDate: o.deadline ? new Date(o.deadline) : null,
+        clientDaysLeft: o.deadline
+          ? Math.ceil((new Date(o.deadline) - now) / (1000 * 60 * 60 * 24))
+          : null
       }))
-      .sort((a, b) => a.deadlineDate - b.deadlineDate);
-    return upcoming;
+      .sort((a, b) => {
+        // Sort by TR deadline first, then by orders without TR deadline
+        if (a.trDeadlineDate && b.trDeadlineDate) return a.trDeadlineDate - b.trDeadlineDate;
+        if (a.trDeadlineDate) return -1;
+        if (b.trDeadlineDate) return 1;
+        return 0;
+      });
   };
 
   // Section navigation
   const sections = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'review', label: 'Review Translations', icon: '✅' },
+    { id: 'tr-deadlines', label: 'TR Deadlines', icon: '⏰' },
     { id: 'team', label: 'My Team', icon: '👥' },
     { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'reports', label: 'Reports', icon: '📈' },
@@ -25251,6 +25332,198 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
       )}
 
+      {/* TR DEADLINES SECTION - Translator Deadline Management */}
+      {activeSection === 'tr-deadlines' && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-800">⏰ Translator Deadlines (TR Deadlines)</h3>
+              <div className="text-xs text-gray-500">
+                Manage when translators must return their work
+              </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <div className="text-2xl font-bold text-red-600">
+                  {getOrdersWithTrDeadlines().filter(o => o.trDaysLeft !== null && o.trDaysLeft < 0).length}
+                </div>
+                <div className="text-xs text-red-700">Overdue</div>
+              </div>
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {getOrdersWithTrDeadlines().filter(o => o.trDaysLeft !== null && o.trDaysLeft >= 0 && o.trDaysLeft <= 2).length}
+                </div>
+                <div className="text-xs text-yellow-700">Due in 2 days</div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="text-2xl font-bold text-blue-600">
+                  {getOrdersWithTrDeadlines().filter(o => o.trDaysLeft !== null && o.trDaysLeft > 2).length}
+                </div>
+                <div className="text-xs text-blue-700">On Track</div>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="text-2xl font-bold text-gray-600">
+                  {getOrdersWithTrDeadlines().filter(o => o.trDaysLeft === null).length}
+                </div>
+                <div className="text-xs text-gray-700">No TR Deadline</div>
+              </div>
+            </div>
+
+            {/* Orders Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 text-left">Order</th>
+                    <th className="p-2 text-left">Client</th>
+                    <th className="p-2 text-left">Translator</th>
+                    <th className="p-2 text-left">Status</th>
+                    <th className="p-2 text-left">TR Deadline</th>
+                    <th className="p-2 text-left">Client Deadline</th>
+                    <th className="p-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getOrdersWithTrDeadlines().map(order => (
+                    <tr key={order.id} className={`border-t hover:bg-gray-50 ${
+                      order.trDaysLeft !== null && order.trDaysLeft < 0 ? 'bg-red-50' :
+                      order.trDaysLeft !== null && order.trDaysLeft <= 2 ? 'bg-yellow-50' : ''
+                    }`}>
+                      <td className="p-2">
+                        <span className="font-mono text-blue-600">{order.order_number}</span>
+                      </td>
+                      <td className="p-2">{order.client_name}</td>
+                      <td className="p-2">
+                        {order.assigned_translator || order.assigned_translator_name || (
+                          <span className="text-gray-400 italic">Not assigned</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                          order.translation_status === 'in_translation' ? 'bg-yellow-100 text-yellow-800' :
+                          order.translation_status === 'review' ? 'bg-blue-100 text-blue-800' :
+                          order.translation_status === 'pending_pm_review' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.translation_status}
+                        </span>
+                      </td>
+                      <td className="p-2">
+                        {editingTrDeadline === order.id ? (
+                          <div className="flex gap-1">
+                            <input
+                              type="date"
+                              value={tempTrDeadline.date}
+                              onChange={(e) => setTempTrDeadline(prev => ({ ...prev, date: e.target.value }))}
+                              className="border rounded px-1 py-0.5 text-xs w-28"
+                            />
+                            <input
+                              type="time"
+                              value={tempTrDeadline.time}
+                              onChange={(e) => setTempTrDeadline(prev => ({ ...prev, time: e.target.value }))}
+                              className="border rounded px-1 py-0.5 text-xs w-20"
+                            />
+                            <button
+                              onClick={() => saveTrDeadline(order.id)}
+                              disabled={savingTrDeadline}
+                              className="px-2 py-0.5 bg-green-500 text-white rounded text-xs hover:bg-green-600"
+                            >
+                              {savingTrDeadline ? '...' : '✓'}
+                            </button>
+                            <button
+                              onClick={() => setEditingTrDeadline(null)}
+                              className="px-2 py-0.5 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {order.translator_deadline ? (
+                              <>
+                                <span className={`font-medium ${
+                                  order.trDaysLeft < 0 ? 'text-red-600' :
+                                  order.trDaysLeft <= 2 ? 'text-yellow-600' : 'text-gray-700'
+                                }`}>
+                                  {formatDateLocal(order.translator_deadline)}
+                                </span>
+                                <span className={`text-[10px] px-1 py-0.5 rounded ${
+                                  order.trDaysLeft < 0 ? 'bg-red-100 text-red-700' :
+                                  order.trDaysLeft <= 2 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-green-100 text-green-700'
+                                }`}>
+                                  {order.trDaysLeft < 0 ? `${Math.abs(order.trDaysLeft)}d overdue` :
+                                   order.trDaysLeft === 0 ? 'Today' :
+                                   `${order.trDaysLeft}d left`}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-gray-400 italic">Not set</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {order.deadline ? (
+                          <span className="text-gray-600">{formatDateLocal(order.deadline)}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">Not set</span>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        {editingTrDeadline !== order.id && (
+                          <button
+                            onClick={() => {
+                              setEditingTrDeadline(order.id);
+                              if (order.translator_deadline) {
+                                const dt = new Date(order.translator_deadline);
+                                setTempTrDeadline({
+                                  date: dt.toISOString().split('T')[0],
+                                  time: dt.toTimeString().slice(0, 5)
+                                });
+                              } else {
+                                // Default to 2 days before client deadline if set, otherwise tomorrow at 5pm
+                                if (order.deadline) {
+                                  const clientDeadline = new Date(order.deadline);
+                                  clientDeadline.setDate(clientDeadline.getDate() - 2);
+                                  setTempTrDeadline({
+                                    date: clientDeadline.toISOString().split('T')[0],
+                                    time: '17:00'
+                                  });
+                                } else {
+                                  const tomorrow = new Date();
+                                  tomorrow.setDate(tomorrow.getDate() + 1);
+                                  setTempTrDeadline({
+                                    date: tomorrow.toISOString().split('T')[0],
+                                    time: '17:00'
+                                  });
+                                }
+                              }
+                            }}
+                            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                          >
+                            {order.translator_deadline ? '✏️ Edit' : '➕ Set Deadline'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {getOrdersWithTrDeadlines().length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-3xl mb-2">📭</div>
+                <p>No active orders to manage</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* TEAM SECTION */}
       {activeSection === 'team' && (
         <div className="space-y-4">
@@ -25329,44 +25602,59 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       {activeSection === 'calendar' && (
         <div className="space-y-4">
           <div className="bg-white rounded-lg shadow p-4">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">📅 Deadline Calendar</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold text-gray-800">📅 Deadline Calendar</h3>
+              <div className="flex gap-2 text-[10px]">
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">⏰ TR = Translator</span>
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">📦 Client = Delivery</span>
+              </div>
+            </div>
             <div className="space-y-2">
-              {getUpcomingDeadlines().map(order => (
+              {getUpcomingDeadlines().map((item, idx) => (
                 <div
-                  key={order.id}
+                  key={`${item.id}-${item.deadlineType}-${idx}`}
                   className={`p-3 rounded-lg border flex justify-between items-center ${
-                    order.daysLeft < 0 ? 'bg-red-50 border-red-200' :
-                    order.daysLeft <= 2 ? 'bg-blue-50 border-blue-200' :
-                    order.daysLeft <= 5 ? 'bg-yellow-50 border-yellow-200' :
+                    item.daysLeft < 0 ? 'bg-red-50 border-red-200' :
+                    item.daysLeft <= 2 ? (item.deadlineType === 'translator' ? 'bg-purple-50 border-purple-200' : 'bg-blue-50 border-blue-200') :
+                    item.daysLeft <= 5 ? 'bg-yellow-50 border-yellow-200' :
                     'bg-green-50 border-green-200'
                   }`}
                 >
                   <div>
-                    <div className="font-mono text-blue-600 font-medium">{order.order_number}</div>
-                    <div className="text-xs text-gray-600">{order.client_name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        item.deadlineType === 'translator'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-blue-500 text-white'
+                      }`}>
+                        {item.deadlineType === 'translator' ? '⏰ TR' : '📦 CLIENT'}
+                      </span>
+                      <span className="font-mono text-blue-600 font-medium">{item.order_number}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">{item.client_name}</div>
                     <div className="text-[10px] text-gray-500">
-                      {order.translate_from} → {order.translate_to} • {order.assigned_translator || 'No translator assigned'}
+                      {item.translate_from} → {item.translate_to} • {item.assigned_translator || item.assigned_translator_name || 'No translator'}
                     </div>
                   </div>
                   <div className="text-right">
                     <div className={`text-lg font-bold ${
-                      order.daysLeft < 0 ? 'text-red-600' :
-                      order.daysLeft <= 2 ? 'text-blue-600' :
-                      order.daysLeft <= 5 ? 'text-yellow-600' :
+                      item.daysLeft < 0 ? 'text-red-600' :
+                      item.daysLeft <= 2 ? (item.deadlineType === 'translator' ? 'text-purple-600' : 'text-blue-600') :
+                      item.daysLeft <= 5 ? 'text-yellow-600' :
                       'text-green-600'
                     }`}>
-                      {order.daysLeft < 0
-                        ? `${Math.abs(order.daysLeft)} dias atrasado`
-                        : order.daysLeft === 0
-                        ? 'HOJE'
-                        : `${order.daysLeft} dias`
+                      {item.daysLeft < 0
+                        ? `${Math.abs(item.daysLeft)}d overdue`
+                        : item.daysLeft === 0
+                        ? 'TODAY'
+                        : `${item.daysLeft}d left`
                       }
                     </div>
                     <div className="text-xs text-gray-500">
-                      {order.deadlineDate.toLocaleDateString('en-US')}
+                      {item.deadlineDate.toLocaleDateString('en-US')} {item.deadlineDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                     </div>
-                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[order.translation_status] || 'bg-gray-100'}`}>
-                      {order.translation_status}
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] ${STATUS_COLORS[item.translation_status] || 'bg-gray-100'}`}>
+                      {item.translation_status}
                     </span>
                   </div>
                 </div>
@@ -25374,7 +25662,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
               {getUpcomingDeadlines().length === 0 && (
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-4xl mb-2">📅</div>
-                  <p>No deadline pending</p>
+                  <p>No deadlines pending</p>
                 </div>
               )}
             </div>
