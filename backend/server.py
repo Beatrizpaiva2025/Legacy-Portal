@@ -10446,17 +10446,24 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     decline_url = f"{api_base}/api/translator/assignment/{assignment_token}/decline"
     portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
 
-    # Get deadline from order
+    # Get deadline from order - prefer translator_deadline if set by PM, otherwise use project deadline
     deadline_str = "To be confirmed"
-    if order and order.get("deadline"):
-        try:
-            deadline = order.get("deadline")
-            if isinstance(deadline, datetime):
-                deadline_str = deadline.strftime("%B %d, %Y at %H:%M")
-            else:
+    if order:
+        # First try translator_deadline (set by PM specifically for translator)
+        deadline = order.get("translator_deadline") or order.get("deadline")
+        if deadline:
+            try:
+                if isinstance(deadline, datetime):
+                    deadline_str = deadline.strftime("%B %d, %Y at %H:%M")
+                elif isinstance(deadline, str):
+                    # Try to parse ISO format
+                    from dateutil import parser
+                    parsed = parser.parse(deadline)
+                    deadline_str = parsed.strftime("%B %d, %Y at %H:%M")
+                else:
+                    deadline_str = str(deadline)
+            except:
                 deadline_str = str(deadline)
-        except:
-            deadline_str = str(order.get("deadline"))
 
     # Create email content with accept/decline buttons
     email_html = f"""
