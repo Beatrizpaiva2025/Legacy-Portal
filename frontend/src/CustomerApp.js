@@ -258,6 +258,8 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Include your email in the payment note',
     zelleAmount: 'Amount',
     payWithZelleBtn: 'Pay with Zelle',
+    couponCodeOptional: 'Coupon Code (optional)',
+    enterCouponCode: 'Enter coupon code',
 
     // Buttons
     continueToPayment: 'Continue to Payment',
@@ -465,6 +467,8 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Incluye tu email en la nota del pago',
     zelleAmount: 'Monto',
     payWithZelleBtn: 'Pagar con Zelle',
+    couponCodeOptional: 'Código de Cupón (opcional)',
+    enterCouponCode: 'Ingresa código de cupón',
 
     // Buttons
     continueToPayment: 'Continuar al Pago',
@@ -672,6 +676,8 @@ const CUSTOMER_TRANSLATIONS = {
     zelleIncludeEmail: 'Inclua seu email na nota do pagamento',
     zelleAmount: 'Valor',
     payWithZelleBtn: 'Pagar com Zelle',
+    couponCodeOptional: 'Código do Cupom (opcional)',
+    enterCouponCode: 'Digite o código do cupom',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -990,6 +996,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'zelle'
   const [zelleReceipt, setZelleReceipt] = useState(null);
   const [showZelleModal, setShowZelleModal] = useState(false);
+  const [zelleCouponCode, setZelleCouponCode] = useState('');
   const zelleReceiptInputRef = useRef(null);
 
   // Support form states
@@ -1506,7 +1513,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         payment_method: 'zelle',
         zelle_receipt_id: receiptUrl,
         total_price: quote?.total_price || 0,
-        notes: formData.notes,
+        notes: zelleCouponCode ? `${formData.notes}\n\nCoupon Code: ${zelleCouponCode}` : formData.notes,
+        coupon_code: zelleCouponCode || null,
         shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
       };
 
@@ -1516,6 +1524,7 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setSuccess(t.zelleOrderSubmitted);
       setShowZelleModal(false);
       setZelleReceipt(null);
+      setZelleCouponCode('');
 
       // Clear form
       setFormData({
@@ -2376,6 +2385,20 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                   </span>
                 )}
               </button>
+            </div>
+
+            {/* Coupon Code (Optional) */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.couponCodeOptional}
+              </label>
+              <input
+                type="text"
+                value={zelleCouponCode}
+                onChange={(e) => setZelleCouponCode(e.target.value.toUpperCase())}
+                placeholder={t.enterCouponCode}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 uppercase"
+              />
             </div>
 
             {/* Submit Button */}
