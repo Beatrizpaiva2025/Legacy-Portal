@@ -22827,6 +22827,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   const [projectDocuments, setProjectDocuments] = useState([]);
   const [loadingProjectDocs, setLoadingProjectDocs] = useState(false);
   const [fileAssignments, setFileAssignments] = useState({});
+
+  // Send Complete Project state
+  const [projectTranslatorId, setProjectTranslatorId] = useState('');
+  const [sendingCompleteProject, setSendingCompleteProject] = useState(false);
+
   const [newMessage, setNewMessage] = useState('');
   const [selectedTranslator, setSelectedTranslator] = useState(null);
   const [reviewQueue, setReviewQueue] = useState([]);
@@ -23210,6 +23215,75 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert('Error sending email invitation');
     } finally {
       setSendingFileInvite(prev => ({ ...prev, [doc.id]: false }));
+    }
+  };
+
+  // Send complete project to translator (all files at once)
+  const sendCompleteProject = async () => {
+    if (!projectTranslatorId) {
+      alert('Please select a translator first');
+      return;
+    }
+
+    if (projectDocuments.length === 0) {
+      alert('No files in this project');
+      return;
+    }
+
+    setSendingCompleteProject(true);
+    try {
+      const translator = translators.find(t => t.id === projectTranslatorId);
+      const fileList = projectDocuments.map(d => d.filename).join(', ');
+
+      // 1. Update all documents with the same translator
+      for (const doc of projectDocuments) {
+        await axios.patch(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
+          assigned_translator_id: projectTranslatorId,
+          assigned_translator_name: translator?.name
+        });
+      }
+
+      // 2. Update the order with the translator assignment
+      await axios.put(`${API}/admin/orders/${selectedProject.id}?admin_key=${adminKey}`, {
+        assigned_translator_id: projectTranslatorId,
+        assigned_translator: translator?.name
+      });
+
+      // 3. Send single email with all files
+      await axios.post(`${API}/admin/send-project-assignment-email?admin_key=${adminKey}`, {
+        translator_id: projectTranslatorId,
+        translator_name: translator?.name,
+        translator_email: translator?.email,
+        order_id: selectedProject?.id,
+        order_number: selectedProject?.order_number,
+        client_name: selectedProject?.client_name,
+        language_pair: `${selectedProject?.translate_from} → ${selectedProject?.translate_to}`,
+        documents: projectDocuments.map(d => ({
+          id: d.id,
+          filename: d.filename,
+          content_type: d.content_type
+        })),
+        total_files: projectDocuments.length,
+        pm_name: user?.name || 'PM',
+        deadline: selectedProject?.translator_deadline || selectedProject?.deadline
+      });
+
+      // Update local state
+      setFileAssignments(prev => {
+        const newState = { ...prev };
+        projectDocuments.forEach(doc => {
+          newState[doc.id] = { id: projectTranslatorId, name: translator?.name };
+        });
+        return newState;
+      });
+
+      alert(`📧 Project invitation sent to ${translator?.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
+      setProjectTranslatorId('');
+    } catch (err) {
+      console.error('Failed to send complete project:', err);
+      alert('Error sending project invitation');
+    } finally {
+      setSendingCompleteProject(false);
     }
   };
 
@@ -26037,6 +26111,56 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
 
             {/* Content */}
             <div className="p-4 overflow-y-auto flex-1">
+              {/* SEND COMPLETE PROJECT - Single invitation for all files */}
+              {!loadingProjectDocs && projectDocuments.length > 0 && (
+                <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">📦</span>
+                    <h4 className="font-bold text-green-800">Send Complete Project</h4>
+                    <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Recommended</span>
+                  </div>
+                  <p className="text-xs text-green-700 mb-3">
+                    Send all {projectDocuments.length} file(s) to a single translator with ONE invitation.
+                    The translator will receive a single email with all files listed.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={projectTranslatorId}
+                      onChange={(e) => setProjectTranslatorId(e.target.value)}
+                      className="flex-1 px-3 py-2 text-sm border-2 border-green-300 rounded-lg bg-white focus:border-green-500 focus:outline-none"
+                    >
+                      <option value="">-- Select Translator for Entire Project --</option>
+                      {translators.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.email})</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={sendCompleteProject}
+                      disabled={!projectTranslatorId || sendingCompleteProject}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {sendingCompleteProject ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>📧 Send All {projectDocuments.length} Files</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Divider */}
+              {!loadingProjectDocs && projectDocuments.length > 0 && (
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 border-t border-gray-300"></div>
+                  <span className="text-xs text-gray-400 font-medium">OR assign files individually</span>
+                  <div className="flex-1 border-t border-gray-300"></div>
+                </div>
+              )}
+
               <p className="text-xs text-gray-500 mb-3">Select a translator for each file. Different files can be assigned to different translators.</p>
 
               {loadingProjectDocs ? (

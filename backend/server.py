@@ -10863,6 +10863,110 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
 
+@api_router.post("/admin/send-project-assignment-email")
+async def send_project_assignment_email(admin_key: str, request: dict = Body(...)):
+    """Send email invitation to translator for complete project assignment (all files at once)"""
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
+        if user and user.get("role") in ["admin", "pm"]:
+            is_valid = True
+
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    translator_email = request.get("translator_email")
+    translator_name = request.get("translator_name", "Translator")
+    order_number = request.get("order_number", "")
+    client_name = request.get("client_name", "")
+    language_pair = request.get("language_pair", "")
+    pm_name = request.get("pm_name", "Project Manager")
+    documents = request.get("documents", [])
+    total_files = request.get("total_files", len(documents))
+    deadline = request.get("deadline")
+
+    if not translator_email:
+        raise HTTPException(status_code=400, detail="Translator email is required")
+
+    if not documents:
+        raise HTTPException(status_code=400, detail="No documents provided")
+
+    # Format deadline if provided
+    deadline_text = ""
+    if deadline:
+        try:
+            deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
+            deadline_text = deadline_dt.strftime("%B %d, %Y at %I:%M %p")
+        except:
+            deadline_text = deadline
+
+    # Build file list HTML
+    files_list_html = ""
+    for idx, doc in enumerate(documents, 1):
+        filename = doc.get("filename", "Document")
+        content_type = doc.get("content_type", "")
+        icon = "📕" if "pdf" in content_type.lower() else "🖼️" if "image" in content_type.lower() else "📄"
+        files_list_html += f'<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{icon} {idx}.</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{filename}</td></tr>'
+
+    # Create email content
+    email_html = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: white; margin: 0;">📦 New Project Assignment</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Complete project with {total_files} file(s)</p>
+        </div>
+        <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
+            <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
+            <p>You have been assigned a <strong>complete project</strong> with {total_files} file(s) to translate:</p>
+
+            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
+                <p style="margin: 5px 0;"><strong>👤 Client:</strong> {client_name}</p>
+                <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
+                <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
+                {f'<p style="margin: 5px 0;"><strong>📅 Deadline:</strong> {deadline_text}</p>' if deadline_text else ''}
+            </div>
+
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px; margin: 20px 0;">
+                <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 14px;">📁 Files in this project ({total_files}):</h3>
+                <table style="width: 100%; font-size: 14px;">
+                    {files_list_html}
+                </table>
+            </div>
+
+            <p>Please log in to your translator portal to view and work on these documents.</p>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-translations.com')}/translator"
+                   style="display: inline-block; background: #059669; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                    Open Translator Portal
+                </a>
+            </div>
+
+            <p style="color: #666; font-size: 12px; margin-top: 20px;">
+                If you have any questions about this project, please contact your Project Manager.
+            </p>
+        </div>
+        <div style="background: #1f2937; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
+            <p style="color: #9ca3af; margin: 0; font-size: 12px;">Legacy Translation Services</p>
+        </div>
+    </div>
+    """
+
+    try:
+        await email_service.send_email(
+            translator_email,
+            f"📦 New Project Assignment - {order_number} ({total_files} files)",
+            email_html
+        )
+        logger.info(f"Sent project assignment email to {translator_name} ({translator_email}) for order {order_number} with {total_files} files")
+        return {"status": "success", "message": f"Project email sent to {translator_name} with {total_files} files"}
+    except Exception as e:
+        logger.error(f"Failed to send project assignment email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
+
+
 @api_router.post("/admin/translator-messages")
 async def send_translator_message(request: TranslatorMessageRequest, admin_key: str):
     """Admin/PM sends a message to a translator"""
