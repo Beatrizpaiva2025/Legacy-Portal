@@ -260,6 +260,8 @@ const CUSTOMER_TRANSLATIONS = {
     payWithZelleBtn: 'Pay with Zelle',
     couponCodeOptional: 'Coupon Code (optional)',
     enterCouponCode: 'Enter coupon code',
+    invalidCoupon: 'Invalid coupon code',
+    zelleAmountToPay: 'Amount to pay',
 
     // Buttons
     continueToPayment: 'Continue to Payment',
@@ -469,6 +471,8 @@ const CUSTOMER_TRANSLATIONS = {
     payWithZelleBtn: 'Pagar con Zelle',
     couponCodeOptional: 'Código de Cupón (opcional)',
     enterCouponCode: 'Ingresa código de cupón',
+    invalidCoupon: 'Código de cupón inválido',
+    zelleAmountToPay: 'Monto a pagar',
 
     // Buttons
     continueToPayment: 'Continuar al Pago',
@@ -678,6 +682,8 @@ const CUSTOMER_TRANSLATIONS = {
     payWithZelleBtn: 'Pagar com Zelle',
     couponCodeOptional: 'Código do Cupom (opcional)',
     enterCouponCode: 'Digite o código do cupom',
+    invalidCoupon: 'Código do cupom inválido',
+    zelleAmountToPay: 'Valor a pagar',
 
     // Buttons
     continueToPayment: 'Continuar para Pagamento',
@@ -997,6 +1003,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   const [zelleReceipt, setZelleReceipt] = useState(null);
   const [showZelleModal, setShowZelleModal] = useState(false);
   const [zelleCouponCode, setZelleCouponCode] = useState('');
+  const [zelleDiscount, setZelleDiscount] = useState(null); // {type: 'percentage'|'fixed', value: number}
+  const [zelleDiscountError, setZelleDiscountError] = useState('');
   const zelleReceiptInputRef = useRef(null);
 
   // Support form states
@@ -1505,15 +1513,20 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       const uploadResponse = await axios.post(`${API}/upload-document`, receiptFormData);
       const receiptUrl = uploadResponse.data.document_id;
 
-      // Step 3: Create Zelle order
+      // Step 3: Create Zelle order with calculated discount
+      const zelleTotal = getZelleTotal();
+      const discountAmount = (quote?.total_price || 0) - zelleTotal;
+
       const zelleOrderData = {
         quote_id: quoteId,
         customer_email: guestEmail,
         customer_name: guestName,
         payment_method: 'zelle',
         zelle_receipt_id: receiptUrl,
-        total_price: quote?.total_price || 0,
-        notes: zelleCouponCode ? `${formData.notes}\n\nCoupon Code: ${zelleCouponCode}` : formData.notes,
+        total_price: zelleTotal,
+        original_price: quote?.total_price || 0,
+        discount_amount: discountAmount > 0 ? discountAmount : 0,
+        notes: zelleCouponCode ? `${formData.notes}\n\nCoupon Code: ${zelleCouponCode} (${zelleDiscount?.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount?.value}`} off)` : formData.notes,
         coupon_code: zelleCouponCode || null,
         shipping_address: needsPhysicalCopy || formData.service_type === 'rmv' ? shippingAddress : null
       };
@@ -1525,6 +1538,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setShowZelleModal(false);
       setZelleReceipt(null);
       setZelleCouponCode('');
+      setZelleDiscount(null);
+      setZelleDiscountError('');
 
       // Clear form
       setFormData({
@@ -1542,6 +1557,44 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
       setError(err.response?.data?.detail || t.failedToProcess);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Validate Zelle coupon code
+  const validateZelleCoupon = async () => {
+    if (!zelleCouponCode.trim()) {
+      setZelleDiscount(null);
+      setZelleDiscountError('');
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API}/discount-codes/validate?code=${zelleCouponCode}`);
+      if (response.data.valid) {
+        setZelleDiscount({
+          type: response.data.type,
+          value: response.data.value
+        });
+        setZelleDiscountError('');
+      } else {
+        setZelleDiscount(null);
+        setZelleDiscountError(t.invalidCoupon);
+      }
+    } catch (err) {
+      setZelleDiscount(null);
+      setZelleDiscountError(t.invalidCoupon);
+    }
+  };
+
+  // Calculate Zelle total with discount
+  const getZelleTotal = () => {
+    const basePrice = quote?.total_price || 0;
+    if (!zelleDiscount) return basePrice;
+
+    if (zelleDiscount.type === 'percentage') {
+      return basePrice * (1 - zelleDiscount.value / 100);
+    } else {
+      return Math.max(0, basePrice - zelleDiscount.value);
     }
   };
 
@@ -2333,7 +2386,13 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-purple-800">{t.payWithZelle}</h3>
               <button
-                onClick={() => setShowZelleModal(false)}
+                onClick={() => {
+                  setShowZelleModal(false);
+                  setZelleCouponCode('');
+                  setZelleDiscount(null);
+                  setZelleDiscountError('');
+                  setZelleReceipt(null);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2342,13 +2401,67 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </button>
             </div>
 
-            {/* Zelle Instructions */}
+            {/* Coupon Code */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t.couponCodeOptional}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={zelleCouponCode}
+                  onChange={(e) => {
+                    setZelleCouponCode(e.target.value.toUpperCase());
+                    setZelleDiscount(null);
+                    setZelleDiscountError('');
+                  }}
+                  placeholder={t.enterCouponCode}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={validateZelleCoupon}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+                >
+                  {t.apply}
+                </button>
+              </div>
+              {zelleDiscountError && (
+                <p className="text-red-500 text-xs mt-1">{zelleDiscountError}</p>
+              )}
+              {zelleDiscount && (
+                <p className="text-green-600 text-xs mt-1">
+                  {zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount.value}`} {t.off} {t.applied}
+                </p>
+              )}
+            </div>
+
+            {/* Price Summary */}
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-              <div className="space-y-2 text-sm text-purple-700">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-purple-700">
+                  <span>Subtotal:</span>
+                  <span>${(quote?.total_price || 0).toFixed(2)}</span>
+                </div>
+                {zelleDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{t.discount} ({zelleDiscount.type === 'percentage' ? `${zelleDiscount.value}%` : `$${zelleDiscount.value}`}):</span>
+                    <span>-${(quote?.total_price - getZelleTotal()).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-purple-800 text-base border-t border-purple-200 pt-2">
+                  <span>{t.zelleAmountToPay}:</span>
+                  <span>${getZelleTotal().toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Zelle Instructions */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+              <div className="space-y-1 text-xs text-gray-600">
                 <p><strong>1.</strong> {t.zelleStep1}</p>
                 <p><strong>2.</strong> {t.zelleSendTo}: <strong>contact@legacytranslations.com</strong></p>
-                <p><strong>3.</strong> {t.zelleAmount}: <strong>${(quote?.total_price || 0).toFixed(2)}</strong></p>
-                <p><strong>4.</strong> {t.zelleIncludeEmail}</p>
+                <p><strong>3.</strong> {t.zelleIncludeEmail}</p>
               </div>
             </div>
 
@@ -2385,20 +2498,6 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
                   </span>
                 )}
               </button>
-            </div>
-
-            {/* Coupon Code (Optional) */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t.couponCodeOptional}
-              </label>
-              <input
-                type="text"
-                value={zelleCouponCode}
-                onChange={(e) => setZelleCouponCode(e.target.value.toUpperCase())}
-                placeholder={t.enterCouponCode}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 uppercase"
-              />
             </div>
 
             {/* Submit Button */}
