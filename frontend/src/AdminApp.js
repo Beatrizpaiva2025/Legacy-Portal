@@ -19870,6 +19870,17 @@ const FinancesPage = ({ adminKey }) => {
   const [paidOrders, setPaidOrders] = useState([]);
   // Partner statistics state
   const [partnerStats, setPartnerStats] = useState({ partners: [], summary: {} });
+  // Partner invoices state
+  const [partnerInvoices, setPartnerInvoices] = useState([]);
+  const [selectedPartnerForInvoice, setSelectedPartnerForInvoice] = useState(null);
+  const [partnerOrdersForInvoice, setPartnerOrdersForInvoice] = useState([]);
+  const [selectedOrdersForInvoice, setSelectedOrdersForInvoice] = useState([]);
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [invoiceDueDays, setInvoiceDueDays] = useState(30);
+  const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [showInvoicesModal, setShowInvoicesModal] = useState(false);
+  const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
   // Quick add vendor modal state
   const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
   const [quickVendorForm, setQuickVendorForm] = useState({ name: '', email: '', role: 'translator', rate_per_page: '' });
@@ -20057,6 +20068,110 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Partner Invoice Functions
+  const fetchPartnerInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-invoices?admin_key=${adminKey}`);
+      setPartnerInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch partner invoices:', err);
+    }
+  };
+
+  const fetchPartnerOrdersForInvoice = async (partnerId) => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-orders/${partnerId}?admin_key=${adminKey}`);
+      setPartnerOrdersForInvoice(response.data.orders || []);
+    } catch (err) {
+      console.error('Failed to fetch partner orders:', err);
+    }
+  };
+
+  const fetchPartnerInvoicesForPartner = async (partnerId) => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-invoices/partner/${partnerId}?admin_key=${adminKey}`);
+      setSelectedPartnerInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch partner invoices:', err);
+    }
+  };
+
+  const handleOpenCreateInvoice = async (partner) => {
+    setSelectedPartnerForInvoice(partner);
+    setSelectedOrdersForInvoice([]);
+    setInvoiceDueDays(30);
+    setInvoiceNotes('');
+    await fetchPartnerOrdersForInvoice(partner.partner_id);
+    setShowCreateInvoiceModal(true);
+  };
+
+  const handleOpenInvoices = async (partner) => {
+    setSelectedPartnerForInvoice(partner);
+    await fetchPartnerInvoicesForPartner(partner.partner_id);
+    setShowInvoicesModal(true);
+  };
+
+  const handleCreateInvoice = async () => {
+    if (selectedOrdersForInvoice.length === 0) {
+      alert('Please select at least one order');
+      return;
+    }
+    setCreatingInvoice(true);
+    try {
+      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, {
+        partner_id: selectedPartnerForInvoice.partner_id,
+        order_ids: selectedOrdersForInvoice,
+        due_days: invoiceDueDays,
+        notes: invoiceNotes
+      });
+      alert('Invoice created successfully!');
+      setShowCreateInvoiceModal(false);
+      fetchPartnerStats();
+      fetchPartnerInvoices();
+    } catch (err) {
+      alert('Error creating invoice: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId) => {
+    if (!window.confirm('Are you sure you want to delete this invoice?')) return;
+    try {
+      await axios.delete(`${API}/admin/partner-invoices/${invoiceId}?admin_key=${adminKey}`);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerStats();
+    } catch (err) {
+      alert('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkInvoicePaid = async (invoiceId, paymentMethod = 'manual') => {
+    try {
+      await axios.put(`${API}/admin/partner-invoices/${invoiceId}/mark-paid?admin_key=${adminKey}&payment_method=${paymentMethod}`);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerStats();
+    } catch (err) {
+      alert('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrdersForInvoice(prev =>
+      prev.includes(orderId)
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const selectAllOrders = () => {
+    if (selectedOrdersForInvoice.length === partnerOrdersForInvoice.length) {
+      setSelectedOrdersForInvoice([]);
+    } else {
+      setSelectedOrdersForInvoice(partnerOrdersForInvoice.map(o => o.id));
+    }
+  };
+
   // Quick add vendor
   const handleQuickAddVendor = async () => {
     if (!quickVendorForm.name || !quickVendorForm.email) {
@@ -20226,6 +20341,7 @@ const FinancesPage = ({ adminKey }) => {
     }
     if (activeView === 'partners') {
       fetchPartnerStats();
+      fetchPartnerInvoices();
     }
     if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
@@ -21473,23 +21589,294 @@ const FinancesPage = ({ adminKey }) => {
                           {formatCurrency(partner.total_received + partner.total_pending)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
-                                deletePartner(partner.partner_id);
-                              }
-                            }}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete partner"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => handleOpenCreateInvoice(partner)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Create Invoice"
+                              disabled={partner.orders_pending === 0}
+                            >
+                              📄
+                            </button>
+                            <button
+                              onClick={() => handleOpenInvoices(partner)}
+                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                              title="View Invoices"
+                            >
+                              📋
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
+                                  deletePartner(partner.partner_id);
+                                }
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete partner"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* All Invoices Summary */}
+          {partnerInvoices.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <h2 className="text-sm font-bold text-gray-700">📋 Recent Invoices</h2>
+                <p className="text-xs text-gray-500 mt-1">All partner invoices</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Partner</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {partnerInvoices.slice(0, 10).map((invoice) => (
+                      <tr key={invoice.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-mono text-xs">{invoice.invoice_number}</td>
+                        <td className="px-4 py-3">{invoice.partner_company}</td>
+                        <td className="px-4 py-3 text-center">{invoice.order_ids?.length || 0}</td>
+                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(invoice.total_amount)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            invoice.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Invoice Modal */}
+      {showCreateInvoiceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Create Invoice</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerForInvoice?.company_name}</p>
+              </div>
+              <button onClick={() => setShowCreateInvoiceModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {partnerOrdersForInvoice.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No pending orders available for invoicing
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <label className="flex items-center text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrdersForInvoice.length === partnerOrdersForInvoice.length}
+                        onChange={selectAllOrders}
+                        className="mr-2"
+                      />
+                      Select All ({partnerOrdersForInvoice.length} orders)
+                    </label>
+                    <div className="text-sm font-medium">
+                      Selected: {formatCurrency(partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0))}
+                    </div>
+                  </div>
+                  <div className="space-y-2 mb-4">
+                    {partnerOrdersForInvoice.map((order) => (
+                      <div
+                        key={order.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedOrdersForInvoice.includes(order.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => toggleOrderSelection(order.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrdersForInvoice.includes(order.id)}
+                              onChange={() => toggleOrderSelection(order.id)}
+                              className="mr-3"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div>
+                              <div className="font-medium text-sm">{order.order_number}</div>
+                              <div className="text-xs text-gray-500">
+                                {order.client_name} - {order.translate_from} to {order.translate_to}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="font-medium text-sm">{formatCurrency(order.total_price)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due in (days)</label>
+                      <select
+                        value={invoiceDueDays}
+                        onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                      >
+                        <option value={7}>7 days</option>
+                        <option value={15}>15 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={45}>45 days</option>
+                        <option value={60}>60 days</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                      <input
+                        type="text"
+                        value={invoiceNotes}
+                        onChange={(e) => setInvoiceNotes(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="Invoice notes..."
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <div className="text-sm">
+                <span className="font-medium">{selectedOrdersForInvoice.length}</span> orders selected
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowCreateInvoiceModal(false)}
+                  className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateInvoice}
+                  disabled={creatingInvoice || selectedOrdersForInvoice.length === 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {creatingInvoice ? 'Creating...' : 'Create Invoice'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Invoices Modal */}
+      {showInvoicesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Invoices</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerForInvoice?.company_name}</p>
+              </div>
+              <button onClick={() => setShowInvoicesModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
+              {selectedPartnerInvoices.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No invoices found for this partner
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {selectedPartnerInvoices.map((invoice) => (
+                    <div key={invoice.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-mono font-medium">{invoice.invoice_number}</div>
+                          <div className="text-xs text-gray-500">
+                            Created: {new Date(invoice.created_at).toLocaleDateString()} |
+                            Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            invoice.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                          <span className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {invoice.order_ids?.length || 0} orders |
+                        {invoice.payment_method && ` Payment: ${invoice.payment_method}`}
+                        {invoice.zelle_receipt_url && (
+                          <a href={invoice.zelle_receipt_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 hover:underline">
+                            View Receipt
+                          </a>
+                        )}
+                      </div>
+                      {invoice.notes && (
+                        <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
+                      )}
+                      {invoice.status !== 'paid' && (
+                        <div className="flex space-x-2 mt-3">
+                          <button
+                            onClick={() => handleMarkInvoicePaid(invoice.id, 'zelle')}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
+                            Mark as Paid (Zelle)
+                          </button>
+                          <button
+                            onClick={() => handleMarkInvoicePaid(invoice.id, 'card')}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                          >
+                            Mark as Paid (Card)
+                          </button>
+                          <button
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowInvoicesModal(false)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

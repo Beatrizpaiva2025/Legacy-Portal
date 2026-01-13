@@ -65,8 +65,27 @@ const TRANSLATIONS = {
     createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
+    invoices: 'Invoices',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Invoice Page
+    myInvoices: 'My Invoices',
+    noInvoices: 'No invoices found',
+    invoiceNumber: 'Invoice #',
+    dueDate: 'Due Date',
+    status: 'Status',
+    amount: 'Amount',
+    payNow: 'Pay Now',
+    payWithCard: 'Pay with Card',
+    payWithZelle: 'Pay with Zelle',
+    uploadReceipt: 'Upload Receipt',
+    zelleInstructions: 'Send payment via Zelle to: payments@legacytranslations.com',
+    receiptUploaded: 'Receipt uploaded successfully. Payment will be verified shortly.',
+    invoicePaid: 'Paid',
+    invoicePending: 'Pending',
+    invoiceOverdue: 'Overdue',
+    viewDetails: 'View Details',
+    ordersIncluded: 'Orders Included',
     // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
@@ -182,8 +201,27 @@ const TRANSLATIONS = {
     createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
     messages: 'Mensajes',
+    invoices: 'Facturas',
     welcome: 'Bienvenido',
     logout: 'Cerrar Sesión',
+    // Invoice Page
+    myInvoices: 'Mis Facturas',
+    noInvoices: 'No se encontraron facturas',
+    invoiceNumber: 'Factura #',
+    dueDate: 'Fecha de Vencimiento',
+    status: 'Estado',
+    amount: 'Monto',
+    payNow: 'Pagar Ahora',
+    payWithCard: 'Pagar con Tarjeta',
+    payWithZelle: 'Pagar con Zelle',
+    uploadReceipt: 'Subir Recibo',
+    zelleInstructions: 'Enviar pago via Zelle a: payments@legacytranslations.com',
+    receiptUploaded: 'Recibo subido exitosamente. El pago sera verificado pronto.',
+    invoicePaid: 'Pagado',
+    invoicePending: 'Pendiente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalles',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
     certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
@@ -298,8 +336,27 @@ const TRANSLATIONS = {
     createNewOrder: 'Criar Novo Pedido',
     myOrders: 'Meus Pedidos',
     messages: 'Mensagens',
+    invoices: 'Faturas',
     welcome: 'Bem-vindo',
     logout: 'Sair',
+    // Invoice Page
+    myInvoices: 'Minhas Faturas',
+    noInvoices: 'Nenhuma fatura encontrada',
+    invoiceNumber: 'Fatura #',
+    dueDate: 'Data de Vencimento',
+    status: 'Status',
+    amount: 'Valor',
+    payNow: 'Pagar Agora',
+    payWithCard: 'Pagar com Cartao',
+    payWithZelle: 'Pagar com Zelle',
+    uploadReceipt: 'Enviar Comprovante',
+    zelleInstructions: 'Enviar pagamento via Zelle para: payments@legacytranslations.com',
+    receiptUploaded: 'Comprovante enviado com sucesso. O pagamento sera verificado em breve.',
+    invoicePaid: 'Pago',
+    invoicePending: 'Pendente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalhes',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Serviço',
     certifiedTranslation: 'Tradução Certificada',
     certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
@@ -1058,6 +1115,7 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
     { id: 'new-order', label: t.newOrder, icon: '➕' },
     { id: 'orders', label: t.myOrders, icon: '📋' },
+    { id: 'invoices', label: t.invoices, icon: '💰' },
     { id: 'messages', label: t.messages, icon: '✉️' }
   ];
 
@@ -2748,6 +2806,375 @@ const OrdersPage = ({ token }) => {
   );
 };
 
+// ==================== INVOICES PAGE ====================
+const InvoicesPage = ({ token, t }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceOrders, setInvoiceOrders] = useState([]);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices?token=${token}`);
+      setInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Error fetching invoices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInvoiceDetails = async (invoiceId) => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices/${invoiceId}?token=${token}`);
+      setSelectedInvoice(response.data.invoice);
+      setInvoiceOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Error fetching invoice details:', err);
+    }
+  };
+
+  const handleViewDetails = async (invoice) => {
+    await fetchInvoiceDetails(invoice.id);
+  };
+
+  const handlePayNow = (invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentMethod('card');
+    setZelleReceipt(null);
+    setShowPayModal(true);
+  };
+
+  const handlePayWithStripe = async () => {
+    if (!selectedInvoice) return;
+    setSubmittingPayment(true);
+    try {
+      const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
+        invoice_id: selectedInvoice.id,
+        origin_url: window.location.origin
+      });
+      if (response.data.checkout_url) {
+        window.location.href = response.data.checkout_url;
+      }
+    } catch (err) {
+      alert('Error creating payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(`${API}/upload-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setZelleReceipt({
+        id: response.data.document_id,
+        filename: file.name
+      });
+    } catch (err) {
+      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  const handleSubmitZellePayment = async () => {
+    if (!selectedInvoice || !zelleReceipt) {
+      alert('Please upload a receipt');
+      return;
+    }
+
+    setSubmittingPayment(true);
+    try {
+      await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-zelle?token=${token}`, {
+        invoice_id: selectedInvoice.id,
+        zelle_receipt_id: zelleReceipt.id
+      });
+      alert(t?.receiptUploaded || 'Receipt uploaded successfully. Payment will be verified shortly.');
+      setShowPayModal(false);
+      setZelleReceipt(null);
+      fetchInvoices();
+    } catch (err) {
+      alert('Error submitting payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-700';
+      case 'overdue': return 'bg-red-100 text-red-700';
+      default: return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'paid': return t?.invoicePaid || 'Paid';
+      case 'overdue': return t?.invoiceOverdue || 'Overdue';
+      default: return t?.invoicePending || 'Pending';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.myInvoices || 'My Invoices'}</h1>
+
+      {invoices.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <span className="text-4xl mb-4 block">📋</span>
+          {t?.noInvoices || 'No invoices found'}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {invoices.map((invoice) => (
+            <div key={invoice.id} className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="font-mono font-bold text-lg">{invoice.invoice_number}</div>
+                    <div className="text-sm text-gray-500">
+                      {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
+                      {getStatusLabel(invoice.status)}
+                    </span>
+                    <span className="text-2xl font-bold text-gray-800">{formatCurrency(invoice.total_amount)}</span>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-500 mb-4">
+                  {invoice.order_ids?.length || 0} {t?.ordersIncluded || 'orders'} |
+                  {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString()}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => handleViewDetails(invoice)}
+                    className="text-teal-600 hover:text-teal-800 text-sm font-medium"
+                  >
+                    {t?.viewDetails || 'View Details'}
+                  </button>
+
+                  {invoice.status !== 'paid' && (
+                    <button
+                      onClick={() => handlePayNow(invoice)}
+                      className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
+                    >
+                      {t?.payNow || 'Pay Now'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Invoice Details Modal */}
+      {selectedInvoice && !showPayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-lg">{selectedInvoice.invoice_number}</h2>
+                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedInvoice.status)}`}>
+                  {getStatusLabel(selectedInvoice.status)}
+                </span>
+              </div>
+              <button onClick={() => setSelectedInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <div className="text-sm text-gray-500">{t?.dueDate || 'Due Date'}</div>
+                  <div className="font-medium">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                  <div className="font-bold text-xl">{formatCurrency(selectedInvoice.total_amount)}</div>
+                </div>
+              </div>
+
+              <h3 className="font-bold text-gray-700 mb-3">{t?.ordersIncluded || 'Orders Included'}</h3>
+              <div className="space-y-2">
+                {invoiceOrders.map((order) => (
+                  <div key={order.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{order.order_number}</div>
+                        <div className="text-sm text-gray-500">
+                          {order.client_name} - {order.translate_from} to {order.translate_to}
+                        </div>
+                        <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <div className="font-medium">{formatCurrency(order.total_price)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedInvoice.notes && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600">{selectedInvoice.notes}</div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setSelectedInvoice(null)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Close
+              </button>
+              {selectedInvoice.status !== 'paid' && (
+                <button
+                  onClick={() => { setShowPayModal(true); }}
+                  className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                >
+                  {t?.payNow || 'Pay Now'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPayModal && selectedInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="font-bold">{t?.payNow || 'Pay Invoice'}</h2>
+              <button onClick={() => { setShowPayModal(false); setZelleReceipt(null); }} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                <div className="text-3xl font-bold text-gray-800">{formatCurrency(selectedInvoice.total_amount)}</div>
+                <div className="text-xs text-gray-500 mt-1">{selectedInvoice.invoice_number}</div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => setPaymentMethod('card')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">💳</span>
+                    <span className="font-medium">{t?.payWithCard || 'Pay with Card'}</span>
+                  </div>
+                  {paymentMethod === 'card' && <span className="text-teal-600">✓</span>}
+                </button>
+
+                <button
+                  onClick={() => setPaymentMethod('zelle')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">🏦</span>
+                    <span className="font-medium">{t?.payWithZelle || 'Pay with Zelle'}</span>
+                  </div>
+                  {paymentMethod === 'zelle' && <span className="text-teal-600">✓</span>}
+                </button>
+              </div>
+
+              {paymentMethod === 'card' && (
+                <button
+                  onClick={handlePayWithStripe}
+                  disabled={submittingPayment}
+                  className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300"
+                >
+                  {submittingPayment ? 'Processing...' : `${t?.payNow || 'Pay'} ${formatCurrency(selectedInvoice.total_amount)}`}
+                </button>
+              )}
+
+              {paymentMethod === 'zelle' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="text-sm font-medium text-purple-800 mb-2">Zelle Payment Instructions:</div>
+                    <div className="text-sm text-purple-700">
+                      {t?.zelleInstructions || 'Send payment via Zelle to: payments@legacytranslations.com'}
+                    </div>
+                    <div className="text-sm text-purple-600 mt-2">Amount: {formatCurrency(selectedInvoice.total_amount)}</div>
+                    <div className="text-xs text-purple-500 mt-1">Reference: {selectedInvoice.invoice_number}</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t?.uploadReceipt || 'Upload Payment Receipt'}
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleReceiptUpload}
+                      accept="image/*,.pdf"
+                      className="w-full border rounded-lg p-2 text-sm"
+                      disabled={uploadingReceipt}
+                    />
+                    {uploadingReceipt && (
+                      <div className="text-sm text-gray-500 mt-1">Uploading...</div>
+                    )}
+                    {zelleReceipt && (
+                      <div className="text-sm text-green-600 mt-1">
+                        ✓ {zelleReceipt.filename}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSubmitZellePayment}
+                    disabled={!zelleReceipt || submittingPayment}
+                    className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:bg-gray-300"
+                  >
+                    {submittingPayment ? 'Submitting...' : 'Submit Zelle Payment'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ==================== MESSAGES PAGE ====================
 const MessagesPage = ({ token }) => {
   const [conversations, setConversations] = useState([]);
@@ -3715,6 +4142,8 @@ function App() {
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
         return <OrdersPage token={token} />;
+      case 'invoices':
+        return <InvoicesPage token={token} t={t} />;
       case 'messages':
         return <MessagesPage token={token} />;
       default:
