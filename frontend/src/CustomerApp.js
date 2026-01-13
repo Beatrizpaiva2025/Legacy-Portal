@@ -232,6 +232,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Discount',
     discountCode: 'Discount Code',
     enterCode: 'Enter code',
+    couponAtCheckout: 'Have a coupon? Apply it at checkout',
     apply: 'Apply',
     off: 'off',
     applied: 'applied!',
@@ -434,6 +435,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Descuento',
     discountCode: 'Código de Descuento',
     enterCode: 'Ingresar código',
+    couponAtCheckout: '¿Tienes un cupón? Aplícalo en el checkout',
     apply: 'Aplicar',
     off: 'de descuento',
     applied: '¡aplicado!',
@@ -636,6 +638,7 @@ const CUSTOMER_TRANSLATIONS = {
     discount: 'Desconto',
     discountCode: 'Código de Desconto',
     enterCode: 'Inserir código',
+    couponAtCheckout: 'Tem um cupom? Aplique no checkout',
     apply: 'Aplicar',
     off: 'de desconto',
     applied: 'aplicado!',
@@ -2329,30 +2332,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
               </div>
             </div>
 
-            {/* Discount Code */}
+            {/* Discount Code Info */}
             <div className="border-t pt-3 mt-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t.discountCode}</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:border-teal-500 focus:ring-1 focus:ring-teal-500 uppercase"
-                  value={discountCode}
-                  onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
-                  placeholder={t.enterCode}
-                />
-                <button
-                  type="button"
-                  onClick={applyDiscountCode}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 transition-colors"
-                >
-                  {t.apply}
-                </button>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>{t.couponAtCheckout}</span>
               </div>
-              {appliedDiscount && (
-                <p className="text-teal-600 text-xs mt-1">
-                  {appliedDiscount.type === 'percentage' ? `${appliedDiscount.value}% ${t.off}` : `$${appliedDiscount.value} ${t.off}`} {t.applied}
-                </p>
-              )}
             </div>
 
             <div className="text-xs text-gray-500 mt-4">

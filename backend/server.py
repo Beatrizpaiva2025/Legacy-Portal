@@ -3439,6 +3439,7 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 'quantity': 1,
             }],
             'mode': 'payment',
+            'allow_promotion_codes': True,  # Enable Stripe coupons/promotion codes
             'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}#/customer",
             'cancel_url': f"{request.origin_url}?payment_cancelled=true#/customer",
             'metadata': {
