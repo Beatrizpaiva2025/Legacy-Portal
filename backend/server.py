@@ -1316,6 +1316,8 @@ class TranslationOrderUpdate(BaseModel):
     document_type: Optional[str] = None
     total_price: Optional[float] = None
     base_price: Optional[float] = None
+    # Translator assignment status (Admin/PM can manually change pending to accepted)
+    translator_assignment_status: Optional[str] = None
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -7836,6 +7838,13 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["total_price"] = update_data.total_price
         if update_data.base_price is not None:
             update_dict["base_price"] = update_data.base_price
+
+        # Handle translator assignment status (Admin/PM can manually change pending to accepted)
+        if update_data.translator_assignment_status is not None:
+            update_dict["translator_assignment_status"] = update_data.translator_assignment_status
+            # Also update the responded_at timestamp when status changes
+            if update_data.translator_assignment_status in ["accepted", "declined"]:
+                update_dict["translator_assignment_responded_at"] = datetime.utcnow()
 
         # Add updated_at timestamp
         update_dict["updated_at"] = datetime.utcnow()
