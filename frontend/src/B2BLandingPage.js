@@ -38,6 +38,14 @@ const B2BLandingPage = () => {
     }
   }, []);
 
+  // Scroll to section helper (avoids HashRouter conflict)
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const [formData, setFormData] = useState({
     company_name: '',
     contact_name: '',
@@ -100,7 +108,7 @@ Message: ${formData.message}
             <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
               Services
             </a>
-            <a href="#/partner" className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
+            <a href="#/partner/login" className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
               Partner Login
             </a>
           </nav>
@@ -124,12 +132,12 @@ Message: ${formData.message}
                 Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.
               </p>
               <div className="flex flex-wrap gap-4 mb-8">
-                <a href="#contact-form" className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
+                <button onClick={() => scrollToSection('contact-form')} className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
                   Request Partnership
-                </a>
-                <a href="#benefits" className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
+                </button>
+                <button onClick={() => scrollToSection('benefits')} className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
                   View Benefits
-                </a>
+                </button>
               </div>
               <div className="flex items-center gap-6 text-sm text-slate-500">
                 <div className="flex items-center">
@@ -179,12 +187,12 @@ Message: ${formData.message}
                 <div className="text-green-100 text-sm md:text-base">1 page - No commitment required</div>
               </div>
             </div>
-            <a
-              href="#contact-form"
+            <button
+              onClick={() => scrollToSection('contact-form')}
               className="px-6 py-3 bg-white text-green-600 rounded-full font-semibold hover:bg-green-50 transition-colors shadow-lg"
             >
               Claim Your Free Translation
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -548,7 +556,7 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-gray-600 mb-4">Already a partner?</p>
           <a
-            href="#/partner"
+            href="#/partner/login"
             className="inline-block px-8 py-3 border-2 border-blue-900 text-blue-900 rounded-full hover:bg-blue-900 hover:text-white font-semibold transition-colors"
           >
             Access Partner Portal
@@ -585,7 +593,7 @@ Message: ${formData.message}
               <div className="space-y-2">
                 <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">Home</a>
                 <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">Services</a>
-                <a href="#/partner" className="block text-blue-200 hover:text-white">Partner Portal</a>
+                <a href="#/partner/login" className="block text-blue-200 hover:text-white">Partner Portal</a>
               </div>
             </div>
           </div>
