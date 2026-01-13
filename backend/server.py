@@ -11316,7 +11316,7 @@ async def admin_download_order_document(doc_id: str, admin_key: str):
     raise HTTPException(status_code=404, detail="Document not found")
 
 @api_router.patch("/admin/order-documents/{doc_id}")
-async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict):
+async def admin_update_order_document(doc_id: str, admin_key: str, update_data: dict = Body(...)):
     """Admin/PM: Update document metadata (e.g., assign translator to specific document)"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
@@ -11346,8 +11346,12 @@ async def admin_update_order_document(doc_id: str, admin_key: str, update_data: 
             {"$set": update_dict}
         )
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Document not found or no changes made")
+    # Also check if matched but not modified (same values)
+    if result.matched_count > 0:
+        return {"success": True, "message": "Document updated successfully"}
+
+    if result.modified_count == 0 and result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
 
     return {"success": True, "message": "Document updated successfully"}
 
