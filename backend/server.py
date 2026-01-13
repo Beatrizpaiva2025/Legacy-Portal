@@ -10863,6 +10863,95 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
 
 
+def get_project_assignment_email_template(translator_name: str, order_details: dict, files_list: list, accept_url: str, decline_url: str) -> str:
+    """Generate professional email template for complete project assignment with accept/decline buttons"""
+
+    # Build files list HTML
+    files_html = ""
+    for idx, doc in enumerate(files_list, 1):
+        filename = doc.get("filename", "Document")
+        files_html += f'''
+                                            <tr>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{idx}. {filename}</td>
+                                            </tr>'''
+
+    total_files = len(files_list)
+
+    content = f'''
+                            <p style="color: #1a2a4a; font-size: 18px; font-weight: 600; margin: 0 0 20px 0;">
+                                Hello, {translator_name}
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                You have been assigned a new translation project with {total_files} file(s). Please review the details below and accept or decline this assignment.
+                            </p>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            Project Details
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0; width: 40%;"><strong>Project Number:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0; font-weight: 600;">{order_details.get('order_number', 'N/A')}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Languages:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('translate_from', 'N/A').title()} &rarr; {order_details.get('translate_to', 'N/A').title()}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Total Files:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{total_files} file(s)</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 14px; padding: 5px 0;"><strong>Deadline:</strong></td>
+                                                <td style="color: #1a2a4a; font-size: 14px; padding: 5px 0;">{order_details.get('deadline', 'To be confirmed')}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 100%); border-radius: 8px; margin: 25px 0;">
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <p style="color: #1a2a4a; font-size: 16px; font-weight: 600; margin: 0 0 15px 0;">
+                                            Files in this Project ({total_files})
+                                        </p>
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            {files_html}
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{accept_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3); margin: 5px;">
+                                            ACCEPT PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding: 10px;">
+                                        <a href="{decline_url}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 50px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3); margin: 5px;">
+                                            DECLINE PROJECT
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color: #64748b; font-size: 13px; line-height: 1.7; margin: 20px 0; text-align: center;">
+                                Please respond as soon as possible so we can proceed with the project.
+                            </p>
+                            <p style="color: #4a5568; font-size: 15px; line-height: 1.7; margin: 0 0 20px 0;">
+                                Regards,
+                            </p>'''
+    return get_email_header() + content + get_email_footer(include_review_button=False)
+
+
 @api_router.post("/admin/send-project-assignment-email")
 async def send_project_assignment_email(admin_key: str, request: dict = Body(...)):
     """Send email invitation to translator for complete project assignment (all files at once)"""
@@ -10878,10 +10967,10 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
 
     translator_email = request.get("translator_email")
     translator_name = request.get("translator_name", "Translator")
+    translator_id = request.get("translator_id")
+    order_id = request.get("order_id")
     order_number = request.get("order_number", "")
-    client_name = request.get("client_name", "")
     language_pair = request.get("language_pair", "")
-    pm_name = request.get("pm_name", "Project Manager")
     documents = request.get("documents", [])
     total_files = request.get("total_files", len(documents))
     deadline = request.get("deadline")
@@ -10892,8 +10981,11 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
     if not documents:
         raise HTTPException(status_code=400, detail="No documents provided")
 
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Order ID is required")
+
     # Format deadline if provided
-    deadline_text = ""
+    deadline_text = "To be confirmed"
     if deadline:
         try:
             deadline_dt = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
@@ -10901,63 +10993,55 @@ async def send_project_assignment_email(admin_key: str, request: dict = Body(...
         except:
             deadline_text = deadline
 
-    # Build file list HTML
-    files_list_html = ""
-    for idx, doc in enumerate(documents, 1):
-        filename = doc.get("filename", "Document")
-        content_type = doc.get("content_type", "")
-        icon = "📕" if "pdf" in content_type.lower() else "🖼️" if "image" in content_type.lower() else "📄"
-        files_list_html += f'<tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{icon} {idx}.</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">{filename}</td></tr>'
+    # Parse language pair
+    translate_from = ""
+    translate_to = ""
+    if language_pair and " → " in language_pair:
+        parts = language_pair.split(" → ")
+        translate_from = parts[0].strip() if len(parts) > 0 else ""
+        translate_to = parts[1].strip() if len(parts) > 1 else ""
+    elif language_pair and " -> " in language_pair:
+        parts = language_pair.split(" -> ")
+        translate_from = parts[0].strip() if len(parts) > 0 else ""
+        translate_to = parts[1].strip() if len(parts) > 1 else ""
 
-    # Create email content
-    email_html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">📦 New Project Assignment</h1>
-            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Complete project with {total_files} file(s)</p>
-        </div>
-        <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
-            <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
-            <p>You have been assigned a <strong>complete project</strong> with {total_files} file(s) to translate:</p>
+    # Generate assignment token and update order
+    assignment_token = str(uuid.uuid4())
+    await db.translation_orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "translator_assignment_token": assignment_token,
+            "translator_assignment_status": "pending",
+            "translator_assignment_responded_at": None
+        }}
+    )
 
-            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
-                <p style="margin: 5px 0;"><strong>👤 Client:</strong> {client_name}</p>
-                <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
-                <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
-                {f'<p style="margin: 5px 0;"><strong>📅 Deadline:</strong> {deadline_text}</p>' if deadline_text else ''}
-            </div>
+    # Build accept/decline URLs
+    frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+    accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
+    decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
 
-            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px; margin: 20px 0;">
-                <h3 style="margin: 0 0 10px 0; color: #166534; font-size: 14px;">📁 Files in this project ({total_files}):</h3>
-                <table style="width: 100%; font-size: 14px;">
-                    {files_list_html}
-                </table>
-            </div>
+    # Prepare order details for email template
+    order_details = {
+        "order_number": order_number,
+        "translate_from": translate_from,
+        "translate_to": translate_to,
+        "deadline": deadline_text
+    }
 
-            <p>Please log in to your translator portal to view and work on these documents.</p>
-
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-translations.com')}/translator"
-                   style="display: inline-block; background: #059669; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                    Open Translator Portal
-                </a>
-            </div>
-
-            <p style="color: #666; font-size: 12px; margin-top: 20px;">
-                If you have any questions about this project, please contact your Project Manager.
-            </p>
-        </div>
-        <div style="background: #1f2937; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
-            <p style="color: #9ca3af; margin: 0; font-size: 12px;">Legacy Translation Services</p>
-        </div>
-    </div>
-    """
+    # Generate email HTML using professional template
+    email_html = get_project_assignment_email_template(
+        translator_name,
+        order_details,
+        documents,
+        accept_url,
+        decline_url
+    )
 
     try:
         await email_service.send_email(
             translator_email,
-            f"📦 New Project Assignment - {order_number} ({total_files} files)",
+            f"New Project Assignment - {order_number} ({total_files} files)",
             email_html
         )
         logger.info(f"Sent project assignment email to {translator_name} ({translator_email}) for order {order_number} with {total_files} files")
