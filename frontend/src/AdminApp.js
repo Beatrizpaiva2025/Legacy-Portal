@@ -22428,27 +22428,41 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       alert('Please select a translator first');
       return;
     }
+
+    // Find translator - compare as strings to handle type mismatch
+    const translator = translators.find(t => String(t.id) === String(translatorId));
+
+    if (!translator) {
+      console.error('Translator not found for file invite:', { translatorId, translators });
+      alert('Error: Translator not found. Please try selecting again.');
+      return;
+    }
+
+    if (!translator.email) {
+      alert('Error: Selected translator has no email address configured.');
+      return;
+    }
+
     setSendingFileInvite(prev => ({ ...prev, [doc.id]: true }));
     try {
-      const translator = translators.find(t => t.id === translatorId);
-
-      // Send email invite via the order update endpoint
+      // Send email invite via the file assignment endpoint
       await axios.post(`${API}/admin/send-file-assignment-email?admin_key=${adminKey}`, {
         document_id: doc.id,
         document_name: doc.filename,
-        translator_id: translatorId,
-        translator_name: translatorName,
-        translator_email: translator?.email,
+        translator_id: translator.id,
+        translator_name: translator.name,
+        translator_email: translator.email,
         order_id: selectedProject?.id,
         order_number: selectedProject?.order_number,
         language_pair: `${selectedProject?.translate_from} → ${selectedProject?.translate_to}`,
         pm_name: user?.name || 'PM'
       });
 
-      alert(`📧 Email invitation sent to ${translatorName}!`);
+      alert(`📧 Email invitation sent to ${translator.name}!`);
     } catch (err) {
       console.error('Failed to send invite:', err);
-      alert('Error sending email invitation');
+      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
+      alert(`Error sending email invitation: ${errorMsg}`);
     } finally {
       setSendingFileInvite(prev => ({ ...prev, [doc.id]: false }));
     }
@@ -22466,30 +22480,43 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       return;
     }
 
+    // Find translator - compare as strings to handle type mismatch
+    const translator = translators.find(t => String(t.id) === String(projectTranslatorId));
+
+    if (!translator) {
+      console.error('Translator not found:', { projectTranslatorId, translators });
+      alert('Error: Translator not found. Please try selecting again.');
+      return;
+    }
+
+    if (!translator.email) {
+      alert('Error: Selected translator has no email address configured.');
+      return;
+    }
+
     setSendingCompleteProject(true);
     try {
-      const translator = translators.find(t => t.id === projectTranslatorId);
       const fileList = projectDocuments.map(d => d.filename).join(', ');
 
       // 1. Update all documents with the same translator
       for (const doc of projectDocuments) {
         await axios.patch(`${API}/admin/order-documents/${doc.id}?admin_key=${adminKey}`, {
-          assigned_translator_id: projectTranslatorId,
-          assigned_translator_name: translator?.name
+          assigned_translator_id: translator.id,
+          assigned_translator_name: translator.name
         });
       }
 
       // 2. Update the order with the translator assignment
       await axios.put(`${API}/admin/orders/${selectedProject.id}?admin_key=${adminKey}`, {
-        assigned_translator_id: projectTranslatorId,
-        assigned_translator: translator?.name
+        assigned_translator_id: translator.id,
+        assigned_translator: translator.name
       });
 
       // 3. Send single email with all files
       await axios.post(`${API}/admin/send-project-assignment-email?admin_key=${adminKey}`, {
-        translator_id: projectTranslatorId,
-        translator_name: translator?.name,
-        translator_email: translator?.email,
+        translator_id: translator.id,
+        translator_name: translator.name,
+        translator_email: translator.email,
         order_id: selectedProject?.id,
         order_number: selectedProject?.order_number,
         client_name: selectedProject?.client_name,
@@ -22508,16 +22535,17 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       setFileAssignments(prev => {
         const newState = { ...prev };
         projectDocuments.forEach(doc => {
-          newState[doc.id] = { id: projectTranslatorId, name: translator?.name };
+          newState[doc.id] = { id: translator.id, name: translator.name };
         });
         return newState;
       });
 
-      alert(`📧 Project invitation sent to ${translator?.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
+      alert(`📧 Project invitation sent to ${translator.name}!\n\n${projectDocuments.length} file(s) assigned:\n${fileList}`);
       setProjectTranslatorId('');
     } catch (err) {
       console.error('Failed to send complete project:', err);
-      alert('Error sending project invitation');
+      const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
+      alert(`Error sending project invitation: ${errorMsg}`);
     } finally {
       setSendingCompleteProject(false);
     }
@@ -25434,7 +25462,8 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <select
                           value={fileAssignments[doc.id]?.id || doc.assigned_translator_id || ''}
                           onChange={(e) => {
-                            const selected = translators.find(t => t.id === e.target.value);
+                            // Compare as strings to handle type mismatch
+                            const selected = translators.find(t => String(t.id) === String(e.target.value));
                             if (selected) {
                               assignTranslatorToFile(doc.id, selected.id, selected.name);
                             }
