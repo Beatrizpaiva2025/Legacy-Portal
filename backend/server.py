@@ -3423,6 +3423,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             return
         
         # Prepare order details for email
+        customer_email = quote.get("customer_email")
         order_details = {
             "reference": quote.get("reference"),
             "service_type": quote.get("service_type"),
@@ -3434,14 +3435,14 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"  # Default for partner portal
+            "client_email": customer_email or "contact@legacytranslations.com"
         }
-        
+
         # Create project in Protemos
         try:
             protemos_response = await protemos_client.create_project(order_details)
             logger.info(f"Created Protemos project for session {session_id}: {protemos_response.get('id')}")
-            
+
             # Update payment transaction with Protemos project ID
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
@@ -3452,11 +3453,23 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
                     }
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to create Protemos project for session {session_id}: {str(e)}")
             # Don't fail the entire process if Protemos fails
-        
+
+        # Send confirmation email to customer (if email available)
+        if customer_email:
+            try:
+                await email_service.send_order_confirmation_email(
+                    customer_email,
+                    order_details,
+                    is_partner=True
+                )
+                logger.info(f"Sent order confirmation to customer: {customer_email}")
+            except Exception as e:
+                logger.error(f"Failed to send customer confirmation email: {str(e)}")
+
         # Send confirmation email to company
         try:
             await email_service.send_order_confirmation_email(
@@ -3488,6 +3501,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             raise HTTPException(status_code=404, detail="Quote not found")
         
         # Prepare order details for Protemos
+        customer_email = quote.get("customer_email")
         order_details = {
             "reference": quote.get("reference"),
             "service_type": quote.get("service_type"),
@@ -3499,7 +3513,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"
+            "client_email": customer_email or "contact@legacytranslations.com"
         }
         
         # Create project in Protemos
@@ -5922,26 +5936,26 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
             # If Zelle payment, send Zelle-specific emails
             if order_data.payment_method == "zelle":
-                # Send Zelle pending email to partner
+                # Send Zelle pending email to client (order email)
                 try:
                     zelle_order_details = {
                         **order_details,
-                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
-                        "customer_email": partner["email"]
+                        "customer_name": order.client_name,
+                        "customer_email": order.client_email
                     }
                     email_html = get_zelle_pending_email_template(
-                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        order.client_name,
                         zelle_order_details
                     )
                     await email_service.send_email(
-                        partner["email"],
+                        order.client_email,
                         f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
                         email_html,
                         "html"
                     )
-                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                    logger.info(f"Zelle pending email sent to client: {order.client_email}")
                 except Exception as ze:
-                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
+                    logger.error(f"Failed to send Zelle pending email to client: {str(ze)}")
 
                 # Send Zelle admin notification
                 try:
@@ -5957,9 +5971,9 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
             else:
                 # Standard order confirmation emails
-                # Notify partner
+                # Notify client (order email)
                 await email_service.send_order_confirmation_email(
-                    partner["email"],
+                    order.client_email,
                     order_details,
                     is_partner=True
                 )
