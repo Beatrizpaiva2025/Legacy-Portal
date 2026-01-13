@@ -1317,6 +1317,50 @@ class TranslationOrderUpdate(BaseModel):
     total_price: Optional[float] = None
     base_price: Optional[float] = None
 
+# Partner Invoice Models
+class PartnerInvoice(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_number: str = Field(default_factory=lambda: f"INV-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    partner_id: str
+    partner_company: str
+    partner_email: Optional[str] = None
+    # Order IDs included in this invoice
+    order_ids: List[str] = []
+    # Financial info
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total_amount: float = 0.0
+    # Status
+    status: str = "pending"  # pending, paid, partial, overdue, cancelled
+    # Payment tracking
+    payment_method: Optional[str] = None  # stripe, zelle
+    stripe_session_id: Optional[str] = None
+    stripe_payment_intent: Optional[str] = None
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    amount_paid: float = 0.0
+    # Dates
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_date: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    # Notes
+    notes: Optional[str] = None
+    admin_notes: Optional[str] = None
+
+class PartnerInvoiceCreate(BaseModel):
+    partner_id: str
+    order_ids: List[str]
+    due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+
+class PartnerInvoicePayStripe(BaseModel):
+    invoice_id: str
+    origin_url: str
+
+class PartnerInvoicePayZelle(BaseModel):
+    invoice_id: str
+    zelle_receipt_id: str
+
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
     # Client info
@@ -3371,29 +3415,77 @@ async def stripe_webhook(request: Request):
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             session_id = session['id']
+            metadata = session.get('metadata', {})
 
             logger.info(f"Processing checkout.session.completed for session: {session_id}")
 
-            # Update payment status
-            result = await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {
-                    "$set": {
-                        "status": "completed",
-                        "payment_status": "paid",
-                        "updated_at": datetime.utcnow()
+            # Check if this is a partner invoice payment
+            if metadata.get('type') == 'partner_invoice':
+                invoice_id = metadata.get('invoice_id')
+                logger.info(f"Processing partner invoice payment for invoice: {invoice_id}")
+
+                # Update invoice status
+                invoice = await db.partner_invoices.find_one({"id": invoice_id})
+                if invoice:
+                    await db.partner_invoices.update_one(
+                        {"id": invoice_id},
+                        {"$set": {
+                            "status": "paid",
+                            "payment_method": "stripe",
+                            "stripe_payment_intent": session.get('payment_intent'),
+                            "amount_paid": invoice.get("total_amount", 0),
+                            "paid_at": datetime.utcnow()
+                        }}
+                    )
+
+                    # Update associated orders to paid
+                    await db.translation_orders.update_many(
+                        {"id": {"$in": invoice.get("order_ids", [])}},
+                        {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+                    )
+
+                    # Create admin notification for Stripe payment
+                    admin_notification = {
+                        "id": str(uuid.uuid4()),
+                        "type": "invoice_stripe_paid",
+                        "title": "Invoice Paid via Stripe",
+                        "message": f"Partner {invoice.get('partner_company')} paid invoice {invoice.get('invoice_number')} via card - ${invoice.get('total_amount', 0):.2f}",
+                        "invoice_id": invoice_id,
+                        "invoice_number": invoice.get("invoice_number"),
+                        "partner_id": invoice.get("partner_id"),
+                        "partner_company": invoice.get("partner_company"),
+                        "amount": invoice.get("total_amount", 0),
+                        "payment_method": "stripe",
+                        "is_read": False,
+                        "created_at": datetime.utcnow()
                     }
-                }
-            )
+                    await db.admin_notifications.insert_one(admin_notification)
 
-            if result.matched_count == 0:
-                logger.warning(f"No transaction found for session_id: {session_id}")
+                    logger.info(f"Successfully processed invoice payment: {invoice.get('invoice_number')}")
+                else:
+                    logger.warning(f"Invoice not found for payment: {invoice_id}")
+            else:
+                # Regular payment transaction
+                # Update payment status
+                result = await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {
+                        "$set": {
+                            "status": "completed",
+                            "payment_status": "paid",
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
 
-            # Get transaction and handle success
-            transaction = await db.payment_transactions.find_one({"session_id": session_id})
-            if transaction:
-                await handle_successful_payment(session_id, transaction)
-                logger.info(f"Successfully processed payment for session: {session_id}")
+                if result.matched_count == 0:
+                    logger.warning(f"No transaction found for session_id: {session_id}")
+
+                # Get transaction and handle success
+                transaction = await db.payment_transactions.find_one({"session_id": session_id})
+                if transaction:
+                    await handle_successful_payment(session_id, transaction)
+                    logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
 
@@ -7668,6 +7760,618 @@ async def delete_partner_by_email(email: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+# ==================== PARTNER INVOICE ENDPOINTS ====================
+
+@api_router.get("/admin/partner-invoices")
+async def get_all_partner_invoices(admin_key: str):
+    """Get all partner invoices (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-invoices/partner/{partner_id}")
+async def get_partner_invoices_admin(partner_id: str, admin_key: str):
+    """Get all invoices for a specific partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner_id}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-orders/{partner_id}")
+async def get_partner_orders_for_invoice(partner_id: str, admin_key: str):
+    """Get all pending orders for a partner (for invoice creation)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get all orders for this partner that are not yet paid
+        orders = await db.translation_orders.find({
+            "partner_id": partner_id,
+            "payment_status": {"$in": ["pending", "overdue"]}
+        }).sort("created_at", -1).to_list(1000)
+
+        # Get already invoiced order IDs
+        invoiced_orders = set()
+        existing_invoices = await db.partner_invoices.find({
+            "partner_id": partner_id,
+            "status": {"$in": ["pending", "partial"]}
+        }).to_list(1000)
+        for inv in existing_invoices:
+            invoiced_orders.update(inv.get("order_ids", []))
+
+        # Filter out already invoiced orders
+        available_orders = []
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+            if order.get("id") not in invoiced_orders:
+                available_orders.append(order)
+
+        return {"orders": available_orders, "invoiced_order_ids": list(invoiced_orders)}
+    except Exception as e:
+        logger.error(f"Error fetching partner orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
+
+@api_router.post("/admin/partner-invoices/create")
+async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: str):
+    """Create a new invoice for a partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get partner info
+        partner = await db.partners.find_one({"id": invoice_data.partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # Get orders and calculate total
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice_data.order_ids}
+        }).to_list(1000)
+
+        if not orders:
+            raise HTTPException(status_code=400, detail="No valid orders found")
+
+        subtotal = sum(order.get("total_price", 0) for order in orders)
+        total_amount = subtotal  # No tax for now
+
+        # Create invoice
+        invoice = PartnerInvoice(
+            partner_id=invoice_data.partner_id,
+            partner_company=partner.get("company_name"),
+            partner_email=partner.get("email"),
+            order_ids=invoice_data.order_ids,
+            subtotal=subtotal,
+            total_amount=total_amount,
+            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
+            notes=invoice_data.notes
+        )
+
+        await db.partner_invoices.insert_one(invoice.dict())
+
+        # Update orders to mark them as invoiced
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice_data.order_ids}},
+            {"$set": {"invoice_id": invoice.id, "invoice_number": invoice.invoice_number}}
+        )
+
+        logger.info(f"Created invoice {invoice.invoice_number} for partner {partner.get('company_name')}")
+
+        return {
+            "status": "success",
+            "invoice": invoice.dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create invoice")
+
+
+@api_router.delete("/admin/partner-invoices/{invoice_id}")
+async def delete_partner_invoice(invoice_id: str, admin_key: str):
+    """Delete a partner invoice (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Remove invoice reference from orders
+        await db.translation_orders.update_many(
+            {"invoice_id": invoice_id},
+            {"$unset": {"invoice_id": "", "invoice_number": ""}}
+        )
+
+        # Delete the invoice
+        await db.partner_invoices.delete_one({"id": invoice_id})
+
+        logger.info(f"Deleted invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Invoice deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")
+async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str = "manual"):
+    """Mark an invoice as paid manually (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "payment_method": payment_method,
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        logger.info(f"Marked invoice {invoice.get('invoice_number')} as paid")
+        return {"status": "success", "message": "Invoice marked as paid"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking invoice as paid: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update invoice")
+
+
+# Partner Portal Invoice Endpoints
+@api_router.get("/partner/invoices")
+async def get_partner_invoices(token: str):
+    """Get all invoices for the logged-in partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner["id"]}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/partner/invoices/{invoice_id}")
+async def get_partner_invoice_detail(invoice_id: str, token: str):
+    """Get invoice details with orders (partner portal)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if '_id' in invoice:
+            del invoice['_id']
+
+        # Get associated orders
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice.get("order_ids", [])}
+        }).to_list(1000)
+
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+
+        return {"invoice": invoice, "orders": orders}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching invoice details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoice details")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-stripe")
+async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoicePayStripe):
+    """Create Stripe checkout session for invoice payment"""
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Create Stripe checkout session
+        checkout_params = {
+            'payment_method_types': ['card'],
+            'line_items': [{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Invoice {invoice.get("invoice_number")}',
+                        'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
+                    },
+                    'unit_amount': int(invoice.get("total_amount", 0) * 100),
+                },
+                'quantity': 1,
+            }],
+            'mode': 'payment',
+            'success_url': f"{request.origin_url}?invoice_paid=true&invoice_id={invoice_id}#/partner",
+            'cancel_url': f"{request.origin_url}?invoice_cancelled=true#/partner",
+            'metadata': {
+                'invoice_id': invoice_id,
+                'invoice_number': invoice.get("invoice_number"),
+                'partner_id': invoice.get("partner_id"),
+                'type': 'partner_invoice'
+            }
+        }
+
+        if invoice.get("partner_email"):
+            checkout_params['customer_email'] = invoice.get("partner_email")
+
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
+
+        # Update invoice with session ID
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {"stripe_session_id": checkout_session.id}}
+        )
+
+        return {
+            "status": "success",
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Stripe checkout for invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-zelle")
+async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoicePayZelle, token: str):
+    """Submit Zelle receipt for invoice payment"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Get receipt URL
+        receipt_url = None
+        if request.zelle_receipt_id:
+            doc = await db.documents.find_one({"id": request.zelle_receipt_id})
+            if doc:
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
+
+        # Update invoice with Zelle receipt (pending verification)
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "payment_method": "zelle",
+                "zelle_receipt_id": request.zelle_receipt_id,
+                "zelle_receipt_url": receipt_url,
+                "zelle_submitted_at": datetime.utcnow(),
+                "status": "pending_zelle"  # Mark as pending Zelle verification
+            }}
+        )
+
+        # Create admin notification for Zelle receipt
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_zelle_receipt",
+            "title": "Invoice Zelle Payment Received",
+            "message": f"Partner {invoice.get('partner_company')} submitted Zelle receipt for invoice {invoice.get('invoice_number')} - {invoice.get('total_amount', 0):.2f} USD",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "receipt_url": receipt_url,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Zelle receipt submitted for invoice {invoice.get('invoice_number')}")
+
+        return {
+            "status": "success",
+            "message": "Zelle receipt submitted. Payment will be verified shortly."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit Zelle payment")
+
+
+# ==================== INVOICE PAYMENT MANAGEMENT ====================
+
+@api_router.get("/admin/invoice-payments/pending-zelle")
+async def get_pending_zelle_invoices(admin_key: str):
+    """Get all invoices with pending Zelle verification"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({
+            "status": "pending_zelle",
+            "zelle_receipt_id": {"$exists": True, "$ne": None}
+        }).sort("zelle_submitted_at", -1).to_list(100)
+
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+
+        return {"invoices": invoices, "count": len(invoices)}
+    except Exception as e:
+        logger.error(f"Error fetching pending Zelle invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending invoices")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/approve-zelle")
+async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
+    """Approve a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice to paid
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow(),
+                "zelle_verified_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders to paid
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        # Record payment in history
+        payment_record = {
+            "id": str(uuid.uuid4()),
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "zelle_receipt_url": invoice.get("zelle_receipt_url"),
+            "status": "completed",
+            "created_at": datetime.utcnow()
+        }
+        await db.invoice_payments.insert_one(payment_record)
+
+        # Create notification for payment approval
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_payment_approved",
+            "title": "Invoice Payment Approved",
+            "message": f"Zelle payment approved for invoice {invoice.get('invoice_number')} - {invoice.get('partner_company')} - ${invoice.get('total_amount', 0):.2f}",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Approved Zelle payment for invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Payment approved successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to approve payment")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/reject-zelle")
+async def reject_zelle_invoice_payment(invoice_id: str, admin_key: str, reason: str = ""):
+    """Reject a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice back to pending
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "pending",
+                "zelle_rejected_at": datetime.utcnow(),
+                "zelle_rejection_reason": reason
+            },
+            "$unset": {
+                "zelle_receipt_id": "",
+                "zelle_receipt_url": "",
+                "zelle_submitted_at": ""
+            }}
+        )
+
+        logger.info(f"Rejected Zelle payment for invoice {invoice.get('invoice_number')}: {reason}")
+        return {"status": "success", "message": "Payment rejected"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reject payment")
+
+
+@api_router.get("/admin/invoice-payments/history")
+async def get_invoice_payment_history(admin_key: str, limit: int = 50):
+    """Get invoice payment history"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get paid invoices as payment history
+        paid_invoices = await db.partner_invoices.find({
+            "status": "paid"
+        }).sort("paid_at", -1).to_list(limit)
+
+        payments = []
+        for inv in paid_invoices:
+            if '_id' in inv:
+                del inv['_id']
+            payments.append({
+                "id": inv.get("id"),
+                "invoice_number": inv.get("invoice_number"),
+                "partner_id": inv.get("partner_id"),
+                "partner_company": inv.get("partner_company"),
+                "amount": inv.get("total_amount", 0),
+                "payment_method": inv.get("payment_method", "unknown"),
+                "paid_at": inv.get("paid_at"),
+                "zelle_receipt_url": inv.get("zelle_receipt_url"),
+                "stripe_payment_intent": inv.get("stripe_payment_intent"),
+                "order_count": len(inv.get("order_ids", []))
+            })
+
+        # Calculate summary
+        total_received = sum(p["amount"] for p in payments)
+
+        return {
+            "payments": payments,
+            "summary": {
+                "total_payments": len(payments),
+                "total_received": total_received
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch payment history")
+
+
+@api_router.get("/admin/invoice-notifications")
+async def get_invoice_notifications(admin_key: str, unread_only: bool = False):
+    """Get invoice-related admin notifications"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        query = {"type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]}}
+        if unread_only:
+            query["is_read"] = False
+
+        notifications = await db.admin_notifications.find(query).sort("created_at", -1).to_list(50)
+
+        for notif in notifications:
+            if '_id' in notif:
+                del notif['_id']
+
+        unread_count = await db.admin_notifications.count_documents({
+            "type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]},
+            "is_read": False
+        })
+
+        return {
+            "notifications": notifications,
+            "unread_count": unread_count
+        }
+    except Exception as e:
+        logger.error(f"Error fetching invoice notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch notifications")
+
+
+@api_router.put("/admin/invoice-notifications/{notif_id}/read")
+async def mark_invoice_notification_read(notif_id: str, admin_key: str):
+    """Mark an invoice notification as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        await db.admin_notifications.update_one(
+            {"id": notif_id},
+            {"$set": {"is_read": True}}
+        )
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update notification")
 
 
 @api_router.get("/admin/orders/{order_id}")
