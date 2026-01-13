@@ -10745,7 +10745,7 @@ class TranslatorMessageRequest(BaseModel):
 
 @api_router.post("/admin/send-file-assignment-email")
 async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
-    """Send email invitation to translator for a specific file assignment"""
+    """Send email invitation to translator for a specific file assignment with accept/decline buttons"""
     # Validate admin key or user token
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -10758,7 +10758,9 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
 
     translator_email = request.get("translator_email")
     translator_name = request.get("translator_name", "Translator")
+    translator_id = request.get("translator_id")
     document_name = request.get("document_name", "Document")
+    order_id = request.get("order_id")
     order_number = request.get("order_number", "")
     language_pair = request.get("language_pair", "")
     pm_name = request.get("pm_name", "Project Manager")
@@ -10766,33 +10768,81 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     if not translator_email:
         raise HTTPException(status_code=400, detail="Translator email is required")
 
-    # Create email content
+    # Get order details for the email
+    order = await db.translation_orders.find_one({"id": order_id}) if order_id else None
+
+    # Generate assignment token and update order
+    assignment_token = str(uuid.uuid4())
+    if order_id:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "assigned_translator_id": translator_id,
+                "assigned_translator_name": translator_name,
+                "translator_assignment_token": assignment_token,
+                "translator_assignment_status": "pending"
+            }}
+        )
+
+    # Build accept/decline URLs
+    api_base = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
+    accept_url = f"{api_base}/api/translator/assignment/{assignment_token}/accept"
+    decline_url = f"{api_base}/api/translator/assignment/{assignment_token}/decline"
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
+    # Get deadline from order - prefer translator_deadline if set by PM, otherwise use project deadline
+    deadline_str = "To be confirmed"
+    if order:
+        # First try translator_deadline (set by PM specifically for translator)
+        deadline = order.get("translator_deadline") or order.get("deadline")
+        if deadline:
+            try:
+                if isinstance(deadline, datetime):
+                    deadline_str = deadline.strftime("%B %d, %Y at %H:%M")
+                elif isinstance(deadline, str):
+                    # Try to parse ISO format
+                    from dateutil import parser
+                    parsed = parser.parse(deadline)
+                    deadline_str = parsed.strftime("%B %d, %Y at %H:%M")
+                else:
+                    deadline_str = str(deadline)
+            except:
+                deadline_str = str(deadline)
+
+    # Create email content with accept/decline buttons
     email_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">📄 New Document Assignment</h1>
+            <h1 style="color: white; margin: 0;">📄 New Translation Assignment</h1>
         </div>
         <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
             <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
-            <p>You have been assigned a new document to translate:</p>
+            <p>You have been assigned a new translation project. Please review the details and accept or decline this assignment:</p>
 
             <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
+                <p style="margin: 5px 0;"><strong>📋 Project:</strong> {order_number}</p>
                 <p style="margin: 5px 0;"><strong>📄 Document:</strong> {document_name}</p>
                 <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
+                <p style="margin: 5px 0;"><strong>📅 Deadline:</strong> {deadline_str}</p>
                 <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
             </div>
 
-            <p>Please log in to your translator portal to view and work on this document.</p>
-
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')}/#/admin"
-                   style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                    Open Translator Portal
+                <a href="{accept_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+                    ✓ ACCEPT PROJECT
+                </a>
+            </div>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{decline_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);">
+                    ✗ DECLINE PROJECT
                 </a>
             </div>
 
-            <p style="color: #64748b; font-size: 14px;">If you have any questions, please contact your project manager.</p>
+            <p style="color: #64748b; font-size: 14px; text-align: center; margin-top: 25px;">
+                Please respond as soon as possible so we can proceed with the project.
+            </p>
         </div>
         <div style="background: #1e293b; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
             <p style="color: #94a3b8; margin: 0; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
@@ -10803,11 +10853,11 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     try:
         await email_service.send_email(
             translator_email,
-            f"📄 New Document Assignment - {order_number}",
+            f"📄 New Translation Assignment - {order_number}",
             email_html
         )
-        logger.info(f"Sent file assignment email to {translator_name} ({translator_email}) for {document_name}")
-        return {"status": "success", "message": f"Email sent to {translator_name}"}
+        logger.info(f"Sent file assignment email with accept/decline to {translator_name} ({translator_email}) for {document_name}")
+        return {"status": "success", "message": f"Email invitation sent to {translator_name}"}
     except Exception as e:
         logger.error(f"Failed to send file assignment email: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
