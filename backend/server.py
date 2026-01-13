@@ -3130,9 +3130,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Try AWS Textract first (best quality)
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
-                text = extract_text_with_textract(content, file_extension)
-                if text and len(text.strip()) > 10:
-                    return text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
             else:
                 logger.info("AWS Textract not configured, using Tesseract directly...")
@@ -3194,9 +3194,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Method 3: PDF is likely image-based - use AWS Textract (best quality)
             if textract_client:
                 logger.info("PDF appears to be image-based. Using AWS Textract...")
-                textract_text = extract_text_with_textract(content, file_extension)
-                if textract_text and len(textract_text.strip()) > 10:
-                    return textract_text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
 
             # Method 4: Fallback to Tesseract OCR with multi-config
