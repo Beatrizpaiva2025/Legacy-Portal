@@ -3943,6 +3943,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     });
   };
 
+  // Helper function to ensure proper image src format (data URI)
+  const getImageSrc = (img) => {
+    if (!img || !img.data) return '';
+    // If already a data URI, return as is
+    if (img.data.startsWith('data:')) return img.data;
+    // Otherwise, construct proper data URI (handle both type and contentType)
+    const type = img.type || img.contentType || 'image/png';
+    return `data:${type};base64,${img.data}`;
+  };
+
   // OCR with backend (supports regular OCR or Claude OCR)
   const handleOCR = async () => {
     if (files.length === 0) {
@@ -7342,17 +7352,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages.map((img, idx) => (
                       <div key={idx} className="mb-2">
-                        {img.filename.toLowerCase().endsWith('.pdf') ? (
+                        {img.filename?.toLowerCase().endsWith('.pdf') ? (
                           <embed
-                            src={img.data}
+                            src={getImageSrc(img)}
                             type="application/pdf"
                             className="w-full border shadow-sm"
                             style={{height: '430px'}}
                           />
                         ) : (
                           <img
-                            src={img.data}
-                            alt={img.filename}
+                            src={getImageSrc(img)}
+                            alt={img.filename || 'Original'}
                             className="max-w-full border shadow-sm"
                           />
                         )}
@@ -7625,7 +7635,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <p className="text-xs text-blue-700 font-medium">{externalOriginalImages.length} file(s) uploaded</p>
                         <div className="mt-2 max-h-32 overflow-auto">
                           {externalOriginalImages.map((img, idx) => (
-                            <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                            <img key={idx} src={getImageSrc(img)} alt={img.filename || 'Original'} className="max-h-24 mx-auto mb-1 border rounded" />
                           ))}
                         </div>
                         <button className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
@@ -7668,7 +7678,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {externalTranslationImages.length > 0 && (
                           <div className="mt-2 max-h-32 overflow-auto">
                             {externalTranslationImages.map((img, idx) => (
-                              <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                              <img key={idx} src={getImageSrc(img)} alt={img.filename || 'Translation'} className="max-h-24 mx-auto mb-1 border rounded" />
                             ))}
                           </div>
                         )}
@@ -8542,9 +8552,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
                     {originalImages[selectedResultIndex] ? (
                       originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
                       ) : (
-                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
                     ) : translationResults[selectedResultIndex]?.original ? (
                       <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
@@ -8780,9 +8790,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages[selectedResultIndex] ? (
                       originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
                       ) : (
-                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
                     ) : translationResults[selectedResultIndex]?.original ? (
                       // Show original image from external upload
@@ -13362,13 +13372,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {reviewOriginalDocs[reviewCurrentPage] ? (
                         reviewOriginalDocs[reviewCurrentPage].contentType?.includes('pdf') ? (
                           <embed
-                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            src={getImageSrc(reviewOriginalDocs[reviewCurrentPage])}
                             type="application/pdf"
                             className="w-full h-full min-h-[500px]"
                           />
                         ) : (
                           <img
-                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            src={getImageSrc(reviewOriginalDocs[reviewCurrentPage])}
                             alt="Original"
                             className="max-w-full border shadow-sm"
                           />
@@ -13396,13 +13406,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           />
                         ) : reviewTranslatedDoc.contentType?.includes('pdf') ? (
                           <embed
-                            src={reviewTranslatedDoc.data}
+                            src={getImageSrc(reviewTranslatedDoc)}
                             type="application/pdf"
                             className="w-full h-full min-h-[500px]"
                           />
                         ) : (
                           <img
-                            src={reviewTranslatedDoc.data}
+                            src={getImageSrc(reviewTranslatedDoc)}
                             alt="Translation"
                             className="max-w-full border shadow-sm"
                           />
