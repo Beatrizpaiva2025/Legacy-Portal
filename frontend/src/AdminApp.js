@@ -582,7 +582,54 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 };
 
 // ==================== HORIZONTAL TOP BAR ====================
-const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
+const TopBar = ({
+  activeTab,
+  setActiveTab,
+  onLogout,
+  user,
+  adminKey,
+  pendingZelleCount = 0,
+  unreadNotifCount = 0,
+  pendingZelleInvoices = [],
+  invoiceNotifications = [],
+  onRefreshNotifications
+}) => {
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  const totalNotifCount = pendingZelleCount + unreadNotifCount;
+
+  const handleApproveZelle = async (invoiceId) => {
+    if (!window.confirm('Approve this Zelle payment?')) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
+      alert('Payment approved!');
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRejectZelle = async (invoiceId) => {
+    const reason = prompt('Rejection reason (optional):');
+    if (reason === null) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
+      alert('Payment rejected');
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'sales'] },
@@ -646,6 +693,147 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
 
       {/* User Info and Actions */}
       <div className="flex items-center space-x-3">
+        {/* Notification Bell - Only for admin */}
+        {userRole === 'admin' && (
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              className="relative p-2 text-slate-300 hover:bg-slate-700 rounded transition-colors"
+              title="Invoice Notifications"
+            >
+              <span className="text-lg">🔔</span>
+              {totalNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalNotifCount > 9 ? '9+' : totalNotifCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifDropdown && (
+              <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border z-50 max-h-[80vh] overflow-hidden">
+                <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-800 text-sm">Invoice Notifications</h3>
+                  <button
+                    onClick={() => setShowNotifDropdown(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[60vh]">
+                  {/* Pending Zelle Section */}
+                  {pendingZelleInvoices.length > 0 && (
+                    <div className="border-b">
+                      <div className="px-3 py-2 bg-purple-50 text-purple-800 text-xs font-bold flex items-center justify-between">
+                        <span>🏦 Pending Zelle Verification</span>
+                        <span className="bg-purple-600 text-white rounded-full px-2 py-0.5 text-[10px]">
+                          {pendingZelleInvoices.length}
+                        </span>
+                      </div>
+                      {pendingZelleInvoices.map((inv) => (
+                        <div key={inv.id} className="p-3 border-b hover:bg-gray-50">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-mono text-xs font-medium">{inv.invoice_number}</div>
+                              <div className="text-xs text-gray-600">{inv.partner_company}</div>
+                              <div className="text-[10px] text-gray-400">
+                                {inv.zelle_submitted_at ? new Date(inv.zelle_submitted_at).toLocaleString() : ''}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-sm text-gray-800">${inv.total_amount?.toFixed(2)}</div>
+                              {inv.zelle_receipt_url && (
+                                <a
+                                  href={inv.zelle_receipt_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-blue-600 hover:underline"
+                                >
+                                  View Receipt
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => handleApproveZelle(inv.id)}
+                              className="flex-1 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectZelle(inv.id)}
+                              className="flex-1 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                            >
+                              ✕ Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recent Notifications */}
+                  {invoiceNotifications.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 bg-gray-50 text-gray-700 text-xs font-bold">
+                        Recent Activity
+                      </div>
+                      {invoiceNotifications.slice(0, 8).map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`p-3 border-b hover:bg-gray-50 cursor-pointer ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                          onClick={() => !notif.is_read && handleMarkRead(notif.id)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm">
+                              {notif.type === 'invoice_stripe_paid' && '💳'}
+                              {notif.type === 'invoice_zelle_receipt' && '🏦'}
+                              {notif.type === 'invoice_payment_approved' && '✅'}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-xs font-medium text-gray-800">{notif.title}</div>
+                              <div className="text-[10px] text-gray-500">{notif.message}</div>
+                              <div className="text-[10px] text-gray-400 mt-1">
+                                {new Date(notif.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                            {!notif.is_read && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {pendingZelleInvoices.length === 0 && invoiceNotifications.length === 0 && (
+                    <div className="p-6 text-center text-gray-500 text-sm">
+                      No notifications
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-2 border-t bg-gray-50">
+                  <button
+                    onClick={() => {
+                      setActiveTab('finances');
+                      setShowNotifDropdown(false);
+                    }}
+                    className="w-full text-center text-xs text-blue-600 hover:text-blue-800 py-1"
+                  >
+                    View all in Finances → Partners
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {user && (
           <div className="flex items-center space-x-2">
             <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
@@ -27351,6 +27539,10 @@ function AdminApp() {
   const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
+  // Global invoice notifications state
+  const [globalInvoiceNotifications, setGlobalInvoiceNotifications] = useState([]);
+  const [globalPendingZelle, setGlobalPendingZelle] = useState([]);
+  const [globalUnreadCount, setGlobalUnreadCount] = useState(0);
 
   // Check for invite_token or reset_token in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -27415,6 +27607,32 @@ function AdminApp() {
 
     window.location.href = '/#/admin';
   };
+
+  // Global invoice notifications fetch
+  const fetchGlobalInvoiceNotifications = async () => {
+    if (!adminKey) return;
+    try {
+      const [notifRes, zelleRes] = await Promise.all([
+        axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}&unread_only=false`),
+        axios.get(`${API}/admin/invoice-payments/pending-zelle?admin_key=${adminKey}`)
+      ]);
+      setGlobalInvoiceNotifications(notifRes.data.notifications || []);
+      setGlobalUnreadCount(notifRes.data.unread_count || 0);
+      setGlobalPendingZelle(zelleRes.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch global invoice notifications:', err);
+    }
+  };
+
+  // Fetch notifications on login and periodically
+  useEffect(() => {
+    if (adminKey && user?.role === 'admin') {
+      fetchGlobalInvoiceNotifications();
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchGlobalInvoiceNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [adminKey, user]);
 
   // Navigate to translation with order
   const navigateToTranslation = (order) => {
@@ -27542,7 +27760,18 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
+      <TopBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+        user={user}
+        adminKey={adminKey}
+        pendingZelleCount={globalPendingZelle.length}
+        unreadNotifCount={globalUnreadCount}
+        pendingZelleInvoices={globalPendingZelle}
+        invoiceNotifications={globalInvoiceNotifications}
+        onRefreshNotifications={fetchGlobalInvoiceNotifications}
+      />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />
     </div>
