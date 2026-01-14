@@ -11292,6 +11292,53 @@ async def admin_download_document(document_id: str, admin_key: str):
         "extracted_text": document.get("extracted_text", "")
     }
 
+
+@api_router.get("/download-document/{document_id}")
+async def public_download_document(document_id: str):
+    """Public endpoint to download/view invoice receipt documents"""
+    # First check in documents collection
+    document = await db.documents.find_one({"id": document_id})
+
+    if not document:
+        # Try order_documents collection
+        document = await db.order_documents.find_one({"id": document_id})
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Return the file as a downloadable response
+    import base64
+    from fastapi.responses import Response
+
+    file_data = document.get("file_data", "")
+    if not file_data:
+        raise HTTPException(status_code=404, detail="Document data not found")
+
+    # Decode base64 if it's encoded
+    try:
+        if isinstance(file_data, str):
+            # Remove data URL prefix if present
+            if "base64," in file_data:
+                file_data = file_data.split("base64,")[1]
+            file_bytes = base64.b64decode(file_data)
+        else:
+            file_bytes = file_data
+    except Exception as e:
+        logger.error(f"Error decoding document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing document")
+
+    content_type = document.get("content_type", "application/octet-stream")
+    filename = document.get("filename", "document")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
+
+
 @api_router.get("/admin/orders/{order_id}/documents")
 async def admin_get_order_documents(order_id: str, admin_key: str):
     """Admin/PM/Translator: Get all documents for an order (from both collections)"""
