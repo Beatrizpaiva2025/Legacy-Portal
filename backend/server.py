@@ -1064,6 +1064,8 @@ class Partner(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None  # EIN/CNPJ
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment & Billing
     payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
     default_payment_method: str = "zelle"  # zelle, card, invoice
@@ -1098,6 +1100,8 @@ class PartnerCreate(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment preferences
     payment_plan: str = "pay_per_order"
     default_payment_method: str = "zelle"
@@ -4309,6 +4313,8 @@ async def register_partner(partner_data: PartnerCreate):
             address_zip=partner_data.address_zip,
             address_country=partner_data.address_country,
             tax_id=partner_data.tax_id,
+            # Estimated volume
+            estimated_volume=partner_data.estimated_volume,
             # Payment settings
             payment_plan=partner_data.payment_plan,
             default_payment_method=partner_data.default_payment_method,
@@ -4337,6 +4343,7 @@ async def register_partner(partner_data: PartnerCreate):
                         <p><strong>Contact:</strong> {partner.contact_name}</p>
                         <p><strong>Email:</strong> {partner.email}</p>
                         <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Estimated Monthly Volume:</strong> {partner.estimated_volume or 'Not specified'} pages/month</p>
                         <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
                         <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
                         {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
@@ -4528,6 +4535,106 @@ async def get_current_partner_info(token: str):
         "email": partner["email"],
         "contact_name": partner["contact_name"],
         "phone": partner.get("phone")
+    }
+
+# ==================== PARTNER CREDIT QUALIFICATION ====================
+
+CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+
+@api_router.get("/partner/credit-qualification")
+async def get_partner_credit_qualification(token: str):
+    """Check if partner qualifies for invoice payment plans"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    plan_approved = partner.get("payment_plan_approved", False)
+
+    # Calculate qualification status
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+
+    # Check if upgrade is pending
+    upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
+    requested_plan = partner.get("requested_payment_plan")
+
+    return {
+        "current_plan": current_plan,
+        "plan_approved": plan_approved,
+        "qualifies_for_invoice": qualifies,
+        "total_paid_orders": total_paid_orders,
+        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_remaining": orders_remaining,
+        "upgrade_pending": upgrade_pending,
+        "requested_plan": requested_plan
+    }
+
+@api_router.post("/partner/request-payment-upgrade")
+async def request_payment_plan_upgrade(token: str, plan: str):
+    """Request upgrade to invoice payment plan (biweekly or monthly)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Validate requested plan
+    if plan not in ["biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'biweekly' or 'monthly'")
+
+    # Check qualification
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+        )
+
+    # Check if already on invoice plan
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    if current_plan in ["biweekly", "monthly"] and partner.get("payment_plan_approved", False):
+        raise HTTPException(status_code=400, detail="Already on an invoice payment plan")
+
+    # Update partner with upgrade request
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {
+            "payment_plan_upgrade_requested": True,
+            "requested_payment_plan": plan,
+            "upgrade_requested_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    # Send email notification to admin
+    plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+    try:
+        email_html = f"""
+        <h2>Payment Plan Upgrade Request</h2>
+        <p>A partner has requested to upgrade their payment plan:</p>
+        <ul>
+            <li><strong>Company:</strong> {partner.get('company_name')}</li>
+            <li><strong>Contact:</strong> {partner.get('contact_name')}</li>
+            <li><strong>Email:</strong> {partner.get('email')}</li>
+            <li><strong>Current Plan:</strong> Pay Per Order</li>
+            <li><strong>Requested Plan:</strong> {plan_name}</li>
+            <li><strong>Total Paid Orders:</strong> {total_paid_orders}</li>
+            <li><strong>Total Revenue:</strong> ${partner.get('total_revenue', 0):.2f}</li>
+        </ul>
+        <p>Please review and approve/deny this request in the admin panel.</p>
+        """
+
+        await send_email(
+            to_email="contact@legacytranslations.com",
+            subject=f"Payment Plan Upgrade Request - {partner.get('company_name')}",
+            html_content=email_html
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send upgrade request email: {e}")
+
+    return {
+        "success": True,
+        "message": f"Upgrade request submitted. An admin will review your request for {plan_name}.",
+        "requested_plan": plan
     }
 
 # ==================== ADMIN USER AUTHENTICATION ====================
@@ -8019,6 +8126,92 @@ async def get_partner_statistics(admin_key: str):
             "total_pending": sum(p["total_pending"] for p in result)
         }
     }
+
+
+@api_router.post("/admin/partners/{partner_id}/approve-payment-upgrade")
+async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, approved: bool, plan: str = None):
+    """Approve or deny a partner's payment plan upgrade request (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        if approved:
+            # Use the requested plan or the one provided
+            target_plan = plan or partner.get("requested_payment_plan", "biweekly")
+            if target_plan not in ["biweekly", "monthly"]:
+                raise HTTPException(status_code=400, detail="Invalid payment plan")
+
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan": target_plan,
+                    "payment_plan_approved": True,
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None,
+                    "payment_plan_approved_at": datetime.utcnow().isoformat()
+                }}
+            )
+
+            # Send approval email to partner
+            plan_name = "Biweekly Invoice" if target_plan == "biweekly" else "Monthly Invoice"
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Approved!</h2>
+                <p>Great news! Your payment plan upgrade request has been approved.</p>
+                <ul>
+                    <li><strong>New Plan:</strong> {plan_name}</li>
+                </ul>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for your business!</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Approved - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send approval email: {e}")
+
+            return {"success": True, "message": f"Partner upgraded to {plan_name}"}
+        else:
+            # Deny the request
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None
+                }}
+            )
+
+            # Send denial email
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Request</h2>
+                <p>Thank you for your interest in our invoice payment plans.</p>
+                <p>At this time, we are unable to approve your upgrade request. Please continue using Pay Per Order for now.</p>
+                <p>If you have questions, please contact us at contact@legacytranslations.com.</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Request Update - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send denial email: {e}")
+
+            return {"success": True, "message": "Upgrade request denied"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing payment upgrade: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process upgrade request")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
