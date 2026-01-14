@@ -1035,6 +1035,46 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
   });
   const USPS_PRIORITY_MAIL = 18.99;
 
+  // Multi-currency support
+  const [userCurrency, setUserCurrency] = useState({ currency: 'usd', symbol: '$', country_code: 'US' });
+  const [exchangeRates, setExchangeRates] = useState({ usd: 1.0, brl: 5.0, eur: 0.92, gbp: 0.79 });
+  const [currencyLoaded, setCurrencyLoaded] = useState(false);
+
+  // Detect user's country and currency on load
+  useEffect(() => {
+    const detectCurrency = async () => {
+      try {
+        const geoResponse = await axios.get(`${API}/geo/detect`);
+        if (geoResponse.data) {
+          setUserCurrency(geoResponse.data);
+        }
+
+        const ratesResponse = await axios.get(`${API}/exchange-rates`);
+        if (ratesResponse.data?.rates) {
+          setExchangeRates(ratesResponse.data.rates);
+        }
+      } catch (err) {
+        console.log('Using default currency (USD)');
+      } finally {
+        setCurrencyLoaded(true);
+      }
+    };
+    detectCurrency();
+  }, []);
+
+  // Convert USD price to user's local currency
+  const convertPrice = (priceUsd) => {
+    if (!priceUsd) return 0;
+    const rate = exchangeRates[userCurrency.currency] || 1;
+    return priceUsd * rate;
+  };
+
+  // Format price in user's local currency
+  const formatLocalPrice = (priceUsd) => {
+    const converted = convertPrice(priceUsd);
+    return `${userCurrency.symbol}${converted.toFixed(2)}`;
+  };
+
   // If logged in, pre-fill email/name
   useEffect(() => {
     if (customer) {
@@ -1440,7 +1480,8 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
         quote_id: quoteId,
         customer_email: guestEmail,
         customer_name: guestName,
-        origin_url: window.location.origin
+        origin_url: window.location.origin,
+        currency: userCurrency.currency // Multi-currency support
       });
 
       // Step 3: Save form data before redirecting to Stripe
@@ -2333,7 +2374,14 @@ const CustomerNewOrderPage = ({ customer, token, onOrderCreated, t }) => {
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">{t.total}</span>
-                <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
+                <div className="text-right">
+                  <span className="font-bold text-teal-600">${(quote?.total_price || 0).toFixed(2)}</span>
+                  {userCurrency.currency !== 'usd' && (
+                    <div className="text-sm text-gray-500">
+                      ≈ {formatLocalPrice(quote?.total_price || 0)}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

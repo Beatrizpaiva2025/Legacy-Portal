@@ -84,6 +84,115 @@ async def health_check():
     """Health check endpoint for monitoring and keeping service alive"""
     return {"status": "healthy", "service": "legacy-portal-backend"}
 
+# ==================== MULTI-CURRENCY SUPPORT ====================
+
+# Currency configuration with Stripe payment methods
+CURRENCY_CONFIG = {
+    "usd": {"symbol": "$", "name": "US Dollar", "payment_methods": ["card"], "country_codes": ["US"]},
+    "brl": {"symbol": "R$", "name": "Brazilian Real", "payment_methods": ["card", "pix"], "country_codes": ["BR"]},
+    "eur": {"symbol": "€", "name": "Euro", "payment_methods": ["card"], "country_codes": ["DE", "FR", "IT", "ES", "PT", "NL", "BE", "AT", "IE", "FI", "GR"]},
+    "gbp": {"symbol": "£", "name": "British Pound", "payment_methods": ["card"], "country_codes": ["GB"]},
+}
+
+# Cache for exchange rates (refresh every hour)
+exchange_rate_cache = {"rates": {}, "last_updated": None}
+
+@api_router.get("/geo/detect")
+async def detect_country(request: Request):
+    """Detect user's country from IP address"""
+    try:
+        # Get client IP
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host
+
+        # Skip for localhost/private IPs
+        if client_ip in ["127.0.0.1", "localhost"] or client_ip.startswith("192.168.") or client_ip.startswith("10."):
+            return {"country_code": "US", "currency": "usd", "symbol": "$"}
+
+        # Use free IP geolocation API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://ip-api.com/json/{client_ip}?fields=countryCode", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                country_code = data.get("countryCode", "US")
+
+                # Map country to currency
+                currency = "usd"  # Default
+                for curr, config in CURRENCY_CONFIG.items():
+                    if country_code in config["country_codes"]:
+                        currency = curr
+                        break
+
+                return {
+                    "country_code": country_code,
+                    "currency": currency,
+                    "symbol": CURRENCY_CONFIG[currency]["symbol"],
+                    "payment_methods": CURRENCY_CONFIG[currency]["payment_methods"]
+                }
+
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+    except Exception as e:
+        logger.error(f"Error detecting country: {str(e)}")
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+
+@api_router.get("/exchange-rates")
+async def get_exchange_rates():
+    """Get current exchange rates (USD as base)"""
+    global exchange_rate_cache
+
+    try:
+        # Check if cache is valid (less than 1 hour old)
+        if exchange_rate_cache["last_updated"]:
+            cache_age = datetime.utcnow() - exchange_rate_cache["last_updated"]
+            if cache_age.total_seconds() < 3600 and exchange_rate_cache["rates"]:
+                return {"rates": exchange_rate_cache["rates"], "base": "usd", "cached": True}
+
+        # Fetch fresh rates from free API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.exchangerate-api.com/v4/latest/USD",
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                rates = {
+                    "usd": 1.0,
+                    "brl": data["rates"].get("BRL", 5.0),
+                    "eur": data["rates"].get("EUR", 0.92),
+                    "gbp": data["rates"].get("GBP", 0.79)
+                }
+
+                # Update cache
+                exchange_rate_cache = {
+                    "rates": rates,
+                    "last_updated": datetime.utcnow()
+                }
+
+                return {"rates": rates, "base": "usd", "cached": False}
+
+        # Fallback rates if API fails
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "cached": False,
+            "fallback": True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching exchange rates: {str(e)}")
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "error": str(e)
+        }
+
+@api_router.get("/currency/config")
+async def get_currency_config():
+    """Get currency configuration"""
+    return {"currencies": CURRENCY_CONFIG}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -1026,6 +1135,7 @@ class PaymentCheckoutRequest(BaseModel):
     origin_url: str
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
+    currency: Optional[str] = "usd"  # usd, brl, eur, gbp
 
 class ZelleOrderRequest(BaseModel):
     quote_id: str
@@ -3403,38 +3513,59 @@ async def get_word_count(text: str = Form(...)):
 # Stripe Payment Integration
 @api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
-    """Create a Stripe checkout session"""
-    
+    """Create a Stripe checkout session with multi-currency support"""
+
     try:
         # Get quote
         quote = await db.translation_quotes.find_one({"id": request.quote_id})
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found")
-        
+
+        # Get currency configuration
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+
+        # Calculate amount in target currency
+        base_price_usd = quote["total_price"]
+        if currency != "usd":
+            # Get exchange rates
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_price_usd * exchange_rate
+        else:
+            amount_in_currency = base_price_usd
+
         # Create payment transaction record
         transaction = PaymentTransaction(
             session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
-            amount=quote["total_price"],
-            currency="usd",
+            amount=amount_in_currency,
+            currency=currency,
             payment_status="pending",
             status="initiated"
         )
-        
+
         # Get customer email from request or quote
         customer_email = request.customer_email or quote.get("customer_email")
 
+        # Get payment methods for this currency
+        payment_methods = currency_info["payment_methods"]
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Translation Service - {quote["service_type"].title()}',
                         'description': f'From {quote["translate_from"]} to {quote["translate_to"]} - {quote["word_count"]} words',
                     },
-                    'unit_amount': int(quote["total_price"] * 100),  # Stripe expects cents
+                    'unit_amount': int(amount_in_currency * 100),  # Stripe expects cents/centavos
                 },
                 'quantity': 1,
             }],
@@ -3446,7 +3577,11 @@ async def create_payment_checkout(request: PaymentCheckoutRequest):
                 'quote_id': request.quote_id,
                 'transaction_id': transaction.id,
                 'customer_email': customer_email or '',
-                'customer_name': request.customer_name or quote.get("customer_name", '')
+                'customer_name': request.customer_name or quote.get("customer_name", ''),
+                'original_currency': 'usd',
+                'original_amount': str(base_price_usd),
+                'charged_currency': currency,
+                'charged_amount': str(amount_in_currency)
             }
         }
 
