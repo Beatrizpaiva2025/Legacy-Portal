@@ -4587,7 +4587,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
@@ -5093,10 +5093,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
 
-        <!-- Order Number -->
+        <!-- Order Number - Only show if real order number exists -->
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `
         <div style="text-align: right; margin-bottom: 24px; font-size: 14px;">
-          <span>Order # </span><strong>${orderNumber || 'P0000'}</strong>
+          <span>Order # </span><strong>${orderNumber}</strong>
         </div>
+        ` : ''}
 
         <!-- Main Title -->
         <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
@@ -5219,7 +5221,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
@@ -22695,7 +22697,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${order?.order_number || orderNumber || 'P0000'}</strong></div>
+        ${(() => {
+          const displayOrderNumber = order?.order_number || orderNumber;
+          return displayOrderNumber && !displayOrderNumber.toLowerCase().includes('order0') && displayOrderNumber !== 'P0000'
+            ? `<div class="order-number">Order # <strong>${displayOrderNumber}</strong></div>`
+            : '';
+        })()}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${order?.document_type || documentType || 'Document'}</strong> from <strong>${order?.source_language || sourceLanguage || 'Portuguese'}</strong> to<br>
