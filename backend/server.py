@@ -15376,6 +15376,167 @@ async def search_quotes_for_client_info(
         raise HTTPException(status_code=500, detail="Failed to search quotes")
 
 
+@api_router.get("/admin/orphaned-payments")
+async def get_orphaned_payments(admin_key: str):
+    """
+    Find paid payment transactions that don't have an associated order.
+    These are orders that were paid but lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(100)
+
+        orphaned = []
+        for tx in paid_transactions:
+            # Check if there's an order for this transaction
+            order = await db.customer_orders.find_one({
+                "$or": [
+                    {"session_id": tx.get("session_id")},
+                    {"quote_id": tx.get("quote_id")}
+                ]
+            })
+
+            if not order:
+                # This is an orphaned payment - get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+
+                # Get associated documents
+                documents = []
+                if quote and quote.get("document_ids"):
+                    docs = await db.documents.find({"id": {"$in": quote.get("document_ids")}}).to_list(50)
+                    documents = [{"id": d.get("id"), "filename": d.get("filename"), "word_count": d.get("word_count")} for d in docs]
+
+                orphaned.append({
+                    "transaction_id": tx.get("id"),
+                    "session_id": tx.get("session_id"),
+                    "quote_id": tx.get("quote_id"),
+                    "amount": tx.get("amount"),
+                    "payment_status": tx.get("payment_status"),
+                    "customer_email": quote.get("customer_email") if quote else None,
+                    "customer_name": quote.get("customer_name") if quote else None,
+                    "service_type": quote.get("service_type") if quote else None,
+                    "translate_from": quote.get("translate_from") if quote else None,
+                    "translate_to": quote.get("translate_to") if quote else None,
+                    "word_count": quote.get("word_count") if quote else None,
+                    "documents": documents,
+                    "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+                })
+
+        return {
+            "orphaned_count": len(orphaned),
+            "orphaned_payments": orphaned
+        }
+
+    except Exception as e:
+        logger.error(f"Error finding orphaned payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to find orphaned payments")
+
+
+@api_router.post("/admin/recover-order/{transaction_id}")
+async def recover_order_from_payment(transaction_id: str, admin_key: str):
+    """
+    Create an order from an orphaned payment transaction.
+    Use this to recover orders that were lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find the payment transaction
+        tx = await db.payment_transactions.find_one({"id": transaction_id})
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        # Check if order already exists
+        existing_order = await db.customer_orders.find_one({
+            "$or": [
+                {"session_id": tx.get("session_id")},
+                {"quote_id": tx.get("quote_id")}
+            ]
+        })
+        if existing_order:
+            raise HTTPException(status_code=400, detail=f"Order already exists: {existing_order.get('order_number')}")
+
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found for this transaction")
+
+        # Generate order number
+        order_number = f"WEB-{quote.get('created_at', datetime.utcnow()).strftime('%Y%m%d%H%M%S')}"
+
+        # Create the order
+        customer_name = quote.get("customer_name") or "Customer"
+        customer_email = quote.get("customer_email")
+
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": tx.get("quote_id"),
+            "session_id": tx.get("session_id"),
+            "customer_id": "guest",
+            "customer_name": customer_name,
+            "customer_email": customer_email,
+            "client_name": customer_name,
+            "client_email": customer_email,
+            "reference": quote.get("reference"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes"),
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "Pending",
+            "recovered_order": True,
+            "created_at": quote.get("created_at", datetime.utcnow()),
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.customer_orders.insert_one(order)
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+
+        # Update transaction with order info
+        await db.payment_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"order_id": order["id"], "order_number": order_number}}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Order {order_number} recovered successfully",
+            "order": order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recovering order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover order")
+
+
 # ==================== DISCOUNT CODES ====================
 
 class DiscountCode(BaseModel):
