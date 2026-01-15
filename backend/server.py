@@ -1064,6 +1064,8 @@ class Partner(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None  # EIN/CNPJ
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment & Billing
     payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
     default_payment_method: str = "zelle"  # zelle, card, invoice
@@ -1085,6 +1087,30 @@ class Partner(BaseModel):
     last_order_at: Optional[datetime] = None
     last_payment_at: Optional[datetime] = None
 
+# ==================== COUPON MODEL ====================
+class Coupon(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str  # e.g., "WELCOME-ABC123" or "PROMO50"
+    partner_id: Optional[str] = None  # If tied to specific partner
+    # Discount details
+    discount_type: str = "certified_page"  # certified_page, percentage, fixed_amount
+    discount_value: float = 1.0  # 1 page, or percentage, or dollar amount
+    max_discount: Optional[float] = None  # Maximum discount in dollars
+    # Usage limits
+    max_uses: int = 1  # How many times can be used total
+    times_used: int = 0
+    # Validity
+    is_active: bool = True
+    valid_from: datetime = Field(default_factory=datetime.utcnow)
+    valid_until: Optional[datetime] = None
+    # Restrictions
+    min_order_value: float = 0.0  # Minimum order value to apply
+    first_order_only: bool = True  # Only valid for first order
+    # Tracking
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = None
+    used_on_order_id: Optional[str] = None
+
 class PartnerCreate(BaseModel):
     company_name: str
     email: EmailStr
@@ -1098,6 +1124,8 @@ class PartnerCreate(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment preferences
     payment_plan: str = "pay_per_order"
     default_payment_method: str = "zelle"
@@ -4309,6 +4337,8 @@ async def register_partner(partner_data: PartnerCreate):
             address_zip=partner_data.address_zip,
             address_country=partner_data.address_country,
             tax_id=partner_data.tax_id,
+            # Estimated volume
+            estimated_volume=partner_data.estimated_volume,
             # Payment settings
             payment_plan=partner_data.payment_plan,
             default_payment_method=partner_data.default_payment_method,
@@ -4325,6 +4355,63 @@ async def register_partner(partner_data: PartnerCreate):
         token = generate_token()
         active_tokens[token] = partner.id
 
+        # Generate WELCOME coupon for new partner (1 free certified page)
+        coupon_suffix = secrets.token_hex(3).upper()  # 6 character random suffix
+        welcome_coupon = Coupon(
+            code=f"WELCOME-{coupon_suffix}",
+            partner_id=partner.id,
+            discount_type="certified_page",
+            discount_value=1.0,  # 1 free certified page
+            max_uses=1,
+            first_order_only=True,
+            valid_until=datetime.utcnow() + timedelta(days=90)  # Valid for 90 days
+        )
+        await db.coupons.insert_one(welcome_coupon.dict())
+
+        # Send welcome email with coupon code
+        try:
+            welcome_subject = f"Welcome to Legacy Translations, {partner.contact_name}!"
+            welcome_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 180px; margin-bottom: 20px;">
+
+                <h2 style="color: #0d9488;">Welcome to Legacy Translations!</h2>
+
+                <p>Dear {partner.contact_name},</p>
+
+                <p>Thank you for registering <strong>{partner.company_name}</strong> as a business partner. We're excited to have you on board!</p>
+
+                <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px;">🎁 YOUR WELCOME GIFT</p>
+                    <p style="margin: 0 0 15px 0; font-size: 24px; font-weight: bold;">1 FREE Certified Translation Page</p>
+                    <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
+                        {welcome_coupon.code}
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 90 days • Use on your first order</p>
+                </div>
+
+                <h3 style="color: #374151;">How to use your coupon:</h3>
+                <ol style="color: #6b7280; line-height: 1.8;">
+                    <li>Log in to your <a href="https://portal.legacytranslations.com/#/partner/login" style="color: #0d9488;">Partner Portal</a></li>
+                    <li>Create a new order</li>
+                    <li>Enter the coupon code at checkout</li>
+                    <li>Enjoy your free certified translation!</li>
+                </ol>
+
+                <p style="color: #6b7280; margin-top: 25px;">
+                    If you have any questions, feel free to reply to this email or use the chat in your portal.
+                </p>
+
+                <p style="color: #374151;">
+                    Best regards,<br>
+                    <strong>The Legacy Translations Team</strong>
+                </p>
+            </div>
+            """
+            await send_email(partner.email, welcome_subject, welcome_content)
+        except Exception as email_error:
+            logger.warning(f"Failed to send welcome email: {email_error}")
+
         # Send notification email to admin if invoice plan requested
         if needs_approval:
             try:
@@ -4337,6 +4424,7 @@ async def register_partner(partner_data: PartnerCreate):
                         <p><strong>Contact:</strong> {partner.contact_name}</p>
                         <p><strong>Email:</strong> {partner.email}</p>
                         <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Estimated Monthly Volume:</strong> {partner.estimated_volume or 'Not specified'} pages/month</p>
                         <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
                         <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
                         {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
@@ -4528,6 +4616,238 @@ async def get_current_partner_info(token: str):
         "email": partner["email"],
         "contact_name": partner["contact_name"],
         "phone": partner.get("phone")
+    }
+
+# ==================== COUPON SYSTEM ====================
+
+# Price for one certified page (used for WELCOME coupon discount calculation)
+CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
+
+@api_router.get("/partner/coupons")
+async def get_partner_coupons(token: str):
+    """Get all coupons for the logged-in partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    coupons = await db.coupons.find({
+        "partner_id": partner["id"],
+        "is_active": True
+    }).to_list(100)
+
+    return [{
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c["times_used"],
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until"),
+        "is_available": c["times_used"] < c["max_uses"]
+    } for c in coupons]
+
+@api_router.post("/partner/validate-coupon")
+async def validate_coupon(token: str, code: str, order_total: float = 0):
+    """Validate a coupon code and return discount details"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find coupon (case-insensitive)
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    # Check if coupon belongs to this partner (if partner-specific)
+    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
+        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
+
+    # Check usage limits
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="This coupon has already been used")
+
+    # Check validity dates
+    now = datetime.utcnow()
+    if coupon.get("valid_until") and now > coupon["valid_until"]:
+        raise HTTPException(status_code=400, detail="This coupon has expired")
+
+    # Check first order only restriction
+    if coupon.get("first_order_only", False):
+        partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+        if partner_orders > 0:
+            raise HTTPException(status_code=400, detail="This coupon is only valid for your first order")
+
+    # Check minimum order value
+    if order_total < coupon.get("min_order_value", 0):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order value of ${coupon['min_order_value']:.2f} required for this coupon"
+        )
+
+    # Calculate discount
+    discount_amount = 0.0
+    discount_description = ""
+
+    if coupon["discount_type"] == "certified_page":
+        # 1 certified page free = $35 discount
+        discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
+        discount_description = f"{int(coupon['discount_value'])} certified page(s) FREE"
+    elif coupon["discount_type"] == "percentage":
+        discount_amount = order_total * (coupon["discount_value"] / 100)
+        discount_description = f"{coupon['discount_value']}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        discount_amount = coupon["discount_value"]
+        discount_description = f"${coupon['discount_value']:.2f} off"
+
+    # Apply max discount cap if set
+    if coupon.get("max_discount") and discount_amount > coupon["max_discount"]:
+        discount_amount = coupon["max_discount"]
+
+    # Don't exceed order total
+    if order_total > 0:
+        discount_amount = min(discount_amount, order_total)
+
+    return {
+        "valid": True,
+        "code": coupon["code"],
+        "discount_type": coupon["discount_type"],
+        "discount_amount": round(discount_amount, 2),
+        "discount_description": discount_description,
+        "message": f"Coupon applied: {discount_description}"
+    }
+
+@api_router.post("/partner/apply-coupon")
+async def apply_coupon_to_order(token: str, code: str, order_id: str):
+    """Mark a coupon as used on an order"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find and validate coupon
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="Coupon already used")
+
+    # Mark coupon as used
+    await db.coupons.update_one(
+        {"id": coupon["id"]},
+        {"$set": {
+            "times_used": coupon["times_used"] + 1,
+            "used_at": datetime.utcnow(),
+            "used_on_order_id": order_id
+        }}
+    )
+
+    return {"success": True, "message": "Coupon applied successfully"}
+
+# ==================== PARTNER CREDIT QUALIFICATION ====================
+
+CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+
+@api_router.get("/partner/credit-qualification")
+async def get_partner_credit_qualification(token: str):
+    """Check if partner qualifies for invoice payment plans"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    plan_approved = partner.get("payment_plan_approved", False)
+
+    # Calculate qualification status
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+
+    # Check if upgrade is pending
+    upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
+    requested_plan = partner.get("requested_payment_plan")
+
+    return {
+        "current_plan": current_plan,
+        "plan_approved": plan_approved,
+        "qualifies_for_invoice": qualifies,
+        "total_paid_orders": total_paid_orders,
+        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_remaining": orders_remaining,
+        "upgrade_pending": upgrade_pending,
+        "requested_plan": requested_plan
+    }
+
+@api_router.post("/partner/request-payment-upgrade")
+async def request_payment_plan_upgrade(token: str, plan: str):
+    """Request upgrade to invoice payment plan (biweekly or monthly)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Validate requested plan
+    if plan not in ["biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'biweekly' or 'monthly'")
+
+    # Check qualification
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+        )
+
+    # Check if already on invoice plan
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    if current_plan in ["biweekly", "monthly"] and partner.get("payment_plan_approved", False):
+        raise HTTPException(status_code=400, detail="Already on an invoice payment plan")
+
+    # Update partner with upgrade request
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {
+            "payment_plan_upgrade_requested": True,
+            "requested_payment_plan": plan,
+            "upgrade_requested_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    # Send email notification to admin
+    plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+    try:
+        email_html = f"""
+        <h2>Payment Plan Upgrade Request</h2>
+        <p>A partner has requested to upgrade their payment plan:</p>
+        <ul>
+            <li><strong>Company:</strong> {partner.get('company_name')}</li>
+            <li><strong>Contact:</strong> {partner.get('contact_name')}</li>
+            <li><strong>Email:</strong> {partner.get('email')}</li>
+            <li><strong>Current Plan:</strong> Pay Per Order</li>
+            <li><strong>Requested Plan:</strong> {plan_name}</li>
+            <li><strong>Total Paid Orders:</strong> {total_paid_orders}</li>
+            <li><strong>Total Revenue:</strong> ${partner.get('total_revenue', 0):.2f}</li>
+        </ul>
+        <p>Please review and approve/deny this request in the admin panel.</p>
+        """
+
+        await send_email(
+            to_email="contact@legacytranslations.com",
+            subject=f"Payment Plan Upgrade Request - {partner.get('company_name')}",
+            html_content=email_html
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send upgrade request email: {e}")
+
+    return {
+        "success": True,
+        "message": f"Upgrade request submitted. An admin will review your request for {plan_name}.",
+        "requested_plan": plan
     }
 
 # ==================== ADMIN USER AUTHENTICATION ====================
@@ -8019,6 +8339,92 @@ async def get_partner_statistics(admin_key: str):
             "total_pending": sum(p["total_pending"] for p in result)
         }
     }
+
+
+@api_router.post("/admin/partners/{partner_id}/approve-payment-upgrade")
+async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, approved: bool, plan: str = None):
+    """Approve or deny a partner's payment plan upgrade request (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        if approved:
+            # Use the requested plan or the one provided
+            target_plan = plan or partner.get("requested_payment_plan", "biweekly")
+            if target_plan not in ["biweekly", "monthly"]:
+                raise HTTPException(status_code=400, detail="Invalid payment plan")
+
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan": target_plan,
+                    "payment_plan_approved": True,
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None,
+                    "payment_plan_approved_at": datetime.utcnow().isoformat()
+                }}
+            )
+
+            # Send approval email to partner
+            plan_name = "Biweekly Invoice" if target_plan == "biweekly" else "Monthly Invoice"
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Approved!</h2>
+                <p>Great news! Your payment plan upgrade request has been approved.</p>
+                <ul>
+                    <li><strong>New Plan:</strong> {plan_name}</li>
+                </ul>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for your business!</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Approved - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send approval email: {e}")
+
+            return {"success": True, "message": f"Partner upgraded to {plan_name}"}
+        else:
+            # Deny the request
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None
+                }}
+            )
+
+            # Send denial email
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Request</h2>
+                <p>Thank you for your interest in our invoice payment plans.</p>
+                <p>At this time, we are unable to approve your upgrade request. Please continue using Pay Per Order for now.</p>
+                <p>If you have questions, please contact us at contact@legacytranslations.com.</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Request Update - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send denial email: {e}")
+
+            return {"success": True, "message": "Upgrade request denied"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing payment upgrade: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process upgrade request")
 
 
 @api_router.delete("/admin/partners/{partner_id}")
