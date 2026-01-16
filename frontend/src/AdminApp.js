@@ -15596,7 +15596,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                       if (confirm(`Enviar tradução para ${viewingOrder.client_email}?${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
                                         try {
                                           await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
-                                            bcc_email: bccEmail
+                                            bcc_email: bccEmail,
+                                            include_verification_page: true,
+                                            certifier_name: 'Beatriz Paiva',
+                                            generate_combined_pdf: true,
+                                            include_certificate: true,
+                                            include_translation: true,
+                                            include_original: true
                                           });
                                           alert('Tradução enviada para o cliente!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));

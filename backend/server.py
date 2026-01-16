@@ -10862,6 +10862,68 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 if original_file_data:
                     order_with_original["original_file"] = original_file_data
 
+                # Fetch translated documents from order_documents collection if not already on order
+                if not order_with_original.get("translated_file"):
+                    translated_docs = await db.order_documents.find({
+                        "order_id": order_id,
+                        "source": "translated_document"
+                    }).to_list(10)
+
+                    if translated_docs:
+                        # Get the first translated document (usually a PDF)
+                        for trans_doc in translated_docs:
+                            trans_data = trans_doc.get("file_data") or trans_doc.get("data")
+                            if trans_data:
+                                content_type = trans_doc.get("content_type", "application/pdf")
+                                # If it's a PDF, use it directly
+                                if "pdf" in content_type.lower():
+                                    order_with_original["translated_file"] = trans_data
+                                    order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf")
+                                    logger.info(f"Found translated PDF from order_documents: {trans_doc.get('filename')}")
+                                    break
+                                # If it's an image (JPG, PNG), convert to PDF with full page size
+                                elif "image" in content_type.lower():
+                                    try:
+                                        import fitz
+                                        from PIL import Image
+                                        import io
+
+                                        img_bytes = base64.b64decode(trans_data)
+                                        # Get image dimensions using PIL
+                                        pil_img = Image.open(io.BytesIO(img_bytes))
+                                        img_width, img_height = pil_img.size
+
+                                        # Create PDF with letter size
+                                        pdf_doc = fitz.open()
+                                        pdf_page = pdf_doc.new_page(width=612, height=792)
+
+                                        # Calculate scale to fit page with small margins
+                                        margin = 36  # 0.5 inch margins
+                                        max_width = 612 - 2 * margin
+                                        max_height = 792 - 2 * margin
+                                        scale = min(max_width / img_width, max_height / img_height)
+
+                                        # Center the image
+                                        new_width = img_width * scale
+                                        new_height = img_height * scale
+                                        x_offset = (612 - new_width) / 2
+                                        y_offset = (792 - new_height) / 2
+                                        insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                                        pdf_page.insert_image(insert_rect, stream=img_bytes)
+
+                                        # Convert to base64
+                                        pdf_bytes = pdf_doc.tobytes()
+                                        order_with_original["translated_file"] = base64.b64encode(pdf_bytes).decode('utf-8')
+                                        order_with_original["translated_filename"] = trans_doc.get("filename", "translation.pdf").rsplit('.', 1)[0] + ".pdf"
+                                        logger.info(f"Converted translated image to PDF (full size): {trans_doc.get('filename')}")
+                                        pdf_doc.close()
+                                        pil_img.close()
+                                        break
+                                    except Exception as img_err:
+                                        logger.error(f"Error converting image to PDF: {str(img_err)}")
+                                        continue
+
                 # Generate the combined PDF
                 combined_pdf_bytes = await generate_combined_delivery_pdf(
                     order=order_with_original,
