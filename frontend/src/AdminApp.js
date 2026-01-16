@@ -15538,72 +15538,96 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                         {/* Action Buttons when translations exist */}
                         {(isAdmin || isPM) && (
-                          <div className="mt-3 pt-3 border-t border-green-200 flex flex-wrap gap-2">
+                          <div className="mt-3 pt-3 border-t border-green-200">
+                            {/* Accept Translation Button - shows when not yet ready */}
                             {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && viewingOrder.translation_status !== 'final' && (
-                              <button
-                                onClick={async () => {
-                                  if (confirm('Mark this project as Ready for delivery?')) {
-                                    try {
-                                      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
-                                        translation_status: 'ready',
-                                        translation_ready_at: new Date().toISOString()
-                                      });
-                                      alert('Project marked as Ready!');
-                                      setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
-                                      fetchOrders();
-                                    } catch (err) {
-                                      console.error('Failed to update status:', err);
-                                      alert('Error updating status');
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('Aceitar esta tradução e marcar como pronta para envio?')) {
+                                      try {
+                                        await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+                                          translation_status: 'ready',
+                                          translation_ready_at: new Date().toISOString()
+                                        });
+                                        alert('Tradução aceita! Agora você pode enviar para o cliente.');
+                                        setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
+                                        fetchOrders();
+                                      } catch (err) {
+                                        console.error('Failed to update status:', err);
+                                        alert('Erro ao atualizar status');
+                                      }
                                     }
-                                  }
-                                }}
-                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1"
-                              >
-                                ✅ Mark as Ready
-                              </button>
+                                  }}
+                                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+                                >
+                                  ✅ Aceitar Tradução
+                                </button>
+                                <p className="text-[10px] text-gray-500 text-center">
+                                  Após aceitar, você poderá enviar o email ao cliente com a tradução
+                                </p>
+                              </div>
                             )}
+
+                            {/* Send Email Section - shows after translation is accepted */}
                             {(viewingOrder.translation_status === 'ready' || viewingOrder.translation_status === 'final') && (
-                              <div className="flex flex-col gap-2 w-full">
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="email"
-                                    placeholder="BCC email (optional)"
-                                    id="bcc-email-input"
-                                    className="flex-1 px-2 py-1.5 border rounded text-xs"
-                                  />
+                              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-2xl">📧</span>
+                                  <div>
+                                    <div className="text-sm font-medium text-purple-800">Tradução Aceita!</div>
+                                    <div className="text-[10px] text-purple-600">Pronto para enviar ao cliente</div>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="email"
+                                      placeholder="BCC email (opcional)"
+                                      id="bcc-email-input"
+                                      className="flex-1 px-2 py-1.5 border border-purple-200 rounded text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                                    />
+                                  </div>
                                   <button
                                     onClick={async () => {
                                       const bccInput = document.getElementById('bcc-email-input');
                                       const bccEmail = bccInput?.value?.trim() || null;
 
-                                      if (confirm(`Send translation to ${viewingOrder.client_email}?${bccEmail ? `\n\nBCC: ${bccEmail}` : ''}`)) {
+                                      if (confirm(`Enviar tradução para ${viewingOrder.client_email}?${bccEmail ? `\n\nCópia (BCC): ${bccEmail}` : ''}`)) {
                                         try {
                                           await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
                                             bcc_email: bccEmail
                                           });
-                                          alert('Translation sent to client!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
+                                          alert('Tradução enviada para o cliente!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
                                           setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
                                           fetchOrders();
                                         } catch (err) {
                                           console.error('Failed to deliver:', err);
-                                          alert('Error sending to client');
+                                          alert('Erro ao enviar para o cliente');
                                         }
                                       }
                                     }}
-                                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                                    className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
                                   >
-                                    📤 Send to Client
+                                    <span className="text-lg">✉️</span>
+                                    Enviar Email ao Cliente
                                   </button>
-                                </div>
-                                <div className="text-[10px] text-gray-500">
-                                  Will send to: {viewingOrder.client_email}
+                                  <div className="text-[10px] text-purple-600 text-center">
+                                    Será enviado para: <strong>{viewingOrder.client_email}</strong>
+                                  </div>
                                 </div>
                               </div>
                             )}
+
+                            {/* Delivered Status */}
                             {viewingOrder.translation_status === 'delivered' && (
-                              <span className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1">
-                                ✅ Delivered to client
-                              </span>
+                              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex items-center gap-2">
+                                <span className="text-2xl">✅</span>
+                                <div>
+                                  <div className="text-sm font-medium text-gray-700">Entregue ao Cliente</div>
+                                  <div className="text-[10px] text-gray-500">Tradução enviada com sucesso</div>
+                                </div>
+                              </div>
                             )}
                           </div>
                         )}
