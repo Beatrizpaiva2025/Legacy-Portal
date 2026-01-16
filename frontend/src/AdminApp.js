@@ -3,8 +3,8 @@ import axios from 'axios';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker (pdfjs-dist 5.x uses .mjs files)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 const API = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -582,7 +582,54 @@ const NotificationBell = ({ adminKey, user, onNotificationClick }) => {
 };
 
 // ==================== HORIZONTAL TOP BAR ====================
-const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
+const TopBar = ({
+  activeTab,
+  setActiveTab,
+  onLogout,
+  user,
+  adminKey,
+  pendingZelleCount = 0,
+  unreadNotifCount = 0,
+  pendingZelleInvoices = [],
+  invoiceNotifications = [],
+  onRefreshNotifications
+}) => {
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+
+  const totalNotifCount = pendingZelleCount + unreadNotifCount;
+
+  const handleApproveZelle = async (invoiceId) => {
+    if (!window.confirm('Approve this Zelle payment?')) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
+      alert('Payment approved!');
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRejectZelle = async (invoiceId) => {
+    const reason = prompt('Rejection reason (optional):');
+    if (reason === null) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
+      alert('Payment rejected');
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
+      if (onRefreshNotifications) onRefreshNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
   // Define menu items with role-based access
   const allMenuItems = [
     { id: 'projects', label: 'Projects', icon: '📋', roles: ['admin', 'sales'] },
@@ -604,7 +651,7 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
 
   // Role display names and colors
   const roleConfig = {
-    admin: { label: 'Administrator', color: 'bg-red-500' },
+    admin: { label: 'Admin', color: 'bg-red-500' },
     pm: { label: 'Project Manager', color: 'bg-blue-500' },
     translator: { label: 'Translator', color: 'bg-green-500' },
     sales: { label: 'Sales', color: 'bg-blue-500' }
@@ -646,6 +693,147 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
 
       {/* User Info and Actions */}
       <div className="flex items-center space-x-3">
+        {/* Notification Bell - Only for admin */}
+        {userRole === 'admin' && (
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              className="relative p-2 text-slate-300 hover:bg-slate-700 rounded transition-colors"
+              title="Invoice Notifications"
+            >
+              <span className="text-lg">🔔</span>
+              {totalNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {totalNotifCount > 9 ? '9+' : totalNotifCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifDropdown && (
+              <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border z-50 max-h-[80vh] overflow-hidden">
+                <div className="p-3 border-b bg-gray-50 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-800 text-sm">Invoice Notifications</h3>
+                  <button
+                    onClick={() => setShowNotifDropdown(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[60vh]">
+                  {/* Pending Zelle Section */}
+                  {pendingZelleInvoices.length > 0 && (
+                    <div className="border-b">
+                      <div className="px-3 py-2 bg-purple-50 text-purple-800 text-xs font-bold flex items-center justify-between">
+                        <span>🏦 Pending Zelle Verification</span>
+                        <span className="bg-purple-600 text-white rounded-full px-2 py-0.5 text-[10px]">
+                          {pendingZelleInvoices.length}
+                        </span>
+                      </div>
+                      {pendingZelleInvoices.map((inv) => (
+                        <div key={inv.id} className="p-3 border-b hover:bg-gray-50">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-mono text-xs font-medium">{inv.invoice_number}</div>
+                              <div className="text-xs text-gray-600">{inv.partner_company}</div>
+                              <div className="text-[10px] text-gray-400">
+                                {inv.zelle_submitted_at ? new Date(inv.zelle_submitted_at).toLocaleString() : ''}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-sm text-gray-800">${inv.total_amount?.toFixed(2)}</div>
+                              {inv.zelle_receipt_url && (
+                                <a
+                                  href={inv.zelle_receipt_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[10px] text-blue-600 hover:underline"
+                                >
+                                  View Receipt
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => handleApproveZelle(inv.id)}
+                              className="flex-1 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            >
+                              ✓ Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectZelle(inv.id)}
+                              className="flex-1 px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                            >
+                              ✕ Reject
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Recent Notifications */}
+                  {invoiceNotifications.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 bg-gray-50 text-gray-700 text-xs font-bold">
+                        Recent Activity
+                      </div>
+                      {invoiceNotifications.slice(0, 8).map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`p-3 border-b hover:bg-gray-50 cursor-pointer ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                          onClick={() => !notif.is_read && handleMarkRead(notif.id)}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-sm">
+                              {notif.type === 'invoice_stripe_paid' && '💳'}
+                              {notif.type === 'invoice_zelle_receipt' && '🏦'}
+                              {notif.type === 'invoice_payment_approved' && '✅'}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-xs font-medium text-gray-800">{notif.title}</div>
+                              <div className="text-[10px] text-gray-500">{notif.message}</div>
+                              <div className="text-[10px] text-gray-400 mt-1">
+                                {new Date(notif.created_at).toLocaleString()}
+                              </div>
+                            </div>
+                            {!notif.is_read && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {pendingZelleInvoices.length === 0 && invoiceNotifications.length === 0 && (
+                    <div className="p-6 text-center text-gray-500 text-sm">
+                      No notifications
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-2 border-t bg-gray-50">
+                  <button
+                    onClick={() => {
+                      setActiveTab('finances');
+                      setShowNotifDropdown(false);
+                    }}
+                    className="w-full text-center text-xs text-blue-600 hover:text-blue-800 py-1"
+                  >
+                    View all in Finances → Partners
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {user && (
           <div className="flex items-center space-x-2">
             <div className={`px-3 py-1 ${roleInfo.color} rounded text-[10px] font-medium text-center`}>
@@ -660,9 +848,9 @@ const TopBar = ({ activeTab, setActiveTab, onLogout, user, adminKey }) => {
         )}
         <button
           onClick={onLogout}
-          className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
+          className="px-2 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
         >
-          Logout
+          🚪 Logout
         </button>
       </div>
     </div>
@@ -3944,6 +4132,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     });
   };
 
+  // Helper function to ensure proper image src format (data URI)
+  const getImageSrc = (img) => {
+    if (!img || !img.data) return '';
+    // If already a data URI, return as is
+    if (img.data.startsWith('data:')) return img.data;
+    // Otherwise, construct proper data URI (handle both type and contentType)
+    const type = img.type || img.contentType || 'image/png';
+    return `data:${type};base64,${img.data}`;
+  };
+
   // OCR with backend (supports regular OCR or Claude OCR)
   const handleOCR = async () => {
     if (files.length === 0) {
@@ -4579,7 +4777,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
@@ -5085,10 +5283,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div style="width: 100%; height: 2px; background: #93c5fd; margin-bottom: 16px;"></div>
 
-        <!-- Order Number -->
+        <!-- Order Number - Only show if real order number exists -->
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `
         <div style="text-align: right; margin-bottom: 24px; font-size: 14px;">
-          <span>Order # </span><strong>${orderNumber || 'P0000'}</strong>
+          <span>Order # </span><strong>${orderNumber}</strong>
         </div>
+        ` : ''}
 
         <!-- Main Title -->
         <h1 style="text-align: center; font-size: 24px; font-weight: normal; margin-bottom: 24px; color: #1a365d;">${certTitle}</h1>
@@ -5211,7 +5411,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${orderNumber || 'P0000'}</strong></div>
+        ${orderNumber && !orderNumber.toLowerCase().includes('order0') && orderNumber !== 'P0000' ? `<div class="order-number">Order # <strong>${orderNumber}</strong></div>` : ''}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${documentType}</strong> from <strong>${sourceLanguage}</strong> to<br>
@@ -7344,17 +7544,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages.map((img, idx) => (
                       <div key={idx} className="mb-2">
-                        {img.filename.toLowerCase().endsWith('.pdf') ? (
+                        {img.filename?.toLowerCase().endsWith('.pdf') ? (
                           <embed
-                            src={img.data}
+                            src={getImageSrc(img)}
                             type="application/pdf"
                             className="w-full border shadow-sm"
                             style={{height: '430px'}}
                           />
                         ) : (
                           <img
-                            src={img.data}
-                            alt={img.filename}
+                            src={getImageSrc(img)}
+                            alt={img.filename || 'Original'}
                             className="max-w-full border shadow-sm"
                           />
                         )}
@@ -7627,7 +7827,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <p className="text-xs text-blue-700 font-medium">{externalOriginalImages.length} file(s) uploaded</p>
                         <div className="mt-2 max-h-32 overflow-auto">
                           {externalOriginalImages.map((img, idx) => (
-                            <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                            <img key={idx} src={getImageSrc(img)} alt={img.filename || 'Original'} className="max-h-24 mx-auto mb-1 border rounded" />
                           ))}
                         </div>
                         <button className="mt-2 px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600">
@@ -7670,7 +7870,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         {externalTranslationImages.length > 0 && (
                           <div className="mt-2 max-h-32 overflow-auto">
                             {externalTranslationImages.map((img, idx) => (
-                              <img key={idx} src={img.data} alt={img.filename} className="max-h-24 mx-auto mb-1 border rounded" />
+                              <img key={idx} src={getImageSrc(img)} alt={img.filename || 'Translation'} className="max-h-24 mx-auto mb-1 border rounded" />
                             ))}
                           </div>
                         )}
@@ -8576,9 +8776,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2" ref={originalTextRef} onScroll={() => handleScroll('original')}>
                     {originalImages[selectedResultIndex] ? (
                       originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
                       ) : (
-                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
                     ) : translationResults[selectedResultIndex]?.original ? (
                       <img src={translationResults[selectedResultIndex].original} alt="Original" className="max-w-full border shadow-sm" />
@@ -8814,9 +9014,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages[selectedResultIndex] ? (
                       originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={originalImages[selectedResultIndex].data} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
                       ) : (
-                        <img src={originalImages[selectedResultIndex].data} alt={originalImages[selectedResultIndex].filename} className="max-w-full border shadow-sm" />
+                        <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
                     ) : translationResults[selectedResultIndex]?.original ? (
                       // Show original image from external upload
@@ -9079,42 +9279,54 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </button>
                     )}
 
-                    {/* Approve Button - Different behavior for Admin, PM, and In-House Translator */}
-                    <button
-                      onClick={() => approveTranslation(false)}
-                      disabled={sendingToProjects}
-                      className={`px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 ${
-                        (isPM && !isAdmin) || isInHouseTranslator ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'
-                      }`}
-                    >
-                      {(isPM && !isAdmin) || isInHouseTranslator ? '📤 Send to Admin' : '✅ Approve'}
-                    </button>
+                    {/* Translators: Send to PM */}
+                    {(isInHouseTranslator || isContractor) && (
+                      <button
+                        onClick={() => sendToProjects('pm')}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 bg-purple-600 hover:bg-purple-700"
+                      >
+                        📤 Send to PM
+                      </button>
+                    )}
 
-                    {/* Admin: Go directly to Deliver */}
+                    {/* PM: Approve and Send to Admin for delivery */}
+                    {(isPM && !isAdmin) && (
+                      <button
+                        onClick={() => approveTranslation(false)}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 text-white text-sm font-medium rounded disabled:bg-gray-300 flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                      >
+                        ✅ Approve
+                      </button>
+                    )}
+
+                    {/* Admin: Send to Client (Deliver) */}
                     {isAdmin && (
                       <button
-                        onClick={() => setActiveSubTab('deliver')}
-                        className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 flex items-center gap-2"
+                        onClick={() => sendToProjects('deliver')}
+                        disabled={sendingToProjects}
+                        className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 flex items-center gap-2"
                       >
-                        📤 Go to Deliver
+                        📤 Send to Client
                       </button>
                     )}
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
-                  {isInHouseTranslator ? (
+                  {(isInHouseTranslator || isContractor) ? (
                     <>
-                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
                     </>
                   ) : isPM && !isAdmin ? (
                     <>
-                      📤 <strong>Send to Admin:</strong> Sends translation to Admin for final approval
+                      ✅ <strong>Approve:</strong> Approves translation and sends to Admin for client delivery
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
                     </>
                   ) : (
                     <>
-                      ✅ <strong>Approve:</strong> Marks translation as "Ready for Delivery"
+                      📤 <strong>Send to Client:</strong> Delivers the approved translation to the client
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
                     </>
@@ -13406,13 +13618,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                       {reviewOriginalDocs[reviewCurrentPage] ? (
                         reviewOriginalDocs[reviewCurrentPage].contentType?.includes('pdf') ? (
                           <embed
-                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            src={getImageSrc(reviewOriginalDocs[reviewCurrentPage])}
                             type="application/pdf"
                             className="w-full h-full min-h-[500px]"
                           />
                         ) : (
                           <img
-                            src={reviewOriginalDocs[reviewCurrentPage].data}
+                            src={getImageSrc(reviewOriginalDocs[reviewCurrentPage])}
                             alt="Original"
                             className="max-w-full border shadow-sm"
                           />
@@ -13440,13 +13652,13 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           />
                         ) : reviewTranslatedDoc.contentType?.includes('pdf') ? (
                           <embed
-                            src={reviewTranslatedDoc.data}
+                            src={getImageSrc(reviewTranslatedDoc)}
                             type="application/pdf"
                             className="w-full h-full min-h-[500px]"
                           />
                         ) : (
                           <img
-                            src={reviewTranslatedDoc.data}
+                            src={getImageSrc(reviewTranslatedDoc)}
                             alt="Translation"
                             className="max-w-full border shadow-sm"
                           />
@@ -14453,7 +14665,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           )}
 
                           {/* Admin only: Deliver to Client (quick) */}
-                          {isAdmin && order.translation_status === 'ready' && (
+                          {isAdmin && (order.translation_status === 'ready' || order.translation_status === 'final') && (
                             <button
                               onClick={() => { deliverOrder(order.id); setOpenActionsDropdown(null); }}
                               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 flex items-center gap-2"
@@ -15048,11 +15260,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <td className="py-2">
                             {viewingOrder.assigned_translator_name || viewingOrder.assigned_translator || '-'}
                             {viewingOrder.translator_assignment_status && (
-                              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
-                                viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
+                              <span
+                                onClick={() => {
+                                  if (isAdmin || isPM) {
+                                    const newStatus = viewingOrder.translator_assignment_status === 'accepted' ? 'pending' : 'accepted';
+                                    if (confirm(`Change translator status to "${newStatus}"?`)) {
+                                      updateTranslatorAssignmentStatus(viewingOrder.id, newStatus);
+                                      setViewingOrder(prev => ({ ...prev, translator_assignment_status: newStatus }));
+                                    }
+                                  }
+                                }}
+                                className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                                  viewingOrder.translator_assignment_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                  viewingOrder.translator_assignment_status === 'declined' ? 'bg-red-100 text-red-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                } ${(isAdmin || isPM) ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                title={(isAdmin || isPM) ? "Click to change status" : ""}
+                              >
                                 {viewingOrder.translator_assignment_status}
                               </span>
                             )}
@@ -15235,7 +15459,49 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
 
                   {/* Translated Documents Section */}
                   <div className="mt-4 pt-4 border-t">
-                    <div className="text-xs font-medium text-green-700 mb-2">📗 Translated Documents</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-medium text-green-700">📗 Translated Documents</div>
+                      {/* Upload Translated Document Button */}
+                      {(isAdmin || isPM) && (
+                        <label className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded cursor-pointer transition-colors flex items-center gap-1">
+                          ⬆️ Upload Translation
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            multiple
+                            onChange={async (e) => {
+                              if (e.target.files && e.target.files.length > 0) {
+                                for (const file of e.target.files) {
+                                  try {
+                                    const reader = new FileReader();
+                                    const base64Promise = new Promise((resolve, reject) => {
+                                      reader.onload = () => resolve(reader.result.split(',')[1]);
+                                      reader.onerror = reject;
+                                    });
+                                    reader.readAsDataURL(file);
+                                    const base64Data = await base64Promise;
+
+                                    await axios.post(`${API}/admin/orders/${viewingOrder.id}/documents?admin_key=${adminKey}`, {
+                                      filename: file.name,
+                                      file_data: base64Data,
+                                      content_type: file.type || 'application/octet-stream',
+                                      source: 'translated_document'
+                                    });
+                                  } catch (err) {
+                                    console.error('Failed to upload translation:', err);
+                                    alert(`Error uploading ${file.name}`);
+                                  }
+                                }
+                                alert('Translation(s) uploaded successfully!');
+                                viewOrderDocuments(viewingOrder);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
                     {orderDocuments.filter(doc => doc.source === 'translated_document').length > 0 ? (
                       <div className="space-y-2">
                         {orderDocuments.filter(doc => doc.source === 'translated_document').map((doc, idx) => (
@@ -15250,19 +15516,103 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 </div>
                               </div>
                             </div>
-                            <button
-                              onClick={() => downloadDocument(doc.id, doc.filename)}
-                              className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
-                            >
-                              <span>⬇️</span> Download
-                            </button>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => downloadDocument(doc.id, doc.filename)}
+                                className="px-2 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700 flex items-center gap-1"
+                              >
+                                ⬇️
+                              </button>
+                              {(isAdmin || isPM) && (
+                                <button
+                                  onClick={() => deleteOrderDocument(doc.id, doc.filename)}
+                                  className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                                  title="Delete translation"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
+
+                        {/* Action Buttons when translations exist */}
+                        {(isAdmin || isPM) && (
+                          <div className="mt-3 pt-3 border-t border-green-200 flex flex-wrap gap-2">
+                            {viewingOrder.translation_status !== 'ready' && viewingOrder.translation_status !== 'delivered' && viewingOrder.translation_status !== 'final' && (
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Mark this project as Ready for delivery?')) {
+                                    try {
+                                      await axios.put(`${API}/admin/orders/${viewingOrder.id}?admin_key=${adminKey}`, {
+                                        translation_status: 'ready',
+                                        translation_ready_at: new Date().toISOString()
+                                      });
+                                      alert('Project marked as Ready!');
+                                      setViewingOrder(prev => ({ ...prev, translation_status: 'ready' }));
+                                      fetchOrders();
+                                    } catch (err) {
+                                      console.error('Failed to update status:', err);
+                                      alert('Error updating status');
+                                    }
+                                  }
+                                }}
+                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded flex items-center gap-1"
+                              >
+                                ✅ Mark as Ready
+                              </button>
+                            )}
+                            {(viewingOrder.translation_status === 'ready' || viewingOrder.translation_status === 'final') && (
+                              <div className="flex flex-col gap-2 w-full">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="email"
+                                    placeholder="BCC email (optional)"
+                                    id="bcc-email-input"
+                                    className="flex-1 px-2 py-1.5 border rounded text-xs"
+                                  />
+                                  <button
+                                    onClick={async () => {
+                                      const bccInput = document.getElementById('bcc-email-input');
+                                      const bccEmail = bccInput?.value?.trim() || null;
+
+                                      if (confirm(`Send translation to ${viewingOrder.client_email}?${bccEmail ? `\n\nBCC: ${bccEmail}` : ''}`)) {
+                                        try {
+                                          await axios.post(`${API}/admin/orders/${viewingOrder.id}/deliver?admin_key=${adminKey}`, {
+                                            bcc_email: bccEmail
+                                          });
+                                          alert('Translation sent to client!' + (bccEmail ? ` (BCC: ${bccEmail})` : ''));
+                                          setViewingOrder(prev => ({ ...prev, translation_status: 'delivered' }));
+                                          fetchOrders();
+                                        } catch (err) {
+                                          console.error('Failed to deliver:', err);
+                                          alert('Error sending to client');
+                                        }
+                                      }
+                                    }}
+                                    className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                                  >
+                                    📤 Send to Client
+                                  </button>
+                                </div>
+                                <div className="text-[10px] text-gray-500">
+                                  Will send to: {viewingOrder.client_email}
+                                </div>
+                              </div>
+                            )}
+                            {viewingOrder.translation_status === 'delivered' && (
+                              <span className="px-3 py-2 bg-gray-100 text-gray-600 text-xs rounded flex items-center gap-1">
+                                ✅ Delivered to client
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-4 text-gray-400">
                         <div className="text-2xl mb-1">📝</div>
-                        <div className="text-xs">No translations approved yet</div>
+                        <div className="text-xs">No translations uploaded yet</div>
+                        <div className="text-[10px] mt-1 text-gray-400">Use "Upload Translation" button above to add completed translations</div>
                       </div>
                     )}
                   </div>
@@ -19812,6 +20162,22 @@ const FinancesPage = ({ adminKey }) => {
   const [paidOrders, setPaidOrders] = useState([]);
   // Partner statistics state
   const [partnerStats, setPartnerStats] = useState({ partners: [], summary: {} });
+  // Partner invoices state
+  const [partnerInvoices, setPartnerInvoices] = useState([]);
+  const [selectedPartnerForInvoice, setSelectedPartnerForInvoice] = useState(null);
+  const [partnerOrdersForInvoice, setPartnerOrdersForInvoice] = useState([]);
+  const [selectedOrdersForInvoice, setSelectedOrdersForInvoice] = useState([]);
+  const [showCreateInvoiceModal, setShowCreateInvoiceModal] = useState(false);
+  const [invoiceDueDays, setInvoiceDueDays] = useState(30);
+  const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
+  const [showInvoicesModal, setShowInvoicesModal] = useState(false);
+  const [selectedPartnerInvoices, setSelectedPartnerInvoices] = useState([]);
+  // Invoice payment management state
+  const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [invoiceNotifications, setInvoiceNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   // Quick add vendor modal state
   const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
   const [quickVendorForm, setQuickVendorForm] = useState({ name: '', email: '', role: 'translator', rate_per_page: '' });
@@ -19999,6 +20365,175 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  // Partner Invoice Functions
+  const fetchPartnerInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-invoices?admin_key=${adminKey}`);
+      setPartnerInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch partner invoices:', err);
+    }
+  };
+
+  const fetchPartnerOrdersForInvoice = async (partnerId) => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-orders/${partnerId}?admin_key=${adminKey}`);
+      setPartnerOrdersForInvoice(response.data.orders || []);
+    } catch (err) {
+      console.error('Failed to fetch partner orders:', err);
+    }
+  };
+
+  const fetchPartnerInvoicesForPartner = async (partnerId) => {
+    try {
+      const response = await axios.get(`${API}/admin/partner-invoices/partner/${partnerId}?admin_key=${adminKey}`);
+      setSelectedPartnerInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch partner invoices:', err);
+    }
+  };
+
+  const handleOpenCreateInvoice = async (partner) => {
+    setSelectedPartnerForInvoice(partner);
+    setSelectedOrdersForInvoice([]);
+    setInvoiceDueDays(30);
+    setInvoiceNotes('');
+    await fetchPartnerOrdersForInvoice(partner.partner_id);
+    setShowCreateInvoiceModal(true);
+  };
+
+  const handleOpenInvoices = async (partner) => {
+    setSelectedPartnerForInvoice(partner);
+    await fetchPartnerInvoicesForPartner(partner.partner_id);
+    setShowInvoicesModal(true);
+  };
+
+  const handleCreateInvoice = async () => {
+    if (selectedOrdersForInvoice.length === 0) {
+      alert('Please select at least one order');
+      return;
+    }
+    setCreatingInvoice(true);
+    try {
+      await axios.post(`${API}/admin/partner-invoices/create?admin_key=${adminKey}`, {
+        partner_id: selectedPartnerForInvoice.partner_id,
+        order_ids: selectedOrdersForInvoice,
+        due_days: invoiceDueDays,
+        notes: invoiceNotes
+      });
+      alert('Invoice created successfully!');
+      setShowCreateInvoiceModal(false);
+      fetchPartnerStats();
+      fetchPartnerInvoices();
+    } catch (err) {
+      alert('Error creating invoice: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId) => {
+    if (!window.confirm('Are you sure you want to delete this invoice?')) return;
+    try {
+      await axios.delete(`${API}/admin/partner-invoices/${invoiceId}?admin_key=${adminKey}`);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerStats();
+    } catch (err) {
+      alert('Error deleting invoice: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkInvoicePaid = async (invoiceId, paymentMethod = 'manual') => {
+    try {
+      await axios.put(`${API}/admin/partner-invoices/${invoiceId}/mark-paid?admin_key=${adminKey}&payment_method=${paymentMethod}`);
+      fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+      fetchPartnerStats();
+    } catch (err) {
+      alert('Error marking invoice as paid: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrdersForInvoice(prev =>
+      prev.includes(orderId)
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
+  };
+
+  const selectAllOrders = () => {
+    if (selectedOrdersForInvoice.length === partnerOrdersForInvoice.length) {
+      setSelectedOrdersForInvoice([]);
+    } else {
+      setSelectedOrdersForInvoice(partnerOrdersForInvoice.map(o => o.id));
+    }
+  };
+
+  // Invoice Payment Management Functions
+  const fetchPendingZelleInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-payments/pending-zelle?admin_key=${adminKey}`);
+      setPendingZelleInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch pending Zelle invoices:', err);
+    }
+  };
+
+  const fetchPaymentHistory = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-payments/history?admin_key=${adminKey}`);
+      setPaymentHistory(response.data.payments || []);
+    } catch (err) {
+      console.error('Failed to fetch payment history:', err);
+    }
+  };
+
+  const fetchInvoiceNotifications = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}`);
+      setInvoiceNotifications(response.data.notifications || []);
+      setUnreadNotifCount(response.data.unread_count || 0);
+    } catch (err) {
+      console.error('Failed to fetch invoice notifications:', err);
+    }
+  };
+
+  const handleApproveZellePayment = async (invoiceId) => {
+    if (!window.confirm('Are you sure you want to approve this Zelle payment?')) return;
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/approve-zelle?admin_key=${adminKey}`);
+      alert('Payment approved successfully!');
+      fetchPendingZelleInvoices();
+      fetchPaymentHistory();
+      fetchPartnerStats();
+      fetchInvoiceNotifications();
+    } catch (err) {
+      alert('Error approving payment: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleRejectZellePayment = async (invoiceId) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    if (reason === null) return; // User cancelled
+    try {
+      await axios.put(`${API}/admin/invoice-payments/${invoiceId}/reject-zelle?admin_key=${adminKey}&reason=${encodeURIComponent(reason)}`);
+      alert('Payment rejected');
+      fetchPendingZelleInvoices();
+      fetchInvoiceNotifications();
+    } catch (err) {
+      alert('Error rejecting payment: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleMarkNotificationRead = async (notifId) => {
+    try {
+      await axios.put(`${API}/admin/invoice-notifications/${notifId}/read?admin_key=${adminKey}`);
+      fetchInvoiceNotifications();
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+    }
+  };
+
   // Quick add vendor
   const handleQuickAddVendor = async () => {
     if (!quickVendorForm.name || !quickVendorForm.email) {
@@ -20168,6 +20703,10 @@ const FinancesPage = ({ adminKey }) => {
     }
     if (activeView === 'partners') {
       fetchPartnerStats();
+      fetchPartnerInvoices();
+      fetchPendingZelleInvoices();
+      fetchPaymentHistory();
+      fetchInvoiceNotifications();
     }
     if (activeView === 'pay-vendors') {
       fetchTranslatorsForPayment();
@@ -21415,23 +21954,448 @@ const FinancesPage = ({ adminKey }) => {
                           {formatCurrency(partner.total_received + partner.total_pending)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
-                                deletePartner(partner.partner_id);
-                              }
-                            }}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete partner"
-                          >
-                            🗑️
-                          </button>
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              onClick={() => handleOpenCreateInvoice(partner)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Create Invoice"
+                              disabled={partner.orders_pending === 0}
+                            >
+                              📄
+                            </button>
+                            <button
+                              onClick={() => handleOpenInvoices(partner)}
+                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded transition-colors"
+                              title="View Invoices"
+                            >
+                              📋
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
+                                  deletePartner(partner.partner_id);
+                                }
+                              }}
+                              className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete partner"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* All Invoices Summary */}
+          {partnerInvoices.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <h2 className="text-sm font-bold text-gray-700">📋 Recent Invoices</h2>
+                <p className="text-xs text-gray-500 mt-1">All partner invoices</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Partner</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {partnerInvoices.slice(0, 10).map((invoice) => (
+                      <tr key={invoice.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-mono text-xs">{invoice.invoice_number}</td>
+                        <td className="px-4 py-3">{invoice.partner_company}</td>
+                        <td className="px-4 py-3 text-center">{invoice.order_ids?.length || 0}</td>
+                        <td className="px-4 py-3 text-right font-medium">{formatCurrency(invoice.total_amount)}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            invoice.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Zelle Verifications */}
+          {pendingZelleInvoices.length > 0 && (
+            <div className="bg-white rounded-lg shadow border-l-4 border-purple-500">
+              <div className="p-4 border-b bg-purple-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-purple-800">🏦 Pending Zelle Verifications</h2>
+                    <p className="text-xs text-purple-600 mt-1">Invoices awaiting Zelle payment verification</p>
+                  </div>
+                  <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {pendingZelleInvoices.length}
+                  </span>
+                </div>
+              </div>
+              <div className="divide-y">
+                {pendingZelleInvoices.map((invoice) => (
+                  <div key={invoice.id} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-mono font-medium text-sm">{invoice.invoice_number}</div>
+                        <div className="text-sm text-gray-600">{invoice.partner_company}</div>
+                        <div className="text-xs text-gray-500">
+                          Submitted: {invoice.zelle_submitted_at ? new Date(invoice.zelle_submitted_at).toLocaleString() : '-'}
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-right">
+                          <div className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</div>
+                          {invoice.zelle_receipt_url && (
+                            <a
+                              href={invoice.zelle_receipt_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              View Receipt
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex flex-col space-y-1">
+                          <button
+                            onClick={() => handleApproveZellePayment(invoice.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectZellePayment(invoice.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Notifications */}
+          {invoiceNotifications.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-700">🔔 Payment Notifications</h2>
+                    <p className="text-xs text-gray-500 mt-1">Recent invoice payment activity</p>
+                  </div>
+                  {unreadNotifCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                      {unreadNotifCount} new
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="divide-y max-h-64 overflow-y-auto">
+                {invoiceNotifications.slice(0, 10).map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`p-3 hover:bg-gray-50 ${!notif.is_read ? 'bg-blue-50' : ''}`}
+                    onClick={() => !notif.is_read && handleMarkNotificationRead(notif.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium flex items-center">
+                          {notif.type === 'invoice_stripe_paid' && <span className="mr-2">💳</span>}
+                          {notif.type === 'invoice_zelle_receipt' && <span className="mr-2">🏦</span>}
+                          {notif.type === 'invoice_payment_approved' && <span className="mr-2">✅</span>}
+                          {notif.title}
+                        </div>
+                        <div className="text-xs text-gray-500">{notif.message}</div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(notif.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Payment History */}
+          {paymentHistory.length > 0 && (
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b bg-gray-50">
+                <h2 className="text-sm font-bold text-gray-700">💰 Payment History</h2>
+                <p className="text-xs text-gray-500 mt-1">Completed invoice payments</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Partner</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Method</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {paymentHistory.slice(0, 15).map((payment) => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-xs">
+                          {payment.paid_at ? new Date(payment.paid_at).toLocaleDateString() : '-'}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">{payment.invoice_number}</td>
+                        <td className="px-4 py-3">{payment.partner_company}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            payment.payment_method === 'stripe' ? 'bg-blue-100 text-blue-700' :
+                            payment.payment_method === 'zelle' ? 'bg-purple-100 text-purple-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {payment.payment_method === 'stripe' ? '💳 Card' :
+                             payment.payment_method === 'zelle' ? '🏦 Zelle' :
+                             payment.payment_method}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-green-600">
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-gray-500">{payment.order_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Create Invoice Modal */}
+      {showCreateInvoiceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Create Invoice</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerForInvoice?.company_name}</p>
+              </div>
+              <button onClick={() => setShowCreateInvoiceModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {partnerOrdersForInvoice.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No pending orders available for invoicing
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <label className="flex items-center text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrdersForInvoice.length === partnerOrdersForInvoice.length}
+                        onChange={selectAllOrders}
+                        className="mr-2"
+                      />
+                      Select All ({partnerOrdersForInvoice.length} orders)
+                    </label>
+                    <div className="text-sm font-medium">
+                      Selected: {formatCurrency(partnerOrdersForInvoice.filter(o => selectedOrdersForInvoice.includes(o.id)).reduce((sum, o) => sum + (o.total_price || 0), 0))}
+                    </div>
+                  </div>
+                  <div className="space-y-2 mb-4">
+                    {partnerOrdersForInvoice.map((order) => (
+                      <div
+                        key={order.id}
+                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedOrdersForInvoice.includes(order.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => toggleOrderSelection(order.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedOrdersForInvoice.includes(order.id)}
+                              onChange={() => toggleOrderSelection(order.id)}
+                              className="mr-3"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <div>
+                              <div className="font-medium text-sm">{order.order_number}</div>
+                              <div className="text-xs text-gray-500">
+                                {order.client_name} - {order.translate_from} to {order.translate_to}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="font-medium text-sm">{formatCurrency(order.total_price)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Due in (days)</label>
+                      <select
+                        value={invoiceDueDays}
+                        onChange={(e) => setInvoiceDueDays(parseInt(e.target.value))}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                      >
+                        <option value={7}>7 days</option>
+                        <option value={15}>15 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={45}>45 days</option>
+                        <option value={60}>60 days</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                      <input
+                        type="text"
+                        value={invoiceNotes}
+                        onChange={(e) => setInvoiceNotes(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                        placeholder="Invoice notes..."
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <div className="text-sm">
+                <span className="font-medium">{selectedOrdersForInvoice.length}</span> orders selected
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowCreateInvoiceModal(false)}
+                  className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateInvoice}
+                  disabled={creatingInvoice || selectedOrdersForInvoice.length === 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {creatingInvoice ? 'Creating...' : 'Create Invoice'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Invoices Modal */}
+      {showInvoicesModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Invoices</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerForInvoice?.company_name}</p>
+              </div>
+              <button onClick={() => setShowInvoicesModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[70vh]">
+              {selectedPartnerInvoices.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No invoices found for this partner
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {selectedPartnerInvoices.map((invoice) => (
+                    <div key={invoice.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-mono font-medium">{invoice.invoice_number}</div>
+                          <div className="text-xs text-gray-500">
+                            Created: {new Date(invoice.created_at).toLocaleDateString()} |
+                            Due: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
+                            invoice.status === 'overdue' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {invoice.status}
+                          </span>
+                          <span className="font-bold text-lg">{formatCurrency(invoice.total_amount)}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {invoice.order_ids?.length || 0} orders |
+                        {invoice.payment_method && ` Payment: ${invoice.payment_method}`}
+                        {invoice.zelle_receipt_url && (
+                          <a href={invoice.zelle_receipt_url} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 hover:underline">
+                            View Receipt
+                          </a>
+                        )}
+                      </div>
+                      {invoice.notes && (
+                        <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
+                      )}
+                      {invoice.status !== 'paid' && (
+                        <div className="flex space-x-2 mt-3">
+                          <button
+                            onClick={() => handleMarkInvoicePaid(invoice.id, 'zelle')}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
+                            Mark as Paid (Zelle)
+                          </button>
+                          <button
+                            onClick={() => handleMarkInvoicePaid(invoice.id, 'card')}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                          >
+                            Mark as Paid (Card)
+                          </button>
+                          <button
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                            className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowInvoicesModal(false)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -22906,7 +23870,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         </div>
         <div class="header-line"></div>
 
-        <div class="order-number">Order # <strong>${order?.order_number || orderNumber || 'P0000'}</strong></div>
+        ${(() => {
+          const displayOrderNumber = order?.order_number || orderNumber;
+          return displayOrderNumber && !displayOrderNumber.toLowerCase().includes('order0') && displayOrderNumber !== 'P0000'
+            ? `<div class="order-number">Order # <strong>${displayOrderNumber}</strong></div>`
+            : '';
+        })()}
         <h1 class="main-title">${certTitle}</h1>
         <div class="subtitle">
             Translation of a <strong>${order?.document_type || documentType || 'Document'}</strong> from <strong>${order?.source_language || sourceLanguage || 'Portuguese'}</strong> to<br>
@@ -27174,6 +28143,10 @@ function AdminApp() {
   const [user, setUser] = useState(null); // User info: { name, email, role, id }
   const [activeTab, setActiveTab] = useState('projects');
   const [selectedOrder, setSelectedOrder] = useState(null); // Order selected for translation
+  // Global invoice notifications state
+  const [globalInvoiceNotifications, setGlobalInvoiceNotifications] = useState([]);
+  const [globalPendingZelle, setGlobalPendingZelle] = useState([]);
+  const [globalUnreadCount, setGlobalUnreadCount] = useState(0);
 
   // Check for invite_token or reset_token in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -27238,6 +28211,32 @@ function AdminApp() {
 
     window.location.href = '/#/admin';
   };
+
+  // Global invoice notifications fetch
+  const fetchGlobalInvoiceNotifications = async () => {
+    if (!adminKey) return;
+    try {
+      const [notifRes, zelleRes] = await Promise.all([
+        axios.get(`${API}/admin/invoice-notifications?admin_key=${adminKey}&unread_only=false`),
+        axios.get(`${API}/admin/invoice-payments/pending-zelle?admin_key=${adminKey}`)
+      ]);
+      setGlobalInvoiceNotifications(notifRes.data.notifications || []);
+      setGlobalUnreadCount(notifRes.data.unread_count || 0);
+      setGlobalPendingZelle(zelleRes.data.invoices || []);
+    } catch (err) {
+      console.error('Failed to fetch global invoice notifications:', err);
+    }
+  };
+
+  // Fetch notifications on login and periodically
+  useEffect(() => {
+    if (adminKey && user?.role === 'admin') {
+      fetchGlobalInvoiceNotifications();
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchGlobalInvoiceNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [adminKey, user]);
 
   // Navigate to translation with order
   const navigateToTranslation = (order) => {
@@ -27365,7 +28364,18 @@ function AdminApp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <TopBar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} user={user} adminKey={adminKey} />
+      <TopBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onLogout={handleLogout}
+        user={user}
+        adminKey={adminKey}
+        pendingZelleCount={globalPendingZelle.length}
+        unreadNotifCount={globalUnreadCount}
+        pendingZelleInvoices={globalPendingZelle}
+        invoiceNotifications={globalInvoiceNotifications}
+        onRefreshNotifications={fetchGlobalInvoiceNotifications}
+      />
       <div className="flex-1 overflow-auto">{renderContent()}</div>
       <FloatingChatWidget adminKey={adminKey} user={user} />
     </div>

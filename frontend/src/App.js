@@ -60,13 +60,48 @@ const TRANSLATIONS = {
     benefit2: 'Dedicated B2B support chat',
     benefit3: 'Priority processing',
     benefit4: 'Exclusive: Digital Verification with QR Code',
+    welcomeGift: '🎁 1 FREE Certified Page on signup!',
     // Navigation
     newOrder: 'New Order',
     createNewOrder: 'Create New Order',
     myOrders: 'My Orders',
     messages: 'Messages',
+    invoices: 'Invoices',
+    paymentPlanMenu: 'Payment Plan',
     welcome: 'Welcome',
     logout: 'Logout',
+    // Payment Plan Page
+    paymentPlanTitle: 'Payment Plan',
+    currentPlan: 'Current Plan',
+    qualificationStatus: 'Qualification Status',
+    qualifiedForInvoice: 'You qualify for invoice plans!',
+    notQualifiedYet: 'Not yet qualified',
+    ordersCompleted: 'orders completed',
+    ordersRemaining: 'more orders to qualify',
+    requestUpgrade: 'Request Upgrade',
+    upgradeRequested: 'Upgrade Requested',
+    awaitingApproval: 'Awaiting admin approval',
+    selectPlanToUpgrade: 'Select the plan you want:',
+    submitUpgradeRequest: 'Submit Upgrade Request',
+    upgradeSuccess: 'Upgrade request submitted successfully!',
+    // Invoice Page
+    myInvoices: 'My Invoices',
+    noInvoices: 'No invoices found',
+    invoiceNumber: 'Invoice #',
+    dueDate: 'Due Date',
+    status: 'Status',
+    amount: 'Amount',
+    payNow: 'Pay Now',
+    payWithCard: 'Pay with Card',
+    payWithZelle: 'Pay with Zelle',
+    uploadReceipt: 'Upload Receipt',
+    zelleInstructions: 'Send payment via Zelle to: payments@legacytranslations.com',
+    receiptUploaded: 'Receipt uploaded successfully. Payment will be verified shortly.',
+    invoicePaid: 'Paid',
+    invoicePending: 'Pending',
+    invoiceOverdue: 'Overdue',
+    viewDetails: 'View Details',
+    ordersIncluded: 'Orders Included',
     // Service Types
     serviceType: 'Service Type',
     certifiedTranslation: 'Certified Translation',
@@ -114,15 +149,24 @@ const TRANSLATIONS = {
     country: 'Country',
     taxId: 'Tax ID (EIN/CNPJ) - Optional',
     taxIdPlaceholder: 'XX-XXXXXXX',
+    // Estimated Volume
+    estimatedVolume: 'Estimated Monthly Volume',
+    selectVolume: 'Select estimated volume',
+    volume1to10: '1-10 pages per month',
+    volume11to50: '11-50 pages per month',
+    volume51to100: '51-100 pages per month',
+    volume100plus: '100+ pages per month',
     // Payment Plan
     paymentPlan: 'How would you like to pay?',
     payPerOrder: 'Pay Per Order',
     payPerOrderDesc: 'Pay for each order via Zelle or card',
     biweeklyInvoice: 'Biweekly Invoice',
-    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks (requires approval)',
+    biweeklyInvoiceDesc: 'Receive invoice every 2 weeks',
     monthlyInvoice: 'Monthly Invoice',
-    monthlyInvoiceDesc: 'Receive monthly invoice (requires approval)',
+    monthlyInvoiceDesc: 'Receive monthly invoice',
     invoiceRequiresApproval: 'Invoice plans require account approval after registration',
+    invoiceComingSoon: 'Available after qualification',
+    invoiceQualificationNote: 'Invoice plans unlock after 3 paid orders. Request upgrade from your dashboard.',
     paymentMethod: 'Preferred Payment Method',
     zelle: 'Zelle',
     creditCard: 'Credit Card',
@@ -177,13 +221,48 @@ const TRANSLATIONS = {
     benefit2: 'Chat de soporte B2B dedicado',
     benefit3: 'Procesamiento prioritario',
     benefit4: 'Exclusivo: Verificación Digital con Código QR',
+    welcomeGift: '🎁 1 Página Certificada GRATIS al registrarse!',
     // Navigation
     newOrder: 'Nuevo Pedido',
     createNewOrder: 'Crear Nuevo Pedido',
     myOrders: 'Mis Pedidos',
     messages: 'Mensajes',
+    invoices: 'Facturas',
+    paymentPlanMenu: 'Plan de Pago',
     welcome: 'Bienvenido',
     logout: 'Cerrar Sesión',
+    // Payment Plan Page
+    paymentPlanTitle: 'Plan de Pago',
+    currentPlan: 'Plan Actual',
+    qualificationStatus: 'Estado de Calificación',
+    qualifiedForInvoice: '¡Califica para planes de factura!',
+    notQualifiedYet: 'Aún no calificado',
+    ordersCompleted: 'pedidos completados',
+    ordersRemaining: 'pedidos más para calificar',
+    requestUpgrade: 'Solicitar Mejora',
+    upgradeRequested: 'Mejora Solicitada',
+    awaitingApproval: 'Esperando aprobación del administrador',
+    selectPlanToUpgrade: 'Seleccione el plan que desea:',
+    submitUpgradeRequest: 'Enviar Solicitud',
+    upgradeSuccess: '¡Solicitud de mejora enviada exitosamente!',
+    // Invoice Page
+    myInvoices: 'Mis Facturas',
+    noInvoices: 'No se encontraron facturas',
+    invoiceNumber: 'Factura #',
+    dueDate: 'Fecha de Vencimiento',
+    status: 'Estado',
+    amount: 'Monto',
+    payNow: 'Pagar Ahora',
+    payWithCard: 'Pagar con Tarjeta',
+    payWithZelle: 'Pagar con Zelle',
+    uploadReceipt: 'Subir Recibo',
+    zelleInstructions: 'Enviar pago via Zelle a: payments@legacytranslations.com',
+    receiptUploaded: 'Recibo subido exitosamente. El pago sera verificado pronto.',
+    invoicePaid: 'Pagado',
+    invoicePending: 'Pendiente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalles',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Servicio',
     certifiedTranslation: 'Traducción Certificada',
     certifiedDesc: 'Documentos oficiales, USCIS, propósitos legales',
@@ -230,15 +309,24 @@ const TRANSLATIONS = {
     country: 'País',
     taxId: 'ID Fiscal (EIN/RFC) - Opcional',
     taxIdPlaceholder: 'XX-XXXXXXX',
+    // Estimated Volume
+    estimatedVolume: 'Volumen Mensual Estimado',
+    selectVolume: 'Seleccione volumen estimado',
+    volume1to10: '1-10 páginas por mes',
+    volume11to50: '11-50 páginas por mes',
+    volume51to100: '51-100 páginas por mes',
+    volume100plus: '100+ páginas por mes',
     // Payment Plan
     paymentPlan: '¿Cómo prefiere pagar?',
     payPerOrder: 'Pago Por Pedido',
     payPerOrderDesc: 'Pague cada pedido vía Zelle o tarjeta',
     biweeklyInvoice: 'Factura Quincenal',
-    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas (requiere aprobación)',
+    biweeklyInvoiceDesc: 'Reciba factura cada 2 semanas',
     monthlyInvoice: 'Factura Mensual',
-    monthlyInvoiceDesc: 'Reciba factura mensual (requiere aprobación)',
+    monthlyInvoiceDesc: 'Reciba factura mensual',
     invoiceRequiresApproval: 'Planes de factura requieren aprobación después del registro',
+    invoiceComingSoon: 'Disponible tras calificación',
+    invoiceQualificationNote: 'Planes de factura se desbloquean después de 3 pedidos pagados. Solicite desde su panel.',
     paymentMethod: 'Método de Pago Preferido',
     zelle: 'Zelle',
     creditCard: 'Tarjeta de Crédito',
@@ -293,13 +381,48 @@ const TRANSLATIONS = {
     benefit2: 'Chat de suporte exclusivo para B2B',
     benefit3: 'Processamento prioritário',
     benefit4: 'Exclusivo: Verificação Digital com QR Code',
+    welcomeGift: '🎁 1 Página Certificada GRÁTIS no cadastro!',
     // Navigation
     newOrder: 'Novo Pedido',
     createNewOrder: 'Criar Novo Pedido',
     myOrders: 'Meus Pedidos',
     messages: 'Mensagens',
+    invoices: 'Faturas',
+    paymentPlanMenu: 'Plano de Pagamento',
     welcome: 'Bem-vindo',
     logout: 'Sair',
+    // Payment Plan Page
+    paymentPlanTitle: 'Plano de Pagamento',
+    currentPlan: 'Plano Atual',
+    qualificationStatus: 'Status de Qualificação',
+    qualifiedForInvoice: 'Você se qualifica para planos de fatura!',
+    notQualifiedYet: 'Ainda não qualificado',
+    ordersCompleted: 'pedidos concluídos',
+    ordersRemaining: 'pedidos restantes para qualificar',
+    requestUpgrade: 'Solicitar Upgrade',
+    upgradeRequested: 'Upgrade Solicitado',
+    awaitingApproval: 'Aguardando aprovação do administrador',
+    selectPlanToUpgrade: 'Selecione o plano desejado:',
+    submitUpgradeRequest: 'Enviar Solicitação',
+    upgradeSuccess: 'Solicitação de upgrade enviada com sucesso!',
+    // Invoice Page
+    myInvoices: 'Minhas Faturas',
+    noInvoices: 'Nenhuma fatura encontrada',
+    invoiceNumber: 'Fatura #',
+    dueDate: 'Data de Vencimento',
+    status: 'Status',
+    amount: 'Valor',
+    payNow: 'Pagar Agora',
+    payWithCard: 'Pagar com Cartao',
+    payWithZelle: 'Pagar com Zelle',
+    uploadReceipt: 'Enviar Comprovante',
+    zelleInstructions: 'Enviar pagamento via Zelle para: payments@legacytranslations.com',
+    receiptUploaded: 'Comprovante enviado com sucesso. O pagamento sera verificado em breve.',
+    invoicePaid: 'Pago',
+    invoicePending: 'Pendente',
+    invoiceOverdue: 'Vencido',
+    viewDetails: 'Ver Detalhes',
+    ordersIncluded: 'Pedidos Incluidos',
     serviceType: 'Tipo de Serviço',
     certifiedTranslation: 'Tradução Certificada',
     certifiedDesc: 'Documentos oficiais, USCIS, fins legais',
@@ -346,15 +469,24 @@ const TRANSLATIONS = {
     country: 'País',
     taxId: 'CNPJ/CPF - Opcional',
     taxIdPlaceholder: 'XX.XXX.XXX/0001-XX',
+    // Estimated Volume
+    estimatedVolume: 'Volume Mensal Estimado',
+    selectVolume: 'Selecione o volume estimado',
+    volume1to10: '1-10 páginas por mês',
+    volume11to50: '11-50 páginas por mês',
+    volume51to100: '51-100 páginas por mês',
+    volume100plus: '100+ páginas por mês',
     // Payment Plan
     paymentPlan: 'Como prefere pagar?',
     payPerOrder: 'Pagar Por Pedido',
     payPerOrderDesc: 'Pague cada pedido via Zelle ou cartão',
     biweeklyInvoice: 'Fatura Quinzenal',
-    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas (requer aprovação)',
+    biweeklyInvoiceDesc: 'Receba fatura a cada 2 semanas',
     monthlyInvoice: 'Fatura Mensal',
-    monthlyInvoiceDesc: 'Receba fatura mensal (requer aprovação)',
+    monthlyInvoiceDesc: 'Receba fatura mensal',
     invoiceRequiresApproval: 'Planos de fatura requerem aprovação após o cadastro',
+    invoiceComingSoon: 'Disponível após qualificação',
+    invoiceQualificationNote: 'Planos de fatura são liberados após 3 pedidos pagos. Solicite pelo painel.',
     paymentMethod: 'Método de Pagamento Preferido',
     zelle: 'Zelle',
     creditCard: 'Cartão de Crédito',
@@ -547,6 +679,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     address_zip: '',
     address_country: 'USA',
     tax_id: '',
+    // Estimated Volume
+    estimated_volume: '',
     // Payment
     payment_plan: 'pay_per_order',
     default_payment_method: 'zelle',
@@ -604,6 +738,8 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           address_zip: formData.address_zip || null,
           address_country: formData.address_country || 'USA',
           tax_id: formData.tax_id || null,
+          // Estimated Volume
+          estimated_volume: formData.estimated_volume || null,
           // Payment
           payment_plan: formData.payment_plan,
           default_payment_method: formData.default_payment_method,
@@ -633,6 +769,11 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             />
             <h1 className="text-xl font-bold mb-1 text-gray-800">{t.createAccount}</h1>
             <p className="text-gray-500 text-xs mb-4">{t.corporateOnly}</p>
+
+            {/* Welcome Gift Highlight */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg p-3 mb-4 text-center">
+              <span className="font-semibold text-sm">{t.welcomeGift}</span>
+            </div>
 
             <div className="space-y-2 text-xs text-gray-700">
               <div className="flex items-center gap-2">
@@ -724,26 +865,52 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
                 </div>
               </div>
 
+              {/* Estimated Monthly Volume */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{t.estimatedVolume} *</label>
+                <select
+                  required
+                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  value={formData.estimated_volume}
+                  onChange={(e) => setFormData({...formData, estimated_volume: e.target.value})}
+                >
+                  <option value="">{t.selectVolume}</option>
+                  <option value="1-10">{t.volume1to10}</option>
+                  <option value="11-50">{t.volume11to50}</option>
+                  <option value="51-100">{t.volume51to100}</option>
+                  <option value="100+">{t.volume100plus}</option>
+                </select>
+              </div>
+
               {/* Payment Plan */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{t.paymentPlan}</label>
                 <div className="grid grid-cols-3 gap-2">
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'pay_per_order' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="pay_per_order" checked={formData.payment_plan === 'pay_per_order'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
+                  {/* Pay Per Order - Always available */}
+                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center border-blue-500 bg-blue-50`}>
+                    <input type="radio" name="payment_plan" value="pay_per_order" checked={true} readOnly className="sr-only" />
                     <span className="font-medium text-xs text-gray-800">{t.payPerOrder}</span>
                     <span className="text-[10px] text-gray-500">{t.payPerOrderDesc}</span>
                   </label>
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'biweekly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="biweekly" checked={formData.payment_plan === 'biweekly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-xs text-gray-800">{t.biweeklyInvoice}</span>
-                    <span className="text-[10px] text-gray-500">{t.biweeklyInvoiceDesc}</span>
-                  </label>
-                  <label className={`flex flex-col p-2 rounded border-2 cursor-pointer transition-all text-center ${formData.payment_plan === 'monthly' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
-                    <input type="radio" name="payment_plan" value="monthly" checked={formData.payment_plan === 'monthly'} onChange={(e) => setFormData({...formData, payment_plan: e.target.value})} className="sr-only" />
-                    <span className="font-medium text-xs text-gray-800">{t.monthlyInvoice}</span>
-                    <span className="text-[10px] text-gray-500">{t.monthlyInvoiceDesc}</span>
-                  </label>
+                  {/* Biweekly Invoice - Disabled for new signups */}
+                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                    <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
+                      <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    </div>
+                    <span className="font-medium text-xs text-gray-500">{t.biweeklyInvoice}</span>
+                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                  </div>
+                  {/* Monthly Invoice - Disabled for new signups */}
+                  <div className="flex flex-col p-2 rounded border-2 border-gray-200 text-center opacity-50 cursor-not-allowed relative" title={t.invoiceQualificationNote}>
+                    <div className="absolute -top-1 -right-1 bg-amber-100 rounded-full p-0.5">
+                      <svg className="w-3 h-3 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>
+                    </div>
+                    <span className="font-medium text-xs text-gray-500">{t.monthlyInvoice}</span>
+                    <span className="text-[10px] text-gray-400">{t.invoiceComingSoon}</span>
+                  </div>
                 </div>
+                {/* Qualification note */}
+                <p className="text-[10px] text-gray-500 mt-1 italic">{t.invoiceQualificationNote}</p>
               </div>
 
               {/* Password */}
@@ -1058,7 +1225,9 @@ const Sidebar = ({ activeTab, setActiveTab, partner, onLogout, t }) => {
   const menuItems = [
     { id: 'new-order', label: t.newOrder, icon: '➕' },
     { id: 'orders', label: t.myOrders, icon: '📋' },
-    { id: 'messages', label: t.messages, icon: '✉️' }
+    { id: 'invoices', label: t.invoices, icon: '💰' },
+    { id: 'messages', label: t.messages, icon: '✉️' },
+    { id: 'payment-plan', label: t.paymentPlanMenu, icon: '💳' }
   ];
 
   return (
@@ -1122,6 +1291,12 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Coupon states
+  const [couponCode, setCouponCode] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState('');
 
   // Refs for scroll-to-error
   const clientNameRef = useRef(null);
@@ -1287,6 +1462,47 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       total_price: basePrice + urgencyFee + shippingFee,
       pages: pages
     });
+  };
+
+  // Validate and apply coupon
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError('');
+
+    try {
+      const orderTotal = quote?.total_price || 0;
+      const res = await fetch(`${API}/partner/validate-coupon?token=${token}&code=${encodeURIComponent(couponCode)}&order_total=${orderTotal}`, {
+        method: 'POST'
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAppliedCoupon(data);
+        setCouponError('');
+      } else {
+        const err = await res.json();
+        setCouponError(err.detail || 'Invalid coupon code');
+        setAppliedCoupon(null);
+      }
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      setCouponError('Failed to validate coupon');
+      setAppliedCoupon(null);
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Remove applied coupon
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
   };
 
   const [processingStatus, setProcessingStatus] = useState('');
@@ -2090,13 +2306,69 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                   <span>{formatPrice(quote.shipping_fee)}</span>
                 </div>
               )}
+
+              {/* Applied Coupon Discount */}
+              {appliedCoupon && (
+                <div className="flex justify-between text-green-600">
+                  <span>Discount ({appliedCoupon.code})</span>
+                  <span>-{formatPrice(appliedCoupon.discount_amount)}</span>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-3 mt-3">
               <div className="flex justify-between text-lg">
                 <span className="font-bold">Total</span>
-                <span className="font-bold text-teal-600">{formatPrice(quote?.total_price || 0)}</span>
+                <span className="font-bold text-teal-600">
+                  {formatPrice(Math.max(0, (quote?.total_price || 0) - (appliedCoupon?.discount_amount || 0)))}
+                </span>
               </div>
+              {appliedCoupon && (
+                <div className="text-xs text-green-600 text-right mt-1">
+                  You save {formatPrice(appliedCoupon.discount_amount)}!
+                </div>
+              )}
+            </div>
+
+            {/* Coupon Code Input */}
+            <div className="border-t pt-4 mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Have a coupon code?</label>
+              {appliedCoupon ? (
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div>
+                    <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
+                    <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="text-red-500 hover:text-red-700 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="Enter code"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={validateCoupon}
+                    disabled={couponLoading || !couponCode.trim()}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {couponError && (
+                <p className="text-red-500 text-xs mt-1">{couponError}</p>
+              )}
             </div>
 
             <div className="text-xs text-gray-500 mt-4">
@@ -2742,6 +3014,553 @@ const OrdersPage = ({ token }) => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== INVOICES PAGE ====================
+const InvoicesPage = ({ token, t }) => {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [invoiceOrders, setInvoiceOrders] = useState([]);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('card');
+  const [zelleReceipt, setZelleReceipt] = useState(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, []);
+
+  const fetchInvoices = async () => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices?token=${token}`);
+      setInvoices(response.data.invoices || []);
+    } catch (err) {
+      console.error('Error fetching invoices:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInvoiceDetails = async (invoiceId) => {
+    try {
+      const response = await axios.get(`${API}/partner/invoices/${invoiceId}?token=${token}`);
+      setSelectedInvoice(response.data.invoice);
+      setInvoiceOrders(response.data.orders || []);
+    } catch (err) {
+      console.error('Error fetching invoice details:', err);
+    }
+  };
+
+  const handleViewDetails = async (invoice) => {
+    await fetchInvoiceDetails(invoice.id);
+  };
+
+  const handlePayNow = (invoice) => {
+    setSelectedInvoice(invoice);
+    setPaymentMethod('card');
+    setZelleReceipt(null);
+    setShowPayModal(true);
+  };
+
+  const handlePayWithStripe = async () => {
+    if (!selectedInvoice) return;
+    setSubmittingPayment(true);
+    try {
+      const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
+        invoice_id: selectedInvoice.id,
+        origin_url: window.location.origin
+      });
+      if (response.data.checkout_url) {
+        window.location.href = response.data.checkout_url;
+      }
+    } catch (err) {
+      alert('Error creating payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleReceiptUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setUploadingReceipt(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await axios.post(`${API}/upload-document`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setZelleReceipt({
+        id: response.data.document_id,
+        filename: file.name
+      });
+    } catch (err) {
+      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setUploadingReceipt(false);
+    }
+  };
+
+  const handleSubmitZellePayment = async () => {
+    if (!selectedInvoice || !zelleReceipt) {
+      alert('Please upload a receipt');
+      return;
+    }
+
+    setSubmittingPayment(true);
+    try {
+      await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-zelle?token=${token}`, {
+        invoice_id: selectedInvoice.id,
+        zelle_receipt_id: zelleReceipt.id
+      });
+      alert(t?.receiptUploaded || 'Receipt uploaded successfully. Payment will be verified shortly.');
+      setShowPayModal(false);
+      setZelleReceipt(null);
+      fetchInvoices();
+    } catch (err) {
+      alert('Error submitting payment: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-700';
+      case 'overdue': return 'bg-red-100 text-red-700';
+      default: return 'bg-yellow-100 text-yellow-700';
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'paid': return t?.invoicePaid || 'Paid';
+      case 'overdue': return t?.invoiceOverdue || 'Overdue';
+      default: return t?.invoicePending || 'Pending';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.myInvoices || 'My Invoices'}</h1>
+
+      {invoices.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          <span className="text-4xl mb-4 block">📋</span>
+          {t?.noInvoices || 'No invoices found'}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {invoices.map((invoice) => (
+            <div key={invoice.id} className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="font-mono font-bold text-lg">{invoice.invoice_number}</div>
+                    <div className="text-sm text-gray-500">
+                      {t?.dueDate || 'Due Date'}: {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-'}
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(invoice.status)}`}>
+                      {getStatusLabel(invoice.status)}
+                    </span>
+                    <span className="text-2xl font-bold text-gray-800">{formatCurrency(invoice.total_amount)}</span>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-500 mb-4">
+                  {invoice.order_ids?.length || 0} {t?.ordersIncluded || 'orders'} |
+                  {t?.invoiceNumber || 'Created'}: {new Date(invoice.created_at).toLocaleDateString()}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => handleViewDetails(invoice)}
+                    className="text-teal-600 hover:text-teal-800 text-sm font-medium"
+                  >
+                    {t?.viewDetails || 'View Details'}
+                  </button>
+
+                  {invoice.status !== 'paid' && (
+                    <button
+                      onClick={() => handlePayNow(invoice)}
+                      className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium"
+                    >
+                      {t?.payNow || 'Pay Now'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Invoice Details Modal */}
+      {selectedInvoice && !showPayModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-lg">{selectedInvoice.invoice_number}</h2>
+                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(selectedInvoice.status)}`}>
+                  {getStatusLabel(selectedInvoice.status)}
+                </span>
+              </div>
+              <button onClick={() => setSelectedInvoice(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <div className="text-sm text-gray-500">{t?.dueDate || 'Due Date'}</div>
+                  <div className="font-medium">{selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                  <div className="font-bold text-xl">{formatCurrency(selectedInvoice.total_amount)}</div>
+                </div>
+              </div>
+
+              <h3 className="font-bold text-gray-700 mb-3">{t?.ordersIncluded || 'Orders Included'}</h3>
+              <div className="space-y-2">
+                {invoiceOrders.map((order) => (
+                  <div key={order.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-medium">{order.order_number}</div>
+                        <div className="text-sm text-gray-500">
+                          {order.client_name} - {order.translate_from} to {order.translate_to}
+                        </div>
+                        <div className="text-xs text-gray-400">{new Date(order.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <div className="font-medium">{formatCurrency(order.total_price)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedInvoice.notes && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-600">{selectedInvoice.notes}</div>
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
+              <button
+                onClick={() => setSelectedInvoice(null)}
+                className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+              >
+                Close
+              </button>
+              {selectedInvoice.status !== 'paid' && (
+                <button
+                  onClick={() => { setShowPayModal(true); }}
+                  className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+                >
+                  {t?.payNow || 'Pay Now'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPayModal && selectedInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <h2 className="font-bold">{t?.payNow || 'Pay Invoice'}</h2>
+              <button onClick={() => { setShowPayModal(false); setZelleReceipt(null); }} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="text-sm text-gray-500">{t?.amount || 'Amount'}</div>
+                <div className="text-3xl font-bold text-gray-800">{formatCurrency(selectedInvoice.total_amount)}</div>
+                <div className="text-xs text-gray-500 mt-1">{selectedInvoice.invoice_number}</div>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => setPaymentMethod('card')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">💳</span>
+                    <span className="font-medium">{t?.payWithCard || 'Pay with Card'}</span>
+                  </div>
+                  {paymentMethod === 'card' && <span className="text-teal-600">✓</span>}
+                </button>
+
+                <button
+                  onClick={() => setPaymentMethod('zelle')}
+                  className={`w-full p-4 border rounded-lg flex items-center justify-between ${
+                    paymentMethod === 'zelle' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-2xl mr-3">🏦</span>
+                    <span className="font-medium">{t?.payWithZelle || 'Pay with Zelle'}</span>
+                  </div>
+                  {paymentMethod === 'zelle' && <span className="text-teal-600">✓</span>}
+                </button>
+              </div>
+
+              {paymentMethod === 'card' && (
+                <button
+                  onClick={handlePayWithStripe}
+                  disabled={submittingPayment}
+                  className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300"
+                >
+                  {submittingPayment ? 'Processing...' : `${t?.payNow || 'Pay'} ${formatCurrency(selectedInvoice.total_amount)}`}
+                </button>
+              )}
+
+              {paymentMethod === 'zelle' && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="text-sm font-medium text-purple-800 mb-2">Zelle Payment Instructions:</div>
+                    <div className="text-sm text-purple-700">
+                      {t?.zelleInstructions || 'Send payment via Zelle to: payments@legacytranslations.com'}
+                    </div>
+                    <div className="text-sm text-purple-600 mt-2">Amount: {formatCurrency(selectedInvoice.total_amount)}</div>
+                    <div className="text-xs text-purple-500 mt-1">Reference: {selectedInvoice.invoice_number}</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t?.uploadReceipt || 'Upload Payment Receipt'}
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleReceiptUpload}
+                      accept="image/*,.pdf"
+                      className="w-full border rounded-lg p-2 text-sm"
+                      disabled={uploadingReceipt}
+                    />
+                    {uploadingReceipt && (
+                      <div className="text-sm text-gray-500 mt-1">Uploading...</div>
+                    )}
+                    {zelleReceipt && (
+                      <div className="text-sm text-green-600 mt-1">
+                        ✓ {zelleReceipt.filename}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSubmitZellePayment}
+                    disabled={!zelleReceipt || submittingPayment}
+                    className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:bg-gray-300"
+                  >
+                    {submittingPayment ? 'Submitting...' : 'Submit Zelle Payment'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ==================== PAYMENT PLAN PAGE ====================
+const PaymentPlanPage = ({ token, t }) => {
+  const [qualification, setQualification] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState('biweekly');
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    fetchQualification();
+  }, [token]);
+
+  const fetchQualification = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/partner/credit-qualification?token=${token}`);
+      if (res.ok) {
+        const data = await res.json();
+        setQualification(data);
+      }
+    } catch (error) {
+      console.error('Error fetching qualification:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestUpgrade = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_BASE}/partner/request-payment-upgrade?token=${token}&plan=${selectedPlan}`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        setSuccess(true);
+        fetchQualification();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error submitting request');
+      }
+    } catch (error) {
+      console.error('Error requesting upgrade:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const getPlanDisplayName = (plan) => {
+    switch (plan) {
+      case 'pay_per_order': return t?.payPerOrder || 'Pay Per Order';
+      case 'biweekly': return t?.biweeklyInvoice || 'Biweekly Invoice';
+      case 'monthly': return t?.monthlyInvoice || 'Monthly Invoice';
+      default: return plan;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 max-w-2xl">
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
+
+      {/* Current Plan Card */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 className="text-sm font-medium text-gray-500 mb-2">{t?.currentPlan || 'Current Plan'}</h2>
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">💳</span>
+          <div>
+            <div className="text-xl font-semibold text-gray-800">{getPlanDisplayName(qualification?.current_plan)}</div>
+            {qualification?.plan_approved && qualification?.current_plan !== 'pay_per_order' && (
+              <span className="inline-block mt-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Approved</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Qualification Status */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.qualificationStatus || 'Qualification Status'}</h2>
+
+        {/* Progress Bar */}
+        <div className="mb-4">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">{qualification?.total_paid_orders || 0} {t?.ordersCompleted || 'orders completed'}</span>
+            <span className="text-gray-500">{qualification?.orders_required || 3} required</span>
+          </div>
+          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-500 ${qualification?.qualifies_for_invoice ? 'bg-green-500' : 'bg-teal-500'}`}
+              style={{ width: `${Math.min(100, ((qualification?.total_paid_orders || 0) / (qualification?.orders_required || 3)) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {qualification?.qualifies_for_invoice ? (
+          <div className="flex items-center gap-2 text-green-600">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+            </svg>
+            <span className="font-medium">{t?.qualifiedForInvoice || 'You qualify for invoice plans!'}</span>
+          </div>
+        ) : (
+          <div className="text-gray-600">
+            <span>{qualification?.orders_remaining || 3} {t?.ordersRemaining || 'more orders to qualify'}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Upgrade Section */}
+      {qualification?.current_plan === 'pay_per_order' && (
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h2 className="text-sm font-medium text-gray-500 mb-4">{t?.requestUpgrade || 'Request Upgrade'}</h2>
+
+          {qualification?.upgrade_pending ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-amber-700">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+                </svg>
+                <span className="font-medium">{t?.upgradeRequested || 'Upgrade Requested'}</span>
+              </div>
+              <p className="text-sm text-amber-600 mt-2">{t?.awaitingApproval || 'Awaiting admin approval'}</p>
+              <p className="text-sm text-amber-600 mt-1">Requested: {getPlanDisplayName(qualification?.requested_plan)}</p>
+            </div>
+          ) : success ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-green-700">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                </svg>
+                <span className="font-medium">{t?.upgradeSuccess || 'Upgrade request submitted successfully!'}</span>
+              </div>
+            </div>
+          ) : qualification?.qualifies_for_invoice ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">{t?.selectPlanToUpgrade || 'Select the plan you want:'}</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'biweekly' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'}`}>
+                  <input type="radio" name="upgrade_plan" value="biweekly" checked={selectedPlan === 'biweekly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                  <span className="font-medium text-gray-800">{t?.biweeklyInvoice || 'Biweekly Invoice'}</span>
+                  <span className="text-xs text-gray-500 mt-1">{t?.biweeklyInvoiceDesc || 'Receive invoice every 2 weeks'}</span>
+                </label>
+                <label className={`flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all ${selectedPlan === 'monthly' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-teal-300'}`}>
+                  <input type="radio" name="upgrade_plan" value="monthly" checked={selectedPlan === 'monthly'} onChange={(e) => setSelectedPlan(e.target.value)} className="sr-only" />
+                  <span className="font-medium text-gray-800">{t?.monthlyInvoice || 'Monthly Invoice'}</span>
+                  <span className="text-xs text-gray-500 mt-1">{t?.monthlyInvoiceDesc || 'Receive monthly invoice'}</span>
+                </label>
+              </div>
+
+              <button
+                onClick={handleRequestUpgrade}
+                disabled={submitting}
+                className="w-full py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium disabled:bg-gray-300 transition-colors"
+              >
+                {submitting ? '...' : (t?.submitUpgradeRequest || 'Submit Upgrade Request')}
+              </button>
+            </div>
+          ) : (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+              <svg className="w-8 h-8 text-gray-400 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+              </svg>
+              <p className="text-sm text-gray-600">{t?.notQualifiedYet || 'Not yet qualified'}</p>
+              <p className="text-xs text-gray-500 mt-1">{qualification?.orders_remaining} {t?.ordersRemaining || 'more orders to qualify'}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -3715,8 +4534,12 @@ function App() {
         return <NewOrderPage partner={partner} token={token} onOrderCreated={() => setActiveTab('orders')} t={t} currency={currency} />;
       case 'orders':
         return <OrdersPage token={token} />;
+      case 'invoices':
+        return <InvoicesPage token={token} t={t} />;
       case 'messages':
         return <MessagesPage token={token} />;
+      case 'payment-plan':
+        return <PaymentPlanPage token={token} t={t} />;
       default:
         return <NewOrderPage partner={partner} token={token} t={t} currency={currency} />;
     }

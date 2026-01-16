@@ -38,6 +38,14 @@ const B2BLandingPage = () => {
     }
   }, []);
 
+  // Scroll to section helper (avoids HashRouter conflict)
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const [formData, setFormData] = useState({
     company_name: '',
     contact_name: '',
@@ -100,7 +108,7 @@ Message: ${formData.message}
             <a href="https://legacytranslations.com/services" className="text-gray-600 hover:text-blue-900 text-sm font-medium hidden md:block">
               Services
             </a>
-            <a href="#/partner" className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
+            <a href="#/partner/login" className="bg-blue-900 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-800 transition-colors">
               Partner Login
             </a>
           </nav>
@@ -108,8 +116,8 @@ Message: ${formData.message}
       </header>
 
       {/* Hero Section - Clean Professional */}
-      <section className="pt-24 bg-gradient-to-b from-slate-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <section className="pt-20 bg-gradient-to-b from-slate-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
               <div className="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-900 rounded-full text-sm font-medium mb-6">
@@ -124,12 +132,12 @@ Message: ${formData.message}
                 Enterprise-grade translation services powered by certified professionals and cutting-edge technology. Trusted by law firms and immigration agencies.
               </p>
               <div className="flex flex-wrap gap-4 mb-8">
-                <a href="#contact-form" className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
+                <button onClick={() => scrollToSection('contact-form')} className="bg-blue-900 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-lg shadow-blue-900/25">
                   Request Partnership
-                </a>
-                <a href="#benefits" className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
+                </button>
+                <button onClick={() => scrollToSection('benefits')} className="border-2 border-slate-300 text-slate-700 px-8 py-4 rounded-lg font-semibold hover:border-blue-900 hover:text-blue-900 transition-colors">
                   View Benefits
-                </a>
+                </button>
               </div>
               <div className="flex items-center gap-6 text-sm text-slate-500">
                 <div className="flex items-center">
@@ -179,12 +187,12 @@ Message: ${formData.message}
                 <div className="text-green-100 text-sm md:text-base">1 page - No commitment required</div>
               </div>
             </div>
-            <a
-              href="#contact-form"
+            <button
+              onClick={() => scrollToSection('contact-form')}
               className="px-6 py-3 bg-white text-green-600 rounded-full font-semibold hover:bg-green-50 transition-colors shadow-lg"
             >
               Claim Your Free Translation
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -300,24 +308,24 @@ Message: ${formData.message}
           <div className="grid md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">1</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Submit Interest</h3>
-              <p className="text-gray-600">Fill out the form below with your company information and translation needs.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">Create Your Account</h3>
+              <p className="text-gray-600">Sign up in minutes with your company information. No approval needed!</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">2</div>
-              <h3 className="text-xl font-bold text-blue-900 mb-3">Get Approved</h3>
-              <p className="text-gray-600">Our team will review your application and set up your corporate account within 24 hours.</p>
+              <h3 className="text-xl font-bold text-blue-900 mb-3">Get Your Free Page</h3>
+              <p className="text-gray-600">Receive a welcome coupon for 1 FREE certified translation page instantly via email.</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-blue-900 text-white rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-6">3</div>
               <h3 className="text-xl font-bold text-blue-900 mb-3">Start Translating</h3>
-              <p className="text-gray-600">Access your dashboard, submit orders, and enjoy all partnership benefits.</p>
+              <p className="text-gray-600">Access your dashboard immediately and submit your first order with pay-per-order pricing.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Contact Form Section */}
+      {/* Signup CTA Section */}
       <section id="contact-form" className="py-20 bg-gradient-to-br from-blue-900 to-blue-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -326,26 +334,26 @@ Message: ${formData.message}
                 Ready to Get Started?
               </h2>
               <p className="text-xl text-blue-100 mb-8">
-                Fill out the form and our partnership team will contact you within 24 hours to discuss your company's needs.
+                Create your account in minutes and start translating today. No approval process, no waiting!
               </p>
               <div className="space-y-4">
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">No commitment required</span>
+                  <span className="text-blue-100">Instant account activation</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">Free consultation</span>
+                  <span className="text-blue-100">Pay per order - no commitments</span>
                 </div>
                 <div className="flex items-center">
                   <svg className="w-6 h-6 text-blue-300 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="text-blue-100">Custom pricing available</span>
+                  <span className="text-blue-100">Invoice plans available after qualification</span>
                 </div>
                 <div className="flex items-start bg-gradient-to-r from-blue-800/50 to-purple-800/50 rounded-lg p-3 border border-blue-400/30">
                   <svg className="w-6 h-6 text-yellow-300 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -369,124 +377,50 @@ Message: ${formData.message}
             </div>
 
             <div className="bg-white rounded-2xl p-8 shadow-2xl">
-              {success ? (
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email!</h3>
-                  <p className="text-gray-600 mb-4">
-                    Your partnership request has been submitted successfully!
-                  </p>
-                  <p className="text-blue-600 font-medium mb-4">
-                    We've sent you an email with a link to complete your registration.
-                  </p>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Our team will also contact you within 24 hours to discuss your needs.
-                  </p>
-                  <a
-                    href="/#/partner"
-                    className="inline-block px-6 py-3 bg-blue-900 text-white rounded-lg font-medium hover:bg-blue-800 transition-colors"
-                  >
-                    Go to Partner Login
-                  </a>
+              {/* Direct Signup CTA */}
+              <div className="text-center py-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <h3 className="text-2xl font-bold text-blue-900 mb-6">Partnership Inquiry</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Create Your Free Account</h3>
+                <p className="text-gray-600 mb-6">
+                  Sign up now and receive a coupon for <span className="font-bold text-teal-600">1 FREE certified translation page!</span>
+                </p>
 
-                  {error && (
-                    <div className="p-4 bg-red-50 text-red-700 rounded-lg text-sm">
-                      {error}
-                    </div>
-                  )}
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.company_name}
-                        onChange={(e) => setFormData({...formData, company_name: e.target.value})}
-                        placeholder="Your Company Inc."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name *</label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.contact_name}
-                        onChange={(e) => setFormData({...formData, contact_name: e.target.value})}
-                        placeholder="John Smith"
-                      />
-                    </div>
+                <div className="space-y-4 mb-8">
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    No credit card required
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Business Email *</label>
-                      <input
-                        type="email"
-                        required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        placeholder="john@company.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        placeholder="+1 (555) 123-4567"
-                      />
-                    </div>
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Setup takes less than 2 minutes
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Monthly Volume</label>
-                    <select
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                      value={formData.estimated_volume}
-                      onChange={(e) => setFormData({...formData, estimated_volume: e.target.value})}
-                    >
-                      <option value="">Select estimated volume</option>
-                      <option value="1-10 pages">1-10 pages per month</option>
-                      <option value="11-50 pages">11-50 pages per month</option>
-                      <option value="51-100 pages">51-100 pages per month</option>
-                      <option value="100+ pages">100+ pages per month</option>
-                    </select>
+                  <div className="flex items-center justify-center text-sm text-gray-600">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Cancel anytime - no fees
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                    <textarea
-                      rows={3}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                      value={formData.message}
-                      onChange={(e) => setFormData({...formData, message: e.target.value})}
-                      placeholder="Tell us about your translation needs..."
-                    />
-                  </div>
+                <a
+                  href="/#/partner/login?register=true"
+                  className="block w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg hover:from-teal-600 hover:to-cyan-600 font-bold text-lg transition-all transform hover:scale-105 shadow-lg"
+                >
+                  🎁 Create Account & Get Free Page
+                </a>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 bg-blue-900 text-white rounded-lg hover:bg-blue-800 disabled:bg-gray-400 font-semibold text-lg transition-colors"
-                  >
-                    {loading ? 'Submitting...' : 'Submit Partnership Request'}
-                  </button>
-                </form>
-              )}
+                <p className="text-sm text-gray-500 mt-4">
+                  Already have an account? <a href="/#/partner/login" className="text-blue-600 hover:underline font-medium">Sign in here</a>
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -548,7 +482,7 @@ Message: ${formData.message}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-gray-600 mb-4">Already a partner?</p>
           <a
-            href="#/partner"
+            href="#/partner/login"
             className="inline-block px-8 py-3 border-2 border-blue-900 text-blue-900 rounded-full hover:bg-blue-900 hover:text-white font-semibold transition-colors"
           >
             Access Partner Portal
@@ -585,7 +519,7 @@ Message: ${formData.message}
               <div className="space-y-2">
                 <a href="https://legacytranslations.com" className="block text-blue-200 hover:text-white">Home</a>
                 <a href="https://legacytranslations.com/services" className="block text-blue-200 hover:text-white">Services</a>
-                <a href="#/partner" className="block text-blue-200 hover:text-white">Partner Portal</a>
+                <a href="#/partner/login" className="block text-blue-200 hover:text-white">Partner Portal</a>
               </div>
             </div>
           </div>

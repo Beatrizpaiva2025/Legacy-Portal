@@ -84,6 +84,115 @@ async def health_check():
     """Health check endpoint for monitoring and keeping service alive"""
     return {"status": "healthy", "service": "legacy-portal-backend"}
 
+# ==================== MULTI-CURRENCY SUPPORT ====================
+
+# Currency configuration with Stripe payment methods
+CURRENCY_CONFIG = {
+    "usd": {"symbol": "$", "name": "US Dollar", "payment_methods": ["card"], "country_codes": ["US"]},
+    "brl": {"symbol": "R$", "name": "Brazilian Real", "payment_methods": ["card", "pix"], "country_codes": ["BR"]},
+    "eur": {"symbol": "€", "name": "Euro", "payment_methods": ["card"], "country_codes": ["DE", "FR", "IT", "ES", "PT", "NL", "BE", "AT", "IE", "FI", "GR"]},
+    "gbp": {"symbol": "£", "name": "British Pound", "payment_methods": ["card"], "country_codes": ["GB"]},
+}
+
+# Cache for exchange rates (refresh every hour)
+exchange_rate_cache = {"rates": {}, "last_updated": None}
+
+@api_router.get("/geo/detect")
+async def detect_country(request: Request):
+    """Detect user's country from IP address"""
+    try:
+        # Get client IP
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host
+
+        # Skip for localhost/private IPs
+        if client_ip in ["127.0.0.1", "localhost"] or client_ip.startswith("192.168.") or client_ip.startswith("10."):
+            return {"country_code": "US", "currency": "usd", "symbol": "$"}
+
+        # Use free IP geolocation API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"http://ip-api.com/json/{client_ip}?fields=countryCode", timeout=5.0)
+            if response.status_code == 200:
+                data = response.json()
+                country_code = data.get("countryCode", "US")
+
+                # Map country to currency
+                currency = "usd"  # Default
+                for curr, config in CURRENCY_CONFIG.items():
+                    if country_code in config["country_codes"]:
+                        currency = curr
+                        break
+
+                return {
+                    "country_code": country_code,
+                    "currency": currency,
+                    "symbol": CURRENCY_CONFIG[currency]["symbol"],
+                    "payment_methods": CURRENCY_CONFIG[currency]["payment_methods"]
+                }
+
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+    except Exception as e:
+        logger.error(f"Error detecting country: {str(e)}")
+        return {"country_code": "US", "currency": "usd", "symbol": "$", "payment_methods": ["card"]}
+
+@api_router.get("/exchange-rates")
+async def get_exchange_rates():
+    """Get current exchange rates (USD as base)"""
+    global exchange_rate_cache
+
+    try:
+        # Check if cache is valid (less than 1 hour old)
+        if exchange_rate_cache["last_updated"]:
+            cache_age = datetime.utcnow() - exchange_rate_cache["last_updated"]
+            if cache_age.total_seconds() < 3600 and exchange_rate_cache["rates"]:
+                return {"rates": exchange_rate_cache["rates"], "base": "usd", "cached": True}
+
+        # Fetch fresh rates from free API
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://api.exchangerate-api.com/v4/latest/USD",
+                timeout=10.0
+            )
+            if response.status_code == 200:
+                data = response.json()
+                rates = {
+                    "usd": 1.0,
+                    "brl": data["rates"].get("BRL", 5.0),
+                    "eur": data["rates"].get("EUR", 0.92),
+                    "gbp": data["rates"].get("GBP", 0.79)
+                }
+
+                # Update cache
+                exchange_rate_cache = {
+                    "rates": rates,
+                    "last_updated": datetime.utcnow()
+                }
+
+                return {"rates": rates, "base": "usd", "cached": False}
+
+        # Fallback rates if API fails
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "cached": False,
+            "fallback": True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching exchange rates: {str(e)}")
+        return {
+            "rates": {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79},
+            "base": "usd",
+            "error": str(e)
+        }
+
+@api_router.get("/currency/config")
+async def get_currency_config():
+    """Get currency configuration"""
+    return {"currencies": CURRENCY_CONFIG}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -1026,6 +1135,7 @@ class PaymentCheckoutRequest(BaseModel):
     origin_url: str
     customer_email: Optional[str] = None
     customer_name: Optional[str] = None
+    currency: Optional[str] = "usd"  # usd, brl, eur, gbp
 
 class ZelleOrderRequest(BaseModel):
     quote_id: str
@@ -1064,6 +1174,8 @@ class Partner(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None  # EIN/CNPJ
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment & Billing
     payment_plan: str = "pay_per_order"  # pay_per_order, biweekly, monthly
     default_payment_method: str = "zelle"  # zelle, card, invoice
@@ -1085,6 +1197,30 @@ class Partner(BaseModel):
     last_order_at: Optional[datetime] = None
     last_payment_at: Optional[datetime] = None
 
+# ==================== COUPON MODEL ====================
+class Coupon(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: str  # e.g., "WELCOME-ABC123" or "PROMO50"
+    partner_id: Optional[str] = None  # If tied to specific partner
+    # Discount details
+    discount_type: str = "certified_page"  # certified_page, percentage, fixed_amount
+    discount_value: float = 1.0  # 1 page, or percentage, or dollar amount
+    max_discount: Optional[float] = None  # Maximum discount in dollars
+    # Usage limits
+    max_uses: int = 1  # How many times can be used total
+    times_used: int = 0
+    # Validity
+    is_active: bool = True
+    valid_from: datetime = Field(default_factory=datetime.utcnow)
+    valid_until: Optional[datetime] = None
+    # Restrictions
+    min_order_value: float = 0.0  # Minimum order value to apply
+    first_order_only: bool = True  # Only valid for first order
+    # Tracking
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: Optional[datetime] = None
+    used_on_order_id: Optional[str] = None
+
 class PartnerCreate(BaseModel):
     company_name: str
     email: EmailStr
@@ -1098,6 +1234,8 @@ class PartnerCreate(BaseModel):
     address_zip: Optional[str] = None
     address_country: Optional[str] = "USA"
     tax_id: Optional[str] = None
+    # Estimated monthly volume
+    estimated_volume: Optional[str] = None  # e.g., "1-10", "11-50", "51-100", "100+"
     # Payment preferences
     payment_plan: str = "pay_per_order"
     default_payment_method: str = "zelle"
@@ -1318,6 +1456,52 @@ class TranslationOrderUpdate(BaseModel):
     base_price: Optional[float] = None
     # Skip automatic email when using dedicated project email endpoint
     skip_email: Optional[bool] = False
+    # Translator assignment status (Admin/PM can manually change pending to accepted)
+    translator_assignment_status: Optional[str] = None
+
+# Partner Invoice Models
+class PartnerInvoice(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    invoice_number: str = Field(default_factory=lambda: f"INV-{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}")
+    partner_id: str
+    partner_company: str
+    partner_email: Optional[str] = None
+    # Order IDs included in this invoice
+    order_ids: List[str] = []
+    # Financial info
+    subtotal: float = 0.0
+    tax: float = 0.0
+    total_amount: float = 0.0
+    # Status
+    status: str = "pending"  # pending, paid, partial, overdue, cancelled
+    # Payment tracking
+    payment_method: Optional[str] = None  # stripe, zelle
+    stripe_session_id: Optional[str] = None
+    stripe_payment_intent: Optional[str] = None
+    zelle_receipt_id: Optional[str] = None
+    zelle_receipt_url: Optional[str] = None
+    amount_paid: float = 0.0
+    # Dates
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    due_date: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    # Notes
+    notes: Optional[str] = None
+    admin_notes: Optional[str] = None
+
+class PartnerInvoiceCreate(BaseModel):
+    partner_id: str
+    order_ids: List[str]
+    due_days: int = 30  # Days until due
+    notes: Optional[str] = None
+
+class PartnerInvoicePayStripe(BaseModel):
+    invoice_id: str
+    origin_url: str
+
+class PartnerInvoicePayZelle(BaseModel):
+    invoice_id: str
+    zelle_receipt_id: str
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -3086,9 +3270,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Try AWS Textract first (best quality)
             if textract_client:
                 logger.info("Using AWS Textract for image OCR...")
-                text = extract_text_with_textract(content, file_extension)
-                if text and len(text.strip()) > 10:
-                    return text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
             else:
                 logger.info("AWS Textract not configured, using Tesseract directly...")
@@ -3150,9 +3334,9 @@ async def extract_text_from_file(file: UploadFile) -> str:
             # Method 3: PDF is likely image-based - use AWS Textract (best quality)
             if textract_client:
                 logger.info("PDF appears to be image-based. Using AWS Textract...")
-                textract_text = extract_text_with_textract(content, file_extension)
-                if textract_text and len(textract_text.strip()) > 10:
-                    return textract_text
+                textract_result = extract_text_with_textract(content, file_extension)
+                if textract_result and textract_result.get('text') and len(textract_result['text'].strip()) > 10:
+                    return textract_result['text']
                 logger.info("Textract returned insufficient text, trying Tesseract...")
 
             # Method 4: Fallback to Tesseract OCR with multi-config
@@ -3359,49 +3543,75 @@ async def get_word_count(text: str = Form(...)):
 # Stripe Payment Integration
 @api_router.post("/create-payment-checkout")
 async def create_payment_checkout(request: PaymentCheckoutRequest):
-    """Create a Stripe checkout session"""
-    
+    """Create a Stripe checkout session with multi-currency support"""
+
     try:
         # Get quote
         quote = await db.translation_quotes.find_one({"id": request.quote_id})
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found")
-        
+
+        # Get currency configuration
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+
+        # Calculate amount in target currency
+        base_price_usd = quote["total_price"]
+        if currency != "usd":
+            # Get exchange rates
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_price_usd * exchange_rate
+        else:
+            amount_in_currency = base_price_usd
+
         # Create payment transaction record
         transaction = PaymentTransaction(
             session_id="",  # Will be updated with Stripe session ID
             quote_id=request.quote_id,
-            amount=quote["total_price"],
-            currency="usd",
+            amount=amount_in_currency,
+            currency=currency,
             payment_status="pending",
             status="initiated"
         )
-        
+
         # Get customer email from request or quote
         customer_email = request.customer_email or quote.get("customer_email")
 
+        # Get payment methods for this currency
+        payment_methods = currency_info["payment_methods"]
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Translation Service - {quote["service_type"].title()}',
                         'description': f'From {quote["translate_from"]} to {quote["translate_to"]} - {quote["word_count"]} words',
                     },
-                    'unit_amount': int(quote["total_price"] * 100),  # Stripe expects cents
+                    'unit_amount': int(amount_in_currency * 100),  # Stripe expects cents/centavos
                 },
                 'quantity': 1,
             }],
             'mode': 'payment',
+            'allow_promotion_codes': True,  # Enable Stripe coupons/promotion codes
             'success_url': f"{request.origin_url}?payment_success=true&session_id={{CHECKOUT_SESSION_ID}}#/customer",
             'cancel_url': f"{request.origin_url}?payment_cancelled=true#/customer",
             'metadata': {
                 'quote_id': request.quote_id,
                 'transaction_id': transaction.id,
                 'customer_email': customer_email or '',
-                'customer_name': request.customer_name or quote.get("customer_name", '')
+                'customer_name': request.customer_name or quote.get("customer_name", ''),
+                'original_currency': 'usd',
+                'original_amount': str(base_price_usd),
+                'charged_currency': currency,
+                'charged_amount': str(amount_in_currency)
             }
         }
 
@@ -3706,29 +3916,77 @@ async def stripe_webhook(request: Request):
         if event['type'] == 'checkout.session.completed':
             session = event['data']['object']
             session_id = session['id']
+            metadata = session.get('metadata', {})
 
             logger.info(f"Processing checkout.session.completed for session: {session_id}")
 
-            # Update payment status
-            result = await db.payment_transactions.update_one(
-                {"session_id": session_id},
-                {
-                    "$set": {
-                        "status": "completed",
-                        "payment_status": "paid",
-                        "updated_at": datetime.utcnow()
+            # Check if this is a partner invoice payment
+            if metadata.get('type') == 'partner_invoice':
+                invoice_id = metadata.get('invoice_id')
+                logger.info(f"Processing partner invoice payment for invoice: {invoice_id}")
+
+                # Update invoice status
+                invoice = await db.partner_invoices.find_one({"id": invoice_id})
+                if invoice:
+                    await db.partner_invoices.update_one(
+                        {"id": invoice_id},
+                        {"$set": {
+                            "status": "paid",
+                            "payment_method": "stripe",
+                            "stripe_payment_intent": session.get('payment_intent'),
+                            "amount_paid": invoice.get("total_amount", 0),
+                            "paid_at": datetime.utcnow()
+                        }}
+                    )
+
+                    # Update associated orders to paid
+                    await db.translation_orders.update_many(
+                        {"id": {"$in": invoice.get("order_ids", [])}},
+                        {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+                    )
+
+                    # Create admin notification for Stripe payment
+                    admin_notification = {
+                        "id": str(uuid.uuid4()),
+                        "type": "invoice_stripe_paid",
+                        "title": "Invoice Paid via Stripe",
+                        "message": f"Partner {invoice.get('partner_company')} paid invoice {invoice.get('invoice_number')} via card - ${invoice.get('total_amount', 0):.2f}",
+                        "invoice_id": invoice_id,
+                        "invoice_number": invoice.get("invoice_number"),
+                        "partner_id": invoice.get("partner_id"),
+                        "partner_company": invoice.get("partner_company"),
+                        "amount": invoice.get("total_amount", 0),
+                        "payment_method": "stripe",
+                        "is_read": False,
+                        "created_at": datetime.utcnow()
                     }
-                }
-            )
+                    await db.admin_notifications.insert_one(admin_notification)
 
-            if result.matched_count == 0:
-                logger.warning(f"No transaction found for session_id: {session_id}")
+                    logger.info(f"Successfully processed invoice payment: {invoice.get('invoice_number')}")
+                else:
+                    logger.warning(f"Invoice not found for payment: {invoice_id}")
+            else:
+                # Regular payment transaction
+                # Update payment status
+                result = await db.payment_transactions.update_one(
+                    {"session_id": session_id},
+                    {
+                        "$set": {
+                            "status": "completed",
+                            "payment_status": "paid",
+                            "updated_at": datetime.utcnow()
+                        }
+                    }
+                )
 
-            # Get transaction and handle success
-            transaction = await db.payment_transactions.find_one({"session_id": session_id})
-            if transaction:
-                await handle_successful_payment(session_id, transaction)
-                logger.info(f"Successfully processed payment for session: {session_id}")
+                if result.matched_count == 0:
+                    logger.warning(f"No transaction found for session_id: {session_id}")
+
+                # Get transaction and handle success
+                transaction = await db.payment_transactions.find_one({"session_id": session_id})
+                if transaction:
+                    await handle_successful_payment(session_id, transaction, metadata)
+                    logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
 
@@ -3745,21 +4003,74 @@ async def stripe_webhook(request: Request):
         logger.error(f"Unexpected error handling webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def handle_successful_payment(session_id: str, payment_transaction: dict):
-    """Handle successful payment by sending confirmation emails and creating Protemos project"""
-    
+async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None):
+    """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
+
     try:
         # Get quote details
         quote_id = payment_transaction.get("quote_id")
         quote = await db.translation_quotes.find_one({"id": quote_id})
-        
+
         if not quote:
             logger.error(f"Quote not found for payment session: {session_id}")
             return
-        
-        # Prepare order details for email
+
+        # Get customer info from quote, with Stripe metadata as fallback
+        stripe_metadata = stripe_metadata or {}
+        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
+
+        # Generate order number with P prefix (like P6377) to match admin panel format
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the actual order record in translation_orders (visible in admin Projects)
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": quote_id,
+            "session_id": session_id,
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or f"Website order - Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+
+        # Insert order into translation_orders (admin Projects collection)
+        await db.translation_orders.insert_one(order)
+        logger.info(f"Created order {order_number} for session {session_id}")
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+            logger.info(f"Linked {len(document_ids)} documents to order {order_number}")
+
+        # Prepare order details for email (now includes customer_name)
         order_details = {
-            "reference": quote.get("reference"),
+            "reference": order_number,
             "service_type": quote.get("service_type"),
             "translate_from": quote.get("translate_from"),
             "translate_to": quote.get("translate_to"),
@@ -3769,30 +4080,55 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"  # Default for partner portal
+            "client_name": customer_name,
+            "customer_name": customer_name,
+            "client_email": customer_email or "contact@legacytranslations.com",
+            "customer_email": customer_email
         }
-        
+
         # Create project in Protemos
         try:
             protemos_response = await protemos_client.create_project(order_details)
             logger.info(f"Created Protemos project for session {session_id}: {protemos_response.get('id')}")
-            
+
             # Update payment transaction with Protemos project ID
             await db.payment_transactions.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
                         "protemos_project_id": protemos_response.get("id"),
-                        "protemos_status": protemos_response.get("status", "created")
+                        "protemos_status": protemos_response.get("status", "created"),
+                        "order_id": order["id"],
+                        "order_number": order_number
                     }
                 }
             )
-            
+
+            # Also update the order with Protemos project ID
+            await db.translation_orders.update_one(
+                {"id": order["id"]},
+                {"$set": {"protemos_project_id": protemos_response.get("id")}}
+            )
+
         except Exception as e:
             logger.error(f"Failed to create Protemos project for session {session_id}: {str(e)}")
             # Don't fail the entire process if Protemos fails
-        
-        # Send confirmation email to company
+
+        # Send confirmation email to customer (if email available)
+        if customer_email:
+            try:
+                await email_service.send_order_confirmation_email(
+                    customer_email,
+                    order_details,
+                    is_partner=True
+                )
+                logger.info(f"Sent order confirmation to customer: {customer_email}")
+            except Exception as e:
+                logger.error(f"Failed to send customer confirmation email: {str(e)}")
+        else:
+            logger.warning(f"No customer email found for session {session_id} - email not sent to customer")
+
+        # Send confirmation email to company (always)
         try:
             await email_service.send_order_confirmation_email(
                 "contact@legacytranslations.com",
@@ -3802,9 +4138,9 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             logger.info(f"Sent order confirmation to company for session: {session_id}")
         except Exception as e:
             logger.error(f"Failed to send company confirmation email: {str(e)}")
-        
-        logger.info(f"Successfully processed payment for session: {session_id}")
-        
+
+        logger.info(f"Successfully processed payment for session: {session_id}, order: {order_number}")
+
     except Exception as e:
         logger.error(f"Error handling successful payment for session {session_id}: {str(e)}")
 
@@ -3823,6 +4159,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             raise HTTPException(status_code=404, detail="Quote not found")
         
         # Prepare order details for Protemos
+        customer_email = quote.get("customer_email")
         order_details = {
             "reference": quote.get("reference"),
             "service_type": quote.get("service_type"),
@@ -3834,7 +4171,7 @@ async def create_protemos_project(request: ProtemosProjectRequest):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": "partner@legacytranslations.com"
+            "client_email": customer_email or "contact@legacytranslations.com"
         }
         
         # Create project in Protemos
@@ -4202,6 +4539,8 @@ async def register_partner(partner_data: PartnerCreate):
             address_zip=partner_data.address_zip,
             address_country=partner_data.address_country,
             tax_id=partner_data.tax_id,
+            # Estimated volume
+            estimated_volume=partner_data.estimated_volume,
             # Payment settings
             payment_plan=partner_data.payment_plan,
             default_payment_method=partner_data.default_payment_method,
@@ -4218,6 +4557,63 @@ async def register_partner(partner_data: PartnerCreate):
         token = generate_token()
         active_tokens[token] = partner.id
 
+        # Generate WELCOME coupon for new partner (1 free certified page)
+        coupon_suffix = secrets.token_hex(3).upper()  # 6 character random suffix
+        welcome_coupon = Coupon(
+            code=f"WELCOME-{coupon_suffix}",
+            partner_id=partner.id,
+            discount_type="certified_page",
+            discount_value=1.0,  # 1 free certified page
+            max_uses=1,
+            first_order_only=True,
+            valid_until=datetime.utcnow() + timedelta(days=90)  # Valid for 90 days
+        )
+        await db.coupons.insert_one(welcome_coupon.dict())
+
+        # Send welcome email with coupon code
+        try:
+            welcome_subject = f"Welcome to Legacy Translations, {partner.contact_name}!"
+            welcome_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" style="max-width: 180px; margin-bottom: 20px;">
+
+                <h2 style="color: #0d9488;">Welcome to Legacy Translations!</h2>
+
+                <p>Dear {partner.contact_name},</p>
+
+                <p>Thank you for registering <strong>{partner.company_name}</strong> as a business partner. We're excited to have you on board!</p>
+
+                <div style="background: linear-gradient(135deg, #0d9488 0%, #0891b2 100%); color: white; padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                    <p style="margin: 0 0 10px 0; font-size: 14px;">🎁 YOUR WELCOME GIFT</p>
+                    <p style="margin: 0 0 15px 0; font-size: 24px; font-weight: bold;">1 FREE Certified Translation Page</p>
+                    <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
+                        {welcome_coupon.code}
+                    </div>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 90 days • Use on your first order</p>
+                </div>
+
+                <h3 style="color: #374151;">How to use your coupon:</h3>
+                <ol style="color: #6b7280; line-height: 1.8;">
+                    <li>Log in to your <a href="https://portal.legacytranslations.com/#/partner/login" style="color: #0d9488;">Partner Portal</a></li>
+                    <li>Create a new order</li>
+                    <li>Enter the coupon code at checkout</li>
+                    <li>Enjoy your free certified translation!</li>
+                </ol>
+
+                <p style="color: #6b7280; margin-top: 25px;">
+                    If you have any questions, feel free to reply to this email or use the chat in your portal.
+                </p>
+
+                <p style="color: #374151;">
+                    Best regards,<br>
+                    <strong>The Legacy Translations Team</strong>
+                </p>
+            </div>
+            """
+            await send_email(partner.email, welcome_subject, welcome_content)
+        except Exception as email_error:
+            logger.warning(f"Failed to send welcome email: {email_error}")
+
         # Send notification email to admin if invoice plan requested
         if needs_approval:
             try:
@@ -4230,6 +4626,7 @@ async def register_partner(partner_data: PartnerCreate):
                         <p><strong>Contact:</strong> {partner.contact_name}</p>
                         <p><strong>Email:</strong> {partner.email}</p>
                         <p><strong>Phone:</strong> {partner.phone or 'Not provided'}</p>
+                        <p><strong>Estimated Monthly Volume:</strong> {partner.estimated_volume or 'Not specified'} pages/month</p>
                         <p><strong>Payment Plan Requested:</strong> <span style="color: #dc2626; font-weight: bold;">{partner.payment_plan.replace('_', ' ').title()}</span></p>
                         <p><strong>Preferred Payment Method:</strong> {partner.default_payment_method.title()}</p>
                         {f'<p><strong>Address:</strong> {partner.address_street}, {partner.address_city}, {partner.address_state} {partner.address_zip}</p>' if partner.address_street else ''}
@@ -4421,6 +4818,238 @@ async def get_current_partner_info(token: str):
         "email": partner["email"],
         "contact_name": partner["contact_name"],
         "phone": partner.get("phone")
+    }
+
+# ==================== COUPON SYSTEM ====================
+
+# Price for one certified page (used for WELCOME coupon discount calculation)
+CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
+
+@api_router.get("/partner/coupons")
+async def get_partner_coupons(token: str):
+    """Get all coupons for the logged-in partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    coupons = await db.coupons.find({
+        "partner_id": partner["id"],
+        "is_active": True
+    }).to_list(100)
+
+    return [{
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c["times_used"],
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until"),
+        "is_available": c["times_used"] < c["max_uses"]
+    } for c in coupons]
+
+@api_router.post("/partner/validate-coupon")
+async def validate_coupon(token: str, code: str, order_total: float = 0):
+    """Validate a coupon code and return discount details"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find coupon (case-insensitive)
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    # Check if coupon belongs to this partner (if partner-specific)
+    if coupon.get("partner_id") and coupon["partner_id"] != partner["id"]:
+        raise HTTPException(status_code=400, detail="This coupon is not valid for your account")
+
+    # Check usage limits
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="This coupon has already been used")
+
+    # Check validity dates
+    now = datetime.utcnow()
+    if coupon.get("valid_until") and now > coupon["valid_until"]:
+        raise HTTPException(status_code=400, detail="This coupon has expired")
+
+    # Check first order only restriction
+    if coupon.get("first_order_only", False):
+        partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+        if partner_orders > 0:
+            raise HTTPException(status_code=400, detail="This coupon is only valid for your first order")
+
+    # Check minimum order value
+    if order_total < coupon.get("min_order_value", 0):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order value of ${coupon['min_order_value']:.2f} required for this coupon"
+        )
+
+    # Calculate discount
+    discount_amount = 0.0
+    discount_description = ""
+
+    if coupon["discount_type"] == "certified_page":
+        # 1 certified page free = $35 discount
+        discount_amount = CERTIFIED_PAGE_PRICE * coupon["discount_value"]
+        discount_description = f"{int(coupon['discount_value'])} certified page(s) FREE"
+    elif coupon["discount_type"] == "percentage":
+        discount_amount = order_total * (coupon["discount_value"] / 100)
+        discount_description = f"{coupon['discount_value']}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        discount_amount = coupon["discount_value"]
+        discount_description = f"${coupon['discount_value']:.2f} off"
+
+    # Apply max discount cap if set
+    if coupon.get("max_discount") and discount_amount > coupon["max_discount"]:
+        discount_amount = coupon["max_discount"]
+
+    # Don't exceed order total
+    if order_total > 0:
+        discount_amount = min(discount_amount, order_total)
+
+    return {
+        "valid": True,
+        "code": coupon["code"],
+        "discount_type": coupon["discount_type"],
+        "discount_amount": round(discount_amount, 2),
+        "discount_description": discount_description,
+        "message": f"Coupon applied: {discount_description}"
+    }
+
+@api_router.post("/partner/apply-coupon")
+async def apply_coupon_to_order(token: str, code: str, order_id: str):
+    """Mark a coupon as used on an order"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Find and validate coupon
+    coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{code}$", "$options": "i"},
+        "is_active": True
+    })
+
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Invalid coupon code")
+
+    if coupon["times_used"] >= coupon["max_uses"]:
+        raise HTTPException(status_code=400, detail="Coupon already used")
+
+    # Mark coupon as used
+    await db.coupons.update_one(
+        {"id": coupon["id"]},
+        {"$set": {
+            "times_used": coupon["times_used"] + 1,
+            "used_at": datetime.utcnow(),
+            "used_on_order_id": order_id
+        }}
+    )
+
+    return {"success": True, "message": "Coupon applied successfully"}
+
+# ==================== PARTNER CREDIT QUALIFICATION ====================
+
+CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+
+@api_router.get("/partner/credit-qualification")
+async def get_partner_credit_qualification(token: str):
+    """Check if partner qualifies for invoice payment plans"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    plan_approved = partner.get("payment_plan_approved", False)
+
+    # Calculate qualification status
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+
+    # Check if upgrade is pending
+    upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
+    requested_plan = partner.get("requested_payment_plan")
+
+    return {
+        "current_plan": current_plan,
+        "plan_approved": plan_approved,
+        "qualifies_for_invoice": qualifies,
+        "total_paid_orders": total_paid_orders,
+        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_remaining": orders_remaining,
+        "upgrade_pending": upgrade_pending,
+        "requested_plan": requested_plan
+    }
+
+@api_router.post("/partner/request-payment-upgrade")
+async def request_payment_plan_upgrade(token: str, plan: str):
+    """Request upgrade to invoice payment plan (biweekly or monthly)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Validate requested plan
+    if plan not in ["biweekly", "monthly"]:
+        raise HTTPException(status_code=400, detail="Invalid payment plan. Must be 'biweekly' or 'monthly'")
+
+    # Check qualification
+    total_paid_orders = partner.get("total_paid_orders", 0)
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+        )
+
+    # Check if already on invoice plan
+    current_plan = partner.get("payment_plan", "pay_per_order")
+    if current_plan in ["biweekly", "monthly"] and partner.get("payment_plan_approved", False):
+        raise HTTPException(status_code=400, detail="Already on an invoice payment plan")
+
+    # Update partner with upgrade request
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {
+            "payment_plan_upgrade_requested": True,
+            "requested_payment_plan": plan,
+            "upgrade_requested_at": datetime.utcnow().isoformat()
+        }}
+    )
+
+    # Send email notification to admin
+    plan_name = "Biweekly Invoice" if plan == "biweekly" else "Monthly Invoice"
+    try:
+        email_html = f"""
+        <h2>Payment Plan Upgrade Request</h2>
+        <p>A partner has requested to upgrade their payment plan:</p>
+        <ul>
+            <li><strong>Company:</strong> {partner.get('company_name')}</li>
+            <li><strong>Contact:</strong> {partner.get('contact_name')}</li>
+            <li><strong>Email:</strong> {partner.get('email')}</li>
+            <li><strong>Current Plan:</strong> Pay Per Order</li>
+            <li><strong>Requested Plan:</strong> {plan_name}</li>
+            <li><strong>Total Paid Orders:</strong> {total_paid_orders}</li>
+            <li><strong>Total Revenue:</strong> ${partner.get('total_revenue', 0):.2f}</li>
+        </ul>
+        <p>Please review and approve/deny this request in the admin panel.</p>
+        """
+
+        await send_email(
+            to_email="contact@legacytranslations.com",
+            subject=f"Payment Plan Upgrade Request - {partner.get('company_name')}",
+            html_content=email_html
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send upgrade request email: {e}")
+
+    return {
+        "success": True,
+        "message": f"Upgrade request submitted. An admin will review your request for {plan_name}.",
+        "requested_plan": plan
     }
 
 # ==================== ADMIN USER AUTHENTICATION ====================
@@ -6257,26 +6886,26 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
 
             # If Zelle payment, send Zelle-specific emails
             if order_data.payment_method == "zelle":
-                # Send Zelle pending email to partner
+                # Send Zelle pending email to client (order email)
                 try:
                     zelle_order_details = {
                         **order_details,
-                        "customer_name": partner.get("company_name", partner.get("contact_name", "Partner")),
-                        "customer_email": partner["email"]
+                        "customer_name": order.client_name,
+                        "customer_email": order.client_email
                     }
                     email_html = get_zelle_pending_email_template(
-                        partner.get("company_name", partner.get("contact_name", "Partner")),
+                        order.client_name,
                         zelle_order_details
                     )
                     await email_service.send_email(
-                        partner["email"],
+                        order.client_email,
                         f"Order Received - Zelle Payment Pending Verification - {order.order_number}",
                         email_html,
                         "html"
                     )
-                    logger.info(f"Zelle pending email sent to partner: {partner['email']}")
+                    logger.info(f"Zelle pending email sent to client: {order.client_email}")
                 except Exception as ze:
-                    logger.error(f"Failed to send Zelle pending email to partner: {str(ze)}")
+                    logger.error(f"Failed to send Zelle pending email to client: {str(ze)}")
 
                 # Send Zelle admin notification
                 try:
@@ -6292,9 +6921,9 @@ async def create_order(order_data: TranslationOrderCreate, token: str):
                     logger.error(f"Failed to send Zelle admin notification: {str(ae)}")
             else:
                 # Standard order confirmation emails
-                # Notify partner
+                # Notify client (order email)
                 await email_service.send_order_confirmation_email(
-                    partner["email"],
+                    order.client_email,
                     order_details,
                     is_partner=True
                 )
@@ -7914,6 +8543,92 @@ async def get_partner_statistics(admin_key: str):
     }
 
 
+@api_router.post("/admin/partners/{partner_id}/approve-payment-upgrade")
+async def approve_partner_payment_upgrade(partner_id: str, admin_key: str, approved: bool, plan: str = None):
+    """Approve or deny a partner's payment plan upgrade request (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        partner = await db.partners.find_one({"id": partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        if approved:
+            # Use the requested plan or the one provided
+            target_plan = plan or partner.get("requested_payment_plan", "biweekly")
+            if target_plan not in ["biweekly", "monthly"]:
+                raise HTTPException(status_code=400, detail="Invalid payment plan")
+
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan": target_plan,
+                    "payment_plan_approved": True,
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None,
+                    "payment_plan_approved_at": datetime.utcnow().isoformat()
+                }}
+            )
+
+            # Send approval email to partner
+            plan_name = "Biweekly Invoice" if target_plan == "biweekly" else "Monthly Invoice"
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Approved!</h2>
+                <p>Great news! Your payment plan upgrade request has been approved.</p>
+                <ul>
+                    <li><strong>New Plan:</strong> {plan_name}</li>
+                </ul>
+                <p>You can now receive invoices for your orders instead of paying per order.</p>
+                <p>Thank you for your business!</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Approved - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send approval email: {e}")
+
+            return {"success": True, "message": f"Partner upgraded to {plan_name}"}
+        else:
+            # Deny the request
+            await db.partners.update_one(
+                {"id": partner_id},
+                {"$set": {
+                    "payment_plan_upgrade_requested": False,
+                    "requested_payment_plan": None
+                }}
+            )
+
+            # Send denial email
+            try:
+                email_html = f"""
+                <h2>Payment Plan Upgrade Request</h2>
+                <p>Thank you for your interest in our invoice payment plans.</p>
+                <p>At this time, we are unable to approve your upgrade request. Please continue using Pay Per Order for now.</p>
+                <p>If you have questions, please contact us at contact@legacytranslations.com.</p>
+                """
+                await send_email(
+                    to_email=partner.get("email"),
+                    subject="Payment Plan Upgrade Request Update - Legacy Translations",
+                    html_content=email_html
+                )
+            except Exception as e:
+                logger.warning(f"Failed to send denial email: {e}")
+
+            return {"success": True, "message": "Upgrade request denied"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error processing payment upgrade: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to process upgrade request")
+
+
 @api_router.delete("/admin/partners/{partner_id}")
 async def delete_partner(partner_id: str, admin_key: str):
     """Delete a partner and optionally their orders (admin only)"""
@@ -7989,6 +8704,618 @@ async def delete_partner_by_email(email: str, admin_key: str):
     except Exception as e:
         logger.error(f"Error deleting partner by email: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete partner")
+
+
+# ==================== PARTNER INVOICE ENDPOINTS ====================
+
+@api_router.get("/admin/partner-invoices")
+async def get_all_partner_invoices(admin_key: str):
+    """Get all partner invoices (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-invoices/partner/{partner_id}")
+async def get_partner_invoices_admin(partner_id: str, admin_key: str):
+    """Get all invoices for a specific partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner_id}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/admin/partner-orders/{partner_id}")
+async def get_partner_orders_for_invoice(partner_id: str, admin_key: str):
+    """Get all pending orders for a partner (for invoice creation)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get all orders for this partner that are not yet paid
+        orders = await db.translation_orders.find({
+            "partner_id": partner_id,
+            "payment_status": {"$in": ["pending", "overdue"]}
+        }).sort("created_at", -1).to_list(1000)
+
+        # Get already invoiced order IDs
+        invoiced_orders = set()
+        existing_invoices = await db.partner_invoices.find({
+            "partner_id": partner_id,
+            "status": {"$in": ["pending", "partial"]}
+        }).to_list(1000)
+        for inv in existing_invoices:
+            invoiced_orders.update(inv.get("order_ids", []))
+
+        # Filter out already invoiced orders
+        available_orders = []
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+            if order.get("id") not in invoiced_orders:
+                available_orders.append(order)
+
+        return {"orders": available_orders, "invoiced_order_ids": list(invoiced_orders)}
+    except Exception as e:
+        logger.error(f"Error fetching partner orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch orders")
+
+
+@api_router.post("/admin/partner-invoices/create")
+async def create_partner_invoice(invoice_data: PartnerInvoiceCreate, admin_key: str):
+    """Create a new invoice for a partner (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get partner info
+        partner = await db.partners.find_one({"id": invoice_data.partner_id})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        # Get orders and calculate total
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice_data.order_ids}
+        }).to_list(1000)
+
+        if not orders:
+            raise HTTPException(status_code=400, detail="No valid orders found")
+
+        subtotal = sum(order.get("total_price", 0) for order in orders)
+        total_amount = subtotal  # No tax for now
+
+        # Create invoice
+        invoice = PartnerInvoice(
+            partner_id=invoice_data.partner_id,
+            partner_company=partner.get("company_name"),
+            partner_email=partner.get("email"),
+            order_ids=invoice_data.order_ids,
+            subtotal=subtotal,
+            total_amount=total_amount,
+            due_date=datetime.utcnow() + timedelta(days=invoice_data.due_days),
+            notes=invoice_data.notes
+        )
+
+        await db.partner_invoices.insert_one(invoice.dict())
+
+        # Update orders to mark them as invoiced
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice_data.order_ids}},
+            {"$set": {"invoice_id": invoice.id, "invoice_number": invoice.invoice_number}}
+        )
+
+        logger.info(f"Created invoice {invoice.invoice_number} for partner {partner.get('company_name')}")
+
+        return {
+            "status": "success",
+            "invoice": invoice.dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating partner invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create invoice")
+
+
+@api_router.delete("/admin/partner-invoices/{invoice_id}")
+async def delete_partner_invoice(invoice_id: str, admin_key: str):
+    """Delete a partner invoice (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Remove invoice reference from orders
+        await db.translation_orders.update_many(
+            {"invoice_id": invoice_id},
+            {"$unset": {"invoice_id": "", "invoice_number": ""}}
+        )
+
+        # Delete the invoice
+        await db.partner_invoices.delete_one({"id": invoice_id})
+
+        logger.info(f"Deleted invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Invoice deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete invoice")
+
+
+@api_router.put("/admin/partner-invoices/{invoice_id}/mark-paid")
+async def mark_invoice_paid(invoice_id: str, admin_key: str, payment_method: str = "manual"):
+    """Mark an invoice as paid manually (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "payment_method": payment_method,
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        logger.info(f"Marked invoice {invoice.get('invoice_number')} as paid")
+        return {"status": "success", "message": "Invoice marked as paid"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error marking invoice as paid: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update invoice")
+
+
+# Partner Portal Invoice Endpoints
+@api_router.get("/partner/invoices")
+async def get_partner_invoices(token: str):
+    """Get all invoices for the logged-in partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoices = await db.partner_invoices.find({"partner_id": partner["id"]}).sort("created_at", -1).to_list(1000)
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+        return {"invoices": invoices}
+    except Exception as e:
+        logger.error(f"Error fetching partner invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoices")
+
+
+@api_router.get("/partner/invoices/{invoice_id}")
+async def get_partner_invoice_detail(invoice_id: str, token: str):
+    """Get invoice details with orders (partner portal)"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if '_id' in invoice:
+            del invoice['_id']
+
+        # Get associated orders
+        orders = await db.translation_orders.find({
+            "id": {"$in": invoice.get("order_ids", [])}
+        }).to_list(1000)
+
+        for order in orders:
+            if '_id' in order:
+                del order['_id']
+
+        return {"invoice": invoice, "orders": orders}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching invoice details: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch invoice details")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-stripe")
+async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoicePayStripe):
+    """Create Stripe checkout session for invoice payment"""
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Create Stripe checkout session
+        checkout_params = {
+            'payment_method_types': ['card'],
+            'line_items': [{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Invoice {invoice.get("invoice_number")}',
+                        'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
+                    },
+                    'unit_amount': int(invoice.get("total_amount", 0) * 100),
+                },
+                'quantity': 1,
+            }],
+            'mode': 'payment',
+            'success_url': f"{request.origin_url}?invoice_paid=true&invoice_id={invoice_id}#/partner",
+            'cancel_url': f"{request.origin_url}?invoice_cancelled=true#/partner",
+            'metadata': {
+                'invoice_id': invoice_id,
+                'invoice_number': invoice.get("invoice_number"),
+                'partner_id': invoice.get("partner_id"),
+                'type': 'partner_invoice'
+            }
+        }
+
+        if invoice.get("partner_email"):
+            checkout_params['customer_email'] = invoice.get("partner_email")
+
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
+
+        # Update invoice with session ID
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {"stripe_session_id": checkout_session.id}}
+        )
+
+        return {
+            "status": "success",
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating Stripe checkout for invoice: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to create payment checkout")
+
+
+@api_router.post("/partner/invoices/{invoice_id}/pay-zelle")
+async def submit_invoice_zelle_payment(invoice_id: str, request: PartnerInvoicePayZelle, token: str):
+    """Submit Zelle receipt for invoice payment"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id, "partner_id": partner["id"]})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        if invoice.get("status") == "paid":
+            raise HTTPException(status_code=400, detail="Invoice already paid")
+
+        # Get receipt URL
+        receipt_url = None
+        if request.zelle_receipt_id:
+            doc = await db.documents.find_one({"id": request.zelle_receipt_id})
+            if doc:
+                backend_url = os.environ.get("BACKEND_URL", "https://legacy-portal-backend.onrender.com")
+                receipt_url = f"{backend_url}/api/download-document/{request.zelle_receipt_id}"
+
+        # Update invoice with Zelle receipt (pending verification)
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "payment_method": "zelle",
+                "zelle_receipt_id": request.zelle_receipt_id,
+                "zelle_receipt_url": receipt_url,
+                "zelle_submitted_at": datetime.utcnow(),
+                "status": "pending_zelle"  # Mark as pending Zelle verification
+            }}
+        )
+
+        # Create admin notification for Zelle receipt
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_zelle_receipt",
+            "title": "Invoice Zelle Payment Received",
+            "message": f"Partner {invoice.get('partner_company')} submitted Zelle receipt for invoice {invoice.get('invoice_number')} - {invoice.get('total_amount', 0):.2f} USD",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "receipt_url": receipt_url,
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Zelle receipt submitted for invoice {invoice.get('invoice_number')}")
+
+        return {
+            "status": "success",
+            "message": "Zelle receipt submitted. Payment will be verified shortly."
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error submitting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to submit Zelle payment")
+
+
+# ==================== INVOICE PAYMENT MANAGEMENT ====================
+
+@api_router.get("/admin/invoice-payments/pending-zelle")
+async def get_pending_zelle_invoices(admin_key: str):
+    """Get all invoices with pending Zelle verification"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoices = await db.partner_invoices.find({
+            "status": "pending_zelle",
+            "zelle_receipt_id": {"$exists": True, "$ne": None}
+        }).sort("zelle_submitted_at", -1).to_list(100)
+
+        for inv in invoices:
+            if '_id' in inv:
+                del inv['_id']
+
+        return {"invoices": invoices, "count": len(invoices)}
+    except Exception as e:
+        logger.error(f"Error fetching pending Zelle invoices: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch pending invoices")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/approve-zelle")
+async def approve_zelle_invoice_payment(invoice_id: str, admin_key: str):
+    """Approve a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice to paid
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "paid",
+                "amount_paid": invoice.get("total_amount", 0),
+                "paid_at": datetime.utcnow(),
+                "zelle_verified_at": datetime.utcnow()
+            }}
+        )
+
+        # Update associated orders to paid
+        await db.translation_orders.update_many(
+            {"id": {"$in": invoice.get("order_ids", [])}},
+            {"$set": {"payment_status": "paid", "payment_date": datetime.utcnow()}}
+        )
+
+        # Record payment in history
+        payment_record = {
+            "id": str(uuid.uuid4()),
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_id": invoice.get("partner_id"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "zelle_receipt_url": invoice.get("zelle_receipt_url"),
+            "status": "completed",
+            "created_at": datetime.utcnow()
+        }
+        await db.invoice_payments.insert_one(payment_record)
+
+        # Create notification for payment approval
+        admin_notification = {
+            "id": str(uuid.uuid4()),
+            "type": "invoice_payment_approved",
+            "title": "Invoice Payment Approved",
+            "message": f"Zelle payment approved for invoice {invoice.get('invoice_number')} - {invoice.get('partner_company')} - ${invoice.get('total_amount', 0):.2f}",
+            "invoice_id": invoice_id,
+            "invoice_number": invoice.get("invoice_number"),
+            "partner_company": invoice.get("partner_company"),
+            "amount": invoice.get("total_amount", 0),
+            "payment_method": "zelle",
+            "is_read": False,
+            "created_at": datetime.utcnow()
+        }
+        await db.admin_notifications.insert_one(admin_notification)
+
+        logger.info(f"Approved Zelle payment for invoice {invoice.get('invoice_number')}")
+        return {"status": "success", "message": "Payment approved successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to approve payment")
+
+
+@api_router.put("/admin/invoice-payments/{invoice_id}/reject-zelle")
+async def reject_zelle_invoice_payment(invoice_id: str, admin_key: str, reason: str = ""):
+    """Reject a Zelle payment for an invoice"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+
+        # Update invoice back to pending
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": {
+                "status": "pending",
+                "zelle_rejected_at": datetime.utcnow(),
+                "zelle_rejection_reason": reason
+            },
+            "$unset": {
+                "zelle_receipt_id": "",
+                "zelle_receipt_url": "",
+                "zelle_submitted_at": ""
+            }}
+        )
+
+        logger.info(f"Rejected Zelle payment for invoice {invoice.get('invoice_number')}: {reason}")
+        return {"status": "success", "message": "Payment rejected"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error rejecting Zelle payment: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to reject payment")
+
+
+@api_router.get("/admin/invoice-payments/history")
+async def get_invoice_payment_history(admin_key: str, limit: int = 50):
+    """Get invoice payment history"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        # Get paid invoices as payment history
+        paid_invoices = await db.partner_invoices.find({
+            "status": "paid"
+        }).sort("paid_at", -1).to_list(limit)
+
+        payments = []
+        for inv in paid_invoices:
+            if '_id' in inv:
+                del inv['_id']
+            payments.append({
+                "id": inv.get("id"),
+                "invoice_number": inv.get("invoice_number"),
+                "partner_id": inv.get("partner_id"),
+                "partner_company": inv.get("partner_company"),
+                "amount": inv.get("total_amount", 0),
+                "payment_method": inv.get("payment_method", "unknown"),
+                "paid_at": inv.get("paid_at"),
+                "zelle_receipt_url": inv.get("zelle_receipt_url"),
+                "stripe_payment_intent": inv.get("stripe_payment_intent"),
+                "order_count": len(inv.get("order_ids", []))
+            })
+
+        # Calculate summary
+        total_received = sum(p["amount"] for p in payments)
+
+        return {
+            "payments": payments,
+            "summary": {
+                "total_payments": len(payments),
+                "total_received": total_received
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error fetching payment history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch payment history")
+
+
+@api_router.get("/admin/invoice-notifications")
+async def get_invoice_notifications(admin_key: str, unread_only: bool = False):
+    """Get invoice-related admin notifications"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        query = {"type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]}}
+        if unread_only:
+            query["is_read"] = False
+
+        notifications = await db.admin_notifications.find(query).sort("created_at", -1).to_list(50)
+
+        for notif in notifications:
+            if '_id' in notif:
+                del notif['_id']
+
+        unread_count = await db.admin_notifications.count_documents({
+            "type": {"$in": ["invoice_zelle_receipt", "invoice_payment_approved", "invoice_stripe_paid"]},
+            "is_read": False
+        })
+
+        return {
+            "notifications": notifications,
+            "unread_count": unread_count
+        }
+    except Exception as e:
+        logger.error(f"Error fetching invoice notifications: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch notifications")
+
+
+@api_router.put("/admin/invoice-notifications/{notif_id}/read")
+async def mark_invoice_notification_read(notif_id: str, admin_key: str):
+    """Mark an invoice notification as read"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm"]:
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    try:
+        await db.admin_notifications.update_one(
+            {"id": notif_id},
+            {"$set": {"is_read": True}}
+        )
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error marking notification as read: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to update notification")
 
 
 @api_router.get("/admin/orders/{order_id}")
@@ -8174,6 +9501,13 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
             update_dict["total_price"] = update_data.total_price
         if update_data.base_price is not None:
             update_dict["base_price"] = update_data.base_price
+
+        # Handle translator assignment status (Admin/PM can manually change pending to accepted)
+        if update_data.translator_assignment_status is not None:
+            update_dict["translator_assignment_status"] = update_data.translator_assignment_status
+            # Also update the responded_at timestamp when status changes
+            if update_data.translator_assignment_status in ["accepted", "declined"]:
+                update_dict["translator_assignment_responded_at"] = datetime.utcnow()
 
         # Add updated_at timestamp
         update_dict["updated_at"] = datetime.utcnow()
@@ -10257,8 +11591,9 @@ async def mark_conversation_read(conversation_id: str, token: str):
 @api_router.get("/admin/partner-messages")
 async def get_admin_partner_messages(admin_key: str, limit: int = 50):
     """Get messages sent by partners for admin view"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     messages = await db.partner_messages.find().sort("created_at", -1).limit(limit).to_list(limit)
 
@@ -10273,8 +11608,9 @@ async def get_admin_partner_messages(admin_key: str, limit: int = 50):
 @api_router.put("/admin/partner-messages/{message_id}/read")
 async def mark_partner_message_read(message_id: str, admin_key: str):
     """Mark a partner message as read by admin"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     result = await db.partner_messages.update_one(
         {"id": message_id},
@@ -10297,8 +11633,9 @@ class ReplyToPartnerRequest(BaseModel):
 @api_router.post("/admin/partner-messages/{message_id}/reply")
 async def reply_to_partner_message(message_id: str, request: ReplyToPartnerRequest, admin_key: str):
     """Admin replies to a partner message via email and stores in portal"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info or user_info.get("role") not in ["admin", "pm", "translator", "contractor", "inhouse"]:
+        raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
     # Get the original message
     message = await db.partner_messages.find_one({"id": message_id})
@@ -10602,7 +11939,7 @@ class TranslatorMessageRequest(BaseModel):
 
 @api_router.post("/admin/send-file-assignment-email")
 async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
-    """Send email invitation to translator for a specific file assignment"""
+    """Send email invitation to translator for a specific file assignment with accept/decline buttons"""
     # Validate admin key or user token
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
@@ -10615,7 +11952,9 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
 
     translator_email = request.get("translator_email")
     translator_name = request.get("translator_name", "Translator")
+    translator_id = request.get("translator_id")
     document_name = request.get("document_name", "Document")
+    order_id = request.get("order_id")
     order_number = request.get("order_number", "")
     language_pair = request.get("language_pair", "")
     pm_name = request.get("pm_name", "Project Manager")
@@ -10623,33 +11962,81 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     if not translator_email:
         raise HTTPException(status_code=400, detail="Translator email is required")
 
-    # Create email content
+    # Get order details for the email
+    order = await db.translation_orders.find_one({"id": order_id}) if order_id else None
+
+    # Generate assignment token and update order
+    assignment_token = str(uuid.uuid4())
+    if order_id:
+        await db.translation_orders.update_one(
+            {"id": order_id},
+            {"$set": {
+                "assigned_translator_id": translator_id,
+                "assigned_translator_name": translator_name,
+                "translator_assignment_token": assignment_token,
+                "translator_assignment_status": "pending"
+            }}
+        )
+
+    # Build accept/decline URLs
+    api_base = os.environ.get("API_URL", "https://legacy-portal-cont-backend.onrender.com")
+    accept_url = f"{api_base}/api/translator/assignment/{assignment_token}/accept"
+    decline_url = f"{api_base}/api/translator/assignment/{assignment_token}/decline"
+    portal_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")
+
+    # Get deadline from order - prefer translator_deadline if set by PM, otherwise use project deadline
+    deadline_str = "To be confirmed"
+    if order:
+        # First try translator_deadline (set by PM specifically for translator)
+        deadline = order.get("translator_deadline") or order.get("deadline")
+        if deadline:
+            try:
+                if isinstance(deadline, datetime):
+                    deadline_str = deadline.strftime("%B %d, %Y at %H:%M")
+                elif isinstance(deadline, str):
+                    # Try to parse ISO format
+                    from dateutil import parser
+                    parsed = parser.parse(deadline)
+                    deadline_str = parsed.strftime("%B %d, %Y at %H:%M")
+                else:
+                    deadline_str = str(deadline)
+            except:
+                deadline_str = str(deadline)
+
+    # Create email content with accept/decline buttons
     email_html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-            <h1 style="color: white; margin: 0;">📄 New Document Assignment</h1>
+            <h1 style="color: white; margin: 0;">📄 New Translation Assignment</h1>
         </div>
         <div style="padding: 30px; background: #f8fafc; border: 1px solid #e2e8f0;">
             <p style="font-size: 16px;">Hello <strong>{translator_name}</strong>,</p>
-            <p>You have been assigned a new document to translate:</p>
+            <p>You have been assigned a new translation project. Please review the details and accept or decline this assignment:</p>
 
             <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>📋 Order:</strong> {order_number}</p>
+                <p style="margin: 5px 0;"><strong>📋 Project:</strong> {order_number}</p>
                 <p style="margin: 5px 0;"><strong>📄 Document:</strong> {document_name}</p>
                 <p style="margin: 5px 0;"><strong>🌐 Language:</strong> {language_pair}</p>
+                <p style="margin: 5px 0;"><strong>📅 Deadline:</strong> {deadline_str}</p>
                 <p style="margin: 5px 0;"><strong>👤 Assigned by:</strong> {pm_name}</p>
             </div>
 
-            <p>Please log in to your translator portal to view and work on this document.</p>
-
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')}/#/admin"
-                   style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-                    Open Translator Portal
+                <a href="{accept_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);">
+                    ✓ ACCEPT PROJECT
+                </a>
+            </div>
+            <div style="text-align: center; margin: 20px 0;">
+                <a href="{decline_url}"
+                   style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; margin: 10px; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);">
+                    ✗ DECLINE PROJECT
                 </a>
             </div>
 
-            <p style="color: #64748b; font-size: 14px;">If you have any questions, please contact your project manager.</p>
+            <p style="color: #64748b; font-size: 14px; text-align: center; margin-top: 25px;">
+                Please respond as soon as possible so we can proceed with the project.
+            </p>
         </div>
         <div style="background: #1e293b; padding: 15px; text-align: center; border-radius: 0 0 8px 8px;">
             <p style="color: #94a3b8; margin: 0; font-size: 12px;">Legacy Translations - Professional Translation Services</p>
@@ -10660,11 +12047,11 @@ async def send_file_assignment_email(admin_key: str, request: dict = Body(...)):
     try:
         await email_service.send_email(
             translator_email,
-            f"📄 New Document Assignment - {order_number}",
+            f"📄 New Translation Assignment - {order_number}",
             email_html
         )
-        logger.info(f"Sent file assignment email to {translator_name} ({translator_email}) for {document_name}")
-        return {"status": "success", "message": f"Email sent to {translator_name}"}
+        logger.info(f"Sent file assignment email with accept/decline to {translator_name} ({translator_email}) for {document_name}")
+        return {"status": "success", "message": f"Email invitation sent to {translator_name}"}
     except Exception as e:
         logger.error(f"Failed to send file assignment email: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to send email: {str(e)}")
@@ -11097,6 +12484,53 @@ async def admin_download_document(document_id: str, admin_key: str):
         "file_data": document["file_data"],
         "extracted_text": document.get("extracted_text", "")
     }
+
+
+@api_router.get("/download-document/{document_id}")
+async def public_download_document(document_id: str):
+    """Public endpoint to download/view invoice receipt documents"""
+    # First check in documents collection
+    document = await db.documents.find_one({"id": document_id})
+
+    if not document:
+        # Try order_documents collection
+        document = await db.order_documents.find_one({"id": document_id})
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Return the file as a downloadable response
+    import base64
+    from fastapi.responses import Response
+
+    file_data = document.get("file_data", "")
+    if not file_data:
+        raise HTTPException(status_code=404, detail="Document data not found")
+
+    # Decode base64 if it's encoded
+    try:
+        if isinstance(file_data, str):
+            # Remove data URL prefix if present
+            if "base64," in file_data:
+                file_data = file_data.split("base64,")[1]
+            file_bytes = base64.b64decode(file_data)
+        else:
+            file_bytes = file_data
+    except Exception as e:
+        logger.error(f"Error decoding document: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing document")
+
+    content_type = document.get("content_type", "application/octet-stream")
+    filename = document.get("filename", "document")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
+
 
 @api_router.get("/admin/orders/{order_id}/documents")
 async def admin_get_order_documents(order_id: str, admin_key: str):
@@ -14542,6 +15976,423 @@ async def exclude_from_followup(admin_key: str, quote_id: str, quote_type: str =
         logger.error(f"Error excluding quote from follow-ups: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to exclude quote")
 
+
+@api_router.get("/admin/quotes/search")
+async def search_quotes_for_client_info(
+    admin_key: str,
+    reference: Optional[str] = None,
+    date: Optional[str] = None,
+    amount: Optional[float] = None
+):
+    """
+    Search quotes and payment transactions to find client email.
+    Useful when order confirmation went to wrong recipient.
+
+    Args:
+        reference: Order reference or partial match (e.g., WEB-1768509736913)
+        date: Date in YYYY-MM-DD format to search quotes created on that day
+        amount: Payment amount to search for
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        results = {
+            "quotes": [],
+            "payment_transactions": [],
+            "documents": []
+        }
+
+        # Build query for translation_quotes
+        quote_query = {}
+        if reference:
+            quote_query["$or"] = [
+                {"reference": {"$regex": reference, "$options": "i"}},
+                {"id": {"$regex": reference, "$options": "i"}}
+            ]
+        if amount:
+            quote_query["total_price"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                quote_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        # Search translation_quotes
+        if quote_query:
+            quotes = await db.translation_quotes.find(quote_query).sort("created_at", -1).to_list(50)
+        else:
+            # Get recent quotes if no filters
+            quotes = await db.translation_quotes.find({}).sort("created_at", -1).to_list(20)
+
+        for q in quotes:
+            results["quotes"].append({
+                "id": q.get("id"),
+                "reference": q.get("reference"),
+                "customer_email": q.get("customer_email"),
+                "customer_name": q.get("customer_name"),
+                "total_price": q.get("total_price"),
+                "document_ids": q.get("document_ids"),
+                "created_at": q.get("created_at").isoformat() if q.get("created_at") else None
+            })
+
+        # Search payment_transactions
+        tx_query = {}
+        if amount:
+            tx_query["amount"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                tx_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if tx_query:
+            transactions = await db.payment_transactions.find(tx_query).sort("created_at", -1).to_list(50)
+        else:
+            transactions = await db.payment_transactions.find({}).sort("created_at", -1).to_list(20)
+
+        for tx in transactions:
+            # Also get the associated quote for customer info
+            quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+            results["payment_transactions"].append({
+                "id": tx.get("id"),
+                "session_id": tx.get("session_id"),
+                "quote_id": tx.get("quote_id"),
+                "amount": tx.get("amount"),
+                "payment_status": tx.get("payment_status"),
+                "status": tx.get("status"),
+                "customer_email": quote.get("customer_email") if quote else None,
+                "customer_name": quote.get("customer_name") if quote else None,
+                "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+            })
+
+        # Search for documents uploaded around that time
+        doc_query = {}
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                doc_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if doc_query:
+            docs = await db.documents.find(doc_query).sort("created_at", -1).to_list(50)
+            for doc in docs:
+                results["documents"].append({
+                    "id": doc.get("id"),
+                    "filename": doc.get("filename"),
+                    "order_id": doc.get("order_id"),
+                    "word_count": doc.get("word_count"),
+                    "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                })
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error searching quotes: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search quotes")
+
+
+@api_router.get("/admin/orphaned-payments")
+async def get_orphaned_payments(admin_key: str):
+    """
+    Find paid payment transactions that don't have an associated order.
+    These are orders that were paid but lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(100)
+
+        orphaned = []
+        for tx in paid_transactions:
+            # Check if there's an order for this transaction in translation_orders
+            order = await db.translation_orders.find_one({
+                "$or": [
+                    {"session_id": tx.get("session_id")},
+                    {"quote_id": tx.get("quote_id")}
+                ]
+            })
+
+            if not order:
+                # This is an orphaned payment - get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+
+                # Get associated documents
+                documents = []
+                if quote and quote.get("document_ids"):
+                    docs = await db.documents.find({"id": {"$in": quote.get("document_ids")}}).to_list(50)
+                    documents = [{"id": d.get("id"), "filename": d.get("filename"), "word_count": d.get("word_count")} for d in docs]
+
+                orphaned.append({
+                    "transaction_id": tx.get("id"),
+                    "session_id": tx.get("session_id"),
+                    "quote_id": tx.get("quote_id"),
+                    "amount": tx.get("amount"),
+                    "payment_status": tx.get("payment_status"),
+                    "customer_email": quote.get("customer_email") if quote else None,
+                    "customer_name": quote.get("customer_name") if quote else None,
+                    "service_type": quote.get("service_type") if quote else None,
+                    "translate_from": quote.get("translate_from") if quote else None,
+                    "translate_to": quote.get("translate_to") if quote else None,
+                    "word_count": quote.get("word_count") if quote else None,
+                    "documents": documents,
+                    "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+                })
+
+        return {
+            "orphaned_count": len(orphaned),
+            "orphaned_payments": orphaned
+        }
+
+    except Exception as e:
+        logger.error(f"Error finding orphaned payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to find orphaned payments")
+
+
+@api_router.post("/admin/recover-order/{transaction_id}")
+async def recover_order_from_payment(transaction_id: str, admin_key: str):
+    """
+    Create an order from an orphaned payment transaction.
+    Use this to recover orders that were lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find the payment transaction
+        tx = await db.payment_transactions.find_one({"id": transaction_id})
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        # Check if order already exists in translation_orders
+        existing_order = await db.translation_orders.find_one({
+            "$or": [
+                {"session_id": tx.get("session_id")},
+                {"quote_id": tx.get("quote_id")}
+            ]
+        })
+        if existing_order:
+            raise HTTPException(status_code=400, detail=f"Order already exists: {existing_order.get('order_number')}")
+
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found for this transaction")
+
+        # Generate order number with P prefix to match admin panel
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the order
+        customer_name = quote.get("customer_name") or "Customer"
+        customer_email = quote.get("customer_email")
+
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": tx.get("quote_id"),
+            "session_id": tx.get("session_id"),
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "recovered_order": True,
+            "created_at": quote.get("created_at", datetime.utcnow()),
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.translation_orders.insert_one(order)
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+
+        # Update transaction with order info
+        await db.payment_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"order_id": order["id"], "order_number": order_number}}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Order {order_number} recovered successfully",
+            "order": order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recovering order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover order")
+
+
+@api_router.get("/admin/recover-all-orders")
+async def recover_all_orphaned_orders(admin_key: str):
+    """
+    Automatically recover ALL orphaned orders from paid payment transactions.
+    Call this once after deploying to fix all lost orders.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(500)
+
+        recovered = []
+        skipped = []
+        errors = []
+
+        for tx in paid_transactions:
+            try:
+                # Check if order already exists in translation_orders
+                existing_order = await db.translation_orders.find_one({
+                    "$or": [
+                        {"session_id": tx.get("session_id")},
+                        {"quote_id": tx.get("quote_id")}
+                    ]
+                })
+
+                if existing_order:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": f"Order already exists: {existing_order.get('order_number')}"
+                    })
+                    continue
+
+                # Get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+                if not quote:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": "Quote not found"
+                    })
+                    continue
+
+                # Generate order number with P prefix to match admin panel
+                order_count = await db.translation_orders.count_documents({})
+                order_number = f"P{order_count + 6001}"
+
+                # Create the order
+                customer_name = quote.get("customer_name") or "Customer"
+                customer_email = quote.get("customer_email")
+                created_at = quote.get("created_at", datetime.utcnow())
+
+                order = {
+                    "id": str(uuid.uuid4()),
+                    "order_number": order_number,
+                    "quote_id": tx.get("quote_id"),
+                    "session_id": tx.get("session_id"),
+                    "partner_id": "website",
+                    "client_name": customer_name,
+                    "client_email": customer_email or "",
+                    "document_type": quote.get("reference", "Document"),
+                    "service_type": quote.get("service_type"),
+                    "translate_from": quote.get("translate_from"),
+                    "translate_to": quote.get("translate_to"),
+                    "word_count": quote.get("word_count", 0),
+                    "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+                    "urgency": quote.get("urgency"),
+                    "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+                    "base_price": quote.get("base_price"),
+                    "urgency_fee": quote.get("urgency_fee"),
+                    "total_price": quote.get("total_price"),
+                    "discount_amount": quote.get("discount_amount", 0),
+                    "discount_code": quote.get("discount_code"),
+                    "payment_status": "paid",
+                    "payment_method": "stripe",
+                    "translation_status": "In Progress",
+                    "source": "website",
+                    "revenue_source": "website",
+                    "recovered_order": True,
+                    "created_at": created_at,
+                    "updated_at": datetime.utcnow()
+                }
+
+                await db.translation_orders.insert_one(order)
+
+                # Link documents to the order
+                document_ids = quote.get("document_ids", [])
+                if document_ids:
+                    await db.documents.update_many(
+                        {"id": {"$in": document_ids}},
+                        {"$set": {"order_id": order["id"], "order_number": order_number}}
+                    )
+
+                # Update transaction with order info
+                await db.payment_transactions.update_one(
+                    {"id": tx.get("id")},
+                    {"$set": {"order_id": order["id"], "order_number": order_number}}
+                )
+
+                recovered.append({
+                    "order_number": order_number,
+                    "customer_email": customer_email,
+                    "customer_name": customer_name,
+                    "amount": tx.get("amount"),
+                    "documents_count": len(document_ids)
+                })
+
+            except Exception as e:
+                errors.append({
+                    "transaction_id": tx.get("id"),
+                    "error": str(e)
+                })
+
+        return {
+            "status": "success",
+            "recovered_count": len(recovered),
+            "skipped_count": len(skipped),
+            "error_count": len(errors),
+            "recovered_orders": recovered,
+            "skipped": skipped,
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error recovering all orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover orders")
+
+
 # ==================== DISCOUNT CODES ====================
 
 class DiscountCode(BaseModel):
@@ -14565,31 +16416,54 @@ class DiscountCodeCreate(BaseModel):
 
 @api_router.get("/discount-codes/validate")
 async def validate_discount_code(code: str):
-    """Validate a discount code"""
+    """Validate a discount code (checks both internal database and Stripe promotion codes)"""
     try:
+        # First, check internal database
         discount = await db.discount_codes.find_one({
             "code": code.upper(),
             "is_active": True
         })
 
-        if not discount:
-            return {"valid": False, "message": "Invalid discount code"}
+        if discount:
+            # Check if expired
+            if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
+                return {"valid": False, "message": "Discount code has expired"}
 
-        # Check if expired
-        if discount.get("expires_at") and datetime.utcnow() > discount["expires_at"]:
-            return {"valid": False, "message": "Discount code has expired"}
+            # Check max uses
+            if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
+                return {"valid": False, "message": "Discount code has reached maximum uses"}
 
-        # Check max uses
-        if discount.get("max_uses") and discount["uses"] >= discount["max_uses"]:
-            return {"valid": False, "message": "Discount code has reached maximum uses"}
-
-        return {
-            "valid": True,
-            "discount": {
+            return {
+                "valid": True,
                 "type": discount["type"],
                 "value": discount["value"]
             }
-        }
+
+        # If not found in internal database, check Stripe promotion codes
+        try:
+            promo_codes = stripe.PromotionCode.list(code=code.upper(), active=True, limit=1)
+            if promo_codes.data:
+                promo_code = promo_codes.data[0]
+                coupon = promo_code.coupon
+
+                # Get discount type and value from Stripe coupon
+                if coupon.percent_off:
+                    return {
+                        "valid": True,
+                        "type": "percentage",
+                        "value": coupon.percent_off
+                    }
+                elif coupon.amount_off:
+                    # Stripe stores amount in cents
+                    return {
+                        "valid": True,
+                        "type": "fixed",
+                        "value": coupon.amount_off / 100
+                    }
+        except Exception as stripe_error:
+            logger.error(f"Error checking Stripe promotion code: {str(stripe_error)}")
+
+        return {"valid": False, "message": "Invalid discount code"}
 
     except Exception as e:
         logger.error(f"Error validating discount code: {str(e)}")
