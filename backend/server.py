@@ -13971,9 +13971,11 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Only admin and PM can run proofreading
-    if user_info.get("role") not in ["admin", "pm"]:
-        raise HTTPException(status_code=403, detail="Only admin and PM can run proofreading")
+    # Admin, PM and in-house translators can run proofreading
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house_translator:
+        raise HTTPException(status_code=403, detail="Only admin, PM and in-house translators can run proofreading")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
