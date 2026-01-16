@@ -14917,6 +14917,69 @@ async def chunk_document_for_translation(original_text: str, original_images: li
     return chunks
 
 
+def compress_image_for_claude_api(img_bytes: bytes, media_type: str = "image/jpeg", max_size: int = 5 * 1024 * 1024) -> tuple:
+    """
+    Compress an image to stay under Claude API's 5MB limit.
+
+    Args:
+        img_bytes: Raw image bytes
+        media_type: MIME type of the image
+        max_size: Maximum size in bytes (default 5MB)
+
+    Returns:
+        tuple: (compressed_bytes, media_type) - always returns JPEG if compression needed
+    """
+    # Check if already under limit
+    if len(img_bytes) <= max_size:
+        return img_bytes, media_type
+
+    try:
+        # Load image with PIL
+        img = Image.open(io.BytesIO(img_bytes))
+
+        # Convert to RGB if necessary (for JPEG output)
+        if img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+
+        # Try progressively lower quality settings
+        quality_levels = [85, 70, 55, 40]
+
+        for quality in quality_levels:
+            jpeg_buffer = io.BytesIO()
+            img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
+            compressed_bytes = jpeg_buffer.getvalue()
+
+            if len(compressed_bytes) <= max_size:
+                logger.info(f"Image compressed from {len(img_bytes)} to {len(compressed_bytes)} bytes (quality={quality})")
+                return compressed_bytes, "image/jpeg"
+
+        # If still too large, resize the image progressively
+        scale_factors = [0.75, 0.5, 0.35, 0.25]
+        original_size = img.size
+
+        for scale in scale_factors:
+            new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+            resized_img = img.resize(new_size, Image.LANCZOS)
+
+            # Try quality settings again with resized image
+            for quality in [70, 50, 35]:
+                jpeg_buffer = io.BytesIO()
+                resized_img.save(jpeg_buffer, format='JPEG', quality=quality, optimize=True)
+                compressed_bytes = jpeg_buffer.getvalue()
+
+                if len(compressed_bytes) <= max_size:
+                    logger.info(f"Image resized to {new_size} and compressed to {len(compressed_bytes)} bytes (quality={quality})")
+                    return compressed_bytes, "image/jpeg"
+
+        # Last resort: return the smallest version we could make
+        logger.warning(f"Could not compress image below {max_size} bytes, using smallest version ({len(compressed_bytes)} bytes)")
+        return compressed_bytes, "image/jpeg"
+
+    except Exception as e:
+        logger.error(f"Image compression failed: {e}")
+        return img_bytes, media_type
+
+
 async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
     """
     STAGE 1: AI TRANSLATOR
@@ -14995,35 +15058,76 @@ Use these EXACT translations for the following terms:
                             # Use higher resolution for better OCR
                             pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))
                             img_bytes = pix.tobytes("jpeg")
-                            page_base64 = base64.b64encode(img_bytes).decode('utf-8')
+
+                            # Compress image if needed to stay under Claude's 5MB limit
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                img_bytes, "image/jpeg"
+                            )
+
+                            page_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
                             all_page_images.append({
                                 "page": page_num + 1,
                                 "data": page_base64,
-                                "media_type": "image/jpeg"
+                                "media_type": final_media_type
                             })
                         doc.close()
                     except Exception as e:
                         logger.error(f"PDF extraction failed: {e}")
-                        # Fallback to single image
+                        # Fallback to single image - still try to compress
+                        try:
+                            img_bytes = base64.b64decode(raw_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                img_bytes, "image/jpeg"
+                            )
+                            compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                        except Exception as compress_err:
+                            logger.warning(f"Fallback compression failed: {compress_err}")
+                            compressed_base64 = raw_data
+                            final_media_type = "image/jpeg"
+
                         all_page_images.append({
                             "page": 1,
-                            "data": raw_data,
-                            "media_type": "image/jpeg"
+                            "data": compressed_base64,
+                            "media_type": final_media_type
                         })
                 else:
                     # Single image (not PDF)
                     media_type = "image/png" if 'png' in header.lower() else "image/jpeg"
+
+                    # Decode and compress if needed to stay under Claude's 5MB limit
+                    try:
+                        img_bytes = base64.b64decode(raw_data)
+                        compressed_bytes, final_media_type = compress_image_for_claude_api(
+                            img_bytes, media_type
+                        )
+                        compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                    except Exception as e:
+                        logger.warning(f"Image compression failed, using original: {e}")
+                        compressed_base64 = raw_data
+                        final_media_type = media_type
+
                     all_page_images.append({
                         "page": 1,
-                        "data": raw_data,
-                        "media_type": media_type
+                        "data": compressed_base64,
+                        "media_type": final_media_type
                     })
             elif image_data:
-                # Raw base64 without header
+                # Raw base64 without header - decode and compress if needed
+                try:
+                    img_bytes = base64.b64decode(image_data)
+                    compressed_bytes, final_media_type = compress_image_for_claude_api(
+                        img_bytes, "image/jpeg"
+                    )
+                    compressed_base64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                except Exception as e:
+                    logger.warning(f"Image compression failed, using original: {e}")
+                    compressed_base64 = image_data
+                    final_media_type = "image/jpeg"
+
                 all_page_images.append({
                     "page": 1,
-                    "data": image_data,
-                    "media_type": "image/jpeg"
+                    "data": compressed_base64,
+                    "media_type": final_media_type
                 })
 
         # Determine chunk size based on number of pages
