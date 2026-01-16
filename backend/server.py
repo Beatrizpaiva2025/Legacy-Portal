@@ -15673,7 +15673,7 @@ async def recover_order_from_payment(transaction_id: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to recover order")
 
 
-@api_router.post("/admin/recover-all-orders")
+@api_router.get("/admin/recover-all-orders")
 async def recover_all_orphaned_orders(admin_key: str):
     """
     Automatically recover ALL orphaned orders from paid payment transactions.
