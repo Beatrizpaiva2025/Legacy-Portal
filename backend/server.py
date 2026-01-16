@@ -13487,10 +13487,15 @@ CRITICAL OUTPUT RULES:
                                 page = doc[page_num]
                                 pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
                                 img_bytes = pix.tobytes("jpeg")
-                                page_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                                # Compress image if needed to stay under Claude's 5MB limit
+                                compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                    img_bytes, "image/jpeg"
+                                )
+                                page_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
                                 page_images.append({
                                     "page_num": page_num + 1,
-                                    "data": page_b64
+                                    "data": page_b64,
+                                    "media_type": final_media_type
                                 })
 
                             doc.close()
@@ -13506,19 +13511,61 @@ CRITICAL OUTPUT RULES:
                             all_page_images = []
                     elif 'png' in header.lower():
                         media_type = "image/png"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'gif' in header.lower():
                         media_type = "image/gif"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'webp' in header.lower():
                         media_type = "image/webp"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     else:
-                        # Default to jpeg
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Default to jpeg - Compress image if needed
+                        media_type = "image/jpeg"
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                 else:
-                    # No header, assume single image
-                    all_page_images = [{"page_num": 1, "data": image_data}] if image_data else []
+                    # No header, assume single image - compress if needed
+                    if image_data:
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, "image/jpeg")
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": "image/jpeg"}]
+                    else:
+                        all_page_images = []
 
                 # Build message content with ALL page images
                 if all_page_images:
@@ -13526,11 +13573,13 @@ CRITICAL OUTPUT RULES:
 
                     # Add ALL page images to the message
                     for page_info in all_page_images:
+                        # Use page-specific media_type if available, fallback to global media_type
+                        page_media_type = page_info.get("media_type", media_type)
                         message_content.append({
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": media_type,
+                                "media_type": page_media_type,
                                 "data": page_info["data"],
                             },
                         })
