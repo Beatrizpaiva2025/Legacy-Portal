@@ -1316,6 +1316,8 @@ class TranslationOrderUpdate(BaseModel):
     document_type: Optional[str] = None
     total_price: Optional[float] = None
     base_price: Optional[float] = None
+    # Skip automatic email when using dedicated project email endpoint
+    skip_email: Optional[bool] = False
 
 # Manual Project Creation (by Admin)
 class ManualProjectCreate(BaseModel):
@@ -8099,7 +8101,8 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                         )
 
                         # Send email to translator with accept/decline links
-                        if translator.get("email"):
+                        # Skip if using dedicated project email endpoint (skip_email=True)
+                        if translator.get("email") and not update_data.skip_email:
                             try:
                                 # Build accept/decline URLs - point to frontend for better UX (no cold start screen)
                                 frontend_url = os.environ.get("FRONTEND_URL", "https://legacy-portal-frontend.onrender.com")

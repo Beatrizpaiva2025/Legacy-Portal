@@ -22521,9 +22521,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
 
       // 2. Update the order with the translator assignment and TR deadline (if set)
+      // skip_email: true to avoid duplicate email (we send via dedicated endpoint below)
       const orderUpdate = {
         assigned_translator_id: translator.id,
-        assigned_translator: translator.name
+        assigned_translator: translator.name,
+        skip_email: true
       };
       if (newTrDeadline) {
         orderUpdate.translator_deadline = newTrDeadline;
