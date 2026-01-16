@@ -3983,7 +3983,7 @@ async def stripe_webhook(request: Request):
                 # Get transaction and handle success
                 transaction = await db.payment_transactions.find_one({"session_id": session_id})
                 if transaction:
-                    await handle_successful_payment(session_id, transaction)
+                    await handle_successful_payment(session_id, transaction, metadata)
                     logger.info(f"Successfully processed payment for session: {session_id}")
         else:
             logger.info(f"Received unhandled webhook event type: {event['type']}")
@@ -4001,22 +4001,74 @@ async def stripe_webhook(request: Request):
         logger.error(f"Unexpected error handling webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-async def handle_successful_payment(session_id: str, payment_transaction: dict):
-    """Handle successful payment by sending confirmation emails and creating Protemos project"""
-    
+async def handle_successful_payment(session_id: str, payment_transaction: dict, stripe_metadata: dict = None):
+    """Handle successful payment by creating order, sending confirmation emails, and creating Protemos project"""
+
     try:
         # Get quote details
         quote_id = payment_transaction.get("quote_id")
         quote = await db.translation_quotes.find_one({"id": quote_id})
-        
+
         if not quote:
             logger.error(f"Quote not found for payment session: {session_id}")
             return
-        
-        # Prepare order details for email
-        customer_email = quote.get("customer_email")
+
+        # Get customer info from quote, with Stripe metadata as fallback
+        stripe_metadata = stripe_metadata or {}
+        customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
+        customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
+
+        # Generate order number with P prefix (like P6377) to match admin panel format
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the actual order record in translation_orders (visible in admin Projects)
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": quote_id,
+            "session_id": session_id,
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or f"Website order - Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+
+        # Insert order into translation_orders (admin Projects collection)
+        await db.translation_orders.insert_one(order)
+        logger.info(f"Created order {order_number} for session {session_id}")
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+            logger.info(f"Linked {len(document_ids)} documents to order {order_number}")
+
+        # Prepare order details for email (now includes customer_name)
         order_details = {
-            "reference": quote.get("reference"),
+            "reference": order_number,
             "service_type": quote.get("service_type"),
             "translate_from": quote.get("translate_from"),
             "translate_to": quote.get("translate_to"),
@@ -4026,7 +4078,10 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
-            "client_email": customer_email or "contact@legacytranslations.com"
+            "client_name": customer_name,
+            "customer_name": customer_name,
+            "client_email": customer_email or "contact@legacytranslations.com",
+            "customer_email": customer_email
         }
 
         # Create project in Protemos
@@ -4040,9 +4095,17 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
                 {
                     "$set": {
                         "protemos_project_id": protemos_response.get("id"),
-                        "protemos_status": protemos_response.get("status", "created")
+                        "protemos_status": protemos_response.get("status", "created"),
+                        "order_id": order["id"],
+                        "order_number": order_number
                     }
                 }
+            )
+
+            # Also update the order with Protemos project ID
+            await db.translation_orders.update_one(
+                {"id": order["id"]},
+                {"$set": {"protemos_project_id": protemos_response.get("id")}}
             )
 
         except Exception as e:
@@ -4060,8 +4123,10 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
                 logger.info(f"Sent order confirmation to customer: {customer_email}")
             except Exception as e:
                 logger.error(f"Failed to send customer confirmation email: {str(e)}")
+        else:
+            logger.warning(f"No customer email found for session {session_id} - email not sent to customer")
 
-        # Send confirmation email to company
+        # Send confirmation email to company (always)
         try:
             await email_service.send_order_confirmation_email(
                 "contact@legacytranslations.com",
@@ -4071,9 +4136,9 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict):
             logger.info(f"Sent order confirmation to company for session: {session_id}")
         except Exception as e:
             logger.error(f"Failed to send company confirmation email: {str(e)}")
-        
-        logger.info(f"Successfully processed payment for session: {session_id}")
-        
+
+        logger.info(f"Successfully processed payment for session: {session_id}, order: {order_number}")
+
     except Exception as e:
         logger.error(f"Error handling successful payment for session {session_id}: {str(e)}")
 
@@ -15323,6 +15388,423 @@ async def exclude_from_followup(admin_key: str, quote_id: str, quote_type: str =
     except Exception as e:
         logger.error(f"Error excluding quote from follow-ups: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to exclude quote")
+
+
+@api_router.get("/admin/quotes/search")
+async def search_quotes_for_client_info(
+    admin_key: str,
+    reference: Optional[str] = None,
+    date: Optional[str] = None,
+    amount: Optional[float] = None
+):
+    """
+    Search quotes and payment transactions to find client email.
+    Useful when order confirmation went to wrong recipient.
+
+    Args:
+        reference: Order reference or partial match (e.g., WEB-1768509736913)
+        date: Date in YYYY-MM-DD format to search quotes created on that day
+        amount: Payment amount to search for
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        results = {
+            "quotes": [],
+            "payment_transactions": [],
+            "documents": []
+        }
+
+        # Build query for translation_quotes
+        quote_query = {}
+        if reference:
+            quote_query["$or"] = [
+                {"reference": {"$regex": reference, "$options": "i"}},
+                {"id": {"$regex": reference, "$options": "i"}}
+            ]
+        if amount:
+            quote_query["total_price"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                quote_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        # Search translation_quotes
+        if quote_query:
+            quotes = await db.translation_quotes.find(quote_query).sort("created_at", -1).to_list(50)
+        else:
+            # Get recent quotes if no filters
+            quotes = await db.translation_quotes.find({}).sort("created_at", -1).to_list(20)
+
+        for q in quotes:
+            results["quotes"].append({
+                "id": q.get("id"),
+                "reference": q.get("reference"),
+                "customer_email": q.get("customer_email"),
+                "customer_name": q.get("customer_name"),
+                "total_price": q.get("total_price"),
+                "document_ids": q.get("document_ids"),
+                "created_at": q.get("created_at").isoformat() if q.get("created_at") else None
+            })
+
+        # Search payment_transactions
+        tx_query = {}
+        if amount:
+            tx_query["amount"] = amount
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                tx_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if tx_query:
+            transactions = await db.payment_transactions.find(tx_query).sort("created_at", -1).to_list(50)
+        else:
+            transactions = await db.payment_transactions.find({}).sort("created_at", -1).to_list(20)
+
+        for tx in transactions:
+            # Also get the associated quote for customer info
+            quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+            results["payment_transactions"].append({
+                "id": tx.get("id"),
+                "session_id": tx.get("session_id"),
+                "quote_id": tx.get("quote_id"),
+                "amount": tx.get("amount"),
+                "payment_status": tx.get("payment_status"),
+                "status": tx.get("status"),
+                "customer_email": quote.get("customer_email") if quote else None,
+                "customer_name": quote.get("customer_name") if quote else None,
+                "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+            })
+
+        # Search for documents uploaded around that time
+        doc_query = {}
+        if date:
+            try:
+                search_date = datetime.strptime(date, "%Y-%m-%d")
+                next_day = search_date + timedelta(days=1)
+                doc_query["created_at"] = {"$gte": search_date, "$lt": next_day}
+            except ValueError:
+                pass
+
+        if doc_query:
+            docs = await db.documents.find(doc_query).sort("created_at", -1).to_list(50)
+            for doc in docs:
+                results["documents"].append({
+                    "id": doc.get("id"),
+                    "filename": doc.get("filename"),
+                    "order_id": doc.get("order_id"),
+                    "word_count": doc.get("word_count"),
+                    "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+                })
+
+        return results
+
+    except Exception as e:
+        logger.error(f"Error searching quotes: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search quotes")
+
+
+@api_router.get("/admin/orphaned-payments")
+async def get_orphaned_payments(admin_key: str):
+    """
+    Find paid payment transactions that don't have an associated order.
+    These are orders that were paid but lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(100)
+
+        orphaned = []
+        for tx in paid_transactions:
+            # Check if there's an order for this transaction in translation_orders
+            order = await db.translation_orders.find_one({
+                "$or": [
+                    {"session_id": tx.get("session_id")},
+                    {"quote_id": tx.get("quote_id")}
+                ]
+            })
+
+            if not order:
+                # This is an orphaned payment - get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+
+                # Get associated documents
+                documents = []
+                if quote and quote.get("document_ids"):
+                    docs = await db.documents.find({"id": {"$in": quote.get("document_ids")}}).to_list(50)
+                    documents = [{"id": d.get("id"), "filename": d.get("filename"), "word_count": d.get("word_count")} for d in docs]
+
+                orphaned.append({
+                    "transaction_id": tx.get("id"),
+                    "session_id": tx.get("session_id"),
+                    "quote_id": tx.get("quote_id"),
+                    "amount": tx.get("amount"),
+                    "payment_status": tx.get("payment_status"),
+                    "customer_email": quote.get("customer_email") if quote else None,
+                    "customer_name": quote.get("customer_name") if quote else None,
+                    "service_type": quote.get("service_type") if quote else None,
+                    "translate_from": quote.get("translate_from") if quote else None,
+                    "translate_to": quote.get("translate_to") if quote else None,
+                    "word_count": quote.get("word_count") if quote else None,
+                    "documents": documents,
+                    "created_at": tx.get("created_at").isoformat() if tx.get("created_at") else None
+                })
+
+        return {
+            "orphaned_count": len(orphaned),
+            "orphaned_payments": orphaned
+        }
+
+    except Exception as e:
+        logger.error(f"Error finding orphaned payments: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to find orphaned payments")
+
+
+@api_router.post("/admin/recover-order/{transaction_id}")
+async def recover_order_from_payment(transaction_id: str, admin_key: str):
+    """
+    Create an order from an orphaned payment transaction.
+    Use this to recover orders that were lost due to the bug.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find the payment transaction
+        tx = await db.payment_transactions.find_one({"id": transaction_id})
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        # Check if order already exists in translation_orders
+        existing_order = await db.translation_orders.find_one({
+            "$or": [
+                {"session_id": tx.get("session_id")},
+                {"quote_id": tx.get("quote_id")}
+            ]
+        })
+        if existing_order:
+            raise HTTPException(status_code=400, detail=f"Order already exists: {existing_order.get('order_number')}")
+
+        # Get quote details
+        quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Quote not found for this transaction")
+
+        # Generate order number with P prefix to match admin panel
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
+
+        # Create the order
+        customer_name = quote.get("customer_name") or "Customer"
+        customer_email = quote.get("customer_email")
+
+        order = {
+            "id": str(uuid.uuid4()),
+            "order_number": order_number,
+            "quote_id": tx.get("quote_id"),
+            "session_id": tx.get("session_id"),
+            "partner_id": "website",
+            "client_name": customer_name,
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
+            "service_type": quote.get("service_type"),
+            "translate_from": quote.get("translate_from"),
+            "translate_to": quote.get("translate_to"),
+            "word_count": quote.get("word_count", 0),
+            "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+            "urgency": quote.get("urgency"),
+            "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+            "base_price": quote.get("base_price"),
+            "urgency_fee": quote.get("urgency_fee"),
+            "total_price": quote.get("total_price"),
+            "discount_amount": quote.get("discount_amount", 0),
+            "discount_code": quote.get("discount_code"),
+            "payment_status": "paid",
+            "payment_method": "stripe",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
+            "recovered_order": True,
+            "created_at": quote.get("created_at", datetime.utcnow()),
+            "updated_at": datetime.utcnow()
+        }
+
+        await db.translation_orders.insert_one(order)
+
+        # Link documents to the order
+        document_ids = quote.get("document_ids", [])
+        if document_ids:
+            await db.documents.update_many(
+                {"id": {"$in": document_ids}},
+                {"$set": {"order_id": order["id"], "order_number": order_number}}
+            )
+
+        # Update transaction with order info
+        await db.payment_transactions.update_one(
+            {"id": transaction_id},
+            {"$set": {"order_id": order["id"], "order_number": order_number}}
+        )
+
+        return {
+            "status": "success",
+            "message": f"Order {order_number} recovered successfully",
+            "order": order
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recovering order: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover order")
+
+
+@api_router.post("/admin/recover-all-orders")
+async def recover_all_orphaned_orders(admin_key: str):
+    """
+    Automatically recover ALL orphaned orders from paid payment transactions.
+    Call this once after deploying to fix all lost orders.
+    """
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    try:
+        # Find all completed/paid payment transactions
+        paid_transactions = await db.payment_transactions.find({
+            "$or": [
+                {"status": "completed"},
+                {"payment_status": "paid"}
+            ]
+        }).sort("created_at", -1).to_list(500)
+
+        recovered = []
+        skipped = []
+        errors = []
+
+        for tx in paid_transactions:
+            try:
+                # Check if order already exists in translation_orders
+                existing_order = await db.translation_orders.find_one({
+                    "$or": [
+                        {"session_id": tx.get("session_id")},
+                        {"quote_id": tx.get("quote_id")}
+                    ]
+                })
+
+                if existing_order:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": f"Order already exists: {existing_order.get('order_number')}"
+                    })
+                    continue
+
+                # Get quote details
+                quote = await db.translation_quotes.find_one({"id": tx.get("quote_id")})
+                if not quote:
+                    skipped.append({
+                        "transaction_id": tx.get("id"),
+                        "reason": "Quote not found"
+                    })
+                    continue
+
+                # Generate order number with P prefix to match admin panel
+                order_count = await db.translation_orders.count_documents({})
+                order_number = f"P{order_count + 6001}"
+
+                # Create the order
+                customer_name = quote.get("customer_name") or "Customer"
+                customer_email = quote.get("customer_email")
+                created_at = quote.get("created_at", datetime.utcnow())
+
+                order = {
+                    "id": str(uuid.uuid4()),
+                    "order_number": order_number,
+                    "quote_id": tx.get("quote_id"),
+                    "session_id": tx.get("session_id"),
+                    "partner_id": "website",
+                    "client_name": customer_name,
+                    "client_email": customer_email or "",
+                    "document_type": quote.get("reference", "Document"),
+                    "service_type": quote.get("service_type"),
+                    "translate_from": quote.get("translate_from"),
+                    "translate_to": quote.get("translate_to"),
+                    "word_count": quote.get("word_count", 0),
+                    "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
+                    "urgency": quote.get("urgency"),
+                    "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
+                    "base_price": quote.get("base_price"),
+                    "urgency_fee": quote.get("urgency_fee"),
+                    "total_price": quote.get("total_price"),
+                    "discount_amount": quote.get("discount_amount", 0),
+                    "discount_code": quote.get("discount_code"),
+                    "payment_status": "paid",
+                    "payment_method": "stripe",
+                    "translation_status": "In Progress",
+                    "source": "website",
+                    "revenue_source": "website",
+                    "recovered_order": True,
+                    "created_at": created_at,
+                    "updated_at": datetime.utcnow()
+                }
+
+                await db.translation_orders.insert_one(order)
+
+                # Link documents to the order
+                document_ids = quote.get("document_ids", [])
+                if document_ids:
+                    await db.documents.update_many(
+                        {"id": {"$in": document_ids}},
+                        {"$set": {"order_id": order["id"], "order_number": order_number}}
+                    )
+
+                # Update transaction with order info
+                await db.payment_transactions.update_one(
+                    {"id": tx.get("id")},
+                    {"$set": {"order_id": order["id"], "order_number": order_number}}
+                )
+
+                recovered.append({
+                    "order_number": order_number,
+                    "customer_email": customer_email,
+                    "customer_name": customer_name,
+                    "amount": tx.get("amount"),
+                    "documents_count": len(document_ids)
+                })
+
+            except Exception as e:
+                errors.append({
+                    "transaction_id": tx.get("id"),
+                    "error": str(e)
+                })
+
+        return {
+            "status": "success",
+            "recovered_count": len(recovered),
+            "skipped_count": len(skipped),
+            "error_count": len(errors),
+            "recovered_orders": recovered,
+            "skipped": skipped,
+            "errors": errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error recovering all orders: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to recover orders")
+
 
 # ==================== DISCOUNT CODES ====================
 
