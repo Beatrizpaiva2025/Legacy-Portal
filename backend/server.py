@@ -10232,7 +10232,7 @@ class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
     attachments: Optional[AttachmentsSelection] = None
-    include_verification_page: bool = False
+    include_verification_page: bool = True  # Include verification page with QR code by default
     certifier_name: Optional[str] = None
     # Combined PDF options
     generate_combined_pdf: bool = True  # Generate single PDF with all parts
@@ -10486,7 +10486,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     bcc_email = request.bcc_email if request else None
     notify_pm = request.notify_pm if request else False
     attachments_selection = request.attachments if request else None
-    include_verification_page = request.include_verification_page if request else False
+    include_verification_page = request.include_verification_page if request else True
     certifier_name = request.certifier_name if request else None
     # Combined PDF options
     generate_combined_pdf = request.generate_combined_pdf if request else True
