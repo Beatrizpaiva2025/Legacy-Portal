@@ -11864,20 +11864,29 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     if (!deliveryModalOrder) return;
 
     setDeliverySending(true);
-    setDeliveryStatus(deliveryIncludeVerification ? 'Creating certification and sending email...' : 'Sending email...');
+    setDeliveryStatus('📄 Generating certified PDF package...');
 
     try {
       const response = await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`, {
         include_verification_page: deliveryIncludeVerification,
-        certifier_name: selectedTranslator || 'Beatriz Paiva'
+        certifier_name: selectedTranslator || 'Beatriz Paiva',
+        // Combined PDF options
+        generate_combined_pdf: true,
+        include_certificate: true,
+        include_translation: true,
+        include_original: true,
+        translator_name: selectedTranslator || 'Beatriz Paiva',
+        document_type: deliveryModalOrder.document_type,
+        source_language: deliveryModalOrder.source_language,
+        target_language: deliveryModalOrder.target_language
       });
 
-      let statusMessage = '✅ Email sent successfully!';
+      let statusMessage = '✅ Certified translation delivered!';
       if (response.data.certification?.included) {
-        statusMessage += `\n🔐 Verification page included (ID: ${response.data.certification.certification_id})`;
+        statusMessage += `\n🔐 Verification ID: ${response.data.certification.certification_id}`;
       }
-      if (response.data.attachments_sent > 0) {
-        statusMessage += `\n📎 ${response.data.attachments_sent} attachment(s) sent`;
+      if (response.data.attachment_filenames?.length > 0) {
+        statusMessage += `\n📎 ${response.data.attachment_filenames.join(', ')}`;
       }
       setDeliveryStatus(statusMessage);
       fetchOrders();

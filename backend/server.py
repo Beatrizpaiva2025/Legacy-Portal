@@ -8900,6 +8900,246 @@ class DeliverOrderRequest(BaseModel):
     attachments: Optional[AttachmentsSelection] = None
     include_verification_page: bool = False
     certifier_name: Optional[str] = None
+    # Combined PDF options
+    generate_combined_pdf: bool = True  # Generate single PDF with all parts
+    include_certificate: bool = True
+    include_translation: bool = True
+    include_original: bool = True
+    translator_name: Optional[str] = None
+    document_type: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+
+
+async def generate_combined_delivery_pdf(
+    order: dict,
+    include_certificate: bool = True,
+    include_translation: bool = True,
+    include_original: bool = True,
+    include_verification: bool = True,
+    certification_data: dict = None,
+    translator_name: str = "Beatriz Paiva"
+) -> bytes:
+    """
+    Generate a combined PDF document with:
+    1. Certificate of Accuracy
+    2. Translation pages
+    3. Original document pages
+    4. Verification page with QR code
+    """
+    import fitz  # PyMuPDF
+    from io import BytesIO
+
+    # Create new PDF document
+    doc = fitz.open()
+
+    # Page dimensions (Letter size)
+    page_width = 612
+    page_height = 792
+
+    # Colors
+    blue_color = (0.11, 0.27, 0.53)  # #1C4587
+    gold_color = (0.85, 0.65, 0.13)  # #D9A521
+    gray_color = (0.4, 0.4, 0.4)
+
+    # Get order details
+    order_number = order.get("order_number", "P0000")
+    document_type = order.get("document_type", "Document")
+    source_lang = order.get("source_language", "Portuguese")
+    target_lang = order.get("target_language", "English")
+    client_name = order.get("client_name", "")
+    translation_date = datetime.utcnow().strftime("%B %d, %Y")
+
+    # ==================== PAGE 1: CERTIFICATE OF ACCURACY ====================
+    if include_certificate:
+        page = doc.new_page(width=page_width, height=page_height)
+
+        # Header line
+        page.draw_rect(fitz.Rect(50, 80, page_width - 50, 83), color=blue_color, fill=blue_color)
+
+        # Company name
+        page.insert_text((page_width/2 - 100, 60), "Legacy Translations", fontsize=18, fontname="helv", color=blue_color)
+
+        # Contact info
+        page.insert_text((page_width/2 - 140, 100), "867 Boylston Street · 5th Floor · #2073 · Boston, MA 02116", fontsize=8, fontname="helv", color=gray_color)
+        page.insert_text((page_width/2 - 95, 112), "(857) 316-7770 · contact@legacytranslations.com", fontsize=8, fontname="helv", color=gray_color)
+
+        # Order number
+        page.insert_text((page_width/2 - 40, 150), f"Order # {order_number}", fontsize=11, fontname="helv", color=gray_color)
+
+        # Main title
+        page.insert_text((page_width/2 - 130, 200), "CERTIFICATION OF TRANSLATION ACCURACY", fontsize=14, fontname="helvB", color=blue_color)
+
+        # Subtitle
+        subtitle = f"Translation of a {document_type} from {source_lang} to {target_lang}"
+        page.insert_text((page_width/2 - len(subtitle)*2.5, 240), subtitle, fontsize=10, fontname="helv", color=gray_color)
+
+        # Body text
+        body_y = 300
+        body_texts = [
+            f"I, {translator_name}, hereby certify that the attached translation from {source_lang}",
+            f"to {target_lang} is a true and accurate translation of the original document.",
+            "",
+            "I further certify that I am competent to translate from the source language to the target",
+            "language, and that the translation is complete and accurate to the best of my knowledge",
+            "and ability.",
+            "",
+            "This certification is made under penalty of perjury under the laws of the United States",
+            "of America and the Commonwealth of Massachusetts."
+        ]
+
+        for text in body_texts:
+            if text:
+                page.insert_text((80, body_y), text, fontsize=10, fontname="helv", color=(0.2, 0.2, 0.2))
+            body_y += 18
+
+        # Signature section
+        sig_y = 550
+        page.insert_text((80, sig_y), "___________________________________", fontsize=10, fontname="helv", color=gray_color)
+        page.insert_text((80, sig_y + 20), translator_name, fontsize=11, fontname="helvB", color=blue_color)
+        page.insert_text((80, sig_y + 35), "Authorized Representative", fontsize=9, fontname="helv", color=gray_color)
+        page.insert_text((80, sig_y + 50), "Legacy Translations Inc.", fontsize=9, fontname="helv", color=gray_color)
+        page.insert_text((80, sig_y + 65), f"Dated: {translation_date}", fontsize=9, fontname="helv", color=gray_color)
+
+        # ATA info
+        page.insert_text((400, sig_y + 35), "ATA Member #275993", fontsize=9, fontname="helv", color=gray_color)
+
+        # Footer line
+        page.draw_rect(fitz.Rect(50, page_height - 60, page_width - 50, page_height - 57), color=blue_color, fill=blue_color)
+
+    # ==================== TRANSLATION PAGES ====================
+    if include_translation:
+        # Check for existing translated file (PDF)
+        translated_file = order.get("translated_file")
+        if translated_file:
+            try:
+                # Decode base64 PDF
+                pdf_bytes = base64.b64decode(translated_file)
+                trans_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                for page_num in range(len(trans_doc)):
+                    # Insert each page from the translated PDF
+                    doc.insert_pdf(trans_doc, from_page=page_num, to_page=page_num)
+
+                trans_doc.close()
+            except Exception as e:
+                logger.error(f"Error adding translated PDF: {str(e)}")
+
+        # Check for translation HTML (workspace content)
+        translation_html = order.get("translation_html")
+        if translation_html and not translated_file:
+            # Create a simple text page with the translation content
+            page = doc.new_page(width=page_width, height=page_height)
+
+            # Header
+            page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=blue_color, fill=blue_color)
+            page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=blue_color)
+
+            # Title
+            page.insert_text((80, 80), "TRANSLATED DOCUMENT", fontsize=12, fontname="helvB", color=blue_color)
+            page.insert_text((80, 100), f"Order: {order_number} | {source_lang} → {target_lang}", fontsize=9, fontname="helv", color=gray_color)
+
+            # Content note
+            page.insert_text((80, 140), "Translation content available in HTML format.", fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((80, 160), "Please refer to the attached HTML file for full formatted content.", fontsize=10, fontname="helv", color=gray_color)
+
+    # ==================== ORIGINAL DOCUMENT PAGES ====================
+    if include_original:
+        # Get original documents from database (will be passed or fetched)
+        original_file = order.get("original_file") or order.get("file_data")
+        if original_file:
+            try:
+                pdf_bytes = base64.b64decode(original_file)
+                orig_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+                # Add separator page
+                sep_page = doc.new_page(width=page_width, height=page_height)
+                sep_page.draw_rect(fitz.Rect(50, 380, page_width - 50, 383), color=blue_color, fill=blue_color)
+                sep_page.insert_text((page_width/2 - 60, 400), "ORIGINAL DOCUMENT", fontsize=16, fontname="helvB", color=blue_color)
+                sep_page.insert_text((page_width/2 - 100, 430), "The following pages contain the original document", fontsize=10, fontname="helv", color=gray_color)
+
+                for page_num in range(len(orig_doc)):
+                    doc.insert_pdf(orig_doc, from_page=page_num, to_page=page_num)
+
+                orig_doc.close()
+            except Exception as e:
+                logger.error(f"Error adding original PDF: {str(e)}")
+
+    # ==================== VERIFICATION PAGE ====================
+    if include_verification and certification_data:
+        page = doc.new_page(width=page_width, height=page_height)
+
+        cert_id = certification_data.get("certification_id", "")
+        verification_url = certification_data.get("verification_url", "")
+        qr_code_data = certification_data.get("qr_code_data", "")
+        document_hash = certification_data.get("document_hash", "")[:20]
+        certified_date = datetime.utcnow().strftime("%B %d, %Y")
+
+        # Header banner background
+        page.draw_rect(fitz.Rect(0, 0, page_width, 100), color=blue_color, fill=blue_color)
+
+        # Header text
+        page.insert_text((page_width/2 - 80, 40), "Legacy Translations", fontsize=16, fontname="helvB", color=(1, 1, 1))
+        page.insert_text((page_width/2 - 70, 65), "Document Verification", fontsize=14, fontname="helv", color=(1, 1, 1))
+        page.insert_text((page_width/2 - 120, 85), "Official Certification for Translated Documents", fontsize=9, fontname="helv", color=(0.8, 0.8, 0.8))
+
+        # Verified badge
+        page.draw_rect(fitz.Rect(200, 130, 412, 160), color=(0.86, 0.97, 0.86), fill=(0.86, 0.97, 0.86), radius=15)
+        page.insert_text((230, 150), "✓ Certified & Verified Document", fontsize=11, fontname="helvB", color=(0.09, 0.4, 0.21))
+
+        # Certification details box
+        page.draw_rect(fitz.Rect(60, 180, page_width - 60, 380), color=(0.95, 0.96, 0.98), fill=(0.95, 0.96, 0.98), radius=10)
+
+        # Details
+        details_y = 210
+        details = [
+            ("Certification ID:", cert_id),
+            ("Order Number:", order_number),
+            ("Document Type:", document_type),
+            ("Translation:", f"{source_lang} → {target_lang}"),
+            ("Certified Date:", certified_date),
+            ("Certified By:", translator_name),
+            ("Document Hash:", f"{document_hash}..."),
+        ]
+
+        for label, value in details:
+            page.insert_text((80, details_y), label, fontsize=10, fontname="helv", color=gray_color)
+            page.insert_text((250, details_y), value, fontsize=10, fontname="helvB", color=(0.1, 0.1, 0.1))
+            details_y += 22
+
+        # QR Code section
+        page.draw_rect(fitz.Rect(150, 400, page_width - 150, 600), color=(0.93, 0.95, 1), fill=(0.93, 0.95, 1), radius=10)
+        page.insert_text((page_width/2 - 60, 430), "📱 Scan to Verify Online", fontsize=11, fontname="helvB", color=blue_color)
+
+        # Add QR code image if available
+        if qr_code_data:
+            try:
+                qr_bytes = base64.b64decode(qr_code_data)
+                qr_rect = fitz.Rect(page_width/2 - 60, 450, page_width/2 + 60, 570)
+                page.insert_image(qr_rect, stream=qr_bytes)
+            except Exception as e:
+                logger.error(f"Error adding QR code: {str(e)}")
+
+        page.insert_text((page_width/2 - 100, 590), "Point your camera at this QR code to verify", fontsize=9, fontname="helv", color=gray_color)
+
+        # Verification URL
+        page.draw_rect(fitz.Rect(80, 620, page_width - 80, 660), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97), radius=5)
+        page.insert_text((100, 635), "Verify at:", fontsize=9, fontname="helv", color=gray_color)
+        page.insert_text((160, 635), verification_url, fontsize=9, fontname="helvB", color=blue_color)
+
+        # Footer notice
+        page.insert_text((80, 700), "⚠️ Important: This document has been digitally certified by Legacy Translations Inc.", fontsize=8, fontname="helvB", color=gray_color)
+        page.insert_text((80, 715), "Any alterations to this document will invalidate this certification.", fontsize=8, fontname="helv", color=gray_color)
+
+        # Company footer
+        page.draw_rect(fitz.Rect(0, page_height - 40, page_width, page_height), color=(0.97, 0.97, 0.97), fill=(0.97, 0.97, 0.97))
+        page.insert_text((page_width/2 - 150, page_height - 20), "Legacy Translations Inc. · 867 Boylston St, Boston, MA · (857) 316-7770 · ATA #275993", fontsize=7, fontname="helv", color=gray_color)
+
+    # Save to bytes
+    pdf_bytes = doc.tobytes()
+    doc.close()
+
+    return pdf_bytes
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
@@ -8914,6 +9154,12 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     attachments_selection = request.attachments if request else None
     include_verification_page = request.include_verification_page if request else False
     certifier_name = request.certifier_name if request else None
+    # Combined PDF options
+    generate_combined_pdf = request.generate_combined_pdf if request else True
+    include_certificate = request.include_certificate if request else True
+    include_translation = request.include_translation if request else True
+    include_original = request.include_original if request else True
+    translator_name = request.translator_name if request else certifier_name or "Beatriz Paiva"
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -8945,79 +9191,9 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
         has_html_translation = order.get("translation_html")
 
         # Debug logging
-        logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}")
+        logger.info(f"Delivering order {order.get('order_number')}: has_file={has_file_attachment}, has_html={bool(has_html_translation)}, combined_pdf={generate_combined_pdf}")
 
-        # Determine what to include based on selection (or default behavior)
-        include_workspace = True
-        additional_doc_ids = []
-
-        if attachments_selection:
-            include_workspace = attachments_selection.include_workspace
-            additional_doc_ids = attachments_selection.additional_document_ids or []
-
-        # Add workspace translation if selected
-        if include_workspace and has_html_translation:
-            translation_html_content = generate_translation_html_for_email(order)
-            all_attachments.append({
-                "content": base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8'),
-                "filename": f"Translation_{order['order_number']}.html",
-                "content_type": "text/html"
-            })
-            attachment_filenames.append(f"Translation_{order['order_number']}.html")
-            logger.info(f"Added workspace translation to attachments")
-
-        # Get ALL documents from the project and include them as attachments
-        # Fetch from both order_documents and documents collections
-        project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
-        project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
-
-        # Add all project documents as attachments
-        for doc in project_docs + project_docs_main:
-            doc_data = doc.get("file_data") or doc.get("data")
-            if doc_data:
-                filename = doc.get("filename", "document.pdf")
-                # Avoid duplicates
-                if filename not in attachment_filenames:
-                    all_attachments.append({
-                        "content": doc_data,
-                        "filename": filename,
-                        "content_type": doc.get("content_type", "application/pdf")
-                    })
-                    attachment_filenames.append(filename)
-                    logger.info(f"Added project document to attachments: {filename}")
-
-        # Also add any additional documents explicitly selected (for backwards compatibility)
-        if additional_doc_ids:
-            for doc_id in additional_doc_ids:
-                # Check if it's a string ID for order documents
-                if isinstance(doc_id, str) and not doc_id.startswith('temp-'):
-                    doc = await db.order_documents.find_one({"id": doc_id})
-                    if doc and (doc.get("file_data") or doc.get("data")):
-                        doc_data = doc.get("file_data") or doc.get("data")
-                        filename = doc.get("filename", f"document_{doc_id}.pdf")
-                        # Avoid duplicates
-                        if filename not in attachment_filenames:
-                            all_attachments.append({
-                                "content": doc_data,
-                                "filename": filename,
-                                "content_type": doc.get("content_type", "application/pdf")
-                            })
-                            attachment_filenames.append(filename)
-                            logger.info(f"Added additional document {doc_id} to attachments: {filename}")
-
-        # Fallback: if no attachments selected but order has translated_file, use that
-        if not all_attachments and has_file_attachment:
-            all_attachments.append({
-                "content": order["translated_file"],
-                "filename": order["translated_filename"],
-                "content_type": order.get("translated_file_type", "application/pdf")
-            })
-            attachment_filenames.append(order["translated_filename"])
-            logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
-
-        has_attachments = len(all_attachments) > 0
-
-        # Create certification and verification page if requested
+        # Create certification first if verification page is requested (needed for combined PDF)
         certification_data = None
         if include_verification_page:
             try:
@@ -9316,20 +9492,129 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 </html>
 """
 
-                # Add verification page as attachment
-                all_attachments.append({
-                    "content": base64.b64encode(verification_page_html.encode('utf-8')).decode('utf-8'),
-                    "filename": f"Verification_{order['order_number']}_{cert_id}.html",
-                    "content_type": "text/html"
-                })
-                attachment_filenames.append(f"Verification_{order['order_number']}_{cert_id}.html")
-                has_attachments = True
-                logger.info(f"Added verification page to delivery attachments")
+                logger.info(f"Certification created for delivery: {cert_id}")
 
             except Exception as e:
                 logger.error(f"Failed to create certification for delivery: {str(e)}")
                 import traceback
                 traceback.print_exc()
+
+        # ==================== GENERATE COMBINED PDF OR SEPARATE ATTACHMENTS ====================
+        if generate_combined_pdf:
+            # Generate a single combined PDF with all parts
+            try:
+                logger.info(f"Generating combined PDF for order {order.get('order_number')}")
+
+                # Fetch original documents for the combined PDF
+                original_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "$or": [
+                        {"document_type": "original"},
+                        {"is_original": True},
+                        {"filename": {"$regex": "original", "$options": "i"}}
+                    ]
+                }).to_list(10)
+
+                # If no specific original docs found, try to get from order
+                original_file_data = None
+                if original_docs:
+                    for doc in original_docs:
+                        if doc.get("file_data") or doc.get("data"):
+                            original_file_data = doc.get("file_data") or doc.get("data")
+                            break
+
+                # Prepare order data with original file if found
+                order_with_original = dict(order)
+                if original_file_data:
+                    order_with_original["original_file"] = original_file_data
+
+                # Generate the combined PDF
+                combined_pdf_bytes = await generate_combined_delivery_pdf(
+                    order=order_with_original,
+                    include_certificate=include_certificate,
+                    include_translation=include_translation,
+                    include_original=include_original and bool(original_file_data),
+                    include_verification=include_verification_page,
+                    certification_data=certification_data,
+                    translator_name=translator_name
+                )
+
+                # Add combined PDF as the single attachment
+                all_attachments = [{
+                    "content": base64.b64encode(combined_pdf_bytes).decode('utf-8'),
+                    "filename": f"Certified_Translation_{order['order_number']}.pdf",
+                    "content_type": "application/pdf"
+                }]
+                attachment_filenames = [f"Certified_Translation_{order['order_number']}.pdf"]
+                has_attachments = True
+                logger.info(f"Generated combined PDF: Certified_Translation_{order['order_number']}.pdf")
+
+            except Exception as e:
+                logger.error(f"Failed to generate combined PDF: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to separate attachments on error
+                generate_combined_pdf = False
+
+        # Fallback to separate attachments if combined PDF failed or not requested
+        if not generate_combined_pdf:
+            # Determine what to include based on selection (or default behavior)
+            include_workspace = True
+            additional_doc_ids = []
+
+            if attachments_selection:
+                include_workspace = attachments_selection.include_workspace
+                additional_doc_ids = attachments_selection.additional_document_ids or []
+
+            # Add workspace translation if selected
+            if include_workspace and has_html_translation:
+                translation_html_content = generate_translation_html_for_email(order)
+                all_attachments.append({
+                    "content": base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8'),
+                    "filename": f"Translation_{order['order_number']}.html",
+                    "content_type": "text/html"
+                })
+                attachment_filenames.append(f"Translation_{order['order_number']}.html")
+                logger.info(f"Added workspace translation to attachments")
+
+            # Get ALL documents from the project and include them as attachments
+            project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
+            project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
+
+            # Add all project documents as attachments
+            for doc in project_docs + project_docs_main:
+                doc_data = doc.get("file_data") or doc.get("data")
+                if doc_data:
+                    filename = doc.get("filename", "document.pdf")
+                    if filename not in attachment_filenames:
+                        all_attachments.append({
+                            "content": doc_data,
+                            "filename": filename,
+                            "content_type": doc.get("content_type", "application/pdf")
+                        })
+                        attachment_filenames.append(filename)
+                        logger.info(f"Added project document to attachments: {filename}")
+
+            # Fallback: if no attachments selected but order has translated_file, use that
+            if not all_attachments and has_file_attachment:
+                all_attachments.append({
+                    "content": order["translated_file"],
+                    "filename": order["translated_filename"],
+                    "content_type": order.get("translated_file_type", "application/pdf")
+                })
+                attachment_filenames.append(order["translated_filename"])
+                logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
+
+            # Add verification page HTML if certification was created and combined PDF not used
+            if certification_data and include_verification_page:
+                all_attachments.append({
+                    "content": base64.b64encode(verification_page_html.encode('utf-8')).decode('utf-8'),
+                    "filename": f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.html",
+                    "content_type": "text/html"
+                })
+                attachment_filenames.append(f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.html")
+
+        has_attachments = len(all_attachments) > 0
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
@@ -9428,10 +9713,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
         return {
             "status": "success",
-            "message": "Order delivered and emails sent",
+            "message": "Certified translation delivered successfully",
             "attachment_sent": has_attachments,
             "attachments_sent": len(all_attachments),
             "attachment_filenames": attachment_filenames,
+            "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
             "certification": {
@@ -9439,10 +9725,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 "certification_id": certification_data.get("certification_id") if certification_data else None,
                 "verification_url": certification_data.get("verification_url") if certification_data else None
             } if include_verification_page else None,
-            "debug": {
-                "had_file": has_file_attachment,
-                "had_html": bool(has_html_translation),
-                "total_attachments": len(all_attachments)
+            "document_contents": {
+                "certificate": include_certificate,
+                "translation": include_translation,
+                "original": include_original,
+                "verification_page": include_verification_page
             }
         }
 
