@@ -10973,23 +10973,26 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 attachment_filenames.append(f"Translation_{order['order_number']}.html")
                 logger.info(f"Added workspace translation to attachments")
 
-            # Get ALL documents from the project and include them as attachments
-            project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
-            project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
+            # ONLY add additional documents if explicitly requested via additional_doc_ids
+            # Do NOT automatically add all project documents - client should receive only the combined PDF or workspace translation
+            if additional_doc_ids:
+                project_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "id": {"$in": additional_doc_ids}
+                }).to_list(100)
 
-            # Add all project documents as attachments
-            for doc in project_docs + project_docs_main:
-                doc_data = doc.get("file_data") or doc.get("data")
-                if doc_data:
-                    filename = doc.get("filename", "document.pdf")
-                    if filename not in attachment_filenames:
-                        all_attachments.append({
-                            "content": doc_data,
-                            "filename": filename,
-                            "content_type": doc.get("content_type", "application/pdf")
-                        })
-                        attachment_filenames.append(filename)
-                        logger.info(f"Added project document to attachments: {filename}")
+                for doc in project_docs:
+                    doc_data = doc.get("file_data") or doc.get("data")
+                    if doc_data:
+                        filename = doc.get("filename", "document.pdf")
+                        if filename not in attachment_filenames:
+                            all_attachments.append({
+                                "content": doc_data,
+                                "filename": filename,
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(filename)
+                            logger.info(f"Added selected document to attachments: {filename}")
 
             # Fallback: if no attachments selected but order has translated_file, use that
             if not all_attachments and has_file_attachment:
