@@ -651,7 +651,7 @@ const TopBar = ({
 
   // Role display names and colors
   const roleConfig = {
-    admin: { label: 'Administrator', color: 'bg-red-500' },
+    admin: { label: 'Admin', color: 'bg-red-500' },
     pm: { label: 'Project Manager', color: 'bg-blue-500' },
     translator: { label: 'Translator', color: 'bg-green-500' },
     sales: { label: 'Sales', color: 'bg-blue-500' }
@@ -848,9 +848,9 @@ const TopBar = ({
         )}
         <button
           onClick={onLogout}
-          className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
+          className="px-2 py-1.5 text-red-400 hover:bg-red-900/30 rounded text-xs"
         >
-          Logout
+          🚪 Logout
         </button>
       </div>
     </div>
