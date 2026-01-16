@@ -3883,29 +3883,27 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
         customer_email = quote.get("customer_email") or stripe_metadata.get("customer_email")
         customer_name = quote.get("customer_name") or stripe_metadata.get("customer_name") or "Valued Customer"
 
-        # Generate order number
-        order_count = await db.customer_orders.count_documents({})
-        order_number = f"WEB-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        # Generate order number with P prefix (like P6377) to match admin panel format
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
 
-        # Create the actual order record
+        # Create the actual order record in translation_orders (visible in admin Projects)
         order = {
             "id": str(uuid.uuid4()),
             "order_number": order_number,
             "quote_id": quote_id,
             "session_id": session_id,
-            "customer_id": "guest",
-            "customer_name": customer_name,
-            "customer_email": customer_email,
+            "partner_id": "website",
             "client_name": customer_name,
-            "client_email": customer_email,
-            "reference": quote.get("reference"),
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
             "service_type": quote.get("service_type"),
             "translate_from": quote.get("translate_from"),
             "translate_to": quote.get("translate_to"),
             "word_count": quote.get("word_count", 0),
             "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
             "urgency": quote.get("urgency"),
-            "notes": quote.get("notes"),
+            "notes": quote.get("notes") or f"Website order - Stripe payment",
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
@@ -3913,13 +3911,15 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             "discount_code": quote.get("discount_code"),
             "payment_status": "paid",
             "payment_method": "stripe",
-            "translation_status": "Pending",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
 
-        # Insert order into database
-        await db.customer_orders.insert_one(order)
+        # Insert order into translation_orders (admin Projects collection)
+        await db.translation_orders.insert_one(order)
         logger.info(f"Created order {order_number} for session {session_id}")
 
         # Link documents to the order
@@ -3968,7 +3968,7 @@ async def handle_successful_payment(session_id: str, payment_transaction: dict, 
             )
 
             # Also update the order with Protemos project ID
-            await db.customer_orders.update_one(
+            await db.translation_orders.update_one(
                 {"id": order["id"]},
                 {"$set": {"protemos_project_id": protemos_response.get("id")}}
             )
@@ -15396,8 +15396,8 @@ async def get_orphaned_payments(admin_key: str):
 
         orphaned = []
         for tx in paid_transactions:
-            # Check if there's an order for this transaction
-            order = await db.customer_orders.find_one({
+            # Check if there's an order for this transaction in translation_orders
+            order = await db.translation_orders.find_one({
                 "$or": [
                     {"session_id": tx.get("session_id")},
                     {"quote_id": tx.get("quote_id")}
@@ -15455,8 +15455,8 @@ async def recover_order_from_payment(transaction_id: str, admin_key: str):
         if not tx:
             raise HTTPException(status_code=404, detail="Transaction not found")
 
-        # Check if order already exists
-        existing_order = await db.customer_orders.find_one({
+        # Check if order already exists in translation_orders
+        existing_order = await db.translation_orders.find_one({
             "$or": [
                 {"session_id": tx.get("session_id")},
                 {"quote_id": tx.get("quote_id")}
@@ -15470,8 +15470,9 @@ async def recover_order_from_payment(transaction_id: str, admin_key: str):
         if not quote:
             raise HTTPException(status_code=404, detail="Quote not found for this transaction")
 
-        # Generate order number
-        order_number = f"WEB-{quote.get('created_at', datetime.utcnow()).strftime('%Y%m%d%H%M%S')}"
+        # Generate order number with P prefix to match admin panel
+        order_count = await db.translation_orders.count_documents({})
+        order_number = f"P{order_count + 6001}"
 
         # Create the order
         customer_name = quote.get("customer_name") or "Customer"
@@ -15482,19 +15483,17 @@ async def recover_order_from_payment(transaction_id: str, admin_key: str):
             "order_number": order_number,
             "quote_id": tx.get("quote_id"),
             "session_id": tx.get("session_id"),
-            "customer_id": "guest",
-            "customer_name": customer_name,
-            "customer_email": customer_email,
+            "partner_id": "website",
             "client_name": customer_name,
-            "client_email": customer_email,
-            "reference": quote.get("reference"),
+            "client_email": customer_email or "",
+            "document_type": quote.get("reference", "Document"),
             "service_type": quote.get("service_type"),
             "translate_from": quote.get("translate_from"),
             "translate_to": quote.get("translate_to"),
             "word_count": quote.get("word_count", 0),
             "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
             "urgency": quote.get("urgency"),
-            "notes": quote.get("notes"),
+            "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
             "base_price": quote.get("base_price"),
             "urgency_fee": quote.get("urgency_fee"),
             "total_price": quote.get("total_price"),
@@ -15502,13 +15501,15 @@ async def recover_order_from_payment(transaction_id: str, admin_key: str):
             "discount_code": quote.get("discount_code"),
             "payment_status": "paid",
             "payment_method": "stripe",
-            "translation_status": "Pending",
+            "translation_status": "In Progress",
+            "source": "website",
+            "revenue_source": "website",
             "recovered_order": True,
             "created_at": quote.get("created_at", datetime.utcnow()),
             "updated_at": datetime.utcnow()
         }
 
-        await db.customer_orders.insert_one(order)
+        await db.translation_orders.insert_one(order)
 
         # Link documents to the order
         document_ids = quote.get("document_ids", [])
@@ -15561,8 +15562,8 @@ async def recover_all_orphaned_orders(admin_key: str):
 
         for tx in paid_transactions:
             try:
-                # Check if order already exists
-                existing_order = await db.customer_orders.find_one({
+                # Check if order already exists in translation_orders
+                existing_order = await db.translation_orders.find_one({
                     "$or": [
                         {"session_id": tx.get("session_id")},
                         {"quote_id": tx.get("quote_id")}
@@ -15585,32 +15586,31 @@ async def recover_all_orphaned_orders(admin_key: str):
                     })
                     continue
 
-                # Generate order number based on original timestamp
-                created_at = quote.get("created_at", datetime.utcnow())
-                order_number = f"WEB-{created_at.strftime('%Y%m%d%H%M%S')}"
+                # Generate order number with P prefix to match admin panel
+                order_count = await db.translation_orders.count_documents({})
+                order_number = f"P{order_count + 6001}"
 
                 # Create the order
                 customer_name = quote.get("customer_name") or "Customer"
                 customer_email = quote.get("customer_email")
+                created_at = quote.get("created_at", datetime.utcnow())
 
                 order = {
                     "id": str(uuid.uuid4()),
                     "order_number": order_number,
                     "quote_id": tx.get("quote_id"),
                     "session_id": tx.get("session_id"),
-                    "customer_id": "guest",
-                    "customer_name": customer_name,
-                    "customer_email": customer_email,
+                    "partner_id": "website",
                     "client_name": customer_name,
-                    "client_email": customer_email,
-                    "reference": quote.get("reference"),
+                    "client_email": customer_email or "",
+                    "document_type": quote.get("reference", "Document"),
                     "service_type": quote.get("service_type"),
                     "translate_from": quote.get("translate_from"),
                     "translate_to": quote.get("translate_to"),
                     "word_count": quote.get("word_count", 0),
                     "page_count": max(1, math.ceil(quote.get("word_count", 0) / 250)),
                     "urgency": quote.get("urgency"),
-                    "notes": quote.get("notes"),
+                    "notes": quote.get("notes") or "Recovered order - Website Stripe payment",
                     "base_price": quote.get("base_price"),
                     "urgency_fee": quote.get("urgency_fee"),
                     "total_price": quote.get("total_price"),
@@ -15618,13 +15618,15 @@ async def recover_all_orphaned_orders(admin_key: str):
                     "discount_code": quote.get("discount_code"),
                     "payment_status": "paid",
                     "payment_method": "stripe",
-                    "translation_status": "Pending",
+                    "translation_status": "In Progress",
+                    "source": "website",
+                    "revenue_source": "website",
                     "recovered_order": True,
                     "created_at": created_at,
                     "updated_at": datetime.utcnow()
                 }
 
-                await db.customer_orders.insert_one(order)
+                await db.translation_orders.insert_one(order)
 
                 # Link documents to the order
                 document_ids = quote.get("document_ids", [])
