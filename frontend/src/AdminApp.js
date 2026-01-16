@@ -11716,6 +11716,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [deliveryTranslationHtml, setDeliveryTranslationHtml] = useState('');
   const [deliverySending, setDeliverySending] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState('');
+  const [deliveryIncludeVerification, setDeliveryIncludeVerification] = useState(true);
 
   // Translator stats for PM view
   const [translatorStats, setTranslatorStats] = useState({ available: 0, busy: 0, total: 0 });
@@ -12075,11 +12076,31 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     if (!deliveryModalOrder) return;
 
     setDeliverySending(true);
-    setDeliveryStatus('Enviando email...');
+    setDeliveryStatus('📄 Generating certified PDF package...');
 
     try {
-      await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`);
-      setDeliveryStatus('✅ Email sent successfully!');
+      const response = await axios.post(`${API}/admin/orders/${deliveryModalOrder.id}/deliver?admin_key=${adminKey}`, {
+        include_verification_page: deliveryIncludeVerification,
+        certifier_name: selectedTranslator || 'Beatriz Paiva',
+        // Combined PDF options
+        generate_combined_pdf: true,
+        include_certificate: true,
+        include_translation: true,
+        include_original: true,
+        translator_name: selectedTranslator || 'Beatriz Paiva',
+        document_type: deliveryModalOrder.document_type,
+        source_language: deliveryModalOrder.source_language,
+        target_language: deliveryModalOrder.target_language
+      });
+
+      let statusMessage = '✅ Certified translation delivered!';
+      if (response.data.certification?.included) {
+        statusMessage += `\n🔐 Verification ID: ${response.data.certification.certification_id}`;
+      }
+      if (response.data.attachment_filenames?.length > 0) {
+        statusMessage += `\n📎 ${response.data.attachment_filenames.join(', ')}`;
+      }
+      setDeliveryStatus(statusMessage);
       fetchOrders();
 
       // Close modal after success
@@ -12088,7 +12109,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         setDeliveryModalOrder(null);
         setDeliveryTranslationHtml('');
         setDeliveryStatus('');
-      }, 2000);
+        setDeliveryIncludeVerification(true); // Reset to default
+      }, 3000);
     } catch (err) {
       console.error('Failed to send email:', err);
       setDeliveryStatus('❌ Error sending email: ' + (err.response?.data?.detail || err.message));
@@ -15965,7 +15987,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                 </p>
               </div>
               <button
-                onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); setDeliveryTranslationHtml(''); }}
+                onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); setDeliveryTranslationHtml(''); setDeliveryIncludeVerification(true); }}
                 className="text-white hover:text-gray-200 text-2xl font-bold"
               >
                 ×
@@ -15993,16 +16015,52 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   <p>Loading translation...</p>
                 </div>
               )}
+
+              {/* Delivery Options */}
+              <div className="mt-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl shadow-sm">
+                <h4 className="text-sm font-bold text-purple-800 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs">⚙</span>
+                  Delivery Options
+                </h4>
+                <label className={`flex items-start text-sm cursor-pointer p-3 rounded-lg transition-all duration-200 ${
+                  deliveryIncludeVerification
+                    ? 'bg-purple-100 border-2 border-purple-400 shadow-md'
+                    : 'bg-white border-2 border-gray-200 hover:border-purple-300 hover:shadow-sm'
+                }`}>
+                  <input
+                    type="checkbox"
+                    checked={deliveryIncludeVerification}
+                    onChange={(e) => setDeliveryIncludeVerification(e.target.checked)}
+                    className="mt-1 mr-3 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  />
+                  <span className="flex items-start gap-3 flex-1">
+                    <span className="text-2xl">🔐</span>
+                    <span className="flex-1">
+                      <span className="font-semibold text-gray-800 block">Include Verification Page (QR Code)</span>
+                      <span className="text-xs text-gray-600 mt-1 block leading-relaxed">
+                        Adds a professionally designed verification page with scannable QR code.
+                        Recipients can verify document authenticity online.
+                      </span>
+                      {deliveryIncludeVerification && (
+                        <span className="inline-flex items-center gap-1 mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                          Will be included in delivery
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             {/* Status Message */}
             {deliveryStatus && (
-              <div className={`px-4 py-2 text-sm text-center ${
-                deliveryStatus.includes('✅') ? 'bg-green-100 text-green-700' :
-                deliveryStatus.includes('❌') ? 'bg-red-100 text-red-700' :
-                'bg-blue-100 text-blue-700'
+              <div className={`px-4 py-3 text-sm ${
+                deliveryStatus.includes('✅') ? 'bg-green-100 text-green-700 border-t border-green-200' :
+                deliveryStatus.includes('❌') ? 'bg-red-100 text-red-700 border-t border-red-200' :
+                'bg-blue-100 text-blue-700 border-t border-blue-200'
               }`}>
-                {deliveryStatus}
+                <div className="whitespace-pre-line text-center">{deliveryStatus}</div>
               </div>
             )}
 
@@ -16013,7 +16071,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); }}
+                  onClick={() => { setShowDeliveryModal(false); setDeliveryModalOrder(null); setDeliveryIncludeVerification(true); }}
                   className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-500 text-sm"
                 >
                   Cancel
@@ -23485,9 +23543,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }
 
       // 2. Update the order with the translator assignment and TR deadline (if set)
+      // skip_email: true to avoid duplicate email (we send via dedicated endpoint below)
       const orderUpdate = {
         assigned_translator_id: translator.id,
-        assigned_translator: translator.name
+        assigned_translator: translator.name,
+        skip_email: true
       };
       if (newTrDeadline) {
         orderUpdate.translator_deadline = newTrDeadline;
