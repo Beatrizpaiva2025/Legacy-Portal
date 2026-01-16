@@ -8898,6 +8898,8 @@ class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
     attachments: Optional[AttachmentsSelection] = None
+    include_verification_page: bool = False
+    certifier_name: Optional[str] = None
 
 @api_router.post("/admin/orders/{order_id}/deliver")
 async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrderRequest = None):
@@ -8910,6 +8912,8 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     bcc_email = request.bcc_email if request else None
     notify_pm = request.notify_pm if request else False
     attachments_selection = request.attachments if request else None
+    include_verification_page = request.include_verification_page if request else False
+    certifier_name = request.certifier_name if request else None
 
     # Find the order
     order = await db.translation_orders.find_one({"id": order_id})
@@ -9012,6 +9016,320 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
 
         has_attachments = len(all_attachments) > 0
+
+        # Create certification and verification page if requested
+        certification_data = None
+        if include_verification_page:
+            try:
+                # Generate certification ID
+                cert_id = f"LT-{datetime.now().strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}"
+
+                # Create document hash from translation content
+                translation_content = order.get('translation_html', '') or 'Translation Content'
+                document_hash = hashlib.sha256(translation_content.encode('utf-8')).hexdigest()
+
+                # Generate verification URL
+                base_url = os.environ.get("FRONTEND_URL", "https://portal.legacytranslations.com")
+                verification_url = f"{base_url}/#/verify/{cert_id}"
+
+                # Generate QR code
+                qr_code_data = generate_qr_code(verification_url)
+
+                # Create certification record
+                certification = {
+                    "certification_id": cert_id,
+                    "order_id": order_id,
+                    "order_number": order.get("order_number"),
+                    "document_type": order.get("document_type", "Document"),
+                    "source_language": order.get("source_language", ""),
+                    "target_language": order.get("target_language", ""),
+                    "page_count": 1,
+                    "document_hash": document_hash,
+                    "certifier_name": certifier_name or "Beatriz Paiva",
+                    "certifier_title": "Legal Representative",
+                    "certifier_credentials": "ATA Member # 275993",
+                    "company_name": "Legacy Translations Inc.",
+                    "company_address": "867 Boylston Street, 5th Floor, #2073, Boston, MA 02116",
+                    "company_phone": "(857) 316-7770",
+                    "company_email": "contact@legacytranslations.com",
+                    "client_name": order.get("client_name", ""),
+                    "certified_at": datetime.utcnow(),
+                    "is_valid": True,
+                    "verification_url": verification_url,
+                    "qr_code_data": qr_code_data
+                }
+
+                # Store in database
+                await db.certifications.insert_one(certification)
+                certification_data = certification
+
+                logger.info(f"Created certification for delivery: {cert_id}")
+
+                # Generate verification page HTML
+                certified_date = datetime.utcnow().strftime('%B %d, %Y')
+                verification_page_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Document Verification - {cert_id}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }}
+        .container {{
+            max-width: 650px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            overflow: hidden;
+        }}
+        .header-banner {{
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }}
+        .header-banner::after {{
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-top: 20px solid #3b82f6;
+        }}
+        .logo {{ max-height: 55px; margin-bottom: 15px; filter: brightness(0) invert(1); }}
+        .header-title {{ color: white; font-size: 26px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }}
+        .header-subtitle {{ color: rgba(255,255,255,0.85); font-size: 14px; margin-top: 8px; }}
+
+        .content {{ padding: 50px 40px 40px; }}
+
+        .badge-container {{ text-align: center; margin-bottom: 30px; }}
+        .valid-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #166534;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 15px;
+            box-shadow: 0 4px 15px rgba(22, 163, 74, 0.2);
+            border: 2px solid #86efac;
+        }}
+        .valid-icon {{
+            width: 24px;
+            height: 24px;
+            background: #166534;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }}
+
+        .cert-card {{
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 25px;
+            margin: 25px 0;
+        }}
+        .cert-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        .cert-row:last-child {{ border-bottom: none; }}
+        .cert-label {{ color: #64748b; font-size: 13px; font-weight: 500; }}
+        .cert-value {{ font-weight: 600; color: #1e293b; font-size: 14px; text-align: right; }}
+        .cert-id-badge {{
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            border: 1px solid #fcd34d;
+        }}
+
+        .qr-section {{
+            text-align: center;
+            margin: 35px 0;
+            padding: 30px;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-radius: 16px;
+            border: 2px dashed #93c5fd;
+        }}
+        .qr-code {{
+            width: 180px;
+            height: 180px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: 4px solid white;
+        }}
+        .qr-title {{
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 15px;
+        }}
+        .qr-instruction {{
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 15px;
+            line-height: 1.5;
+        }}
+
+        .verify-url-box {{
+            text-align: center;
+            padding: 15px 20px;
+            background: #f8fafc;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 1px solid #e2e8f0;
+        }}
+        .verify-label {{ font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }}
+        .verify-url {{
+            font-size: 14px;
+            color: #3b82f6;
+            word-break: break-all;
+            font-weight: 600;
+        }}
+
+        .footer {{
+            text-align: center;
+            padding: 25px 40px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }}
+        .footer-notice {{
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }}
+        .footer-notice strong {{ color: #1e293b; }}
+        .footer-company {{
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.8;
+        }}
+        .divider {{
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            margin: 15px auto;
+            border-radius: 2px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-banner">
+            <img src="https://legacytranslations.com/wp-content/themes/legacy/images/logo215x80.png" alt="Legacy Translations" class="logo" />
+            <h1 class="header-title">Document Verification</h1>
+            <p class="header-subtitle">Official Certification for Translated Documents</p>
+        </div>
+
+        <div class="content">
+            <div class="badge-container">
+                <span class="valid-badge">
+                    <span class="valid-icon">✓</span>
+                    Certified & Verified Document
+                </span>
+            </div>
+
+            <div class="cert-card">
+                <div class="cert-row">
+                    <span class="cert-label">Certification ID</span>
+                    <span class="cert-value cert-id-badge">{cert_id}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Order Number</span>
+                    <span class="cert-value">{order.get('order_number', 'N/A')}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Document Type</span>
+                    <span class="cert-value">{order.get('document_type', 'Document')}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Translation</span>
+                    <span class="cert-value">{order.get('source_language', '')} → {order.get('target_language', '')}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Certified Date</span>
+                    <span class="cert-value">{certified_date}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Certified By</span>
+                    <span class="cert-value">{certifier_name or 'Beatriz Paiva'}</span>
+                </div>
+                <div class="cert-row">
+                    <span class="cert-label">Document Hash</span>
+                    <span class="cert-value" style="font-family: monospace; font-size: 11px; color: #64748b;">{document_hash[:20]}...</span>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <p class="qr-title">📱 Scan to Verify Online</p>
+                {f'<img src="data:image/png;base64,{qr_code_data}" alt="QR Code" class="qr-code" />' if qr_code_data else '<div style="width:180px;height:180px;background:#e2e8f0;display:inline-block;border-radius:12px;"></div>'}
+                <p class="qr-instruction">
+                    Point your phone's camera at this QR code<br/>
+                    to instantly verify the authenticity of this document
+                </p>
+            </div>
+
+            <div class="verify-url-box">
+                <p class="verify-label">Manual Verification URL</p>
+                <p class="verify-url">{verification_url}</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p class="footer-notice">
+                <strong>⚠️ Important Notice:</strong> This document has been digitally certified by Legacy Translations Inc.<br/>
+                Any alterations to this document will invalidate this certification.
+            </p>
+            <div class="divider"></div>
+            <p class="footer-company">
+                <strong>Legacy Translations Inc.</strong><br/>
+                867 Boylston Street, 5th Floor, #2073 • Boston, MA 02116<br/>
+                (857) 316-7770 • contact@legacytranslations.com<br/>
+                ATA Member #275993
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+                # Add verification page as attachment
+                all_attachments.append({
+                    "content": base64.b64encode(verification_page_html.encode('utf-8')).decode('utf-8'),
+                    "filename": f"Verification_{order['order_number']}_{cert_id}.html",
+                    "content_type": "text/html"
+                })
+                attachment_filenames.append(f"Verification_{order['order_number']}_{cert_id}.html")
+                has_attachments = True
+                logger.info(f"Added verification page to delivery attachments")
+
+            except Exception as e:
+                logger.error(f"Failed to create certification for delivery: {str(e)}")
+                import traceback
+                traceback.print_exc()
 
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
@@ -9116,6 +9434,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "attachment_filenames": attachment_filenames,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
+            "certification": {
+                "included": bool(certification_data),
+                "certification_id": certification_data.get("certification_id") if certification_data else None,
+                "verification_url": certification_data.get("verification_url") if certification_data else None
+            } if include_verification_page else None,
             "debug": {
                 "had_file": has_file_attachment,
                 "had_html": bool(has_html_translation),
