@@ -1788,6 +1788,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState('');
   const [selectedResultIndex, setSelectedResultIndex] = useState(0);
+  const [translationEditMode, setTranslationEditMode] = useState(false); // Edit mode for in-house translators in TRANSLATION tab
 
   // Proofreading state (admin only)
   const [proofreadingResult, setProofreadingResult] = useState(null);
@@ -5886,12 +5887,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       </div>
 
       {/* Sub-tabs */}
-      {/* Translator access: IN_HOUSE = ALL TABS | CONTRACTOR = START, DELIVER */}
+      {/* Translator access: IN_HOUSE = ALL TABS (except REVIEW - merged into TRANSLATION) | CONTRACTOR = START, TRANSLATE, REVIEW, DELIVER */}
       <div className="flex space-x-1 mb-4 border-b overflow-x-auto">
         {[
           { id: 'start', label: 'START', icon: '📝', roles: ['admin', 'pm', 'translator'] },
           { id: 'translate', label: 'TRANSLATION', icon: '📄', roles: ['admin', 'pm', 'translator'] },
-          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator'] },
+          { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
           { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
@@ -5902,7 +5903,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           // For translators, check translator_type for extended access
           if (userRole === 'translator' && user?.translator_type === 'in_house') {
             // In-house translators get access to tabs marked with 'translator_inhouse'
-            return tab.roles.includes('translator') || tab.roles.includes('translator_inhouse');
+            // But NOT 'translator_contractor' (like REVIEW which is merged into TRANSLATION)
+            return tab.roles.includes('translator_inhouse') || (tab.roles.includes('translator') && !tab.roles.includes('translator_contractor'));
+          }
+          // Contractors get basic translator tabs
+          if (userRole === 'translator') {
+            return tab.roles.includes('translator') || tab.roles.includes('translator_contractor');
           }
           return tab.roles.includes(userRole);
         }).map(tab => (
@@ -5922,7 +5928,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       {/* START TAB - Combined Setup & Cover Letter */}
       {activeSubTab === 'start' && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Processing Status Indicator */}
           {processingStatus && (
             <div className={`p-3 rounded-lg text-sm font-medium animate-pulse ${
@@ -5934,12 +5940,14 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Upload Document Section */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-            <h3 className="text-sm font-bold text-green-800 mb-3">📤 Upload Document to Translate</h3>
-            <p className="text-xs text-green-600 mb-3">Upload your document (PDF, Image, Word) to start translating</p>
+          {/* Upload Document Section - Compact */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-bold text-green-800">📤 Upload Document to Translate</h3>
+              <span className="text-[10px] text-green-600">PDF, Images, Word (.docx)</span>
+            </div>
 
-            <div className="border-2 border-dashed border-green-300 rounded-lg p-4 text-center hover:border-green-500 transition-colors">
+            <div className="border-2 border-dashed border-green-300 rounded-lg p-3 text-center hover:border-green-500 transition-colors">
               <input
                 type="file"
                 accept=".pdf,image/*,.docx,.doc"
@@ -6007,18 +6015,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 className="hidden"
                 id="start-upload-docs"
               />
-              <label htmlFor="start-upload-docs" className="cursor-pointer">
-                <div className="text-3xl mb-2">📄</div>
-                <span className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 inline-block">
+              <label htmlFor="start-upload-docs" className="cursor-pointer flex items-center justify-center gap-3">
+                <span className="text-2xl">📄</span>
+                <span className="px-4 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 inline-block">
                   Choose Files
                 </span>
-                <p className="text-xs text-gray-500 mt-2">PDF, Images, Word (.docx)</p>
               </label>
             </div>
 
-            {/* Show loaded files list with delete option */}
+            {/* Show loaded files list with delete option - Compact */}
             {(originalImages.length > 0 || translationResults.length > 0) && (
-              <div className="mt-3 p-3 bg-green-100 rounded-lg">
+              <div className="mt-2 p-2 bg-green-100 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-green-700 font-medium">
                     ✅ {originalImages.length + translationResults.length} document(s) loaded
@@ -6501,41 +6508,35 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             </div>
           )}
 
-          {/* Quick Start Guide - Different steps for IN_HOUSE vs regular translators */}
-          <div className="bg-blue-50 border border-blue-200 rounded p-3">
-            <p className="text-xs text-blue-700">
-              <strong>Quick Start:</strong> {isInHouseTranslator || isAdmin || isPM
-                ? '1️⃣ START → 2️⃣ TRANSLATE → 3️⃣ REVIEW → 4️⃣ PROOFREADING → 5️⃣ DELIVER'
-                : '1️⃣ Setup Cover Letter → 2️⃣ Upload Document → 3️⃣ Review → 4️⃣ Deliver'}
+          {/* Quick Start Guide - Compact */}
+          <div className="bg-blue-50 border border-blue-200 rounded px-3 py-1.5">
+            <p className="text-[10px] text-blue-700">
+              <strong>Workflow:</strong> {isInHouseTranslator
+                ? 'START → TRANSLATE (edit) → PROOFREADING → DELIVER'
+                : isAdmin || isPM
+                  ? 'START → TRANSLATE → REVIEW → PROOFREADING → DELIVER'
+                  : 'START → TRANSLATE → REVIEW → DELIVER'}
             </p>
           </div>
 
-          {/* Translation Direction */}
-          <div className="bg-white rounded shadow p-4">
-            <h3 className="text-xs font-bold text-blue-700 mb-3">🌐 Translation Direction</h3>
-            <div className="flex items-center justify-center gap-4">
-              <div className="flex-1">
-                <label className="block text-xs text-gray-600 mb-1">From:</label>
-                <select
-                  value={sourceLanguage}
-                  onChange={(e) => setSourceLanguage(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border rounded font-medium"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </div>
-              <div className="pt-5 text-2xl text-blue-500">→</div>
-              <div className="flex-1">
-                <label className="block text-xs text-gray-600 mb-1">To:</label>
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border rounded font-medium"
-                >
-                  {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                </select>
-              </div>
-            </div>
+          {/* Translation Direction - Compact inline */}
+          <div className="bg-white rounded shadow p-2 flex items-center gap-2">
+            <span className="text-xs font-bold text-blue-700">🌐</span>
+            <select
+              value={sourceLanguage}
+              onChange={(e) => setSourceLanguage(e.target.value)}
+              className="px-2 py-1 text-xs border rounded font-medium flex-1"
+            >
+              {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+            </select>
+            <span className="text-lg text-blue-500">→</span>
+            <select
+              value={targetLanguage}
+              onChange={(e) => setTargetLanguage(e.target.value)}
+              className="px-2 py-1 text-xs border rounded font-medium flex-1"
+            >
+              {LANGUAGES.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+            </select>
           </div>
 
           {/* Document Type - Expandable */}
@@ -7562,17 +7563,65 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     ))}
                   </div>
 
-                  {/* Right: Translation Result */}
-                  <div className="overflow-auto bg-white">
+                  {/* Right: Translation Result - With Edit Mode for In-House Translators */}
+                  <div className="overflow-auto bg-white flex flex-col">
+                    {/* Edit Mode Toggle - Only for In-House Translators */}
+                    {isInHouseTranslator && translationResults.length > 0 && (
+                      <div className="flex items-center justify-between px-2 py-1 bg-gray-100 border-b">
+                        <span className="text-[10px] text-gray-600">Mode:</span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setTranslationEditMode && setTranslationEditMode(false)}
+                            className={`px-2 py-0.5 text-[10px] rounded ${!translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                          >
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => setTranslationEditMode && setTranslationEditMode(true)}
+                            className={`px-2 py-0.5 text-[10px] rounded ${translationEditMode ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border'}`}
+                          >
+                            ✏️ Edit
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Edit Toolbar - Only when in Edit Mode for In-House */}
+                    {isInHouseTranslator && translationEditMode && translationResults.length > 0 && (
+                      <div className="flex gap-1 px-2 py-1 bg-gray-50 border-b flex-wrap">
+                        <button onClick={() => document.execCommand('bold')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 font-bold" title="Bold">B</button>
+                        <button onClick={() => document.execCommand('italic')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 italic" title="Italic">I</button>
+                        <button onClick={() => document.execCommand('underline')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100 underline" title="Underline">U</button>
+                        <span className="border-l mx-1"></span>
+                        <button onClick={() => document.execCommand('fontSize', false, '2')} className="px-2 py-0.5 text-[10px] border rounded hover:bg-gray-100" title="Small">A-</button>
+                        <button onClick={() => document.execCommand('fontSize', false, '4')} className="px-2 py-0.5 text-xs border rounded hover:bg-gray-100" title="Normal">A</button>
+                        <button onClick={() => document.execCommand('fontSize', false, '6')} className="px-2 py-0.5 text-sm border rounded hover:bg-gray-100" title="Large">A+</button>
+                      </div>
+                    )}
                     {translationResults.length > 0 ? (
-                      <iframe
-                        srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
-                        title="Translation"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '450px'}}
-                      />
+                      isInHouseTranslator && translationEditMode ? (
+                        <div
+                          contentEditable
+                          suppressContentEditableWarning
+                          className="flex-1 p-3 overflow-auto focus:outline-none"
+                          style={{minHeight: '400px'}}
+                          dangerouslySetInnerHTML={{ __html: translationResults[0]?.translatedText || '<p>No translation</p>' }}
+                          onBlur={(e) => {
+                            // Save edits back to translationResults
+                            const newResults = [...translationResults];
+                            newResults[0] = { ...newResults[0], translatedText: e.target.innerHTML };
+                            setTranslationResults(newResults);
+                          }}
+                        />
+                      ) : (
+                        <iframe
+                          srcDoc={translationResults[0]?.translatedText || '<p>No translation</p>'}
+                          title="Translation"
+                          className="w-full h-full border-0 flex-1"
+                          style={{minHeight: '450px'}}
+                        />
+                      )
                     ) : (
-                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4">
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm p-4 flex-1">
                         <div className="text-center">
                           <div className="text-3xl mb-2">🌐</div>
                           <p>Click "Translate" to start</p>
@@ -7620,12 +7669,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded">
                   <div className="flex justify-between items-center mb-3">
                     <p className="text-xs text-green-700 font-medium">✅ Translation complete!</p>
-                    <button
-                      onClick={() => setActiveSubTab('review')}
-                      className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                    >
-                      Go to Review →
-                    </button>
+                    {/* In-house translators go directly to Proofreading (REVIEW merged into TRANSLATION) */}
+                    {isInHouseTranslator ? (
+                      <button
+                        onClick={() => setActiveSubTab('proofreading')}
+                        className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                      >
+                        Next: Proofreading →
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setActiveSubTab('review')}
+                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        Go to Review →
+                      </button>
+                    )}
                   </div>
 
                   {/* Correction Command - Also available in Translation tab */}
@@ -7762,13 +7821,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             >
               <span className="mr-2">←</span> Back: Details
             </button>
-            <button
-              onClick={() => setActiveSubTab('review')}
-              disabled={translationResults.length === 0}
-              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
-            >
-              Next: Review <span className="ml-2">→</span>
-            </button>
+            {/* In-house translators go directly to Proofreading (REVIEW merged into TRANSLATION) */}
+            {isInHouseTranslator ? (
+              <button
+                onClick={() => setActiveSubTab('proofreading')}
+                disabled={translationResults.length === 0}
+                className="px-6 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+              >
+                Next: Proofreading <span className="ml-2">→</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveSubTab('review')}
+                disabled={translationResults.length === 0}
+                className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center"
+              >
+                Next: Review <span className="ml-2">→</span>
+              </button>
+            )}
           </div>
             </>
           )}

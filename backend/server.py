@@ -10232,7 +10232,7 @@ class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
     attachments: Optional[AttachmentsSelection] = None
-    include_verification_page: bool = False
+    include_verification_page: bool = True  # Include verification page with QR code by default
     certifier_name: Optional[str] = None
     # Combined PDF options
     generate_combined_pdf: bool = True  # Generate single PDF with all parts
@@ -10486,7 +10486,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
     bcc_email = request.bcc_email if request else None
     notify_pm = request.notify_pm if request else False
     attachments_selection = request.attachments if request else None
-    include_verification_page = request.include_verification_page if request else False
+    include_verification_page = request.include_verification_page if request else True
     certifier_name = request.certifier_name if request else None
     # Combined PDF options
     generate_combined_pdf = request.generate_combined_pdf if request else True
@@ -10973,23 +10973,26 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 attachment_filenames.append(f"Translation_{order['order_number']}.html")
                 logger.info(f"Added workspace translation to attachments")
 
-            # Get ALL documents from the project and include them as attachments
-            project_docs = await db.order_documents.find({"order_id": order_id}).to_list(100)
-            project_docs_main = await db.documents.find({"order_id": order_id}).to_list(100)
+            # ONLY add additional documents if explicitly requested via additional_doc_ids
+            # Do NOT automatically add all project documents - client should receive only the combined PDF or workspace translation
+            if additional_doc_ids:
+                project_docs = await db.order_documents.find({
+                    "order_id": order_id,
+                    "id": {"$in": additional_doc_ids}
+                }).to_list(100)
 
-            # Add all project documents as attachments
-            for doc in project_docs + project_docs_main:
-                doc_data = doc.get("file_data") or doc.get("data")
-                if doc_data:
-                    filename = doc.get("filename", "document.pdf")
-                    if filename not in attachment_filenames:
-                        all_attachments.append({
-                            "content": doc_data,
-                            "filename": filename,
-                            "content_type": doc.get("content_type", "application/pdf")
-                        })
-                        attachment_filenames.append(filename)
-                        logger.info(f"Added project document to attachments: {filename}")
+                for doc in project_docs:
+                    doc_data = doc.get("file_data") or doc.get("data")
+                    if doc_data:
+                        filename = doc.get("filename", "document.pdf")
+                        if filename not in attachment_filenames:
+                            all_attachments.append({
+                                "content": doc_data,
+                                "filename": filename,
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            attachment_filenames.append(filename)
+                            logger.info(f"Added selected document to attachments: {filename}")
 
             # Fallback: if no attachments selected but order has translated_file, use that
             if not all_attachments and has_file_attachment:
@@ -13487,10 +13490,15 @@ CRITICAL OUTPUT RULES:
                                 page = doc[page_num]
                                 pix = page.get_pixmap(matrix=fitz.Matrix(2.0, 2.0))  # 2x zoom for better quality
                                 img_bytes = pix.tobytes("jpeg")
-                                page_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                                # Compress image if needed to stay under Claude's 5MB limit
+                                compressed_bytes, final_media_type = compress_image_for_claude_api(
+                                    img_bytes, "image/jpeg"
+                                )
+                                page_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
                                 page_images.append({
                                     "page_num": page_num + 1,
-                                    "data": page_b64
+                                    "data": page_b64,
+                                    "media_type": final_media_type
                                 })
 
                             doc.close()
@@ -13506,19 +13514,61 @@ CRITICAL OUTPUT RULES:
                             all_page_images = []
                     elif 'png' in header.lower():
                         media_type = "image/png"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'gif' in header.lower():
                         media_type = "image/gif"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     elif 'webp' in header.lower():
                         media_type = "image/webp"
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Compress image if needed to stay under Claude's 5MB limit
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                     else:
-                        # Default to jpeg
-                        all_page_images = [{"page_num": 1, "data": image_data}]
+                        # Default to jpeg - Compress image if needed
+                        media_type = "image/jpeg"
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, media_type)
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": media_type}]
                 else:
-                    # No header, assume single image
-                    all_page_images = [{"page_num": 1, "data": image_data}] if image_data else []
+                    # No header, assume single image - compress if needed
+                    if image_data:
+                        try:
+                            img_bytes = base64.b64decode(image_data)
+                            compressed_bytes, final_media_type = compress_image_for_claude_api(img_bytes, "image/jpeg")
+                            compressed_b64 = base64.b64encode(compressed_bytes).decode('utf-8')
+                            all_page_images = [{"page_num": 1, "data": compressed_b64, "media_type": final_media_type}]
+                        except Exception as e:
+                            logger.warning(f"Image compression failed, using original: {e}")
+                            all_page_images = [{"page_num": 1, "data": image_data, "media_type": "image/jpeg"}]
+                    else:
+                        all_page_images = []
 
                 # Build message content with ALL page images
                 if all_page_images:
@@ -13526,11 +13576,13 @@ CRITICAL OUTPUT RULES:
 
                     # Add ALL page images to the message
                     for page_info in all_page_images:
+                        # Use page-specific media_type if available, fallback to global media_type
+                        page_media_type = page_info.get("media_type", media_type)
                         message_content.append({
                             "type": "image",
                             "source": {
                                 "type": "base64",
-                                "media_type": media_type,
+                                "media_type": page_media_type,
                                 "data": page_info["data"],
                             },
                         })
@@ -13922,9 +13974,11 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
-    # Only admin and PM can run proofreading
-    if user_info.get("role") not in ["admin", "pm"]:
-        raise HTTPException(status_code=403, detail="Only admin and PM can run proofreading")
+    # Admin, PM and in-house translators can run proofreading
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+    if user_role not in ["admin", "pm"] and not is_in_house_translator:
+        raise HTTPException(status_code=403, detail="Only admin, PM and in-house translators can run proofreading")
 
     if not request.claude_api_key:
         raise HTTPException(status_code=400, detail="Claude API key is required")
