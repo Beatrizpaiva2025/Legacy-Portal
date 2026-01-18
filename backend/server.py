@@ -2459,14 +2459,29 @@ async def validate_admin_or_user_token(admin_key: str) -> dict:
 
     # Check if it's a valid user token in memory
     if admin_key in active_admin_tokens:
-        return {"role": active_admin_tokens[admin_key]["role"], "user_id": active_admin_tokens[admin_key]["user_id"], "is_master": False}
+        cached = active_admin_tokens[admin_key]
+        return {
+            "role": cached["role"],
+            "user_id": cached["user_id"],
+            "translator_type": cached.get("translator_type"),
+            "is_master": False
+        }
 
     # Check database for valid token
     user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
     if user:
-        # Cache the token
-        active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
-        return {"role": user["role"], "user_id": user["id"], "is_master": False}
+        # Cache the token (including translator_type)
+        active_admin_tokens[admin_key] = {
+            "user_id": user["id"],
+            "role": user["role"],
+            "translator_type": user.get("translator_type")
+        }
+        return {
+            "role": user["role"],
+            "user_id": user["id"],
+            "translator_type": user.get("translator_type"),
+            "is_master": False
+        }
 
     return None
 
