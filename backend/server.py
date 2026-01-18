@@ -10276,11 +10276,11 @@ async def generate_combined_delivery_pdf(
     gold_color = (0.85, 0.65, 0.13)  # #D9A521
     gray_color = (0.4, 0.4, 0.4)
 
-    # Get order details
+    # Get order details (orders may have different field names for languages/document type)
     order_number = order.get("order_number", "P0000")
-    document_type = order.get("document_type", "Document")
-    source_lang = order.get("source_language", "Portuguese")
-    target_lang = order.get("target_language", "English")
+    document_type = order.get("translation_document_type") or order.get("document_type") or "Document"
+    source_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
+    target_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
     client_name = order.get("client_name", "")
     translation_date = datetime.utcnow().strftime("%B %d, %Y")
 
@@ -10379,25 +10379,97 @@ async def generate_combined_delivery_pdf(
 
     # ==================== ORIGINAL DOCUMENT PAGES ====================
     if include_original:
-        # Get original documents from database (will be passed or fetched)
+        # Get original documents - support both single file and list of files
+        original_file_list = order.get("original_file_list", [])
         original_file = order.get("original_file") or order.get("file_data")
-        if original_file:
-            try:
-                pdf_bytes = base64.b64decode(original_file)
-                orig_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-                # Add separator page
-                sep_page = doc.new_page(width=page_width, height=page_height)
-                sep_page.draw_rect(fitz.Rect(50, 380, page_width - 50, 383), color=blue_color, fill=blue_color)
-                sep_page.insert_text((page_width/2 - 60, 400), "ORIGINAL DOCUMENT", fontsize=16, fontname="helvB", color=blue_color)
-                sep_page.insert_text((page_width/2 - 100, 430), "The following pages contain the original document", fontsize=10, fontname="helv", color=gray_color)
+        # If we have a single file but no list, create a list with it
+        if original_file and not original_file_list:
+            original_file_list = [{"data": original_file, "filename": "original.pdf", "content_type": "application/pdf"}]
 
-                for page_num in range(len(orig_doc)):
-                    doc.insert_pdf(orig_doc, from_page=page_num, to_page=page_num)
+        if original_file_list:
+            # Add separator page
+            sep_page = doc.new_page(width=page_width, height=page_height)
+            sep_page.draw_rect(fitz.Rect(50, 380, page_width - 50, 383), color=blue_color, fill=blue_color)
+            sep_page.insert_text((page_width/2 - 60, 400), "ORIGINAL DOCUMENT", fontsize=16, fontname="helvB", color=blue_color)
+            sep_page.insert_text((page_width/2 - 100, 430), "The following pages contain the original document", fontsize=10, fontname="helv", color=gray_color)
 
-                orig_doc.close()
-            except Exception as e:
-                logger.error(f"Error adding original PDF: {str(e)}")
+            for orig_item in original_file_list:
+                try:
+                    file_data = orig_item.get("data", "")
+                    content_type = orig_item.get("content_type", "application/pdf").lower()
+                    filename = orig_item.get("filename", "").lower()
+
+                    file_bytes = base64.b64decode(file_data)
+
+                    # Check if it's an image (JPG, PNG, etc.)
+                    is_image = "image" in content_type or filename.endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp'))
+
+                    if is_image:
+                        # Convert image to PDF page
+                        try:
+                            from PIL import Image
+                            import io
+
+                            pil_img = Image.open(io.BytesIO(file_bytes))
+                            img_width, img_height = pil_img.size
+
+                            # Create a new page and insert the image
+                            img_page = doc.new_page(width=page_width, height=page_height)
+
+                            # Calculate scale to fit page with margins
+                            margin = 36
+                            max_width = page_width - 2 * margin
+                            max_height = page_height - 2 * margin
+                            scale = min(max_width / img_width, max_height / img_height)
+
+                            new_width = img_width * scale
+                            new_height = img_height * scale
+                            x_offset = (page_width - new_width) / 2
+                            y_offset = (page_height - new_height) / 2
+                            insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                            img_page.insert_image(insert_rect, stream=file_bytes)
+                            pil_img.close()
+                            logger.info(f"Added original image to combined PDF: {orig_item.get('filename', 'image')}")
+                        except Exception as img_err:
+                            logger.error(f"Error adding original image: {str(img_err)}")
+                    else:
+                        # Try to open as PDF
+                        try:
+                            orig_doc = fitz.open(stream=file_bytes, filetype="pdf")
+                            for page_num in range(len(orig_doc)):
+                                doc.insert_pdf(orig_doc, from_page=page_num, to_page=page_num)
+                            orig_doc.close()
+                            logger.info(f"Added original PDF to combined PDF: {orig_item.get('filename', 'document')}")
+                        except Exception as pdf_err:
+                            # If it fails as PDF, try as image
+                            try:
+                                from PIL import Image
+                                import io
+
+                                pil_img = Image.open(io.BytesIO(file_bytes))
+                                img_width, img_height = pil_img.size
+
+                                img_page = doc.new_page(width=page_width, height=page_height)
+                                margin = 36
+                                max_width = page_width - 2 * margin
+                                max_height = page_height - 2 * margin
+                                scale = min(max_width / img_width, max_height / img_height)
+
+                                new_width = img_width * scale
+                                new_height = img_height * scale
+                                x_offset = (page_width - new_width) / 2
+                                y_offset = (page_height - new_height) / 2
+                                insert_rect = fitz.Rect(x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+
+                                img_page.insert_image(insert_rect, stream=file_bytes)
+                                pil_img.close()
+                                logger.info(f"Added original file as image to combined PDF: {orig_item.get('filename', 'file')}")
+                            except Exception as fallback_err:
+                                logger.error(f"Error adding original document: {str(fallback_err)}")
+                except Exception as e:
+                    logger.error(f"Error processing original document: {str(e)}")
 
     # ==================== VERIFICATION PAGE ====================
     if include_verification and certification_data:
@@ -10577,6 +10649,10 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
                 # Generate verification page HTML
                 certified_date = datetime.utcnow().strftime('%B %d, %Y')
+                # Get document info with fallbacks (orders may have different field names)
+                doc_type = order.get("translation_document_type") or order.get("document_type") or "Document"
+                src_lang = order.get("translation_source_language") or order.get("translate_from") or order.get("source_language") or "Portuguese"
+                tgt_lang = order.get("translation_target_language") or order.get("translate_to") or order.get("target_language") or "English"
                 verification_page_html = f"""
 <!DOCTYPE html>
 <html>
@@ -10773,11 +10849,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 </div>
                 <div class="cert-row">
                     <span class="cert-label">Document Type</span>
-                    <span class="cert-value">{order.get('document_type', 'Document')}</span>
+                    <span class="cert-value">{doc_type}</span>
                 </div>
                 <div class="cert-row">
                     <span class="cert-label">Translation</span>
-                    <span class="cert-value">{order.get('source_language', '')} → {order.get('target_language', '')}</span>
+                    <span class="cert-value">{src_lang} → {tgt_lang}</span>
                 </div>
                 <div class="cert-row">
                     <span class="cert-label">Certified Date</span>
@@ -10840,6 +10916,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 logger.info(f"Generating combined PDF for order {order.get('order_number')}")
 
                 # Fetch original documents for the combined PDF
+                # First try to find explicitly marked originals
                 original_docs = await db.order_documents.find({
                     "order_id": order_id,
                     "$or": [
@@ -10849,18 +10926,34 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     ]
                 }).to_list(10)
 
-                # If no specific original docs found, try to get from order
+                # If no specific original docs found, try documents that are NOT translated
+                if not original_docs:
+                    original_docs = await db.order_documents.find({
+                        "order_id": order_id,
+                        "source": {"$ne": "translated_document"}
+                    }).to_list(10)
+
+                # If still no docs, try to get from order itself
                 original_file_data = None
+                original_file_list = []  # Support multiple originals
                 if original_docs:
                     for doc in original_docs:
-                        if doc.get("file_data") or doc.get("data"):
-                            original_file_data = doc.get("file_data") or doc.get("data")
-                            break
+                        doc_data = doc.get("file_data") or doc.get("data")
+                        if doc_data:
+                            original_file_list.append({
+                                "data": doc_data,
+                                "filename": doc.get("filename", "original.pdf"),
+                                "content_type": doc.get("content_type", "application/pdf")
+                            })
+                            if not original_file_data:
+                                original_file_data = doc_data  # Keep first for backward compatibility
 
                 # Prepare order data with original file if found
                 order_with_original = dict(order)
                 if original_file_data:
                     order_with_original["original_file"] = original_file_data
+                if original_file_list:
+                    order_with_original["original_file_list"] = original_file_list
 
                 # Fetch translated documents from order_documents collection if not already on order
                 if not order_with_original.get("translated_file"):
