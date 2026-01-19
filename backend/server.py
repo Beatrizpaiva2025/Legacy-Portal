@@ -1488,6 +1488,12 @@ class PartnerInvoice(BaseModel):
     # Notes
     notes: Optional[str] = None
     admin_notes: Optional[str] = None
+    # QuickBooks integration
+    quickbooks_invoice_id: Optional[str] = None
+    quickbooks_invoice_number: Optional[str] = None
+    quickbooks_synced_at: Optional[datetime] = None
+    quickbooks_customer_id: Optional[str] = None
+    quickbooks_invoice_link: Optional[str] = None  # Payment link for partner
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
@@ -4869,25 +4875,55 @@ CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
 
 @api_router.get("/partner/coupons")
 async def get_partner_coupons(token: str):
-    """Get all coupons for the logged-in partner"""
+    """Get all coupons available for the logged-in partner (assigned coupons only)"""
     partner = await get_current_partner(token)
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    # Get coupons specifically assigned to this partner
     coupons = await db.coupons.find({
         "partner_id": partner["id"],
         "is_active": True
     }).to_list(100)
 
-    return [{
-        "code": c["code"],
-        "discount_type": c["discount_type"],
-        "discount_value": c["discount_value"],
-        "times_used": c["times_used"],
-        "max_uses": c["max_uses"],
-        "valid_until": c.get("valid_until"),
-        "is_available": c["times_used"] < c["max_uses"]
-    } for c in coupons]
+    # Filter out expired and fully used coupons
+    now = datetime.utcnow()
+    available_coupons = []
+    for c in coupons:
+        # Check if expired
+        if c.get("valid_until") and now > c["valid_until"]:
+            continue
+        # Check if fully used
+        if c.get("times_used", 0) >= c.get("max_uses", 1):
+            continue
+        # Check first order restriction
+        if c.get("first_order_only", False):
+            partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+            if partner_orders > 0:
+                continue
+
+        available_coupons.append({
+            "code": c["code"],
+            "discount_type": c["discount_type"],
+            "discount_value": c["discount_value"],
+            "times_used": c.get("times_used", 0),
+            "max_uses": c["max_uses"],
+            "valid_until": c.get("valid_until"),
+            "description": get_coupon_description(c)
+        })
+
+    return available_coupons
+
+def get_coupon_description(coupon: dict) -> str:
+    """Generate human-readable description for a coupon"""
+    if coupon["discount_type"] == "percentage":
+        return f"{int(coupon['discount_value'])}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        return f"${coupon['discount_value']:.2f} off"
+    elif coupon["discount_type"] == "certified_page":
+        pages = int(coupon["discount_value"])
+        return f"{pages} free page{'s' if pages > 1 else ''}"
+    return "Discount"
 
 @api_router.post("/partner/validate-coupon")
 async def validate_coupon(token: str, code: str, order_total: float = 0):
@@ -4993,6 +5029,221 @@ async def apply_coupon_to_order(token: str, code: str, order_id: str):
     )
 
     return {"success": True, "message": "Coupon applied successfully"}
+
+# ==================== ADMIN COUPON MANAGEMENT ====================
+
+class CouponCreate(BaseModel):
+    code: str
+    discount_type: str = "percentage"  # percentage, fixed_amount, certified_page
+    discount_value: float  # percentage (e.g., 5 for 5%), dollar amount, or pages
+    max_uses: int = 9999  # How many times can be used
+    valid_days: int = 365  # Valid for X days from now
+    min_order_value: float = 0.0  # Minimum order value
+    first_order_only: bool = False  # Only for first orders
+    partner_id: Optional[str] = None  # Specific partner or None for all
+
+@api_router.post("/admin/coupons/create")
+async def create_coupon(coupon_data: CouponCreate, admin_key: str):
+    """Create a new coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if coupon code already exists
+    existing = await db.coupons.find_one({"code": {"$regex": f"^{coupon_data.code}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Coupon code already exists")
+
+    coupon = Coupon(
+        code=coupon_data.code,
+        discount_type=coupon_data.discount_type,
+        discount_value=coupon_data.discount_value,
+        max_uses=coupon_data.max_uses,
+        valid_until=datetime.utcnow() + timedelta(days=coupon_data.valid_days),
+        min_order_value=coupon_data.min_order_value,
+        first_order_only=coupon_data.first_order_only,
+        partner_id=coupon_data.partner_id
+    )
+
+    await db.coupons.insert_one(coupon.dict())
+
+    return {
+        "success": True,
+        "coupon": {
+            "id": coupon.id,
+            "code": coupon.code,
+            "discount_type": coupon.discount_type,
+            "discount_value": coupon.discount_value,
+            "max_uses": coupon.max_uses,
+            "valid_until": coupon.valid_until.isoformat()
+        }
+    }
+
+@api_router.get("/admin/coupons")
+async def list_all_coupons(admin_key: str):
+    """List all coupons (admin only) - auto-creates default templates if none exist"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if we need to create default coupon templates
+    existing_templates = await db.coupons.count_documents({"partner_id": None})
+    if existing_templates == 0:
+        # Create default MASS coupon templates
+        default_coupons = [
+            {"code": "MASS5", "discount_value": 5.0, "first_order_only": False},
+            {"code": "MASS10", "discount_value": 10.0, "first_order_only": False},
+            {"code": "MASS15", "discount_value": 15.0, "first_order_only": False},
+            {"code": "MASS20", "discount_value": 20.0, "first_order_only": False},
+            {"code": "MASS25", "discount_value": 25.0, "first_order_only": False},
+            {"code": "MASS30", "discount_value": 30.0, "first_order_only": False},
+            {"code": "MASS35", "discount_value": 35.0, "first_order_only": False},
+            {"code": "WELCOME100", "discount_value": 100.0, "first_order_only": True},  # 100% off first order only
+        ]
+        for coupon_data in default_coupons:
+            coupon = {
+                "id": str(uuid.uuid4()),
+                "code": coupon_data["code"],
+                "discount_type": "percentage",
+                "discount_value": coupon_data["discount_value"],
+                "max_uses": 9999,
+                "times_used": 0,
+                "is_active": True,
+                "valid_from": datetime.utcnow(),
+                "valid_until": datetime.utcnow() + timedelta(days=365 * 5),
+                "min_order_value": 0.0,
+                "first_order_only": coupon_data.get("first_order_only", False),
+                "partner_id": None,
+                "created_at": datetime.utcnow()
+            }
+            await db.coupons.insert_one(coupon)
+        logger.info("Created default coupon templates including WELCOME100")
+
+    coupons = await db.coupons.find().to_list(500)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until"),
+        "is_active": c.get("is_active", True),
+        "partner_id": c.get("partner_id"),
+        "first_order_only": c.get("first_order_only", False)
+    } for c in coupons]
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(coupon_id: str, admin_key: str):
+    """Delete/deactivate a coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    result = await db.coupons.update_one(
+        {"id": coupon_id},
+        {"$set": {"is_active": False}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    return {"success": True, "message": "Coupon deactivated"}
+
+class AssignCouponRequest(BaseModel):
+    coupon_code: str  # The coupon code to assign (e.g., "MASS10")
+    partner_id: str   # The partner to assign it to
+    max_uses: int = 1  # How many times this partner can use it
+
+@api_router.post("/admin/coupons/assign")
+async def assign_coupon_to_partner(request: AssignCouponRequest, admin_key: str):
+    """Assign a coupon to a specific partner (creates a partner-specific instance)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the template coupon (the master coupon to copy from)
+    template_coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{request.coupon_code}$", "$options": "i"},
+        "partner_id": None  # Must be a global/template coupon
+    })
+
+    if not template_coupon:
+        raise HTTPException(status_code=404, detail=f"Coupon template '{request.coupon_code}' not found")
+
+    # Verify partner exists
+    partner = await db.partners.find_one({"id": request.partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Check if this partner already has this coupon assigned
+    existing = await db.coupons.find_one({
+        "code": template_coupon["code"],
+        "partner_id": request.partner_id,
+        "is_active": True
+    })
+
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Partner already has coupon '{request.coupon_code}' assigned")
+
+    # Create partner-specific coupon
+    partner_coupon = Coupon(
+        code=template_coupon["code"],
+        partner_id=request.partner_id,
+        discount_type=template_coupon["discount_type"],
+        discount_value=template_coupon["discount_value"],
+        max_uses=request.max_uses,
+        valid_until=template_coupon.get("valid_until") or (datetime.utcnow() + timedelta(days=365)),
+        min_order_value=template_coupon.get("min_order_value", 0),
+        first_order_only=template_coupon.get("first_order_only", False)
+    )
+
+    await db.coupons.insert_one(partner_coupon.dict())
+
+    return {
+        "success": True,
+        "message": f"Coupon '{request.coupon_code}' assigned to {partner['company_name']}",
+        "coupon_id": partner_coupon.id
+    }
+
+@api_router.get("/admin/partners/list")
+async def list_partners_for_admin(admin_key: str):
+    """List all partners (for coupon assignment dropdown)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    partners = await db.partners.find({"is_active": True}).to_list(500)
+
+    return [{
+        "id": p["id"],
+        "company_name": p["company_name"],
+        "email": p["email"],
+        "contact_name": p.get("contact_name", "")
+    } for p in partners]
+
+@api_router.get("/admin/partners/{partner_id}/coupons")
+async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
+    """Get all coupons assigned to a specific partner (admin view)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    coupons = await db.coupons.find({
+        "partner_id": partner_id,
+        "is_active": True
+    }).to_list(100)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until")
+    } for c in coupons]
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 
@@ -6372,10 +6623,17 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
 @api_router.get("/admin/payments/translators")
 async def get_translators_payment_summary(admin_key: str):
     """Get payment summary for all translators (admin only)"""
+    # First try master admin key
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
+        # Try user token with admin role
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        # Also try validate_admin_or_user_token for broader compatibility
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6429,7 +6687,11 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6493,7 +6755,11 @@ async def register_payment(
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6565,7 +6831,11 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6592,7 +6862,11 @@ async def get_payment_report(admin_key: str, start_date: str = None, end_date: s
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -7872,6 +8146,36 @@ async def get_users_by_role(role: str, admin_key: str, include_pending: bool = T
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
+@api_router.get("/admin/translators")
+async def get_all_translators(admin_key: str):
+    """Get all translators/vendors from admin_users collection"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Get all users with translator role (both active and inactive)
+        translators = await db.admin_users.find({
+            "role": {"$in": ["translator", "pm", "admin", "sales"]}
+        }).to_list(200)
+
+        return [{
+            "id": t.get("id") or str(t.get("_id", "")),
+            "name": t.get("name", ""),
+            "email": t.get("email", ""),
+            "role": t.get("role", "translator"),
+            "is_active": t.get("is_active", True),
+            "rate_per_page": t.get("rate_per_page", 0),
+            "rate_per_word": t.get("rate_per_word", 0),
+            "language_pairs": t.get("language_pairs", []),
+            "translator_type": t.get("translator_type", "contractor"),
+            "pages_translated": t.get("pages_translated", 0),
+            "pages_pending_payment": t.get("pages_pending_payment", 0)
+        } for t in translators]
+    except Exception as e:
+        logger.error(f"Error fetching translators: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch translators")
+
 @api_router.get("/admin/translators/status")
 async def get_translators_with_status(admin_key: str):
     """Get all translators with their current project status and deadlines"""
@@ -8259,8 +8563,22 @@ async def delete_payment(payment_id: str, admin_key: str):
 # ==================== EXPENSES ====================
 
 @api_router.post("/admin/expenses")
-async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Optional[str] = None):
-    """Create a new expense record"""
+async def create_expense(
+    admin_key: str,
+    category: str = Form(...),
+    description: str = Form(...),
+    amount: float = Form(...),
+    date: str = Form(None),
+    subcategory: str = Form(None),
+    is_recurring: str = Form("false"),
+    recurring_period: str = Form(None),
+    vendor: str = Form(None),
+    vendor_id: str = Form(None),
+    notes: str = Form(None),
+    receipt_file: UploadFile = File(None),
+    token: Optional[str] = None
+):
+    """Create a new expense record with optional receipt file upload"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -8268,25 +8586,56 @@ async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Opt
     if token:
         current_user = await get_current_admin_user(token)
 
-    expense = Expense(
-        category=expense_data.category,
-        subcategory=expense_data.subcategory,
-        description=expense_data.description,
-        amount=expense_data.amount,
-        date=datetime.fromisoformat(expense_data.date.replace('Z', '+00:00')) if expense_data.date else datetime.utcnow(),
-        is_recurring=expense_data.is_recurring,
-        recurring_period=expense_data.recurring_period,
-        vendor=expense_data.vendor,
-        notes=expense_data.notes,
-        created_by_id=current_user["id"] if current_user else None,
-        created_by_name=current_user.get("name") if current_user else None
-    )
+    # Handle receipt file upload
+    receipt_file_data = None
+    receipt_file_type = None
+    receipt_filename = None
+    if receipt_file and receipt_file.filename:
+        allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+        if receipt_file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid file type. Allowed: PNG, JPG, GIF, PDF")
 
-    await db.expenses.insert_one(expense.dict())
-    return {"status": "success", "expense": expense.dict()}
+        file_content = await receipt_file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+        receipt_file_data = base64.b64encode(file_content).decode('utf-8')
+        receipt_file_type = receipt_file.content_type
+        receipt_filename = receipt_file.filename
+
+    # Parse is_recurring from form string
+    is_recurring_bool = is_recurring.lower() in ('true', '1', 'yes')
+
+    expense_dict = {
+        "id": str(uuid.uuid4()),
+        "category": category,
+        "subcategory": subcategory or None,
+        "description": description,
+        "amount": float(amount),
+        "date": datetime.fromisoformat(date.replace('Z', '+00:00')) if date else datetime.utcnow(),
+        "is_recurring": is_recurring_bool,
+        "recurring_period": recurring_period or None,
+        "vendor": vendor or None,
+        "vendor_id": vendor_id or None,
+        "receipt_file_data": receipt_file_data,
+        "receipt_file_type": receipt_file_type,
+        "receipt_filename": receipt_filename,
+        "notes": notes or None,
+        "created_at": datetime.utcnow(),
+        "created_by_id": current_user["id"] if current_user else None,
+        "created_by_name": current_user.get("name") if current_user else None
+    }
+
+    await db.expenses.insert_one(expense_dict)
+
+    # Remove file data from response to keep it small
+    expense_response = {k: v for k, v in expense_dict.items() if k != 'receipt_file_data'}
+    expense_response['has_receipt'] = receipt_file_data is not None
+
+    return {"status": "success", "expense": expense_response}
 
 @api_router.get("/admin/expenses")
-async def get_expenses(admin_key: str, category: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+async def get_expenses(admin_key: str, category: Optional[str] = None, vendor_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Get all expenses with optional filters"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -8294,6 +8643,8 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     query = {}
     if category:
         query["category"] = category
+    if vendor_id:
+        query["vendor_id"] = vendor_id
 
     if start_date or end_date:
         query["date"] = {}
@@ -8307,8 +8658,31 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     for expense in expenses:
         if '_id' in expense:
             del expense['_id']
+        # Add has_receipt flag and remove file data from list
+        expense['has_receipt'] = bool(expense.get('receipt_file_data'))
+        if 'receipt_file_data' in expense:
+            del expense['receipt_file_data']
 
     return {"expenses": expenses}
+
+@api_router.get("/admin/expenses/{expense_id}/receipt")
+async def get_expense_receipt(expense_id: str, admin_key: str):
+    """Get the receipt file for an expense"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if not expense.get('receipt_file_data'):
+        raise HTTPException(status_code=404, detail="No receipt attached to this expense")
+
+    return {
+        "receipt_file_data": expense['receipt_file_data'],
+        "receipt_file_type": expense.get('receipt_file_type'),
+        "receipt_filename": expense.get('receipt_filename')
+    }
 
 @api_router.put("/admin/expenses/{expense_id}")
 async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key: str):
@@ -8548,6 +8922,10 @@ async def get_partner_statistics(admin_key: str):
         "partner_id": {"$exists": True, "$ne": None}
     }).to_list(10000)
 
+    # Get all partners for contact info
+    all_partners = await db.partners.find({}).to_list(500)
+    partners_by_id = {p.get("id"): p for p in all_partners}
+
     # Group by partner company
     partner_stats = {}
     for order in partner_orders:
@@ -8555,13 +8933,19 @@ async def get_partner_statistics(admin_key: str):
         partner_id = order.get("partner_id")
 
         if company not in partner_stats:
+            # Get partner contact info
+            partner_info = partners_by_id.get(partner_id, {})
             partner_stats[company] = {
                 "partner_id": partner_id,
                 "company_name": company,
+                "email": partner_info.get("email", ""),
+                "contact_name": partner_info.get("contact_name") or partner_info.get("name", ""),
+                "phone": partner_info.get("phone", ""),
                 "total_received": 0,
                 "total_pending": 0,
                 "orders_paid": 0,
-                "orders_pending": 0
+                "orders_pending": 0,
+                "created_at": partner_info.get("created_at", "")
             }
 
         total_price = order.get("total_price", 0)
@@ -20250,6 +20634,175 @@ async def quickbooks_sync_contractor_payment(
         raise
     except Exception as e:
         logger.error(f"QuickBooks sync contractor payment error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/partner-invoice")
+async def quickbooks_sync_partner_invoice(
+    admin_key: str = None,
+    invoice_id: str = Body(...),
+    send_email: bool = Body(True)
+):
+    """
+    Create and optionally send an Invoice in QuickBooks for a Partner Invoice.
+
+    This creates a proper Invoice (not Sales Receipt) for B2B partner billing,
+    since the partner hasn't paid yet. The invoice will be sent to the partner's email.
+    """
+    try:
+        # Check QuickBooks connection
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        # Get the partner invoice
+        partner_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not partner_invoice:
+            raise HTTPException(status_code=404, detail="Partner invoice not found")
+
+        # Check if already synced
+        if partner_invoice.get("quickbooks_invoice_id"):
+            return {
+                "success": True,
+                "already_synced": True,
+                "invoice_id": partner_invoice.get("quickbooks_invoice_id"),
+                "invoice_number": partner_invoice.get("quickbooks_invoice_number"),
+                "message": "Invoice already synced to QuickBooks"
+            }
+
+        # Get partner details
+        partner = await db.partners.find_one({"id": partner_invoice.get("partner_id")})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # Get or create customer in QuickBooks
+        partner_email = partner.get("email") or partner_invoice.get("partner_email")
+        partner_name = partner.get("company_name") or partner_invoice.get("partner_company")
+
+        qb_customer_id = None
+
+        # Try to find existing customer by email
+        if partner_email:
+            existing = qb_client.find_customer_by_email(partner_email)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # If not found by email, try by company name
+        if not qb_customer_id and partner_name:
+            existing = qb_client.find_customer_by_name(partner_name)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # Create customer if not found
+        if not qb_customer_id:
+            cust_result = qb_client.create_customer(
+                display_name=partner_name or "Partner",
+                email=partner_email,
+                phone=partner.get("phone"),
+                company=partner_name
+            )
+            if cust_result.get("success"):
+                qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+            else:
+                raise HTTPException(status_code=400, detail=f"Failed to create customer in QuickBooks: {cust_result.get('error')}")
+
+        # Get orders included in this invoice to build line items
+        order_ids = partner_invoice.get("order_ids", [])
+        orders = await db.translation_orders.find({"id": {"$in": order_ids}}).to_list(1000)
+
+        # Build line items from orders
+        line_items = []
+        for order in orders:
+            doc_type = order.get('document_type', order.get('service_type', 'Document'))
+            source_lang = order.get('translate_from', order.get('source_language', ''))
+            target_lang = order.get('translate_to', order.get('target_language', ''))
+            order_num = order.get('order_number', order.get('id', ''))[:8]
+
+            description = f"Translation - {doc_type}"
+            if source_lang and target_lang:
+                description += f" ({source_lang} to {target_lang})"
+            description += f" - Order #{order_num}"
+
+            line_items.append({
+                "description": description,
+                "amount": order.get("total_price", 0),
+                "quantity": 1
+            })
+
+        # If no orders found, create a single line item with total
+        if not line_items:
+            line_items = [{
+                "description": f"Partner Invoice {partner_invoice.get('invoice_number')} - Translation Services",
+                "amount": partner_invoice.get("total_amount", 0),
+                "quantity": 1
+            }]
+
+        # Format due date
+        due_date = None
+        if partner_invoice.get("due_date"):
+            due_date_obj = partner_invoice.get("due_date")
+            if isinstance(due_date_obj, datetime):
+                due_date = due_date_obj.strftime("%Y-%m-%d")
+            elif isinstance(due_date_obj, str):
+                due_date = due_date_obj[:10]  # Take just the date part
+
+        # Create Invoice in QuickBooks
+        invoice_result = qb_client.create_invoice(
+            customer_id=qb_customer_id,
+            line_items=line_items,
+            due_date=due_date,
+            memo=f"Invoice {partner_invoice.get('invoice_number')} - {len(order_ids)} orders"
+        )
+
+        if not invoice_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create invoice: {invoice_result.get('error')}")
+
+        qb_invoice = invoice_result.get("data", {}).get("Invoice", {})
+        qb_invoice_id = qb_invoice.get("Id")
+        qb_invoice_number = qb_invoice.get("DocNumber")
+
+        # Send invoice via email if requested
+        email_sent = False
+        if send_email and qb_invoice_id and partner_email:
+            send_result = qb_client.send_invoice(qb_invoice_id, partner_email)
+            if send_result.get("success"):
+                email_sent = True
+            else:
+                logger.warning(f"Failed to send invoice email: {send_result.get('error')}")
+
+        # Update partner invoice with QuickBooks info
+        update_data = {
+            "quickbooks_invoice_id": qb_invoice_id,
+            "quickbooks_invoice_number": qb_invoice_number,
+            "quickbooks_synced_at": datetime.utcnow(),
+            "quickbooks_customer_id": qb_customer_id
+        }
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_data}
+        )
+
+        logger.info(f"Synced partner invoice {partner_invoice.get('invoice_number')} to QuickBooks as invoice #{qb_invoice_number}")
+
+        return {
+            "success": True,
+            "invoice_id": qb_invoice_id,
+            "invoice_number": qb_invoice_number,
+            "customer_id": qb_customer_id,
+            "email_sent": email_sent,
+            "sent_to": partner_email if email_sent else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync partner invoice error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
