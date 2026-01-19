@@ -4725,6 +4725,31 @@ async def logout_partner(token: str):
         del active_tokens[token]
     return {"status": "success", "message": "Logged out successfully"}
 
+@api_router.get("/partner/verify-token")
+async def verify_partner_token(token: str):
+    """Verify if a partner token is valid and not expired"""
+    try:
+        partner = await get_current_partner(token)
+        if not partner:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+        return {
+            "valid": True,
+            "partner": {
+                "id": partner["id"],
+                "company_name": partner["company_name"],
+                "email": partner["email"],
+                "contact_name": partner["contact_name"],
+                "phone": partner.get("phone"),
+                "token": token
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error verifying partner token: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to verify token")
+
 # Store for password reset tokens (token -> {email, expires})
 password_reset_tokens = {}
 admin_invitation_tokens = {}  # For admin user invitations

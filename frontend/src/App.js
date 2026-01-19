@@ -4450,6 +4450,7 @@ function App() {
   const [currency] = useState(getLocalCurrency);
   const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
+  const [isValidatingSession, setIsValidatingSession] = useState(true);
 
   // Get translations for current language
   const t = TRANSLATIONS[lang];
@@ -4499,14 +4500,34 @@ function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Check for saved session
+  // Check for saved session and validate token
   useEffect(() => {
-    const savedPartner = localStorage.getItem('partner');
-    const savedToken = localStorage.getItem('token');
-    if (savedPartner && savedToken) {
-      setPartner(JSON.parse(savedPartner));
-      setToken(savedToken);
-    }
+    const validateSession = async () => {
+      const savedToken = localStorage.getItem('token');
+      if (!savedToken) {
+        setIsValidatingSession(false);
+        return;
+      }
+
+      try {
+        // Validate token with backend
+        const response = await axios.get(`${API}/partner/verify-token?token=${savedToken}`);
+        if (response.data.valid && response.data.partner) {
+          setPartner(response.data.partner);
+          setToken(savedToken);
+          // Update localStorage with fresh partner data
+          localStorage.setItem('partner', JSON.stringify(response.data.partner));
+        }
+      } catch (err) {
+        // Token is invalid or expired, clear localStorage
+        console.log('Session expired, clearing localStorage');
+        localStorage.removeItem('partner');
+        localStorage.removeItem('token');
+      } finally {
+        setIsValidatingSession(false);
+      }
+    };
+    validateSession();
   }, []);
 
   const handleLogin = (data) => {
@@ -4567,6 +4588,18 @@ function App() {
           window.location.href = '/#/partner';
         }}
       />
+    );
+  }
+
+  // Show loading while validating session
+  if (isValidatingSession) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
     );
   }
 
