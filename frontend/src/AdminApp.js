@@ -23196,21 +23196,9 @@ const FinancesPage = ({ adminKey }) => {
                       {qbConnected && (
                         <div className="flex items-center space-x-2 mb-2">
                           {invoice.quickbooks_invoice_id ? (
-                            <div className="flex items-center space-x-2">
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
-                                QB Invoice #{invoice.quickbooks_invoice_number}
-                              </span>
-                              {invoice.quickbooks_invoice_link && (
-                                <a
-                                  href={invoice.quickbooks_invoice_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                >
-                                  Link de Pagamento
-                                </a>
-                              )}
-                            </div>
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                              QB Invoice #{invoice.quickbooks_invoice_number}
+                            </span>
                           ) : (
                             <button
                               onClick={() => syncPartnerInvoiceToQuickBooks(invoice)}
