@@ -8826,6 +8826,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                   </div>
                 )}
               </div>
