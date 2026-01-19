@@ -2428,8 +2428,8 @@ async def get_current_admin_user(token: str = None) -> Optional[dict]:
     # Fallback: check database for persisted token
     user = await db.admin_users.find_one({"token": token, "is_active": True})
     if user:
-        # Restore token to memory cache
-        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+        # Restore token to memory cache (including translator_type for in-house translators)
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
         return user
 
     return None
@@ -5277,7 +5277,7 @@ async def login_admin_user(login_data: AdminUserLogin, request: Request):
 
         # Generate token
         token = generate_token()
-        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"]}
+        active_admin_tokens[token] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
 
         # Also save token to database for persistence across server restarts
         await db.admin_users.update_one(
@@ -7140,8 +7140,8 @@ async def admin_get_all_orders(
             user = await db.admin_users.find_one({"token": admin_key, "is_active": True})
             if user:
                 is_valid = True
-                # Cache the token
-                active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"]}
+                # Cache the token (including translator_type for in-house translators)
+                active_admin_tokens[admin_key] = {"user_id": user["id"], "role": user["role"], "translator_type": user.get("translator_type")}
 
     if not is_valid:
         logger.warning(f"Invalid admin key attempt: key_len={len(admin_key)}, expected_len={len(expected_key)}")
