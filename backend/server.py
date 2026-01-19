@@ -4869,25 +4869,55 @@ CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
 
 @api_router.get("/partner/coupons")
 async def get_partner_coupons(token: str):
-    """Get all coupons for the logged-in partner"""
+    """Get all coupons available for the logged-in partner (assigned coupons only)"""
     partner = await get_current_partner(token)
     if not partner:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    # Get coupons specifically assigned to this partner
     coupons = await db.coupons.find({
         "partner_id": partner["id"],
         "is_active": True
     }).to_list(100)
 
-    return [{
-        "code": c["code"],
-        "discount_type": c["discount_type"],
-        "discount_value": c["discount_value"],
-        "times_used": c["times_used"],
-        "max_uses": c["max_uses"],
-        "valid_until": c.get("valid_until"),
-        "is_available": c["times_used"] < c["max_uses"]
-    } for c in coupons]
+    # Filter out expired and fully used coupons
+    now = datetime.utcnow()
+    available_coupons = []
+    for c in coupons:
+        # Check if expired
+        if c.get("valid_until") and now > c["valid_until"]:
+            continue
+        # Check if fully used
+        if c.get("times_used", 0) >= c.get("max_uses", 1):
+            continue
+        # Check first order restriction
+        if c.get("first_order_only", False):
+            partner_orders = await db.translation_orders.count_documents({"partner_id": partner["id"]})
+            if partner_orders > 0:
+                continue
+
+        available_coupons.append({
+            "code": c["code"],
+            "discount_type": c["discount_type"],
+            "discount_value": c["discount_value"],
+            "times_used": c.get("times_used", 0),
+            "max_uses": c["max_uses"],
+            "valid_until": c.get("valid_until"),
+            "description": get_coupon_description(c)
+        })
+
+    return available_coupons
+
+def get_coupon_description(coupon: dict) -> str:
+    """Generate human-readable description for a coupon"""
+    if coupon["discount_type"] == "percentage":
+        return f"{int(coupon['discount_value'])}% off"
+    elif coupon["discount_type"] == "fixed_amount":
+        return f"${coupon['discount_value']:.2f} off"
+    elif coupon["discount_type"] == "certified_page":
+        pages = int(coupon["discount_value"])
+        return f"{pages} free page{'s' if pages > 1 else ''}"
+    return "Discount"
 
 @api_router.post("/partner/validate-coupon")
 async def validate_coupon(token: str, code: str, order_total: float = 0):
@@ -4993,6 +5023,188 @@ async def apply_coupon_to_order(token: str, code: str, order_id: str):
     )
 
     return {"success": True, "message": "Coupon applied successfully"}
+
+# ==================== ADMIN COUPON MANAGEMENT ====================
+
+class CouponCreate(BaseModel):
+    code: str
+    discount_type: str = "percentage"  # percentage, fixed_amount, certified_page
+    discount_value: float  # percentage (e.g., 5 for 5%), dollar amount, or pages
+    max_uses: int = 9999  # How many times can be used
+    valid_days: int = 365  # Valid for X days from now
+    min_order_value: float = 0.0  # Minimum order value
+    first_order_only: bool = False  # Only for first orders
+    partner_id: Optional[str] = None  # Specific partner or None for all
+
+@api_router.post("/admin/coupons/create")
+async def create_coupon(coupon_data: CouponCreate, admin_key: str):
+    """Create a new coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if coupon code already exists
+    existing = await db.coupons.find_one({"code": {"$regex": f"^{coupon_data.code}$", "$options": "i"}})
+    if existing:
+        raise HTTPException(status_code=400, detail="Coupon code already exists")
+
+    coupon = Coupon(
+        code=coupon_data.code,
+        discount_type=coupon_data.discount_type,
+        discount_value=coupon_data.discount_value,
+        max_uses=coupon_data.max_uses,
+        valid_until=datetime.utcnow() + timedelta(days=coupon_data.valid_days),
+        min_order_value=coupon_data.min_order_value,
+        first_order_only=coupon_data.first_order_only,
+        partner_id=coupon_data.partner_id
+    )
+
+    await db.coupons.insert_one(coupon.dict())
+
+    return {
+        "success": True,
+        "coupon": {
+            "id": coupon.id,
+            "code": coupon.code,
+            "discount_type": coupon.discount_type,
+            "discount_value": coupon.discount_value,
+            "max_uses": coupon.max_uses,
+            "valid_until": coupon.valid_until.isoformat()
+        }
+    }
+
+@api_router.get("/admin/coupons")
+async def list_all_coupons(admin_key: str):
+    """List all coupons (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    coupons = await db.coupons.find().to_list(500)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until"),
+        "is_active": c.get("is_active", True),
+        "partner_id": c.get("partner_id"),
+        "first_order_only": c.get("first_order_only", False)
+    } for c in coupons]
+
+@api_router.delete("/admin/coupons/{coupon_id}")
+async def delete_coupon(coupon_id: str, admin_key: str):
+    """Delete/deactivate a coupon (admin only)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    result = await db.coupons.update_one(
+        {"id": coupon_id},
+        {"$set": {"is_active": False}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    return {"success": True, "message": "Coupon deactivated"}
+
+class AssignCouponRequest(BaseModel):
+    coupon_code: str  # The coupon code to assign (e.g., "MASS10")
+    partner_id: str   # The partner to assign it to
+    max_uses: int = 1  # How many times this partner can use it
+
+@api_router.post("/admin/coupons/assign")
+async def assign_coupon_to_partner(request: AssignCouponRequest, admin_key: str):
+    """Assign a coupon to a specific partner (creates a partner-specific instance)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Find the template coupon (the master coupon to copy from)
+    template_coupon = await db.coupons.find_one({
+        "code": {"$regex": f"^{request.coupon_code}$", "$options": "i"},
+        "partner_id": None  # Must be a global/template coupon
+    })
+
+    if not template_coupon:
+        raise HTTPException(status_code=404, detail=f"Coupon template '{request.coupon_code}' not found")
+
+    # Verify partner exists
+    partner = await db.partners.find_one({"id": request.partner_id})
+    if not partner:
+        raise HTTPException(status_code=404, detail="Partner not found")
+
+    # Check if this partner already has this coupon assigned
+    existing = await db.coupons.find_one({
+        "code": template_coupon["code"],
+        "partner_id": request.partner_id,
+        "is_active": True
+    })
+
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Partner already has coupon '{request.coupon_code}' assigned")
+
+    # Create partner-specific coupon
+    partner_coupon = Coupon(
+        code=template_coupon["code"],
+        partner_id=request.partner_id,
+        discount_type=template_coupon["discount_type"],
+        discount_value=template_coupon["discount_value"],
+        max_uses=request.max_uses,
+        valid_until=template_coupon.get("valid_until") or (datetime.utcnow() + timedelta(days=365)),
+        min_order_value=template_coupon.get("min_order_value", 0),
+        first_order_only=template_coupon.get("first_order_only", False)
+    )
+
+    await db.coupons.insert_one(partner_coupon.dict())
+
+    return {
+        "success": True,
+        "message": f"Coupon '{request.coupon_code}' assigned to {partner['company_name']}",
+        "coupon_id": partner_coupon.id
+    }
+
+@api_router.get("/admin/partners/list")
+async def list_partners_for_admin(admin_key: str):
+    """List all partners (for coupon assignment dropdown)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    partners = await db.partners.find({"is_active": True}).to_list(500)
+
+    return [{
+        "id": p["id"],
+        "company_name": p["company_name"],
+        "email": p["email"],
+        "contact_name": p.get("contact_name", "")
+    } for p in partners]
+
+@api_router.get("/admin/partners/{partner_id}/coupons")
+async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
+    """Get all coupons assigned to a specific partner (admin view)"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    coupons = await db.coupons.find({
+        "partner_id": partner_id,
+        "is_active": True
+    }).to_list(100)
+
+    return [{
+        "id": c["id"],
+        "code": c["code"],
+        "discount_type": c["discount_type"],
+        "discount_value": c["discount_value"],
+        "times_used": c.get("times_used", 0),
+        "max_uses": c["max_uses"],
+        "valid_until": c.get("valid_until")
+    } for c in coupons]
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 

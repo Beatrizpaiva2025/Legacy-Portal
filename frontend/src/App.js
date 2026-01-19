@@ -1293,7 +1293,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
   const [fieldErrors, setFieldErrors] = useState({});
 
   // Coupon states
-  const [couponCode, setCouponCode] = useState('');
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [selectedCoupon, setSelectedCoupon] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState('');
@@ -1334,6 +1335,20 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
       }
     };
     fetchPartnerOrders();
+  }, [token]);
+
+  // Fetch available coupons for this partner
+  useEffect(() => {
+    const fetchAvailableCoupons = async () => {
+      if (!token) return;
+      try {
+        const response = await axios.get(`${API}/partner/coupons?token=${token}`);
+        setAvailableCoupons(response.data || []);
+      } catch (err) {
+        console.error('Failed to fetch available coupons:', err);
+      }
+    };
+    fetchAvailableCoupons();
   }, [token]);
 
   // Get unique PMs from orders
@@ -1466,8 +1481,8 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
   // Validate and apply coupon
   const validateCoupon = async () => {
-    if (!couponCode.trim()) {
-      setCouponError('Please enter a coupon code');
+    if (!selectedCoupon) {
+      setCouponError('Please select a coupon');
       return;
     }
 
@@ -1476,7 +1491,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
 
     try {
       const orderTotal = quote?.total_price || 0;
-      const res = await fetch(`${API}/partner/validate-coupon?token=${token}&code=${encodeURIComponent(couponCode)}&order_total=${orderTotal}`, {
+      const res = await fetch(`${API}/partner/validate-coupon?token=${token}&code=${encodeURIComponent(selectedCoupon)}&order_total=${orderTotal}`, {
         method: 'POST'
       });
 
@@ -1486,7 +1501,7 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
         setCouponError('');
       } else {
         const err = await res.json();
-        setCouponError(err.detail || 'Invalid coupon code');
+        setCouponError(err.detail || 'Invalid coupon');
         setAppliedCoupon(null);
       }
     } catch (error) {
@@ -2330,36 +2345,45 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               )}
             </div>
 
-            {/* Coupon Code Input */}
+            {/* Coupon/Discount Section */}
             <div className="border-t pt-4 mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Have a coupon code?</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Coupon
+              </label>
               {appliedCoupon ? (
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div>
+                /* Coupon Applied - Show discount */
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
                     <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
                     <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={removeCoupon}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    Remove
-                  </button>
                 </div>
               ) : (
+                /* Coupon Selection - Dropdown + Apply Button */
                 <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="Enter code"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
-                  />
+                  <select
+                    value={selectedCoupon}
+                    onChange={(e) => setSelectedCoupon(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                  >
+                    {availableCoupons.length > 0 ? (
+                      <>
+                        <option value="">Select coupon...</option>
+                        {availableCoupons.map((coupon) => (
+                          <option key={coupon.code} value={coupon.code}>
+                            {coupon.code}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="">No Coupon available now</option>
+                    )}
+                  </select>
                   <button
                     type="button"
                     onClick={validateCoupon}
-                    disabled={couponLoading || !couponCode.trim()}
+                    disabled={couponLoading || !selectedCoupon || availableCoupons.length === 0}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {couponLoading ? '...' : 'Apply'}
