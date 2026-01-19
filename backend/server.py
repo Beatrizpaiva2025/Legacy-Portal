@@ -6616,10 +6616,17 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
 @api_router.get("/admin/payments/translators")
 async def get_translators_payment_summary(admin_key: str):
     """Get payment summary for all translators (admin only)"""
+    # First try master admin key
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
+        # Try user token with admin role
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        # Also try validate_admin_or_user_token for broader compatibility
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6673,7 +6680,11 @@ async def get_translator_payment_history(translator_id: str, admin_key: str):
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6737,7 +6748,11 @@ async def register_payment(
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6809,7 +6824,11 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
@@ -6836,7 +6855,11 @@ async def get_payment_report(admin_key: str, start_date: str = None, end_date: s
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") == "admin":
+        if user and user.get("role", "").lower() == "admin":
+            is_valid = True
+    if not is_valid:
+        user_info = await validate_admin_or_user_token(admin_key)
+        if user_info and user_info.get("role", "").lower() == "admin":
             is_valid = True
     if not is_valid:
         raise HTTPException(status_code=401, detail="Admin access required")
