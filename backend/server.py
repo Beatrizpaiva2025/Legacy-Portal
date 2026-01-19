@@ -6389,13 +6389,19 @@ async def get_translators_payment_summary(admin_key: str):
 
         result = []
         for translator in all_users:
-            payments = await db.translator_payments.find({"translator_id": translator["id"]}).sort("payment_date", -1).to_list(100)
+            # Handle both "id" field and MongoDB "_id" for backwards compatibility
+            translator_id = translator.get("id") or str(translator.get("_id", ""))
+            if not translator_id:
+                logger.warning(f"Skipping user without valid ID: {translator.get('email', 'unknown')}")
+                continue
+
+            payments = await db.translator_payments.find({"translator_id": translator_id}).sort("payment_date", -1).to_list(100)
             total_paid = sum(p.get("amount", 0) for p in payments)
             rate_per_page = translator.get("rate_per_page", 0) or 0
             pages_pending = translator.get("pages_pending_payment", 0) or 0
             pending_amount = rate_per_page * pages_pending
             result.append({
-                "translator_id": translator["id"],
+                "translator_id": translator_id,
                 "name": translator.get("name", ""),
                 "email": translator.get("email", ""),
                 "role": translator.get("role", "translator"),
