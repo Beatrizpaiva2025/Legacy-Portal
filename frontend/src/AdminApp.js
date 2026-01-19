@@ -21200,6 +21200,34 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const syncPartnerInvoiceToQuickBooks = async (invoice) => {
+    setQbSyncing(prev => ({ ...prev, [`inv_${invoice.id}`]: true }));
+    try {
+      const response = await axios.post(`${API}/quickbooks/sync/partner-invoice?admin_key=${adminKey}`, {
+        invoice_id: invoice.id,
+        send_email: true
+      });
+
+      if (response.data.success) {
+        if (response.data.already_synced) {
+          alert(`Invoice already synced to QuickBooks as #${response.data.invoice_number}`);
+        } else {
+          const emailMsg = response.data.email_sent ? ` and sent to ${response.data.sent_to}` : '';
+          alert(`Invoice created in QuickBooks as #${response.data.invoice_number}${emailMsg}!`);
+        }
+        // Refresh the invoices list
+        if (selectedPartnerForInvoice) {
+          fetchPartnerInvoicesForPartner(selectedPartnerForInvoice.partner_id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync partner invoice to QuickBooks:', err);
+      alert('Failed to sync: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setQbSyncing(prev => ({ ...prev, [`inv_${invoice.id}`]: false }));
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -23163,6 +23191,48 @@ const FinancesPage = ({ adminKey }) => {
                       </div>
                       {invoice.notes && (
                         <div className="text-xs text-gray-600 mb-2">Notes: {invoice.notes}</div>
+                      )}
+                      {/* QuickBooks Integration */}
+                      {qbConnected && (
+                        <div className="flex items-center space-x-2 mb-2">
+                          {invoice.quickbooks_invoice_id ? (
+                            <div className="flex items-center space-x-2">
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                                QB Invoice #{invoice.quickbooks_invoice_number}
+                              </span>
+                              {invoice.quickbooks_invoice_link && (
+                                <a
+                                  href={invoice.quickbooks_invoice_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                >
+                                  Link de Pagamento
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => syncPartnerInvoiceToQuickBooks(invoice)}
+                              disabled={qbSyncing[`inv_${invoice.id}`]}
+                              className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700 disabled:opacity-50 flex items-center space-x-1"
+                            >
+                              {qbSyncing[`inv_${invoice.id}`] ? (
+                                <>
+                                  <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                  <span>Syncing...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Send to QuickBooks</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
                       )}
                       {invoice.status !== 'paid' && (
                         <div className="flex space-x-2 mt-3">
