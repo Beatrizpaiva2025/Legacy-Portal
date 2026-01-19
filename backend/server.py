@@ -14356,9 +14356,17 @@ async def delete_translation_instruction(instruction_id: str, admin_key: str):
 # Glossaries CRUD
 @api_router.get("/admin/glossaries")
 async def get_glossaries(admin_key: str):
-    """Get all glossaries"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Get all glossaries - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can access glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can access glossaries")
 
     glossaries = await db.glossaries.find().sort("created_at", -1).to_list(100)
     for gloss in glossaries:
@@ -14372,9 +14380,17 @@ async def get_glossaries(admin_key: str):
 
 @api_router.post("/admin/glossaries")
 async def create_glossary(data: GlossaryCreate, admin_key: str):
-    """Create a new glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Create a new glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can create glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can create glossaries")
 
     glossary = {
         "id": str(uuid.uuid4()),
@@ -14395,9 +14411,17 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
 
 @api_router.put("/admin/glossaries/{glossary_id}")
 async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str):
-    """Update a glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Update a glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can update glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can update glossaries")
 
     result = await db.glossaries.update_one(
         {"id": glossary_id},
@@ -14420,9 +14444,17 @@ async def update_glossary(glossary_id: str, data: GlossaryCreate, admin_key: str
 
 @api_router.delete("/admin/glossaries/{glossary_id}")
 async def delete_glossary(glossary_id: str, admin_key: str):
-    """Delete a glossary"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    """Delete a glossary - Admin, PM, and in-house translators"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Admin, PM, and in-house translators can delete glossaries
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can delete glossaries")
 
     result = await db.glossaries.delete_one({"id": glossary_id})
 
@@ -14493,14 +14525,17 @@ class TranslationMemoryCreate(BaseModel):
 
 @api_router.get("/admin/translation-memory")
 async def get_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Get all translation memory entries - ADMIN ONLY"""
+    """Get all translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can access TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can access Translation Memory")
+    # Admin, PM, and in-house translators can access TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can access Translation Memory")
 
     # Build query filter
     query = {}
@@ -14584,14 +14619,17 @@ async def add_translation_memory(data: TranslationMemoryCreate, admin_key: str):
 
 @api_router.delete("/admin/translation-memory/{entry_id}")
 async def delete_translation_memory(entry_id: str, admin_key: str):
-    """Delete a translation memory entry - ADMIN ONLY"""
+    """Delete a translation memory entry - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can delete TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can delete Translation Memory")
+    # Admin, PM, and in-house translators can delete TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can delete Translation Memory")
 
     result = await db.translation_memory.delete_one({"id": entry_id})
 
@@ -14602,14 +14640,17 @@ async def delete_translation_memory(entry_id: str, admin_key: str):
 
 @api_router.delete("/admin/translation-memory")
 async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Clear translation memory entries - ADMIN ONLY"""
+    """Clear translation memory entries - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can clear TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can clear Translation Memory")
+    # Admin, PM, and in-house translators can clear TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can clear Translation Memory")
 
     query = {}
     if sourceLang:
@@ -14623,14 +14664,17 @@ async def clear_translation_memory(admin_key: str, sourceLang: Optional[str] = N
 
 @api_router.get("/admin/translation-memory/download")
 async def download_translation_memory(admin_key: str, format: str = "csv", sourceLang: Optional[str] = None, targetLang: Optional[str] = None):
-    """Download translation memory as CSV or TMX - ADMIN ONLY"""
+    """Download translation memory as CSV or TMX - Admin, PM, and in-house translators"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
 
-    # Only admin can download TM
-    if user_info.get("role") != "admin" and not user_info.get("is_master"):
-        raise HTTPException(status_code=403, detail="Only admin can download Translation Memory")
+    # Admin, PM, and in-house translators can download TM
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can download Translation Memory")
 
     # Build query filter
     query = {}
@@ -14683,6 +14727,325 @@ async def download_translation_memory(admin_key: str, format: str = "csv", sourc
 
         csv_content = "\n".join(csv_lines)
         return JSONResponse(content={"format": "csv", "content": csv_content, "filename": f"translation_memory_{datetime.now().strftime('%Y%m%d')}.csv"})
+
+
+@api_router.post("/admin/translation-memory/upload")
+async def upload_translation_memory(
+    admin_key: str,
+    file: UploadFile = File(...),
+    sourceLang: str = Form("Portuguese (Brazil)"),
+    targetLang: str = Form("English"),
+    field: str = Form("General")
+):
+    """
+    Upload Translation Memory from CSV or TMX file
+    Only admin, PM, and in-house translators can upload TM
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user is admin, PM, or in-house translator
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can upload Translation Memory")
+
+    # Read file content
+    content = await file.read()
+    filename = file.filename.lower()
+
+    added_count = 0
+    updated_count = 0
+    entries = []
+
+    try:
+        if filename.endswith('.tmx') or filename.endswith('.xml'):
+            # Parse TMX file
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(content.decode('utf-8'))
+
+            for tu in root.findall('.//tu'):
+                tuvs = tu.findall('tuv')
+                if len(tuvs) >= 2:
+                    source_text = ""
+                    target_text = ""
+
+                    for tuv in tuvs:
+                        lang = tuv.get('{http://www.w3.org/XML/1998/namespace}lang', '') or tuv.get('lang', '')
+                        seg = tuv.find('seg')
+                        if seg is not None and seg.text:
+                            # Determine if this is source or target based on language code
+                            lang_lower = lang.lower()
+                            if lang_lower.startswith('pt') or lang_lower.startswith('por'):
+                                source_text = seg.text.strip()
+                            elif lang_lower.startswith('en'):
+                                target_text = seg.text.strip()
+                            elif not source_text:
+                                source_text = seg.text.strip()
+                            else:
+                                target_text = seg.text.strip()
+
+                    if source_text and target_text:
+                        entries.append({
+                            "source": source_text,
+                            "target": target_text
+                        })
+
+        elif filename.endswith('.csv'):
+            # Parse CSV file
+            import csv
+            import io
+            content_str = content.decode('utf-8-sig')  # Handle BOM
+            reader = csv.reader(io.StringIO(content_str))
+            header = next(reader, None)  # Skip header row
+
+            # Try to determine column positions
+            source_col = 0
+            target_col = 1
+
+            if header:
+                header_lower = [h.lower().strip() for h in header]
+                for i, h in enumerate(header_lower):
+                    if 'source' in h or 'original' in h or 'origem' in h:
+                        source_col = i
+                    elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h:
+                        target_col = i
+
+            for row in reader:
+                if len(row) > max(source_col, target_col):
+                    source_text = row[source_col].strip()
+                    target_text = row[target_col].strip()
+
+                    if source_text and target_text:
+                        entries.append({
+                            "source": source_text,
+                            "target": target_text
+                        })
+
+        # Insert entries into database
+        for entry in entries:
+            # Check if entry already exists
+            existing = await db.translation_memory.find_one({
+                "sourceLang": sourceLang,
+                "targetLang": targetLang,
+                "source": entry["source"]
+            })
+
+            if existing:
+                # Update if target is different
+                if existing.get("target") != entry["target"]:
+                    await db.translation_memory.update_one(
+                        {"id": existing["id"]},
+                        {"$set": {
+                            "target": entry["target"],
+                            "score": 100,  # Uploaded TM gets highest priority
+                            "is_uploaded": True,
+                            "updated_at": datetime.utcnow()
+                        }}
+                    )
+                    updated_count += 1
+            else:
+                tm_entry = {
+                    "id": str(uuid.uuid4()),
+                    "sourceLang": sourceLang,
+                    "targetLang": targetLang,
+                    "field": field,
+                    "documentType": "Uploaded TM",
+                    "source": entry["source"],
+                    "target": entry["target"],
+                    "score": 100,  # Uploaded TM gets highest priority
+                    "is_uploaded": True,
+                    "context": f"Uploaded by {user_info.get('user_id', 'unknown')}",
+                    "created_at": datetime.utcnow(),
+                    "created_by": user_info.get("user_id", "system")
+                }
+                await db.translation_memory.insert_one(tm_entry)
+                added_count += 1
+
+        return {
+            "status": "success",
+            "added": added_count,
+            "updated": updated_count,
+            "total_entries": len(entries),
+            "message": f"Successfully processed {len(entries)} TM entries"
+        }
+
+    except Exception as e:
+        logger.error(f"Error uploading TM: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+
+
+@api_router.post("/admin/glossaries/upload")
+async def upload_glossary(
+    admin_key: str,
+    file: UploadFile = File(...),
+    name: str = Form("Uploaded Glossary"),
+    sourceLang: str = Form("Portuguese (Brazil)"),
+    targetLang: str = Form("English"),
+    field: str = Form("All Fields"),
+    bidirectional: bool = Form(True)
+):
+    """
+    Upload Glossary from CSV or TMX file
+    Only admin, PM, and in-house translators can upload glossaries
+    """
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user is admin, PM, or in-house translator
+    user_role = user_info.get("role")
+    is_in_house_translator = user_role == "translator" and user_info.get("translator_type") == "in_house"
+
+    if user_role not in ["admin", "pm"] and not is_in_house_translator and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Only admin, PM, or in-house translators can upload glossaries")
+
+    # Read file content
+    content = await file.read()
+    filename = file.filename.lower()
+
+    terms = []
+
+    try:
+        if filename.endswith('.tmx') or filename.endswith('.xml'):
+            # Parse TMX file
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(content.decode('utf-8'))
+
+            for tu in root.findall('.//tu'):
+                tuvs = tu.findall('tuv')
+                if len(tuvs) >= 2:
+                    source_text = ""
+                    target_text = ""
+
+                    for tuv in tuvs:
+                        lang = tuv.get('{http://www.w3.org/XML/1998/namespace}lang', '') or tuv.get('lang', '')
+                        seg = tuv.find('seg')
+                        if seg is not None and seg.text:
+                            lang_lower = lang.lower()
+                            if lang_lower.startswith('pt') or lang_lower.startswith('por'):
+                                source_text = seg.text.strip()
+                            elif lang_lower.startswith('en'):
+                                target_text = seg.text.strip()
+                            elif not source_text:
+                                source_text = seg.text.strip()
+                            else:
+                                target_text = seg.text.strip()
+
+                    if source_text and target_text:
+                        terms.append({
+                            "id": len(terms) + 1,
+                            "source": source_text,
+                            "target": target_text,
+                            "notes": ""
+                        })
+
+        elif filename.endswith('.csv'):
+            # Parse CSV file
+            import csv
+            import io
+            content_str = content.decode('utf-8-sig')  # Handle BOM
+            reader = csv.reader(io.StringIO(content_str))
+            header = next(reader, None)  # Skip header row
+
+            # Try to determine column positions
+            source_col = 0
+            target_col = 1
+            notes_col = -1
+
+            if header:
+                header_lower = [h.lower().strip() for h in header]
+                for i, h in enumerate(header_lower):
+                    if 'source' in h or 'original' in h or 'origem' in h or 'term' in h:
+                        source_col = i
+                    elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h:
+                        target_col = i
+                    elif 'note' in h or 'comment' in h or 'observação' in h:
+                        notes_col = i
+
+            term_id = 1
+            for row in reader:
+                if len(row) > max(source_col, target_col):
+                    source_text = row[source_col].strip()
+                    target_text = row[target_col].strip()
+                    notes = row[notes_col].strip() if notes_col >= 0 and len(row) > notes_col else ""
+
+                    if source_text and target_text:
+                        terms.append({
+                            "id": term_id,
+                            "source": source_text,
+                            "target": target_text,
+                            "notes": notes
+                        })
+                        term_id += 1
+
+        if not terms:
+            raise HTTPException(status_code=400, detail="No valid terms found in the file")
+
+        # Create or update glossary
+        glossary_name = name or f"Uploaded Glossary ({datetime.now().strftime('%Y-%m-%d')})"
+
+        # Check if glossary with same name exists
+        existing_glossary = await db.glossaries.find_one({"name": glossary_name})
+
+        if existing_glossary:
+            # Merge terms
+            existing_terms = existing_glossary.get("terms", [])
+            existing_sources = {t["source"].lower() for t in existing_terms}
+
+            for term in terms:
+                if term["source"].lower() not in existing_sources:
+                    term["id"] = len(existing_terms) + 1
+                    existing_terms.append(term)
+
+            await db.glossaries.update_one(
+                {"id": existing_glossary["id"]},
+                {"$set": {
+                    "terms": existing_terms,
+                    "is_uploaded": True,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+
+            return {
+                "status": "success",
+                "glossary_id": existing_glossary["id"],
+                "added_terms": len(terms),
+                "total_terms": len(existing_terms),
+                "message": f"Merged {len(terms)} terms into existing glossary '{glossary_name}'"
+            }
+        else:
+            # Create new glossary
+            glossary = {
+                "id": str(uuid.uuid4()),
+                "name": glossary_name,
+                "sourceLang": sourceLang,
+                "targetLang": targetLang,
+                "bidirectional": bidirectional,
+                "language": f"{sourceLang} <> {targetLang}",
+                "field": field,
+                "terms": terms,
+                "is_uploaded": True,
+                "created_at": datetime.utcnow(),
+                "created_by": user_info.get("user_id", "system")
+            }
+
+            await db.glossaries.insert_one(glossary)
+
+            return {
+                "status": "success",
+                "glossary_id": glossary["id"],
+                "added_terms": len(terms),
+                "message": f"Created glossary '{glossary_name}' with {len(terms)} terms"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading glossary: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
 
 # ==================== CUSTOMER MODELS ====================
@@ -17739,14 +18102,20 @@ async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
 
     # Get glossary terms if enabled
     glossary_terms = ""
+    source_lang_full = config.get("source_language", "Portuguese (Brazil)")
+    target_lang_full = config.get("target_language", "English")
+
     if config.get("use_glossary"):
         source_lang = config["source_language"].lower()[:2]
         target_lang = config["target_language"].lower()[:2]
 
+        # Try to find glossary by language codes or full names
         glossary = await db.glossaries.find_one({
             "$or": [
                 {"source_language": source_lang, "target_language": target_lang},
-                {"language_pair": f"{source_lang}-{target_lang}"}
+                {"language_pair": f"{source_lang}-{target_lang}"},
+                {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                {"sourceLang": {"$regex": source_lang, "$options": "i"}, "targetLang": {"$regex": target_lang, "$options": "i"}}
             ]
         })
 
@@ -17760,8 +18129,48 @@ Use these EXACT translations for the following terms:
 {terms_list}
 """
 
-    # Get specialized prompt
-    system_prompt = get_ai_translator_prompt(config, glossary_terms)
+    # Get Translation Memory entries (prioritize uploaded TM with score=100)
+    tm_terms = ""
+    try:
+        # Fetch TM entries sorted by score (highest first) - uploaded TM has score=100
+        tm_entries = await db.translation_memory.find({
+            "$or": [
+                {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                 "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+            ]
+        }).sort("score", -1).to_list(100)
+
+        if tm_entries:
+            # Separate uploaded TM (priority) from auto-generated TM
+            uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+            auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+            tm_text = ""
+            if uploaded_tm:
+                tm_text += "🔹 PRIORITY TERMS (from uploaded TM - USE EXACTLY):\n"
+                for tm in uploaded_tm[:50]:
+                    tm_text += f"• {tm['source']} → {tm['target']}\n"
+
+            if auto_tm and len(uploaded_tm) < 50:
+                tm_text += "\n🔸 APPROVED TRANSLATIONS (from high-quality translations):\n"
+                for tm in auto_tm[:50 - len(uploaded_tm)]:
+                    tm_text += f"• {tm['source']} → {tm['target']} (score: {tm.get('score', 0)}%)\n"
+
+            if tm_text:
+                tm_terms = f"""
+═══════════════════════════════════════════════════════════════════
+                    TRANSLATION MEMORY
+═══════════════════════════════════════════════════════════════════
+Reference these approved translations when translating similar content:
+{tm_text}
+"""
+    except Exception as e:
+        logger.warning(f"Error fetching TM for translation: {e}")
+
+    # Get specialized prompt - combine glossary and TM terms
+    combined_terms = glossary_terms + tm_terms
+    system_prompt = get_ai_translator_prompt(config, combined_terms)
 
     # Add custom instructions if provided
     custom_instructions = config.get("custom_instructions", "") or ""
