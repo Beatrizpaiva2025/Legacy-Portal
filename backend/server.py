@@ -19859,12 +19859,15 @@ def generate_qr_code(data: str) -> str:
 @api_router.post("/certifications/create")
 async def create_certification(data: CertificationCreate, admin_key: str):
     """Create a new document certification with unique ID and QR code"""
-    # Validate admin key
+    # Validate admin key or user token (admin, PM, and in-house translators can create certifications)
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
-            is_valid = True
+        if user:
+            user_role = user.get("role")
+            is_in_house = user_role == "translator" and user.get("translator_type") == "in_house"
+            if user_role in ["admin", "pm"] or is_in_house:
+                is_valid = True
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
