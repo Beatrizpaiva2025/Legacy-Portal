@@ -8228,8 +8228,22 @@ async def delete_payment(payment_id: str, admin_key: str):
 # ==================== EXPENSES ====================
 
 @api_router.post("/admin/expenses")
-async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Optional[str] = None):
-    """Create a new expense record"""
+async def create_expense(
+    admin_key: str,
+    category: str = Form(...),
+    description: str = Form(...),
+    amount: float = Form(...),
+    date: str = Form(None),
+    subcategory: str = Form(None),
+    is_recurring: str = Form("false"),
+    recurring_period: str = Form(None),
+    vendor: str = Form(None),
+    vendor_id: str = Form(None),
+    notes: str = Form(None),
+    receipt_file: UploadFile = File(None),
+    token: Optional[str] = None
+):
+    """Create a new expense record with optional receipt file upload"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
 
@@ -8237,25 +8251,56 @@ async def create_expense(expense_data: ExpenseCreate, admin_key: str, token: Opt
     if token:
         current_user = await get_current_admin_user(token)
 
-    expense = Expense(
-        category=expense_data.category,
-        subcategory=expense_data.subcategory,
-        description=expense_data.description,
-        amount=expense_data.amount,
-        date=datetime.fromisoformat(expense_data.date.replace('Z', '+00:00')) if expense_data.date else datetime.utcnow(),
-        is_recurring=expense_data.is_recurring,
-        recurring_period=expense_data.recurring_period,
-        vendor=expense_data.vendor,
-        notes=expense_data.notes,
-        created_by_id=current_user["id"] if current_user else None,
-        created_by_name=current_user.get("name") if current_user else None
-    )
+    # Handle receipt file upload
+    receipt_file_data = None
+    receipt_file_type = None
+    receipt_filename = None
+    if receipt_file and receipt_file.filename:
+        allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+        if receipt_file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Invalid file type. Allowed: PNG, JPG, GIF, PDF")
 
-    await db.expenses.insert_one(expense.dict())
-    return {"status": "success", "expense": expense.dict()}
+        file_content = await receipt_file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+        receipt_file_data = base64.b64encode(file_content).decode('utf-8')
+        receipt_file_type = receipt_file.content_type
+        receipt_filename = receipt_file.filename
+
+    # Parse is_recurring from form string
+    is_recurring_bool = is_recurring.lower() in ('true', '1', 'yes')
+
+    expense_dict = {
+        "id": str(uuid.uuid4()),
+        "category": category,
+        "subcategory": subcategory or None,
+        "description": description,
+        "amount": float(amount),
+        "date": datetime.fromisoformat(date.replace('Z', '+00:00')) if date else datetime.utcnow(),
+        "is_recurring": is_recurring_bool,
+        "recurring_period": recurring_period or None,
+        "vendor": vendor or None,
+        "vendor_id": vendor_id or None,
+        "receipt_file_data": receipt_file_data,
+        "receipt_file_type": receipt_file_type,
+        "receipt_filename": receipt_filename,
+        "notes": notes or None,
+        "created_at": datetime.utcnow(),
+        "created_by_id": current_user["id"] if current_user else None,
+        "created_by_name": current_user.get("name") if current_user else None
+    }
+
+    await db.expenses.insert_one(expense_dict)
+
+    # Remove file data from response to keep it small
+    expense_response = {k: v for k, v in expense_dict.items() if k != 'receipt_file_data'}
+    expense_response['has_receipt'] = receipt_file_data is not None
+
+    return {"status": "success", "expense": expense_response}
 
 @api_router.get("/admin/expenses")
-async def get_expenses(admin_key: str, category: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
+async def get_expenses(admin_key: str, category: Optional[str] = None, vendor_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None):
     """Get all expenses with optional filters"""
     if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -8263,6 +8308,8 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     query = {}
     if category:
         query["category"] = category
+    if vendor_id:
+        query["vendor_id"] = vendor_id
 
     if start_date or end_date:
         query["date"] = {}
@@ -8276,8 +8323,31 @@ async def get_expenses(admin_key: str, category: Optional[str] = None, start_dat
     for expense in expenses:
         if '_id' in expense:
             del expense['_id']
+        # Add has_receipt flag and remove file data from list
+        expense['has_receipt'] = bool(expense.get('receipt_file_data'))
+        if 'receipt_file_data' in expense:
+            del expense['receipt_file_data']
 
     return {"expenses": expenses}
+
+@api_router.get("/admin/expenses/{expense_id}/receipt")
+async def get_expense_receipt(expense_id: str, admin_key: str):
+    """Get the receipt file for an expense"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    if not expense.get('receipt_file_data'):
+        raise HTTPException(status_code=404, detail="No receipt attached to this expense")
+
+    return {
+        "receipt_file_data": expense['receipt_file_data'],
+        "receipt_file_type": expense.get('receipt_file_type'),
+        "receipt_filename": expense.get('receipt_filename')
+    }
 
 @api_router.put("/admin/expenses/{expense_id}")
 async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key: str):
