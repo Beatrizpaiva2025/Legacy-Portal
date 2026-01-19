@@ -20608,6 +20608,14 @@ const FinancesPage = ({ adminKey }) => {
   const [addingPages, setAddingPages] = useState(false);
   const [editingPagesLog, setEditingPagesLog] = useState(null);
   const [editPagesForm, setEditPagesForm] = useState({ pages: '', date: '', note: '' });
+  // Coupon management state
+  const [couponTemplates, setCouponTemplates] = useState([]);
+  const [showCouponModal, setShowCouponModal] = useState(false);
+  const [selectedPartnerForCoupon, setSelectedPartnerForCoupon] = useState(null);
+  const [partnerCoupons, setPartnerCoupons] = useState([]);
+  const [selectedCouponToAssign, setSelectedCouponToAssign] = useState('');
+  const [couponMaxUses, setCouponMaxUses] = useState(1);
+  const [assigningCoupon, setAssigningCoupon] = useState(false);
   const [expenseForm, setExpenseForm] = useState({
     category: 'fixed',
     subcategory: '',
@@ -20885,6 +20893,69 @@ const FinancesPage = ({ adminKey }) => {
       setSelectedOrdersForInvoice([]);
     } else {
       setSelectedOrdersForInvoice(partnerOrdersForInvoice.map(o => o.id));
+    }
+  };
+
+  // Coupon Management Functions
+  const fetchCouponTemplates = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/coupons?admin_key=${adminKey}`);
+      // Filter to only show template coupons (partner_id is null)
+      const templates = (response.data || []).filter(c => !c.partner_id && c.is_active);
+      setCouponTemplates(templates);
+    } catch (err) {
+      console.error('Failed to fetch coupon templates:', err);
+    }
+  };
+
+  const fetchPartnerCoupons = async (partnerId) => {
+    try {
+      const response = await axios.get(`${API}/admin/partners/${partnerId}/coupons?admin_key=${adminKey}`);
+      setPartnerCoupons(response.data || []);
+    } catch (err) {
+      console.error('Failed to fetch partner coupons:', err);
+      setPartnerCoupons([]);
+    }
+  };
+
+  const handleOpenCouponModal = async (partner) => {
+    setSelectedPartnerForCoupon(partner);
+    setSelectedCouponToAssign('');
+    setCouponMaxUses(1);
+    await fetchCouponTemplates();
+    await fetchPartnerCoupons(partner.partner_id);
+    setShowCouponModal(true);
+  };
+
+  const handleAssignCoupon = async () => {
+    if (!selectedCouponToAssign) {
+      alert('Please select a coupon to assign');
+      return;
+    }
+    setAssigningCoupon(true);
+    try {
+      await axios.post(`${API}/admin/coupons/assign?admin_key=${adminKey}`, {
+        coupon_code: selectedCouponToAssign,
+        partner_id: selectedPartnerForCoupon.partner_id,
+        max_uses: couponMaxUses
+      });
+      alert(`Coupon ${selectedCouponToAssign} assigned successfully!`);
+      await fetchPartnerCoupons(selectedPartnerForCoupon.partner_id);
+      setSelectedCouponToAssign('');
+    } catch (err) {
+      alert('Error assigning coupon: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAssigningCoupon(false);
+    }
+  };
+
+  const handleRemovePartnerCoupon = async (couponId) => {
+    if (!window.confirm('Are you sure you want to remove this coupon from the partner?')) return;
+    try {
+      await axios.delete(`${API}/admin/coupons/${couponId}?admin_key=${adminKey}`);
+      await fetchPartnerCoupons(selectedPartnerForCoupon.partner_id);
+    } catch (err) {
+      alert('Error removing coupon: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22390,6 +22461,13 @@ const FinancesPage = ({ adminKey }) => {
                               📋
                             </button>
                             <button
+                              onClick={() => handleOpenCouponModal(partner)}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                              title="Manage Discounts"
+                            >
+                              🏷️
+                            </button>
+                            <button
                               onClick={() => {
                                 if (window.confirm(`Are you sure you want to delete partner "${partner.company_name}"?\n\nThis action cannot be undone.`)) {
                                   deletePartner(partner.partner_id);
@@ -22811,6 +22889,97 @@ const FinancesPage = ({ adminKey }) => {
             <div className="p-4 border-t bg-gray-50 flex justify-end">
               <button
                 onClick={() => setShowInvoicesModal(false)}
+                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Coupon Management Modal */}
+      {showCouponModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="font-bold text-gray-800">Manage Discount</h2>
+                <p className="text-sm text-gray-500">{selectedPartnerForCoupon?.company_name}</p>
+              </div>
+              <button onClick={() => setShowCouponModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div className="p-4">
+              {/* Current Partner Coupon */}
+              {partnerCoupons.length > 0 ? (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Current Discount</label>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    {partnerCoupons.map((coupon) => (
+                      <div key={coupon.id} className="flex items-center justify-between">
+                        <div>
+                          <span className="text-green-700 font-medium">{coupon.code}</span>
+                          <span className="text-green-600 text-sm ml-2">
+                            ({coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `$${coupon.discount_value} off`})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRemovePartnerCoupon(coupon.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Current Discount</label>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-500 text-sm">
+                    No discount assigned to this partner
+                  </div>
+                </div>
+              )}
+
+              {/* Assign New Coupon */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Discount</label>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedCouponToAssign}
+                    onChange={(e) => setSelectedCouponToAssign(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    {couponTemplates.length > 0 ? (
+                      <>
+                        <option value="">Select discount...</option>
+                        {couponTemplates.map((coupon) => (
+                          <option key={coupon.id} value={coupon.code}>
+                            {coupon.code} ({coupon.discount_value}% off)
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="">No discounts available</option>
+                    )}
+                  </select>
+                  <button
+                    onClick={handleAssignCoupon}
+                    disabled={!selectedCouponToAssign || assigningCoupon || couponTemplates.length === 0}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {assigningCoupon ? 'Assigning...' : 'Assign'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Available discounts: MASS5 (5%), MASS10 (10%), MASS15 (15%), MASS20 (20%), MASS25 (25%), MASS30 (30%), MASS35 (35%)
+                </p>
+              </div>
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowCouponModal(false)}
                 className="px-4 py-2 border rounded-md text-sm hover:bg-gray-100"
               >
                 Close
