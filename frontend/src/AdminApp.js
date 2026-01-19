@@ -9096,12 +9096,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-0 h-96 overflow-hidden">
+                <div className="grid grid-cols-2 gap-0 h-[600px] overflow-hidden">
                   {/* Left: Original Document */}
                   <div className="border-r overflow-auto bg-gray-50 p-2">
                     {originalImages[selectedResultIndex] ? (
                       originalImages[selectedResultIndex].filename?.toLowerCase().endsWith('.pdf') ? (
-                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '380px'}} />
+                        <embed src={getImageSrc(originalImages[selectedResultIndex])} type="application/pdf" className="w-full border shadow-sm" style={{height: '580px'}} />
                       ) : (
                         <img src={getImageSrc(originalImages[selectedResultIndex])} alt={originalImages[selectedResultIndex].filename || 'Original'} className="max-w-full border shadow-sm" />
                       )
@@ -9131,6 +9131,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <div className="w-px h-5 bg-gray-300 mx-1"></div>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                        <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                        <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                       </div>
                     )}
                     {proofreadingViewMode === 'preview' ? (
@@ -9138,7 +9142,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
                         className="w-full h-full border-0"
-                        style={{minHeight: '384px'}}
+                        style={{minHeight: '580px'}}
                       />
                     ) : (
                       <div
@@ -9149,7 +9153,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
                         className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        style={{minHeight: '580px', height: '580px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
