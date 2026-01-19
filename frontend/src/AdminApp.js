@@ -266,7 +266,7 @@ const WriteIcon = ({ className = "w-3 h-3" }) => (
 const AdminLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [useAdminKey, setUseAdminKey] = useState(false); // Fallback to admin key login
@@ -276,7 +276,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorr('');
+    setError('');
     setSuccess('');
     setLoading(true);
 
@@ -303,7 +303,7 @@ const AdminLogin = ({ onLogin }) => {
         }
       }
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Invalid credentials');
+      setError(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -311,7 +311,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
-    setErrorr('');
+    setError('');
     setSuccess('');
     setLoading(true);
 
@@ -320,7 +320,7 @@ const AdminLogin = ({ onLogin }) => {
       setSuccess('If an account exists with this email, a password reset link has been sent.');
       setForgotEmail('');
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Error sending reset email');
+      setError(err.response?.data?.detail || 'Error sending reset email');
     } finally {
       setLoading(false);
     }
@@ -375,7 +375,7 @@ const AdminLogin = ({ onLogin }) => {
 
           <div className="mt-4 text-center">
             <button
-              onClick={() => { setShowForgotPassword(false); setErrorr(''); setSuccess(''); }}
+              onClick={() => { setShowForgotPassword(false); setError(''); setSuccess(''); }}
               className="text-blue-600 hover:underline text-xs"
             >
               ← Back to Login
@@ -1603,7 +1603,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Proofreading state (admin only)
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
-  const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [proofreadingError, setProofreadingError] = useState('');
   const [highlightedErrorIndex, setHighlightedErrorIndex] = useState(null);
 
   // Rejection modal state (PM/Admin)
@@ -1720,7 +1720,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           }));
         }
       } catch (err) {
-        console.error('Errorr fetching exchange rate:', err);
+        console.error('Error fetching exchange rate:', err);
         alert('Could not fetch exchange rate. Please enter manually.');
       }
     } finally {
@@ -1996,8 +1996,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       setProcessingStatus(`✅ ${assetType === 'logo_left' ? 'Left logo' : assetType === 'logo_right' ? 'Center logo' : assetType === 'logo_stamp' ? 'Stamp' : assetType === 'signature_image' ? 'Signature' : assetType} salvo!`);
       return true;
     } catch (error) {
-      console.error('Errorr saving asset:', error);
-      setProcessingStatus(`❌ Falha ao savedr ${assetType}`);
+      console.error('Error saving asset:', error);
+      setProcessingStatus(`❌ Falha ao salvar ${assetType}`);
       return false;
     }
   };
@@ -2747,7 +2747,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         throw new Error(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
-      console.error('Errorr sending to projects:', error);
+      console.error('Error sending to projects:', error);
       setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -2863,7 +2863,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setActiveSubTab('deliver');
       }
     } catch (error) {
-      console.error('Errorr approving translation:', error);
+      console.error('Error approving translation:', error);
       setProcessingStatus(`❌ Failed to approve: ${error.response?.data?.detail || error.message}`);
     } finally {
       setSendingToProjects(false);
@@ -3116,8 +3116,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const errorMsg = err.code === 'ECONNABORTED'
         ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Errorr'
-          ? 'Network Errorr - Server may be restarting. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
           : (err.response?.data?.detail || err.message);
 
       alert('Failed to save instruction: ' + errorMsg);
@@ -3184,8 +3184,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
       const errorMsg = err.code === 'ECONNABORTED'
         ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Errorr'
-          ? 'Network Errorr - Server may be restarting. Saved locally as backup.'
+        : err.message === 'Network Error'
+          ? 'Network Error - Server may be restarting. Saved locally as backup.'
           : (err.response?.data?.detail || err.message);
 
       alert('Failed to save glossary: ' + errorMsg);
@@ -3390,8 +3390,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           setProcessingStatus(`✅ Image uploaded`);
         }
       } catch (err) {
-        console.error(`Errorr processing ${file.name}:`, err);
-        setProcessingStatus(`⚠️ Errorr processing ${file.name}`);
+        console.error(`Error processing ${file.name}:`, err);
+        setProcessingStatus(`⚠️ Error processing ${file.name}`);
       }
     }
 
@@ -3529,7 +3529,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
 
     setIsProofreading(true);
-    setProofreadingErrorr('');
+    setProofreadingError('');
     setProofreadingResult(null);
 
     try {
@@ -3564,11 +3564,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       } else if (data.raw_response) {
         // Show raw response if JSON parsing failed
-        setProofreadingErrorr(`JSON parsing failed. Raw response:\n${data.raw_response}`);
+        setProofreadingError(`JSON parsing failed. Raw response:\n${data.raw_response}`);
       }
     } catch (error) {
       console.error('Proofreading error:', error);
-      setProofreadingErrorr(error.message);
+      setProofreadingError(error.message);
     } finally {
       setIsProofreading(false);
     }
@@ -4231,7 +4231,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       }
     } catch (error) {
       console.error('Correction error:', error);
-      alert('Errorr applying correction: ' + error.message);
+      alert('Error applying correction: ' + error.message);
     } finally {
       setApplyingCorrection(false);
     }
@@ -4300,7 +4300,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
-          console.error('Errorr applying font size:', e);
+          console.error('Error applying font size:', e);
         }
       }
     }
@@ -4328,7 +4328,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           newRange.selectNodeContents(span);
           selection.addRange(newRange);
         } catch (e) {
-          console.error('Errorr applying format:', e);
+          console.error('Error applying format:', e);
         }
       }
     }
@@ -4435,8 +4435,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           console.warn(`Unsupported file type: ${file.name}`);
         }
       } catch (err) {
-        console.error(`Errorr processing ${file.name}:`, err);
-        setQuickPackageProgress(`⚠️ Errorr processing ${file.name}`);
+        console.error(`Error processing ${file.name}:`, err);
+        setQuickPackageProgress(`⚠️ Error processing ${file.name}`);
       }
     }
 
@@ -4492,7 +4492,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           console.warn(`Unsupported file type for original: ${file.name}`);
         }
       } catch (err) {
-        console.error(`Errorr processing ${file.name}:`, err);
+        console.error(`Error processing ${file.name}:`, err);
       }
     }
 
@@ -4953,8 +4953,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
       }, 10000);
     } catch (err) {
-      console.error('Errorr generating package:', err);
-      alert('Errorr generating package. Please try with fewer files.');
+      console.error('Error generating package:', err);
+      alert('Error generating package. Please try with fewer files.');
       setQuickPackageLoading(false);
       setQuickPackageProgress('');
     }
@@ -8859,10 +8859,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </button>
                 </div>
 
-                {/* Errorr Display */}
-                {proofreadingErrorr && (
+                {/* Error Display */}
+                {proofreadingError && (
                   <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
-                    ❌ {proofreadingErrorr}
+                    ❌ {proofreadingError}
                   </div>
                 )}
 
@@ -8906,7 +8906,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </span>
                     </div>
 
-                    {/* Errorrs Table */}
+                    {/* Errors Table */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                       <div>
                         {/* Apply All Button */}
@@ -8996,7 +8996,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       </div>
                     )}
 
-                    {/* No Errorrs Message */}
+                    {/* No Errors Message */}
                     {(!proofreadingResult.erros || proofreadingResult.erros.length === 0) && (
                       <div className="p-4 bg-green-100 border border-green-300 rounded text-center">
                         <span className="text-green-700 text-sm font-medium">
@@ -9016,7 +9016,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
 
                 {/* Instructions when no result */}
-                {!proofreadingResult && !isProofreading && !proofreadingErrorr && (
+                {!proofreadingResult && !isProofreading && !proofreadingError && (
                   <p className="text-xs text-gray-500">
                     Click em "Run Proofreading" to analyze a translation e identificar erros.
                   </p>
@@ -9346,9 +9346,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 </div>
               )}
 
-              {proofreadingErrorr && (
+              {proofreadingError && (
                 <div className="p-3 bg-red-100 border border-red-300 rounded text-xs text-red-700">
-                  ❌ {proofreadingErrorr}
+                  ❌ {proofreadingError}
                 </div>
               )}
 
@@ -12008,7 +12008,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download translation:', err);
-      alert('Errorr downloading translation');
+      alert('Error downloading translation');
     }
   };
 
@@ -12138,7 +12138,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to download:', err);
-      alert('Errorr downloading document');
+      alert('Error downloading document');
     }
   };
 
@@ -12169,7 +12169,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload document:', err);
-      alert('Errorr uploading document');
+      alert('Error uploading document');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -12256,7 +12256,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       viewOrderDocuments(viewingOrder);
     } catch (err) {
       console.error('Failed to upload documents:', err);
-      alert('Errorr uploading documents');
+      alert('Error uploading documents');
     } finally {
       setUploadingProjectDoc(false);
     }
@@ -12374,7 +12374,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to update notes:', err);
-      alert('Errorr updating notes');
+      alert('Error updating notes');
     }
   };
 
@@ -12422,7 +12422,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       alert('✅ Projeto salvo successfully!');
     } catch (err) {
       console.error('Failed to save project:', err);
-      alert('Errorr saving project: ' + (err.response?.data?.detail || err.message));
+      alert('Error saving project: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSavingProject(false);
     }
@@ -12605,7 +12605,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to add translator:', err);
-      alert(err.response?.data?.detail || 'Errorr creating translator');
+      alert(err.response?.data?.detail || 'Error creating translator');
     } finally {
       setAddingTranslator(false);
     }
@@ -12667,7 +12667,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       }
     } catch (err) {
       console.error('Failed to load review documents:', err);
-      alert('Errorr loading documents for review');
+      alert('Error loading documents for review');
     } finally {
       setLoadingReview(false);
     }
@@ -12689,7 +12689,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to approve:', err);
-      alert('Errorr approving translation');
+      alert('Error approving translation');
     } finally {
       setSubmittingReview(false);
     }
@@ -12715,7 +12715,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       fetchOrders();
     } catch (err) {
       console.error('Failed to request correction:', err);
-      alert('Errorr requesting correction');
+      alert('Error requesting correction');
     } finally {
       setSubmittingReview(false);
     }
@@ -12936,8 +12936,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setDocumentFiles([]);
       fetchOrders();
     } catch (err) {
-      console.error('Errorr creating project:', err.response?.data || err);
-      const errorMsg = err.response?.data?.detail || 'Errorr creating project';
+      console.error('Error creating project:', err.response?.data || err);
+      const errorMsg = err.response?.data?.detail || 'Error creating project';
       alert(errorMsg.includes('email') ? 'Invalid email format. Please enter a valid email (e.g., name@email.com)' : errorMsg);
     } finally {
       setCreatingProject(false);
@@ -15889,7 +15889,7 @@ const NewQuotePage = ({ adminKey, user }) => {
   const [sending, setSending] = useState(false);
   const [quote, setQuote] = useState(null);
   const [success, setSuccess] = useState(false);
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
 
   const LANGUAGES = ['Portuguese', 'Spanish', 'English', 'French', 'German', 'Italian', 'Chinese', 'Japanese', 'Korean', 'Arabic', 'Russian'];
 
@@ -15955,12 +15955,12 @@ const NewQuotePage = ({ adminKey, user }) => {
   // Calculate quote
   const calculateQuote = () => {
     if (uploadedFiles.length === 0) {
-      setErrorr('Please upload at least one document');
+      setError('Please upload at least one document');
       return;
     }
 
     setCalculating(true);
-    setErrorr('');
+    setError('');
 
     // Calculate total pages (simplified - 1 page per file for now)
     const totalPages = uploadedFiles.length || 1;
@@ -15996,17 +15996,17 @@ const NewQuotePage = ({ adminKey, user }) => {
   // Send quote to client
   const sendQuote = async () => {
     if (!quote) {
-      setErrorr('Please calculate the quote first');
+      setError('Please calculate the quote first');
       return;
     }
 
     if (!formData.client_email || !formData.client_name) {
-      setErrorr('Please fill in client name and email');
+      setError('Please fill in client name and email');
       return;
     }
 
     setSending(true);
-    setErrorr('');
+    setError('');
 
     try {
       // Create order in backend
@@ -16048,7 +16048,7 @@ const NewQuotePage = ({ adminKey, user }) => {
       }
     } catch (err) {
       console.error('Failed to send quote:', err);
-      setErrorr(err.response?.data?.detail || err.message || 'Failed to send quote');
+      setError(err.response?.data?.detail || err.message || 'Failed to send quote');
     } finally {
       setSending(false);
     }
@@ -16460,7 +16460,7 @@ const FollowupsPage = ({ adminKey }) => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [followupData, setFollowupData] = useState(null);
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
   const [selectedStage, setSelectedStage] = useState(null);
   const [showModal, setShowModal] = useState(false);
 
@@ -16470,7 +16470,7 @@ const FollowupsPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/quotes/followup-status?admin_key=${adminKey}`);
       setFollowupData(response.data);
     } catch (err) {
-      setErrorr('Failed to load follow-up data');
+      setError('Failed to load follow-up data');
       console.error(err);
     } finally {
       setLoading(false);
@@ -16482,7 +16482,7 @@ const FollowupsPage = ({ adminKey }) => {
     try {
       const response = await axios.post(`${API}/admin/quotes/process-followups?admin_key=${adminKey}`);
       const result = response.data;
-      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrorrs: ${result.errors.length}` : ''}`);
+      alert(`Follow-ups processed!\n\nReminders sent: ${result.reminders_sent}\nMarked as lost: ${result.marked_lost}${result.errors?.length > 0 ? `\nErrors: ${result.errors.length}` : ''}`);
       fetchFollowupStatus();
     } catch (err) {
       alert('Failed to process follow-ups. Check console for details.');
@@ -17677,7 +17677,7 @@ const SettingsPage = ({ adminKey }) => {
 const TranslatorLogin = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -17686,7 +17686,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorr('');
+    setError('');
     setLoading(true);
 
     try {
@@ -17694,7 +17694,7 @@ const TranslatorLogin = ({ onLogin }) => {
       if (response.data && response.data.token) {
         // Only allow translators to login here
         if (response.data.role !== 'translator') {
-          setErrorr('This portal is for translators only. Please use the admin panel.');
+          setError('This portal is for translators only. Please use the admin panel.');
           setLoading(false);
           return;
         }
@@ -17709,7 +17709,7 @@ const TranslatorLogin = ({ onLogin }) => {
         });
       }
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Invalid credentials');
+      setError(err.response?.data?.detail || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -17722,7 +17722,7 @@ const TranslatorLogin = ({ onLogin }) => {
       await axios.post(`${API}/admin/auth/forgot-password`, { email: resetEmail });
       setResetSent(true);
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Failed to send reset email');
+      setError(err.response?.data?.detail || 'Failed to send reset email');
     } finally {
       setResetLoading(false);
     }
@@ -17808,7 +17808,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
                   <button
                     type="button"
-                    onClick={() => { setShowForgotPassword(false); setErrorr(''); }}
+                    onClick={() => { setShowForgotPassword(false); setError(''); }}
                     className="w-full py-3 text-gray-600 hover:text-gray-800 font-medium"
                   >
                     Back to Login
@@ -17859,7 +17859,7 @@ const TranslatorLogin = ({ onLogin }) => {
 
               <div className="mt-6 text-center">
                 <button
-                  onClick={() => { setShowForgotPassword(true); setErrorr(''); }}
+                  onClick={() => { setShowForgotPassword(true); setError(''); }}
                   className="text-blue-600 hover:text-blue-700 text-sm hover:underline"
                 >
                   Forgot password?
@@ -17992,7 +17992,7 @@ const ReviewPage = ({ adminKey, user }) => {
           ]);
         }
       } catch (err) {
-        console.error('Errorr loading review data:', err);
+        console.error('Error loading review data:', err);
       } finally {
         setLoading(false);
       }
@@ -18025,7 +18025,7 @@ const ReviewPage = ({ adminKey, user }) => {
       setFullScreenReview(false);
       alert('Translation approved and sent to client!');
     } catch (err) {
-      alert('Errorr approving: ' + (err.response?.data?.detail || err.message));
+      alert('Error approving: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -18044,7 +18044,7 @@ const ReviewPage = ({ adminKey, user }) => {
       setFullScreenReview(false);
       alert('Revision requested from translator!');
     } catch (err) {
-      alert('Errorr: ' + (err.response?.data?.detail || err.message));
+      alert('Error: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -18058,7 +18058,7 @@ const ReviewPage = ({ adminKey, user }) => {
       alert('Changes saved!');
       fetchPendingSubmissions();
     } catch (err) {
-      alert('Errorr saving: ' + (err.response?.data?.detail || err.message));
+      alert('Error saving: ' + (err.response?.data?.detail || err.message));
     } finally {
       setSaving(false);
     }
@@ -18517,7 +18517,7 @@ const UsersPage = ({ adminKey, user }) => {
       const response = await axios.get(`${API}/admin/users?admin_key=${adminKey}&token=`);
       setUsers(response.data);
     } catch (err) {
-      console.error('Errorr fetching users:', err);
+      console.error('Error fetching users:', err);
     } finally {
       setLoading(false);
     }
@@ -18531,7 +18531,7 @@ const UsersPage = ({ adminKey, user }) => {
       const response = await axios.get(`${API}/admin/users/${userId}/documents?admin_key=${adminKey}`);
       setUserDocuments(prev => ({ ...prev, [userId]: response.data.documents || [] }));
     } catch (err) {
-      console.error('Errorr fetching user documents:', err);
+      console.error('Error fetching user documents:', err);
       setUserDocuments(prev => ({ ...prev, [userId]: [] }));
     }
   };
@@ -18575,7 +18575,7 @@ const UsersPage = ({ adminKey, user }) => {
       setEditForm({});
       alert('Perfil atualizado successfully!');
     } catch (err) {
-      console.error('Errorr updating user:', err);
+      console.error('Error updating user:', err);
       alert(err.response?.data?.detail || 'Error updating profile');
     } finally {
       setSavingUser(false);
@@ -18596,7 +18596,7 @@ const UsersPage = ({ adminKey, user }) => {
       await fetchUserDocuments(userId);
       alert('Document sent successfully!');
     } catch (err) {
-      console.error('Errorr uploading document:', err);
+      console.error('Error uploading document:', err);
       alert('Error uploading document');
     } finally {
       setUploadingDoc(false);
@@ -18612,7 +18612,7 @@ const UsersPage = ({ adminKey, user }) => {
       link.download = filename;
       link.click();
     } catch (err) {
-      console.error('Errorr downloading document:', err);
+      console.error('Error downloading document:', err);
       alert('Error downloading document');
     }
   };
@@ -18624,7 +18624,7 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.delete(`${API}/admin/users/${userId}/documents/${docId}?admin_key=${adminKey}`);
       await fetchUserDocuments(userId);
     } catch (err) {
-      console.error('Errorr deleting document:', err);
+      console.error('Error deleting document:', err);
       alert('Error deleting document');
     }
   };
@@ -18687,7 +18687,7 @@ const UsersPage = ({ adminKey, user }) => {
       await axios.put(`${API}/admin/users/${userId}/toggle-active?admin_key=${adminKey}`);
       fetchUsers();
     } catch (err) {
-      alert('Errorr toggling user status');
+      alert('Error toggling user status');
     }
   };
 
@@ -19287,7 +19287,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/production/stats?admin_key=${adminKey}`);
       setStats(response.data.stats || []);
     } catch (err) {
-      console.error('Errorr fetching production stats:', err);
+      console.error('Error fetching production stats:', err);
     }
   };
 
@@ -19296,7 +19296,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments?admin_key=${adminKey}`);
       setPayments(response.data.payments || []);
     } catch (err) {
-      console.error('Errorr fetching payments:', err);
+      console.error('Error fetching payments:', err);
     }
   };
 
@@ -19305,7 +19305,7 @@ const ProductionPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/production/translator/${translatorId}/orders?admin_key=${adminKey}&status=completed`);
       setTranslatorOrders(response.data.orders || []);
     } catch (err) {
-      console.error('Errorr fetching translator orders:', err);
+      console.error('Error fetching translator orders:', err);
     }
   };
 
@@ -19380,7 +19380,7 @@ const ProductionPage = ({ adminKey }) => {
       fetchPayments();
       fetchStats();
     } catch (err) {
-      alert('Errorr deleting payment');
+      alert('Error deleting payment');
     }
   };
 
@@ -19908,7 +19908,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/finances/summary?admin_key=${adminKey}&period=${period}`);
       setSummary(response.data);
     } catch (err) {
-      console.error('Errorr fetching financial summary:', err);
+      console.error('Error fetching financial summary:', err);
     }
   };
 
@@ -19917,7 +19917,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/expenses?admin_key=${adminKey}`);
       setExpenses(response.data.expenses || []);
     } catch (err) {
-      console.error('Errorr fetching expenses:', err);
+      console.error('Error fetching expenses:', err);
     }
   };
 
@@ -19937,7 +19937,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments/report?admin_key=${adminKey}`);
       setPaymentReport(response.data);
     } catch (err) {
-      console.error('Errorr fetching payment report:', err);
+      console.error('Error fetching payment report:', err);
     }
   };
 
@@ -19946,7 +19946,7 @@ const FinancesPage = ({ adminKey }) => {
       const response = await axios.get(`${API}/admin/payments/translator/${translatorId}?admin_key=${adminKey}`);
       setTranslatorPayments(response.data.payments || []);
     } catch (err) {
-      console.error('Errorr fetching translator payments:', err);
+      console.error('Error fetching translator payments:', err);
     }
   };
 
@@ -20147,7 +20147,7 @@ const FinancesPage = ({ adminKey }) => {
       alert('Partner deleted successfully');
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
-      alert('Errorr deleting partner: ' + (err.response?.data?.detail || err.message));
+      alert('Error deleting partner: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -20238,7 +20238,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Errorr creating expense');
+      alert('Error creating expense');
     }
   };
 
@@ -20249,7 +20249,7 @@ const FinancesPage = ({ adminKey }) => {
       fetchExpenses();
       fetchSummary();
     } catch (err) {
-      alert('Errorr deleting expense');
+      alert('Error deleting expense');
     }
   };
 
@@ -21490,7 +21490,7 @@ const FinancesPage = ({ adminKey }) => {
 const SetPasswordPage = ({ inviteToken, onComplete }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -21522,7 +21522,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
         const response = await axios.get(`${API}/admin/auth/verify-invitation?token=${inviteToken}`);
         setUserInfo(response.data.user);
       } catch (err) {
-        setErrorr(err.response?.data?.detail || 'Invalid or expired invitation link');
+        setError(err.response?.data?.detail || 'Invalid or expired invitation link');
       } finally {
         setVerifying(false);
       }
@@ -21532,15 +21532,15 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 
   const handlePasswordStep = (e) => {
     e.preventDefault();
-    setErrorr('');
+    setError('');
 
     if (password !== confirmPassword) {
-      setErrorr('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      setErrorr('Password must be at least 6 characters');
+      setError('Password must be at least 6 characters');
       return;
     }
 
@@ -21553,21 +21553,21 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
   };
 
   const handleFinalSubmit = async () => {
-    setErrorr('');
+    setError('');
 
     // Validate terms acceptance for translators and PMs
     if (requiresTerms) {
       if (!acceptedTerms) {
-        setErrorr('You must accept the terms and conditions');
+        setError('You must accept the terms and conditions');
         return;
       }
       if (!acceptedProhibitedUse) {
-        setErrorr('You must accept the prohibited use clause');
+        setError('You must accept the prohibited use clause');
         return;
       }
       // Ethics only required for translators
       if (isTranslator && !acceptedEthics) {
-        setErrorr('You must accept the translator ethics guidelines');
+        setError('You must accept the translator ethics guidelines');
         return;
       }
     }
@@ -21607,7 +21607,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
       setSuccess('Account set up successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Failed to set up account');
+      setError(err.response?.data?.detail || 'Failed to set up account');
     } finally {
       setLoading(false);
     }
@@ -22006,7 +22006,7 @@ const SetPasswordPage = ({ inviteToken, onComplete }) => {
 const ResetPasswordPage = ({ resetToken, onComplete }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setErrorr] = useState('');
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(true);
@@ -22018,7 +22018,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
         await axios.get(`${API}/admin/auth/verify-reset-token?token=${resetToken}`);
         setTokenValid(true);
       } catch (err) {
-        setErrorr(err.response?.data?.detail || 'Invalid or expired reset link');
+        setError(err.response?.data?.detail || 'Invalid or expired reset link');
       } finally {
         setVerifying(false);
       }
@@ -22028,15 +22028,15 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorr('');
+    setError('');
 
     if (password !== confirmPassword) {
-      setErrorr('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      setErrorr('Password must be at least 6 characters');
+      setError('Password must be at least 6 characters');
       return;
     }
 
@@ -22052,7 +22052,7 @@ const ResetPasswordPage = ({ resetToken, onComplete }) => {
       setSuccess('Password reset successfully! You can now log in.');
       setTimeout(() => onComplete(), 2000);
     } catch (err) {
-      setErrorr(err.response?.data?.detail || 'Failed to reset password');
+      setError(err.response?.data?.detail || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -22185,7 +22185,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Proofreading state
   const [proofreadingResult, setProofreadingResult] = useState(null);
   const [isProofreading, setIsProofreading] = useState(false);
-  const [proofreadingErrorr, setProofreadingErrorr] = useState('');
+  const [proofreadingError, setProofreadingError] = useState('');
 
   // Translator Assignment Modal state (for email invites)
   const [assigningTranslatorModal, setAssigningTranslatorModal] = useState(null);
@@ -22694,7 +22694,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
           htmlContent = result.value;
         } catch (err) {
           console.error('Word conversion error:', err);
-          alert(`Errorr converting Word document: ${file.name}`);
+          alert(`Error converting Word document: ${file.name}`);
         }
       }
       // Plain text
@@ -23332,7 +23332,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
   // Execute automatic proofreading
   const executeProofreading = async () => {
     if (!selectedReview || !translatedContent) {
-      setProofreadingErrorr('Noa translation selected to review.');
+      setProofreadingError('Noa translation selected to review.');
       return;
     }
 
@@ -23357,12 +23357,12 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     }
 
     if (!translatedText.trim()) {
-      setProofreadingErrorr('Não foi possível extrair o texto da translation to review.');
+      setProofreadingError('Não foi possível extrair o texto da translation to review.');
       return;
     }
 
     setIsProofreading(true);
-    setProofreadingErrorr('');
+    setProofreadingError('');
     setProofreadingResult(null);
 
     try {
@@ -23370,7 +23370,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       const claudeApiKey = localStorage.getItem('claude_api_key') || '';
 
       if (!claudeApiKey) {
-        setProofreadingErrorr('Chave API do Claude não configurada. Configure em Configurações.');
+        setProofreadingError('Chave API do Claude não configurada. Configure em Configurações.');
         setIsProofreading(false);
         return;
       }
@@ -23387,11 +23387,11 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       if (response.data.proofreading_result) {
         setProofreadingResult(response.data.proofreading_result);
       } else if (response.data.raw_response) {
-        setProofreadingErrorr(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
+        setProofreadingError(`Resposta da IA:\n${response.data.raw_response.substring(0, 500)}...`);
       }
     } catch (error) {
       console.error('Proofreading error:', error);
-      setProofreadingErrorr(error.response?.data?.detail || error.message || 'Error running automatic review');
+      setProofreadingError(error.response?.data?.detail || error.message || 'Error running automatic review');
     } finally {
       setIsProofreading(false);
     }
@@ -24373,10 +24373,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                   </button>
                 </div>
 
-                {/* Errorr Message */}
-                {proofreadingErrorr && (
+                {/* Error Message */}
+                {proofreadingError && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded mb-3">
-                    <p className="text-xs text-red-600">❌ {proofreadingErrorr}</p>
+                    <p className="text-xs text-red-600">❌ {proofreadingError}</p>
                   </div>
                 )}
 
@@ -24419,7 +24419,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                       </div>
                     </div>
 
-                    {/* Errorr List */}
+                    {/* Error List */}
                     {proofreadingResult.erros && proofreadingResult.erros.length > 0 && (
                       <div className="max-h-60 overflow-y-auto border rounded">
                         <table className="w-full text-[10px]">
@@ -24476,7 +24476,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                 )}
 
                 {/* No review yet message */}
-                {!proofreadingResult && !proofreadingErrorr && !isProofreading && (
+                {!proofreadingResult && !proofreadingError && !isProofreading && (
                   <div className="text-center py-4 text-gray-400 text-xs">
                     Click em "Run Proofreading" to analyze a translation automatically
                   </div>
@@ -26615,7 +26615,7 @@ function AdminApp() {
             setActiveTab('translation');
           }
         } catch (e) {
-          console.error('Errorr parsing saved user:', e);
+          console.error('Error parsing saved user:', e);
         }
       }
     }
