@@ -8,6 +8,7 @@ import CustomerApp from "./CustomerApp";
 import SalespersonApp from "./SalespersonApp";
 import B2BLandingPage from "./B2BLandingPage";
 import AssignmentPage from "./AssignmentPage";
+import VerificationPage from "./VerificationPage";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
@@ -27,6 +28,9 @@ root.render(
         <Route path="/sales-invite" element={<SalespersonApp />} />
         {/* Assignment Accept/Decline - /#/assignment/:token/:action */}
         <Route path="/assignment/:token/:action" element={<AssignmentPage />} />
+        {/* Document Verification - /#/verify/:certificationId */}
+        <Route path="/verify/:certificationId" element={<VerificationPage />} />
+        <Route path="/verify" element={<VerificationPage />} />
         {/* B2B Landing Page - Alternative route */}
         <Route path="/b2b" element={<B2BLandingPage />} />
         {/* Customer Portal - Default page for visitors to request quotes */}

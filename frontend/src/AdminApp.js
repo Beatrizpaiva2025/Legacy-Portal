@@ -2706,9 +2706,23 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             }]);
           }
 
-          // Set original images if available
+          // Set original images if available (for both normal flow and Quick Package)
           if (orderData.translation_original_images && orderData.translation_original_images.length > 0) {
             setOriginalImages(orderData.translation_original_images);
+            // Also populate quickOriginalFiles for Quick Package mode
+            const convertedForQuickPackage = orderData.translation_original_images.map(img => {
+              let data = img.data;
+              let type = img.type || 'image/png';
+              if (data && data.startsWith('data:')) {
+                const matches = data.match(/^data:([^;]+);base64,(.+)$/);
+                if (matches) {
+                  type = matches[1];
+                  data = matches[2];
+                }
+              }
+              return { filename: img.filename, data: data, type: type };
+            });
+            setQuickOriginalFiles(convertedForQuickPackage);
           }
 
           // Set other translation settings
@@ -4742,6 +4756,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         setCertificationData(certData);
       } catch (err) {
         console.error('Failed to create certification for Quick Package:', err);
+        // Show warning but continue without verification page
+        setQuickPackageProgress('⚠️ Verification page not available - continuing without QR code...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
       }
       setQuickPackageProgress('Generating package...');
     }
@@ -9704,7 +9721,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <input
                     type="radio"
                     checked={quickPackageMode}
-                    onChange={() => setQuickPackageMode(true)}
+                    onChange={() => {
+                      setQuickPackageMode(true);
+                      // Auto-populate quickOriginalFiles from originalImages if available
+                      if (originalImages.length > 0 && quickOriginalFiles.length === 0) {
+                        const convertedFiles = originalImages.map(img => {
+                          // Extract base64 data - handle both formats (with and without data: prefix)
+                          let data = img.data;
+                          let type = img.type || 'image/png';
+                          if (data && data.startsWith('data:')) {
+                            const matches = data.match(/^data:([^;]+);base64,(.+)$/);
+                            if (matches) {
+                              type = matches[1];
+                              data = matches[2];
+                            }
+                          }
+                          return { filename: img.filename, data: data, type: type };
+                        });
+                        setQuickOriginalFiles(convertedFiles);
+                      }
+                    }}
                     className="sr-only"
                   />
                   <span className="mr-2">📦</span>

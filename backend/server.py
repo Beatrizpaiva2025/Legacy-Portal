@@ -1603,6 +1603,8 @@ class CertificationVerifyResponse(BaseModel):
     document_type: Optional[str] = None
     source_language: Optional[str] = None
     target_language: Optional[str] = None
+    page_count: Optional[int] = None
+    order_number: Optional[str] = None
     certifier_name: Optional[str] = None
     certifier_title: Optional[str] = None
     certifier_credentials: Optional[str] = None
@@ -19859,12 +19861,15 @@ def generate_qr_code(data: str) -> str:
 @api_router.post("/certifications/create")
 async def create_certification(data: CertificationCreate, admin_key: str):
     """Create a new document certification with unique ID and QR code"""
-    # Validate admin key
+    # Validate admin key or user token (admin, PM, and in-house translators can create certifications)
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
-            is_valid = True
+        if user:
+            user_role = user.get("role")
+            is_in_house = user_role == "translator" and user.get("translator_type") == "in_house"
+            if user_role in ["admin", "pm"] or is_in_house:
+                is_valid = True
 
     if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid admin key")
@@ -19956,6 +19961,8 @@ async def verify_certification(certification_id: str):
             document_type=certification.get("document_type"),
             source_language=certification.get("source_language"),
             target_language=certification.get("target_language"),
+            page_count=certification.get("page_count"),
+            order_number=certification.get("order_number"),
             certifier_name=certification.get("certifier_name"),
             certifier_title=certification.get("certifier_title"),
             certifier_credentials=certification.get("certifier_credentials"),
