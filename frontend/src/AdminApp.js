@@ -8826,6 +8826,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     <div className="w-px h-5 bg-gray-300 mx-1"></div>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('decreaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A-</button>
                     <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('increaseFontSize'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200">A+</button>
+                    <div className="w-px h-5 bg-gray-300 mx-1"></div>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyLeft'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Left">⬅</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyCenter'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Center">⬌</button>
+                    <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('justifyRight'); }} className="px-2 py-1 text-xs bg-white border rounded hover:bg-gray-200" title="Align Right">➡</button>
                   </div>
                 )}
               </div>
@@ -8886,13 +8890,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     )}
                   </div>
                   {/* Right: Translation */}
-                  <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                  <div className="overflow-hidden bg-white flex flex-col h-full" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
                     {reviewViewMode === 'preview' ? (
                       <iframe
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                         title="Translation Preview"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '384px'}}
+                        className="w-full border-0 flex-1"
+                        style={{minHeight: '380px'}}
                       />
                     ) : (
                       <div
@@ -8902,8 +8906,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
+                        style={{minHeight: '380px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9129,9 +9133,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     )}
                   </div>
                   {/* Right: Translation */}
-                  <div className="overflow-auto bg-white">
+                  <div className="overflow-hidden bg-white flex flex-col h-full">
                     {proofreadingViewMode === 'edit' && (
-                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b sticky top-0">
+                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b flex-shrink-0">
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200">B</button>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200">I</button>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200">U</button>
@@ -9148,8 +9152,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '580px'}}
+                        className="w-full border-0 flex-1"
+                        style={{minHeight: '540px'}}
                       />
                     ) : (
                       <div
@@ -9159,8 +9163,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '580px', height: '580px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
+                        style={{minHeight: '540px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9409,24 +9413,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         📤 Send to Client
                       </button>
                     )}
+
+                    {/* Next: Go to Deliver tab */}
+                    <button
+                      onClick={() => setActiveSubTab('deliver')}
+                      className="px-6 py-2 bg-teal-600 text-white text-sm font-medium rounded hover:bg-teal-700 flex items-center gap-2"
+                    >
+                      Next: Deliver <span className="ml-1">→</span>
+                    </button>
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
                   {(isInHouseTranslator || isContractor) ? (
                     <>
                       📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   ) : isPM && !isAdmin ? (
                     <>
                       ✅ <strong>Approve:</strong> Approves translation and sends to Admin for client delivery
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   ) : (
                     <>
                       📤 <strong>Send to Client:</strong> Delivers the approved translation to the client
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   )}
                 </p>
@@ -10440,46 +10458,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Non-Certified Translation Options */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-2">📄 For non-certified translations</h3>
-                <p className="text-[10px] text-slate-600 mb-3">Check to EXCLUDE from final document:</p>
+              {/* Document Options */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-green-700 mb-2">📦 Document Options</h3>
+                <p className="text-[10px] text-green-600 mb-3">Select what to include in the final document:</p>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeCover}
-                      onChange={(e) => setIncludeCover(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeCover}
+                      onChange={(e) => setIncludeCover(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Certificate of Accuracy</span>
+                    <span className="font-medium">📜 Include Certificate of Accuracy</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeLetterhead}
-                      onChange={(e) => setIncludeLetterhead(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeLetterhead}
+                      onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Letterhead</span>
+                    <span className="font-medium">📋 Include Letterhead on pages</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeOriginal}
-                      onChange={(e) => setIncludeOriginal(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeOriginal}
+                      onChange={(e) => setIncludeOriginal(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Original Document</span>
+                    <span className="font-medium">📑 Include Original Documents</span>
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
+                  <label className="flex items-center text-xs cursor-pointer p-2 bg-purple-50 border border-purple-200 rounded">
                     <input
                       type="checkbox"
                       checked={includeVerificationPage}
                       onChange={(e) => setIncludeVerificationPage(e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">🔐 Include Verification Page (QR Code)</span>
+                    <span className="font-medium text-purple-700">🔐 Include Verification Page (QR Code)</span>
                   </label>
                 </div>
               </div>
