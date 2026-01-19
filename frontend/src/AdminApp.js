@@ -21885,6 +21885,12 @@ const FinancesPage = ({ adminKey }) => {
                   <div className="p-3 bg-red-50 border border-red-200 rounded">
                     <p className="text-red-600 text-sm font-medium">Failed to load vendors</p>
                     <p className="text-red-500 text-xs mt-1">{vendorError}</p>
+                    {vendorError.includes('401') && (
+                      <p className="text-red-400 text-xs mt-2">Session may have expired. Try logging out and back in.</p>
+                    )}
+                    {vendorError.includes('403') && (
+                      <p className="text-red-400 text-xs mt-2">Permission denied. Your role may have changed - try logging out and back in.</p>
+                    )}
                     <button
                       onClick={fetchTranslatorsForPayment}
                       className="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
