@@ -14102,6 +14102,39 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
 
         # Build the message content based on whether we have an image or just text
         if request.original_image:
+            # Compress image if too large to avoid Claude API size limits
+            image_data = request.original_image
+            media_type = "image/png"
+            try:
+                # Decode base64 image
+                import io
+                image_bytes = base64.b64decode(image_data)
+                img = Image.open(io.BytesIO(image_bytes))
+
+                # Check if image needs resizing (max 1500px on longest side for API limits)
+                max_dimension = 1500
+                if img.width > max_dimension or img.height > max_dimension:
+                    # Calculate new size maintaining aspect ratio
+                    ratio = min(max_dimension / img.width, max_dimension / img.height)
+                    new_size = (int(img.width * ratio), int(img.height * ratio))
+                    img = img.resize(new_size, Image.Resampling.LANCZOS)
+                    logger.info(f"Resized image from {request.original_image[:50]}... to {new_size}")
+
+                # Convert to RGB if necessary (for JPEG)
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+
+                # Compress as JPEG with quality 85
+                buffer = io.BytesIO()
+                img.save(buffer, format='JPEG', quality=85, optimize=True)
+                image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                media_type = "image/jpeg"
+                logger.info(f"Compressed image for proofreading: original ~{len(request.original_image)//1024}KB, compressed ~{len(image_data)//1024}KB")
+            except Exception as e:
+                logger.warning(f"Could not compress image, using original: {str(e)}")
+                # Use original image if compression fails
+                image_data = request.original_image
+
             # Use Claude Vision API with image
             user_content = [
                 {
@@ -14112,8 +14145,8 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
                     "type": "image",
                     "source": {
                         "type": "base64",
-                        "media_type": "image/png",
-                        "data": request.original_image
+                        "media_type": media_type,
+                        "data": image_data
                     }
                 },
                 {
