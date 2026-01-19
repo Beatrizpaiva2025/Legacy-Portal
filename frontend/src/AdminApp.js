@@ -8886,13 +8886,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     )}
                   </div>
                   {/* Right: Translation */}
-                  <div className="overflow-auto bg-white" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
+                  <div className="overflow-hidden bg-white flex flex-col h-full" ref={translatedTextRef} onScroll={() => handleScroll('translated')}>
                     {reviewViewMode === 'preview' ? (
                       <iframe
                         srcDoc={translationResults[selectedResultIndex]?.translatedText || '<p>No translation</p>'}
                         title="Translation Preview"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '384px'}}
+                        className="w-full border-0 flex-1"
+                        style={{minHeight: '380px'}}
                       />
                     ) : (
                       <div
@@ -8902,8 +8902,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '384px', height: '384px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
+                        style={{minHeight: '380px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
@@ -9129,9 +9129,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     )}
                   </div>
                   {/* Right: Translation */}
-                  <div className="overflow-auto bg-white">
+                  <div className="overflow-hidden bg-white flex flex-col h-full">
                     {proofreadingViewMode === 'edit' && (
-                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b sticky top-0">
+                      <div className="flex items-center space-x-1 bg-gray-100 px-2 py-1 border-b flex-shrink-0">
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('bold'); }} className="px-2 py-1 text-xs font-bold bg-white border rounded hover:bg-gray-200">B</button>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('italic'); }} className="px-2 py-1 text-xs italic bg-white border rounded hover:bg-gray-200">I</button>
                         <button onMouseDown={(e) => { e.preventDefault(); execFormatCommand('underline'); }} className="px-2 py-1 text-xs underline bg-white border rounded hover:bg-gray-200">U</button>
@@ -9148,8 +9148,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full h-full border-0"
-                        style={{minHeight: '580px'}}
+                        className="w-full border-0 flex-1"
+                        style={{minHeight: '540px'}}
                       />
                     ) : (
                       <div
@@ -9159,8 +9159,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto"
-                        style={{minHeight: '580px', height: '580px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
+                        style={{minHeight: '540px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
