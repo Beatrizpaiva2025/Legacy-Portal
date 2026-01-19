@@ -1488,6 +1488,11 @@ class PartnerInvoice(BaseModel):
     # Notes
     notes: Optional[str] = None
     admin_notes: Optional[str] = None
+    # QuickBooks integration
+    quickbooks_invoice_id: Optional[str] = None
+    quickbooks_invoice_number: Optional[str] = None
+    quickbooks_synced_at: Optional[datetime] = None
+    quickbooks_customer_id: Optional[str] = None
 
 class PartnerInvoiceCreate(BaseModel):
     partner_id: str
@@ -20628,6 +20633,175 @@ async def quickbooks_sync_contractor_payment(
         raise
     except Exception as e:
         logger.error(f"QuickBooks sync contractor payment error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/quickbooks/sync/partner-invoice")
+async def quickbooks_sync_partner_invoice(
+    admin_key: str = None,
+    invoice_id: str = Body(...),
+    send_email: bool = Body(True)
+):
+    """
+    Create and optionally send an Invoice in QuickBooks for a Partner Invoice.
+
+    This creates a proper Invoice (not Sales Receipt) for B2B partner billing,
+    since the partner hasn't paid yet. The invoice will be sent to the partner's email.
+    """
+    try:
+        # Check QuickBooks connection
+        settings = await db.settings.find_one({"key": "quickbooks"})
+        if not settings or not settings.get("quickbooks_connected"):
+            raise HTTPException(status_code=400, detail="QuickBooks not connected")
+
+        # Get the partner invoice
+        partner_invoice = await db.partner_invoices.find_one({"id": invoice_id})
+        if not partner_invoice:
+            raise HTTPException(status_code=404, detail="Partner invoice not found")
+
+        # Check if already synced
+        if partner_invoice.get("quickbooks_invoice_id"):
+            return {
+                "success": True,
+                "already_synced": True,
+                "invoice_id": partner_invoice.get("quickbooks_invoice_id"),
+                "invoice_number": partner_invoice.get("quickbooks_invoice_number"),
+                "message": "Invoice already synced to QuickBooks"
+            }
+
+        # Get partner details
+        partner = await db.partners.find_one({"id": partner_invoice.get("partner_id")})
+        if not partner:
+            raise HTTPException(status_code=404, detail="Partner not found")
+
+        qb_client = get_quickbooks_client(settings)
+
+        # Get or create customer in QuickBooks
+        partner_email = partner.get("email") or partner_invoice.get("partner_email")
+        partner_name = partner.get("company_name") or partner_invoice.get("partner_company")
+
+        qb_customer_id = None
+
+        # Try to find existing customer by email
+        if partner_email:
+            existing = qb_client.find_customer_by_email(partner_email)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # If not found by email, try by company name
+        if not qb_customer_id and partner_name:
+            existing = qb_client.find_customer_by_name(partner_name)
+            if existing.get("success"):
+                customers = existing.get("data", {}).get("QueryResponse", {}).get("Customer", [])
+                if customers:
+                    qb_customer_id = customers[0].get("Id")
+
+        # Create customer if not found
+        if not qb_customer_id:
+            cust_result = qb_client.create_customer(
+                display_name=partner_name or "Partner",
+                email=partner_email,
+                phone=partner.get("phone"),
+                company=partner_name
+            )
+            if cust_result.get("success"):
+                qb_customer_id = cust_result.get("data", {}).get("Customer", {}).get("Id")
+            else:
+                raise HTTPException(status_code=400, detail=f"Failed to create customer in QuickBooks: {cust_result.get('error')}")
+
+        # Get orders included in this invoice to build line items
+        order_ids = partner_invoice.get("order_ids", [])
+        orders = await db.translation_orders.find({"id": {"$in": order_ids}}).to_list(1000)
+
+        # Build line items from orders
+        line_items = []
+        for order in orders:
+            doc_type = order.get('document_type', order.get('service_type', 'Document'))
+            source_lang = order.get('translate_from', order.get('source_language', ''))
+            target_lang = order.get('translate_to', order.get('target_language', ''))
+            order_num = order.get('order_number', order.get('id', ''))[:8]
+
+            description = f"Translation - {doc_type}"
+            if source_lang and target_lang:
+                description += f" ({source_lang} to {target_lang})"
+            description += f" - Order #{order_num}"
+
+            line_items.append({
+                "description": description,
+                "amount": order.get("total_price", 0),
+                "quantity": 1
+            })
+
+        # If no orders found, create a single line item with total
+        if not line_items:
+            line_items = [{
+                "description": f"Partner Invoice {partner_invoice.get('invoice_number')} - Translation Services",
+                "amount": partner_invoice.get("total_amount", 0),
+                "quantity": 1
+            }]
+
+        # Format due date
+        due_date = None
+        if partner_invoice.get("due_date"):
+            due_date_obj = partner_invoice.get("due_date")
+            if isinstance(due_date_obj, datetime):
+                due_date = due_date_obj.strftime("%Y-%m-%d")
+            elif isinstance(due_date_obj, str):
+                due_date = due_date_obj[:10]  # Take just the date part
+
+        # Create Invoice in QuickBooks
+        invoice_result = qb_client.create_invoice(
+            customer_id=qb_customer_id,
+            line_items=line_items,
+            due_date=due_date,
+            memo=f"Invoice {partner_invoice.get('invoice_number')} - {len(order_ids)} orders"
+        )
+
+        if not invoice_result.get("success"):
+            raise HTTPException(status_code=400, detail=f"Failed to create invoice: {invoice_result.get('error')}")
+
+        qb_invoice = invoice_result.get("data", {}).get("Invoice", {})
+        qb_invoice_id = qb_invoice.get("Id")
+        qb_invoice_number = qb_invoice.get("DocNumber")
+
+        # Send invoice via email if requested
+        email_sent = False
+        if send_email and qb_invoice_id and partner_email:
+            send_result = qb_client.send_invoice(qb_invoice_id, partner_email)
+            if send_result.get("success"):
+                email_sent = True
+            else:
+                logger.warning(f"Failed to send invoice email: {send_result.get('error')}")
+
+        # Update partner invoice with QuickBooks info
+        update_data = {
+            "quickbooks_invoice_id": qb_invoice_id,
+            "quickbooks_invoice_number": qb_invoice_number,
+            "quickbooks_synced_at": datetime.utcnow(),
+            "quickbooks_customer_id": qb_customer_id
+        }
+
+        await db.partner_invoices.update_one(
+            {"id": invoice_id},
+            {"$set": update_data}
+        )
+
+        logger.info(f"Synced partner invoice {partner_invoice.get('invoice_number')} to QuickBooks as invoice #{qb_invoice_number}")
+
+        return {
+            "success": True,
+            "invoice_id": qb_invoice_id,
+            "invoice_number": qb_invoice_number,
+            "customer_id": qb_customer_id,
+            "email_sent": email_sent,
+            "sent_to": partner_email if email_sent else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"QuickBooks sync partner invoice error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
