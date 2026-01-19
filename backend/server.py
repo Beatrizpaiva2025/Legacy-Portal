@@ -6615,14 +6615,14 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
 
 @api_router.get("/admin/payments/translators")
 async def get_translators_payment_summary(admin_key: str):
-    """Get payment summary for all translators (admin and PM can access)"""
+    """Get payment summary for all translators (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
+        if user and user.get("role") == "admin":
             is_valid = True
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin or PM access required")
+        raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
         # Get ALL users - show everyone regardless of is_active status
@@ -6669,14 +6669,14 @@ async def get_translators_payment_summary(admin_key: str):
 
 @api_router.get("/admin/payments/translator/{translator_id}")
 async def get_translator_payment_history(translator_id: str, admin_key: str):
-    """Get payment history for a specific translator (admin and PM can access)"""
+    """Get payment history for a specific translator (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
+        if user and user.get("role") == "admin":
             is_valid = True
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin or PM access required")
+        raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -6733,14 +6733,14 @@ async def register_payment(
     commission_rate: float = Form(None),
     receipt_file: UploadFile = File(None)
 ):
-    """Register a payment made to a vendor/contractor (admin and PM can access)"""
+    """Register a payment made to a vendor/contractor (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
+        if user and user.get("role") == "admin":
             is_valid = True
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin or PM access required")
+        raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
         # Find user (translator, sales, or any role)
@@ -6805,14 +6805,14 @@ async def register_payment(
 
 @api_router.post("/admin/payments/add-pages")
 async def add_translator_pages(admin_key: str, translator_id: str = Body(...), pages: int = Body(...), order_id: str = Body(""), notes: str = Body("")):
-    """Add pages to a translator's pending payment count (admin and PM can access)"""
+    """Add pages to a translator's pending payment count (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
+        if user and user.get("role") == "admin":
             is_valid = True
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin or PM access required")
+        raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -6832,14 +6832,14 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
 
 @api_router.get("/admin/payments/report")
 async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
-    """Get payment report with totals (admin and PM can access)"""
+    """Get payment report with totals (admin only)"""
     is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
     if not is_valid:
         user = await get_current_admin_user(admin_key)
-        if user and user.get("role") in ["admin", "pm"]:
+        if user and user.get("role") == "admin":
             is_valid = True
     if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin or PM access required")
+        raise HTTPException(status_code=401, detail="Admin access required")
 
     try:
         query = {}
