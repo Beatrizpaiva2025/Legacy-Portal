@@ -22681,6 +22681,7 @@ const FinancesPage = ({ adminKey }) => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Paid</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Orders Pending</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Received</th>
@@ -22692,7 +22693,7 @@ const FinancesPage = ({ adminKey }) => {
                 <tbody className="divide-y">
                   {partnerStats.partners?.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
                         No partner orders found
                       </td>
                     </tr>
@@ -22701,6 +22702,32 @@ const FinancesPage = ({ adminKey }) => {
                       <tr key={partner.partner_id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-800">{partner.company_name}</div>
+                          {partner.contact_name && (
+                            <div className="text-xs text-gray-500">{partner.contact_name}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {partner.email ? (
+                            <div className="space-y-1">
+                              <a
+                                href={`mailto:${partner.email}`}
+                                className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1"
+                                title={`Send email to ${partner.email}`}
+                              >
+                                📧 {partner.email}
+                              </a>
+                              {partner.phone && (
+                                <a
+                                  href={`tel:${partner.phone}`}
+                                  className="text-green-600 hover:text-green-800 text-xs flex items-center gap-1"
+                                >
+                                  📞 {partner.phone}
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 text-xs">No contact info</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
