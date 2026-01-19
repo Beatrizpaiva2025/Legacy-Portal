@@ -2858,9 +2858,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       // Get original images - use Quick Package data if in that mode
       let origImages = [];
       if (quickPackageMode && quickOriginalFiles.length > 0) {
-        origImages = quickOriginalFiles.map(img => ({ filename: img.filename, data: img.data }));
+        origImages = quickOriginalFiles.map(img => ({ filename: img.filename, data: img.data, type: img.type || 'image/png' }));
       } else if (originalImages.length > 0) {
-        origImages = originalImages.map(img => ({ filename: img.filename, data: img.data }));
+        origImages = originalImages.map(img => ({ filename: img.filename, data: img.data, type: img.type || 'image/png' }));
       }
 
       // Send to backend with destination info
@@ -4758,10 +4758,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         console.error('Failed to create certification for Quick Package:', err);
         // Show warning but continue without verification page
         setQuickPackageProgress('⚠️ Verification page not available - continuing without QR code...');
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Alert user so they're aware
+        console.warn('Certificate creation failed. Check if order is selected and API is accessible.');
       }
       setQuickPackageProgress('Generating package...');
     }
+
+    // Log certification status for debugging
+    console.log('Certification status:', { includeCertification, hasCertData: !!certData, certId: certData?.certification_id });
 
     // Use saved translator name from database if available, otherwise fall back to UI selection
     const translatorNameForCert = savedTranslatorName || selectedTranslator;
@@ -4867,11 +4872,21 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
         <div class="header-line"></div>`;
 
-    // Translation pages - supports both HTML content and images
+    // Translation pages - supports HTML content OR images (not both to avoid duplication)
     let translationPagesHTML = '';
 
-    // If we have HTML content (from Word/HTML/TXT)
-    if (quickTranslationHtml) {
+    // Prefer image files if available (from images or PDF conversion) - each page gets its own header
+    if (quickTranslationFiles.length > 0) {
+      translationPagesHTML = quickTranslationFiles.map((file, idx) => `
+    <div class="translation-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="translation-content">
+            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
+        </div>
+    </div>`).join('');
+    }
+    // Otherwise use HTML content (from Word/HTML/TXT)
+    else if (quickTranslationHtml) {
       // For HTML content, use a running header that appears on every printed page
       translationPagesHTML = `
     <div class="translation-text-page">
@@ -4888,19 +4903,10 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     </div>`;
     }
 
-    // If we have image files (from images or PDF conversion)
-    if (quickTranslationFiles.length > 0) {
-      translationPagesHTML += quickTranslationFiles.map((file, idx) => `
-    <div class="translation-page">
-        ${includeLetterhead ? letterheadHTML : ''}
-        <div class="translation-content">
-            <img src="data:${file.type || 'image/png'};base64,${file.data}" alt="Translation page ${idx + 1}" class="translation-image" />
-        </div>
-    </div>`).join('');
-    }
-
     // Original document pages (SAME structure as handleDownload)
-    const originalPagesHTML = (includeOriginal && quickOriginalFiles.length > 0) ? quickOriginalFiles.map((file, idx) => `
+    // Filter out files with invalid/missing data
+    const validOriginalFiles = quickOriginalFiles.filter(file => file.data && file.data.length > 100);
+    const originalPagesHTML = (includeOriginal && validOriginalFiles.length > 0) ? validOriginalFiles.map((file, idx) => `
     <div class="original-documents-page">
         ${includeLetterhead ? letterheadHTML : ''}
         ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
