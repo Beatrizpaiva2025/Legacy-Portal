@@ -5085,13 +5085,14 @@ async def list_all_coupons(admin_key: str):
     if existing_templates == 0:
         # Create default MASS coupon templates
         default_coupons = [
-            {"code": "MASS5", "discount_value": 5.0},
-            {"code": "MASS10", "discount_value": 10.0},
-            {"code": "MASS15", "discount_value": 15.0},
-            {"code": "MASS20", "discount_value": 20.0},
-            {"code": "MASS25", "discount_value": 25.0},
-            {"code": "MASS30", "discount_value": 30.0},
-            {"code": "MASS35", "discount_value": 35.0},
+            {"code": "MASS5", "discount_value": 5.0, "first_order_only": False},
+            {"code": "MASS10", "discount_value": 10.0, "first_order_only": False},
+            {"code": "MASS15", "discount_value": 15.0, "first_order_only": False},
+            {"code": "MASS20", "discount_value": 20.0, "first_order_only": False},
+            {"code": "MASS25", "discount_value": 25.0, "first_order_only": False},
+            {"code": "MASS30", "discount_value": 30.0, "first_order_only": False},
+            {"code": "MASS35", "discount_value": 35.0, "first_order_only": False},
+            {"code": "WELCOME100", "discount_value": 100.0, "first_order_only": True},  # 100% off first order only
         ]
         for coupon_data in default_coupons:
             coupon = {
@@ -5105,12 +5106,12 @@ async def list_all_coupons(admin_key: str):
                 "valid_from": datetime.utcnow(),
                 "valid_until": datetime.utcnow() + timedelta(days=365 * 5),
                 "min_order_value": 0.0,
-                "first_order_only": False,
+                "first_order_only": coupon_data.get("first_order_only", False),
                 "partner_id": None,
                 "created_at": datetime.utcnow()
             }
             await db.coupons.insert_one(coupon)
-        logger.info("Created default MASS coupon templates")
+        logger.info("Created default coupon templates including WELCOME100")
 
     coupons = await db.coupons.find().to_list(500)
 
@@ -8915,6 +8916,10 @@ async def get_partner_statistics(admin_key: str):
         "partner_id": {"$exists": True, "$ne": None}
     }).to_list(10000)
 
+    # Get all partners for contact info
+    all_partners = await db.partners.find({}).to_list(500)
+    partners_by_id = {p.get("id"): p for p in all_partners}
+
     # Group by partner company
     partner_stats = {}
     for order in partner_orders:
@@ -8922,13 +8927,19 @@ async def get_partner_statistics(admin_key: str):
         partner_id = order.get("partner_id")
 
         if company not in partner_stats:
+            # Get partner contact info
+            partner_info = partners_by_id.get(partner_id, {})
             partner_stats[company] = {
                 "partner_id": partner_id,
                 "company_name": company,
+                "email": partner_info.get("email", ""),
+                "contact_name": partner_info.get("contact_name") or partner_info.get("name", ""),
+                "phone": partner_info.get("phone", ""),
                 "total_received": 0,
                 "total_pending": 0,
                 "orders_paid": 0,
-                "orders_pending": 0
+                "orders_pending": 0,
+                "created_at": partner_info.get("created_at", "")
             }
 
         total_price = order.get("total_price", 0)
