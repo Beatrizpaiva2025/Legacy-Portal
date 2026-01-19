@@ -1818,6 +1818,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [includeCover, setIncludeCover] = useState(true);
   const [includeLetterhead, setIncludeLetterhead] = useState(true);
   const [includeOriginal, setIncludeOriginal] = useState(true);
+  const [includeVerificationPage, setIncludeVerificationPage] = useState(true);
   const [includeCertification, setIncludeCertification] = useState(true);
   const [certificationData, setCertificationData] = useState(null);
   const [originalImages, setOriginalImages] = useState([]); // base64 images of originals
@@ -10465,6 +10466,15 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                     />
                     <span className="font-medium">Exclude Original Document</span>
                   </label>
+                  <label className="flex items-center text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeVerificationPage}
+                      onChange={(e) => setIncludeVerificationPage(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="font-medium">🔐 Include Verification Page (QR Code)</span>
+                  </label>
                 </div>
               </div>
 
@@ -10612,9 +10622,16 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Original</span>
                       </>
                     )}
+                    {includeVerificationPage && (
+                      <>
+                        <span className="text-gray-400">→</span>
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
+                      </>
+                    )}
                   </div>
                   <p className="text-[10px] text-gray-500 mt-2">
                     {includeLetterhead ? '✓ Letterhead on all pages' : '✗ No letterhead'}
+                    {includeVerificationPage ? ' • ✓ Verification page' : ''}
                   </p>
                 </div>
 
@@ -24156,13 +24173,91 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         return `
     <div class="original-documents-page">
         ${includeLetterhead ? letterheadHTML : ''}
-        ${idx === 0 ? '<div class="page-title">Original Document</div>' : ''}
+        ${idx === 0 ? '<div class="page-title">ORIGINAL DOCUMENT</div>' : ''}
         <div class="original-image-container">
             <img src="${imgSrc}" alt="Original page ${idx + 1}" class="original-image" />
         </div>
     </div>`;
       }).join('');
     }
+
+    // Verification page HTML (with QR code)
+    const verificationId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const verificationPageHTML = includeVerificationPage ? `
+    <div class="verification-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="verification-box">
+            <div class="verification-header">
+                <div class="verification-icon">🔐</div>
+                <h2 class="verification-title">Translation Verification</h2>
+                <p class="verification-subtitle">This document can be verified for authenticity</p>
+            </div>
+
+            <div class="verification-content">
+                <div class="verification-info">
+                    <div class="verification-row">
+                        <span class="verification-label">Verification ID:</span>
+                        <span class="verification-value verification-id">${verificationId}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Document Type:</span>
+                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Languages:</span>
+                        <span class="verification-value">${sourceLanguage} → ${targetLanguage}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Issue Date:</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Page Count:</span>
+                        <span class="verification-value">${origDocs.length || 1} page(s)</span>
+                    </div>
+                </div>
+
+                <div class="verification-qr">
+                    <div class="qr-placeholder">
+                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <rect fill="#fff" width="100" height="100"/>
+                            <g fill="#000">
+                                <rect x="10" y="10" width="25" height="25"/>
+                                <rect x="65" y="10" width="25" height="25"/>
+                                <rect x="10" y="65" width="25" height="25"/>
+                                <rect x="15" y="15" width="15" height="15" fill="#fff"/>
+                                <rect x="70" y="15" width="15" height="15" fill="#fff"/>
+                                <rect x="15" y="70" width="15" height="15" fill="#fff"/>
+                                <rect x="20" y="20" width="5" height="5"/>
+                                <rect x="75" y="20" width="5" height="5"/>
+                                <rect x="20" y="75" width="5" height="5"/>
+                                <rect x="40" y="10" width="5" height="5"/>
+                                <rect x="50" y="10" width="5" height="5"/>
+                                <rect x="40" y="20" width="5" height="5"/>
+                                <rect x="45" y="25" width="5" height="5"/>
+                                <rect x="40" y="40" width="5" height="5"/>
+                                <rect x="50" y="45" width="5" height="5"/>
+                                <rect x="65" y="45" width="5" height="5"/>
+                                <rect x="75" y="50" width="5" height="5"/>
+                                <rect x="85" y="45" width="5" height="5"/>
+                                <rect x="65" y="65" width="5" height="5"/>
+                                <rect x="75" y="70" width="5" height="5"/>
+                                <rect x="85" y="75" width="5" height="5"/>
+                                <rect x="70" y="80" width="10" height="10"/>
+                            </g>
+                        </svg>
+                    </div>
+                    <p class="qr-instruction">Scan to verify authenticity</p>
+                </div>
+            </div>
+
+            <div class="verification-footer">
+                <p class="verification-url">Verify at: <strong>legacytranslations.com/verify/${verificationId}</strong></p>
+                <p class="verification-notice">This translation has been prepared by Legacy Translations Inc., a professional translation company. For verification, please contact us at contact@legacytranslations.com or call (857) 316-7770.</p>
+            </div>
+        </div>
+    </div>
+    ` : '';
 
     // Complete HTML
     const fullHTML = `<!DOCTYPE html>
@@ -24251,10 +24346,38 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
         .running-header { position: running(header); }
         .running-header-spacer { height: 80px; }
+        /* Verification Page Styles */
+        .verification-page { page-break-before: always; padding-top: 20px; }
+        .verification-box {
+            max-width: 550px; margin: 40px auto; padding: 30px;
+            border: 2px solid #2563eb; border-radius: 12px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+        .verification-header { text-align: center; margin-bottom: 25px; }
+        .verification-icon { font-size: 48px; margin-bottom: 10px; }
+        .verification-title { font-size: 22px; font-weight: bold; color: #1e40af; margin: 0 0 5px 0; }
+        .verification-subtitle { font-size: 12px; color: #64748b; margin: 0; }
+        .verification-content { display: flex; gap: 30px; align-items: flex-start; }
+        .verification-info { flex: 1; }
+        .verification-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #cbd5e1; }
+        .verification-row:last-child { border-bottom: none; }
+        .verification-label { font-size: 11px; color: #64748b; font-weight: 500; }
+        .verification-value { font-size: 12px; color: #1e293b; font-weight: 600; text-align: right; }
+        .verification-id { font-family: 'Courier New', monospace; color: #2563eb; font-size: 13px; letter-spacing: 1px; }
+        .verification-qr { text-align: center; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .verification-qr .qr-placeholder { width: 100px; height: 100px; margin: 0 auto; }
+        .qr-instruction { font-size: 10px; color: #64748b; margin-top: 8px; }
+        .verification-footer { margin-top: 25px; text-align: center; padding-top: 20px; border-top: 1px solid #cbd5e1; }
+        .verification-url { font-size: 11px; color: #1e40af; margin-bottom: 12px; }
+        .verification-notice { font-size: 9px; color: #64748b; line-height: 1.5; max-width: 480px; margin: 0 auto; }
         @page { @top-center { content: element(header); } }
         @media print {
-            body { padding: 0; }
-            .cover-page, .translation-page, .translation-text-page, .original-documents-page { page-break-after: always; }
+            body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .cover-page { page-break-after: always; }
+            .translation-page, .translation-text-page { page-break-after: always; }
+            .original-documents-page { page-break-after: always; }
+            .verification-page { page-break-before: always; }
+            .verification-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -24262,6 +24385,7 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
+    ${verificationPageHTML}
 </body>
 </html>`;
 
