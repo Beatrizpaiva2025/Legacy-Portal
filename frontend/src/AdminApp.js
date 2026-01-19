@@ -2011,6 +2011,107 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   // Bulk upload state for glossary
   const [bulkTermsText, setBulkTermsText] = useState('');
 
+  // Unsaved changes indicator
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState(null);
+
+  // Auto-save to localStorage - save critical workflow data
+  useEffect(() => {
+    // Only save if there's actual data to save
+    if (originalImages.length > 0 || translationResults.length > 0 || orderNumber) {
+      const workflowData = {
+        originalImages,
+        translationResults,
+        orderNumber,
+        documentType,
+        sourceLanguage,
+        targetLanguage,
+        workflowMode,
+        activeSubTab,
+        externalOriginalImages,
+        externalTranslationText,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('translation_workflow_autosave', JSON.stringify(workflowData));
+      setLastSavedTime(new Date());
+      setHasUnsavedChanges(false);
+    }
+  }, [originalImages, translationResults, orderNumber, documentType, sourceLanguage, targetLanguage, workflowMode, activeSubTab, externalOriginalImages, externalTranslationText]);
+
+  // Restore from localStorage on mount
+  useEffect(() => {
+    const savedData = localStorage.getItem('translation_workflow_autosave');
+    if (savedData) {
+      try {
+        const data = JSON.parse(savedData);
+        // Only restore if data is less than 24 hours old
+        const isRecent = data.timestamp && (Date.now() - data.timestamp) < 24 * 60 * 60 * 1000;
+        if (isRecent && (data.originalImages?.length > 0 || data.translationResults?.length > 0)) {
+          // Ask user if they want to restore
+          const shouldRestore = window.confirm(
+            `Found unsaved work from ${new Date(data.timestamp).toLocaleString()}.\n\n` +
+            `Documents: ${(data.originalImages?.length || 0) + (data.translationResults?.length || 0)}\n` +
+            `Order: ${data.orderNumber || 'Not set'}\n\n` +
+            `Do you want to restore this session?`
+          );
+          if (shouldRestore) {
+            if (data.originalImages?.length > 0) setOriginalImages(data.originalImages);
+            if (data.translationResults?.length > 0) setTranslationResults(data.translationResults);
+            if (data.orderNumber) setOrderNumber(data.orderNumber);
+            if (data.documentType) setDocumentType(data.documentType);
+            if (data.sourceLanguage) setSourceLanguage(data.sourceLanguage);
+            if (data.targetLanguage) setTargetLanguage(data.targetLanguage);
+            if (data.workflowMode) setWorkflowMode(data.workflowMode);
+            if (data.externalOriginalImages?.length > 0) setExternalOriginalImages(data.externalOriginalImages);
+            if (data.externalTranslationText) setExternalTranslationText(data.externalTranslationText);
+            setProcessingStatus('✅ Previous session restored successfully!');
+          } else {
+            // Clear old data if user declines
+            localStorage.removeItem('translation_workflow_autosave');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to restore autosave:', e);
+        localStorage.removeItem('translation_workflow_autosave');
+      }
+    }
+  }, []); // Run only on mount
+
+  // Clear autosave when workflow is complete (sent to PM/Admin/Client)
+  const clearAutosave = () => {
+    localStorage.removeItem('translation_workflow_autosave');
+    setHasUnsavedChanges(false);
+  };
+
+  // Handle workflow mode change with confirmation if there's existing data
+  const handleWorkflowModeChange = (newMode) => {
+    if (newMode === workflowMode) return; // No change
+
+    // Check if there's existing work that might be lost
+    const hasExistingWork = translationResults.length > 0 ||
+                            originalImages.length > 0 ||
+                            externalOriginalImages.length > 0 ||
+                            externalTranslationText;
+
+    if (hasExistingWork) {
+      const modeNames = {
+        'ai': 'AI Translation',
+        'external': 'External Translation',
+        'ocr': 'OCR (CAT Tool)',
+        'template': 'Fill Template'
+      };
+      const confirmed = window.confirm(
+        `⚠️ Switching to "${modeNames[newMode]}" mode.\n\n` +
+        `You have existing work that may be affected.\n` +
+        `Your data will be preserved, but the view will change.\n\n` +
+        `Continue?`
+      );
+      if (!confirmed) return;
+    }
+
+    setWorkflowMode(newMode);
+  };
+
   // Auto-transfer external translation data when navigating to Review tab
   useEffect(() => {
     if (activeSubTab === 'review' && workflowMode === 'external') {
@@ -2948,12 +3049,20 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         // Refresh orders list
         fetchAvailableOrders();
         fetchAssignedOrders();
+
+        // Clear autosave on successful send (except for 'save' which is just saving progress)
+        if (destination !== 'save') {
+          clearAutosave();
+        }
+
+        return true; // Success
       } else {
         throw new Error(response.data.error || response.data.detail || 'Failed to send');
       }
     } catch (error) {
       console.error('Error sending to projects:', error);
       setProcessingStatus(`❌ Failed to send: ${error.response?.data?.detail || error.message}`);
+      return false; // Failed
     } finally {
       setSendingToProjects(false);
     }
@@ -3918,11 +4027,17 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    // Update translation results
+    // Update translation results with corrected text AND track applied corrections
     const newResults = [...translationResults];
+    const appliedCorrections = currentResult.appliedCorrections || [];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: result.updatedHtml
+      translatedText: result.updatedHtml,
+      appliedCorrections: [...appliedCorrections, {
+        original: foundText,
+        corrected: suggestionText,
+        timestamp: Date.now()
+      }]
     };
     setTranslationResults(newResults);
 
@@ -3935,6 +4050,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         erros: updatedErrors
       });
     }
+
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
   };
 
   // Apply all proofreading corrections at once
@@ -3946,6 +4064,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
 
     let updatedHtml = currentResult.translatedText;
     let appliedCount = 0;
+    const newAppliedCorrections = [];
 
     const updatedErrors = proofreadingResult.erros.map(erro => {
       // Handle both field name conventions - traducao_errada is the incorrect English text to find
@@ -3957,6 +4076,11 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         if (result.replaced) {
           updatedHtml = result.updatedHtml;
           appliedCount++;
+          newAppliedCorrections.push({
+            original: foundText,
+            corrected: suggestionText,
+            timestamp: Date.now()
+          });
           return { ...erro, applied: true };
         }
       }
@@ -3968,11 +4092,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       return;
     }
 
-    // Update translation results
+    // Update translation results with corrected text AND track all applied corrections
     const newResults = [...translationResults];
+    const existingCorrections = currentResult.appliedCorrections || [];
     newResults[selectedResultIndex] = {
       ...currentResult,
-      translatedText: updatedHtml
+      translatedText: updatedHtml,
+      appliedCorrections: [...existingCorrections, ...newAppliedCorrections]
     };
     setTranslationResults(newResults);
 
@@ -3981,6 +4107,13 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       ...proofreadingResult,
       erros: updatedErrors
     });
+
+    // Mark as having unsaved changes
+    setHasUnsavedChanges(true);
+
+    // Show success message
+    setProcessingStatus(`✅ ${appliedCount} correction(s) applied successfully!`);
+    setTimeout(() => setProcessingStatus(''), 3000);
   };
 
   // Save translation pairs to Translation Memory after successful proofreading
@@ -4461,6 +4594,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       translatedText: newText
     };
     setTranslationResults(updatedResults);
+    setHasUnsavedChanges(true); // Mark as having unsaved changes
   };
 
   // Save and restore selection for formatting commands
@@ -5795,6 +5929,26 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
           <h1 className="text-lg font-bold text-blue-600">TRANSLATION WORKSPACE</h1>
+          {/* Auto-save indicator */}
+          {(originalImages.length > 0 || translationResults.length > 0) && (
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] ${
+              hasUnsavedChanges
+                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                : 'bg-green-100 text-green-700 border border-green-300'
+            }`}>
+              {hasUnsavedChanges ? (
+                <>
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                  <span>Unsaved changes</span>
+                </>
+              ) : (
+                <>
+                  <span>✓</span>
+                  <span>Auto-saved {lastSavedTime ? lastSavedTime.toLocaleTimeString() : ''}</span>
+                </>
+              )}
+            </div>
+          )}
           {selectedOrder && (
             <div className="relative group project-menu-container">
               <button
@@ -7237,7 +7391,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   name="workflowMode"
                   value="ai"
                   checked={workflowMode === 'ai'}
-                  onChange={() => setWorkflowMode('ai')}
+                  onChange={() => handleWorkflowModeChange('ai')}
                   className="sr-only"
                 />
                 <span className="mr-2">🤖</span>
@@ -7249,7 +7403,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   name="workflowMode"
                   value="external"
                   checked={workflowMode === 'external'}
-                  onChange={() => setWorkflowMode('external')}
+                  onChange={() => handleWorkflowModeChange('external')}
                   className="sr-only"
                 />
                 <span className="mr-2">📥</span>
@@ -7261,7 +7415,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   name="workflowMode"
                   value="ocr"
                   checked={workflowMode === 'ocr'}
-                  onChange={() => setWorkflowMode('ocr')}
+                  onChange={() => handleWorkflowModeChange('ocr')}
                   className="sr-only"
                 />
                 <span className="mr-2">📝</span>
@@ -7273,7 +7427,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   name="workflowMode"
                   value="template"
                   checked={workflowMode === 'template'}
-                  onChange={() => setWorkflowMode('template')}
+                  onChange={() => handleWorkflowModeChange('template')}
                   className="sr-only"
                 />
                 <span className="mr-2">📋</span>
@@ -8936,13 +9090,12 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   {isContractor && (
                     <button
                       onClick={async () => {
-                        await sendToProjects('pm');
-                        alert('Translation sent to PM!');
-                        setTranslationResults([]);
-                        setOriginalImages([]);
-                        setSelectedOrderId(null);
-                        setOrderNumber('');
-                        fetchAssignedOrders();
+                        const success = await sendToProjects('pm');
+                        if (success) {
+                          alert('Translation sent to PM!');
+                          // Data clearing is now handled inside sendToProjects on success
+                        }
+                        // If failed, data is preserved and user can retry
                       }}
                       disabled={sendingToProjects}
                       className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded hover:bg-purple-700 disabled:bg-gray-300"
