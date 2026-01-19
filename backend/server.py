@@ -8116,6 +8116,36 @@ async def get_users_by_role(role: str, admin_key: str, include_pending: bool = T
         logger.error(f"Error fetching users by role: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to fetch users")
 
+@api_router.get("/admin/translators")
+async def get_all_translators(admin_key: str):
+    """Get all translators/vendors from admin_users collection"""
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    try:
+        # Get all users with translator role (both active and inactive)
+        translators = await db.admin_users.find({
+            "role": {"$in": ["translator", "pm", "admin", "sales"]}
+        }).to_list(200)
+
+        return [{
+            "id": t.get("id") or str(t.get("_id", "")),
+            "name": t.get("name", ""),
+            "email": t.get("email", ""),
+            "role": t.get("role", "translator"),
+            "is_active": t.get("is_active", True),
+            "rate_per_page": t.get("rate_per_page", 0),
+            "rate_per_word": t.get("rate_per_word", 0),
+            "language_pairs": t.get("language_pairs", []),
+            "translator_type": t.get("translator_type", "contractor"),
+            "pages_translated": t.get("pages_translated", 0),
+            "pages_pending_payment": t.get("pages_pending_payment", 0)
+        } for t in translators]
+    except Exception as e:
+        logger.error(f"Error fetching translators: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch translators")
+
 @api_router.get("/admin/translators/status")
 async def get_translators_with_status(admin_key: str):
     """Get all translators with their current project status and deadlines"""
