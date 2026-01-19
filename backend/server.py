@@ -20667,7 +20667,6 @@ async def quickbooks_sync_partner_invoice(
                 "already_synced": True,
                 "invoice_id": partner_invoice.get("quickbooks_invoice_id"),
                 "invoice_number": partner_invoice.get("quickbooks_invoice_number"),
-                "invoice_link": partner_invoice.get("quickbooks_invoice_link"),
                 "message": "Invoice already synced to QuickBooks"
             }
 
@@ -20777,24 +20776,12 @@ async def quickbooks_sync_partner_invoice(
             else:
                 logger.warning(f"Failed to send invoice email: {send_result.get('error')}")
 
-        # Generate QuickBooks invoice payment link
-        realm_id = settings.get("quickbooks_realm_id")
-        qb_environment = settings.get("quickbooks_environment", "sandbox")
-
-        # Construct the payment link based on environment
-        if qb_environment == "production":
-            qb_invoice_link = f"https://c1.qbo.intuit.com/qbo1/invoicelink?cid={realm_id}&txnId={qb_invoice_id}"
-        else:
-            # Sandbox environment
-            qb_invoice_link = f"https://sandbox.qbo.intuit.com/app/invoicelink?txnId={qb_invoice_id}&company={realm_id}"
-
         # Update partner invoice with QuickBooks info
         update_data = {
             "quickbooks_invoice_id": qb_invoice_id,
             "quickbooks_invoice_number": qb_invoice_number,
             "quickbooks_synced_at": datetime.utcnow(),
-            "quickbooks_customer_id": qb_customer_id,
-            "quickbooks_invoice_link": qb_invoice_link
+            "quickbooks_customer_id": qb_customer_id
         }
 
         await db.partner_invoices.update_one(
@@ -20809,7 +20796,6 @@ async def quickbooks_sync_partner_invoice(
             "invoice_id": qb_invoice_id,
             "invoice_number": qb_invoice_number,
             "customer_id": qb_customer_id,
-            "invoice_link": qb_invoice_link,
             "email_sent": email_sent,
             "sent_to": partner_email if email_sent else None
         }
