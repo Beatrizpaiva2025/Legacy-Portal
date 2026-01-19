@@ -21141,6 +21141,9 @@ const FinancesPage = ({ adminKey }) => {
       fetchPagesLogs();
       fetchTranslatorsForPayment();
     }
+    if (activeView === 'expenses') {
+      fetchTranslatorsForPayment(); // Load vendors for expense dropdown
+    }
   }, [activeView]);
 
   const handleCreateExpense = async (e) => {
@@ -21470,13 +21473,13 @@ const FinancesPage = ({ adminKey }) => {
 
       {/* Expense Modal */}
       {showExpenseModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-4 border-b flex justify-between items-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center flex-shrink-0">
               <h3 className="font-bold text-gray-800">New Expense</h3>
               <button onClick={() => setShowExpenseModal(false)} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
-            <form onSubmit={handleCreateExpense} className="p-4 space-y-4">
+            <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Categoria</label>
                 <select
@@ -21524,13 +21527,17 @@ const FinancesPage = ({ adminKey }) => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Fornecedor (opcional)</label>
-                <input
-                  type="text"
+                <label className="block text-xs text-gray-600 mb-1">Vendor / Fornecedor (opcional)</label>
+                <select
                   value={expenseForm.vendor}
                   onChange={(e) => setExpenseForm({...expenseForm, vendor: e.target.value})}
                   className="w-full px-3 py-2 border rounded text-sm"
-                />
+                >
+                  <option value="">Select vendor...</option>
+                  {translators.map((t) => (
+                    <option key={t.translator_id} value={t.name}>{t.name} ({t.email})</option>
+                  ))}
+                </select>
               </div>
               <div className="flex items-center">
                 <input
