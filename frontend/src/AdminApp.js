@@ -20920,8 +20920,8 @@ const FinancesPage = ({ adminKey }) => {
   const fetchCouponTemplates = async () => {
     try {
       const response = await axios.get(`${API}/admin/coupons?admin_key=${adminKey}`);
-      // Filter to only show template coupons (partner_id is null)
-      const templates = (response.data || []).filter(c => !c.partner_id && c.is_active);
+      // Show all active coupons that can be assigned to partners
+      const templates = (response.data || []).filter(c => c.is_active);
       setCouponTemplates(templates);
     } catch (err) {
       console.error('Failed to fetch coupon templates:', err);

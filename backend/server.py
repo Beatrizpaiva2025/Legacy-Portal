@@ -5075,10 +5075,42 @@ async def create_coupon(coupon_data: CouponCreate, admin_key: str):
 
 @api_router.get("/admin/coupons")
 async def list_all_coupons(admin_key: str):
-    """List all coupons (admin only)"""
+    """List all coupons (admin only) - auto-creates default templates if none exist"""
     user_info = await validate_admin_or_user_token(admin_key)
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if we need to create default coupon templates
+    existing_templates = await db.coupons.count_documents({"partner_id": None})
+    if existing_templates == 0:
+        # Create default MASS coupon templates
+        default_coupons = [
+            {"code": "MASS5", "discount_value": 5.0},
+            {"code": "MASS10", "discount_value": 10.0},
+            {"code": "MASS15", "discount_value": 15.0},
+            {"code": "MASS20", "discount_value": 20.0},
+            {"code": "MASS25", "discount_value": 25.0},
+            {"code": "MASS30", "discount_value": 30.0},
+            {"code": "MASS35", "discount_value": 35.0},
+        ]
+        for coupon_data in default_coupons:
+            coupon = {
+                "id": str(uuid.uuid4()),
+                "code": coupon_data["code"],
+                "discount_type": "percentage",
+                "discount_value": coupon_data["discount_value"],
+                "max_uses": 9999,
+                "times_used": 0,
+                "is_active": True,
+                "valid_from": datetime.utcnow(),
+                "valid_until": datetime.utcnow() + timedelta(days=365 * 5),
+                "min_order_value": 0.0,
+                "first_order_only": False,
+                "partner_id": None,
+                "created_at": datetime.utcnow()
+            }
+            await db.coupons.insert_one(coupon)
+        logger.info("Created default MASS coupon templates")
 
     coupons = await db.coupons.find().to_list(500)
 
