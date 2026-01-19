@@ -6073,8 +6073,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
           { id: 'review', label: 'REVIEW', icon: '📋', roles: ['admin', 'pm', 'translator_contractor'] }, // Hidden for in-house - merged into TRANSLATION
           { id: 'proofreading', label: 'PROOFREADING', icon: '🔍', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'deliver', label: 'DELIVER', icon: '✅', roles: ['admin', 'pm', 'translator'] },
-          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'translator_inhouse'] },
-          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'translator_inhouse'] },
+          { id: 'glossaries', label: 'GLOSSARIES', icon: '🌐', roles: ['admin', 'pm', 'translator_inhouse'] },
+          { id: 'tm', label: 'TM', icon: '🧠', roles: ['admin', 'pm', 'translator_inhouse'] },
           { id: 'instructions', label: 'INSTRUCTIONS', icon: '📋', roles: ['admin', 'pm', 'translator_inhouse'] }
         ].filter(tab => {
           const userRole = user?.role || 'translator';
@@ -10957,12 +10957,58 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 <p className="text-xs text-gray-500">Upload and manage terminology resources</p>
               </div>
             </div>
-            <button
-              onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', sourceLang: 'Portuguese (Brazil)', targetLang: 'English', bidirectional: true, field: 'All Fields', terms: [] }); setTermSearchQuery(''); setShowGlossaryModal(true); }}
-              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-            >
-              <span className="mr-1">+</span> Add
-            </button>
+            <div className="flex space-x-2">
+              {/* Upload Glossary Button */}
+              <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
+                <input
+                  type="file"
+                  accept=".csv,.tmx,.xml"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const glossaryName = prompt('Enter a name for this glossary:', file.name.replace(/\.(csv|tmx|xml)$/i, ''));
+                    if (!glossaryName) {
+                      e.target.value = '';
+                      return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('name', glossaryName);
+                    formData.append('sourceLang', resourcesFilter.language !== 'All Languages' ? resourcesFilter.language : 'Portuguese (Brazil)');
+                    formData.append('targetLang', 'English');
+                    formData.append('field', resourcesFilter.field !== 'All Fields' ? resourcesFilter.field : 'All Fields');
+                    formData.append('bidirectional', 'true');
+
+                    try {
+                      setProcessingStatus('Uploading glossary...');
+                      const response = await axios.post(
+                        `${API}/admin/glossaries/upload?admin_key=${adminKey}`,
+                        formData,
+                        { headers: { 'Content-Type': 'multipart/form-data' } }
+                      );
+                      setProcessingStatus(`✅ ${response.data.message}`);
+                      // Refresh glossaries list
+                      const res = await axios.get(`${API}/admin/glossaries?admin_key=${adminKey}`);
+                      setGlossaries(res.data.glossaries || []);
+                    } catch (err) {
+                      alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                      setProcessingStatus('');
+                    }
+                    e.target.value = ''; // Reset file input
+                  }}
+                />
+                📤 Upload Glossary
+              </label>
+              <button
+                onClick={() => { setEditingGlossary(null); setGlossaryForm({ name: '', sourceLang: 'Portuguese (Brazil)', targetLang: 'English', bidirectional: true, field: 'All Fields', terms: [] }); setTermSearchQuery(''); setShowGlossaryModal(true); }}
+                className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+              >
+                <span className="mr-1">+</span> Add
+              </button>
+            </div>
           </div>
           <div className="p-4">
             {/* Filters */}
@@ -11169,8 +11215,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         </div>
       )}
 
-      {/* TRANSLATION MEMORY TAB - Admin and In-House Translators */}
-      {activeSubTab === 'tm' && (isAdmin || isInHouseTranslator) && (
+      {/* TRANSLATION MEMORY TAB - Admin, PM, and In-House Translators */}
+      {activeSubTab === 'tm' && (isAdmin || isPM || isInHouseTranslator) && (
         <div className="bg-white rounded shadow">
           <div className="p-4 border-b flex items-center justify-between">
             <div className="flex items-center space-x-2">
@@ -11181,6 +11227,45 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               </div>
             </div>
             <div className="flex space-x-2">
+              {/* Upload TM Button - only for admin, PM, and in-house translators */}
+              <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
+                <input
+                  type="file"
+                  accept=".csv,.tmx,.xml"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const sourceLang = tmFilter.sourceLang || 'Portuguese (Brazil)';
+                    const targetLang = tmFilter.targetLang || 'English';
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('sourceLang', sourceLang);
+                    formData.append('targetLang', targetLang);
+                    formData.append('field', 'General');
+
+                    try {
+                      setProcessingStatus('Uploading TM...');
+                      const response = await axios.post(
+                        `${API}/admin/translation-memory/upload?admin_key=${adminKey}`,
+                        formData,
+                        { headers: { 'Content-Type': 'multipart/form-data' } }
+                      );
+                      setProcessingStatus(`✅ ${response.data.message}`);
+                      // Refresh TM list
+                      const res = await axios.get(`${API}/admin/translation-memory?admin_key=${adminKey}`);
+                      setTranslationMemories(res.data.memories || []);
+                    } catch (err) {
+                      alert('Upload failed: ' + (err.response?.data?.detail || err.message));
+                      setProcessingStatus('');
+                    }
+                    e.target.value = ''; // Reset file input
+                  }}
+                />
+                📤 Upload TM
+              </label>
               <button
                 onClick={async () => {
                   try {
