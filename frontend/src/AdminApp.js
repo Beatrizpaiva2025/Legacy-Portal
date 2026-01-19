@@ -9409,24 +9409,38 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         📤 Send to Client
                       </button>
                     )}
+
+                    {/* Next: Go to Deliver tab */}
+                    <button
+                      onClick={() => setActiveSubTab('deliver')}
+                      className="px-6 py-2 bg-teal-600 text-white text-sm font-medium rounded hover:bg-teal-700 flex items-center gap-2"
+                    >
+                      Next: Deliver <span className="ml-1">→</span>
+                    </button>
                   </div>
                 </div>
                 <p className="text-[10px] text-gray-500 mt-2">
                   {(isInHouseTranslator || isContractor) ? (
                     <>
                       📤 <strong>Send to PM:</strong> Sends translation to Project Manager for review and approval
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   ) : isPM && !isAdmin ? (
                     <>
                       ✅ <strong>Approve:</strong> Approves translation and sends to Admin for client delivery
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   ) : (
                     <>
                       📤 <strong>Send to Client:</strong> Delivers the approved translation to the client
                       <br/>
                       ❌ <strong>Reject:</strong> Returns translation to translator with feedback
+                      <br/>
+                      ➡️ <strong>Next:</strong> Go to Deliver tab to generate final documents
                     </>
                   )}
                 </p>
