@@ -24358,9 +24358,42 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
       }).join('');
     }
 
-    // Verification page HTML (with QR code)
-    const verificationId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    const verificationPageHTML = includeVerificationPage ? `
+    // Verification page HTML (with QR code) - Create certification in backend
+    let verificationPageHTML = '';
+    if (includeVerificationPage) {
+      try {
+        setProcessingStatus('Creating document certification...');
+
+        // Get translation content for hashing
+        const translationContent = translatedContent || pmTranslationHtml ||
+          translationResults.map(r => r.translatedText).join('\n');
+
+        // Create certification in backend
+        const certResponse = await axios.post(`${API}/certifications/create?admin_key=${adminKey}`, {
+          order_id: order?.id || selectedOrderId,
+          order_number: order?.order_number || orderNumber,
+          document_type: order?.document_type || documentType || 'Translation',
+          source_language: sourceLanguage,
+          target_language: targetLanguage,
+          page_count: origDocs.length || 1,
+          document_content: translationContent || 'Certified Translation',
+          certifier_name: savedTranslatorName || 'Beatriz Paiva',
+          certifier_title: 'Certified Translator',
+          certifier_credentials: 'ATA Member #275993',
+          company_name: 'Legacy Translations Inc.',
+          company_address: '867 Boylston Street, 5th Floor, #2073, Boston, MA 02116',
+          company_phone: '(857) 316-7770',
+          company_email: 'contact@legacytranslations.com',
+          client_name: order?.client_name || ''
+        });
+
+        if (certResponse.data.success) {
+          const certData = certResponse.data;
+          const verificationId = certData.certification_id;
+          const verificationUrl = certData.verification_url;
+          const qrCodeData = certData.qr_code_data;
+
+          verificationPageHTML = `
     <div class="verification-page">
         ${includeLetterhead ? letterheadHTML : ''}
         <div class="verification-box">
@@ -24375,6 +24408,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                     <div class="verification-row">
                         <span class="verification-label">Verification ID:</span>
                         <span class="verification-value verification-id">${verificationId}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Order Reference:</span>
+                        <span class="verification-value">${order?.order_number || orderNumber || 'N/A'}</span>
                     </div>
                     <div class="verification-row">
                         <span class="verification-label">Document Type:</span>
@@ -24392,49 +24429,104 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                         <span class="verification-label">Page Count:</span>
                         <span class="verification-value">${origDocs.length || 1} page(s)</span>
                     </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Certified By:</span>
+                        <span class="verification-value">${savedTranslatorName || 'Beatriz Paiva'}</span>
+                    </div>
                 </div>
 
                 <div class="verification-qr">
-                    <div class="qr-placeholder">
-                        <svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                            <rect fill="#fff" width="100" height="100"/>
-                            <g fill="#000">
-                                <rect x="10" y="10" width="25" height="25"/>
-                                <rect x="65" y="10" width="25" height="25"/>
-                                <rect x="10" y="65" width="25" height="25"/>
-                                <rect x="15" y="15" width="15" height="15" fill="#fff"/>
-                                <rect x="70" y="15" width="15" height="15" fill="#fff"/>
-                                <rect x="15" y="70" width="15" height="15" fill="#fff"/>
-                                <rect x="20" y="20" width="5" height="5"/>
-                                <rect x="75" y="20" width="5" height="5"/>
-                                <rect x="20" y="75" width="5" height="5"/>
-                                <rect x="40" y="10" width="5" height="5"/>
-                                <rect x="50" y="10" width="5" height="5"/>
-                                <rect x="40" y="20" width="5" height="5"/>
-                                <rect x="45" y="25" width="5" height="5"/>
-                                <rect x="40" y="40" width="5" height="5"/>
-                                <rect x="50" y="45" width="5" height="5"/>
-                                <rect x="65" y="45" width="5" height="5"/>
-                                <rect x="75" y="50" width="5" height="5"/>
-                                <rect x="85" y="45" width="5" height="5"/>
-                                <rect x="65" y="65" width="5" height="5"/>
-                                <rect x="75" y="70" width="5" height="5"/>
-                                <rect x="85" y="75" width="5" height="5"/>
-                                <rect x="70" y="80" width="10" height="10"/>
-                            </g>
-                        </svg>
-                    </div>
+                    ${qrCodeData
+                      ? `<img src="${qrCodeData}" alt="QR Code" style="width: 120px; height: 120px;" />`
+                      : `<div class="qr-placeholder" style="width: 120px; height: 120px; border: 2px dashed #ccc; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #666;">QR Code</div>`
+                    }
                     <p class="qr-instruction">Scan to verify authenticity</p>
                 </div>
             </div>
 
             <div class="verification-footer">
-                <p class="verification-url">Verify at: <strong>legacytranslations.com/verify/${verificationId}</strong></p>
-                <p class="verification-notice">This translation has been prepared by Legacy Translations Inc., a professional translation company. For verification, please contact us at contact@legacytranslations.com or call (857) 316-7770.</p>
+                <p class="verification-url">Verify at: <strong>${verificationUrl || `portal.legacytranslations.com/#/verify/${verificationId}`}</strong></p>
+                <p class="verification-notice">This translation has been prepared by Legacy Translations Inc., a professional translation company and ATA Member #275993. For verification, please contact us at contact@legacytranslations.com or call (857) 316-7770.</p>
             </div>
         </div>
-    </div>
-    ` : '';
+    </div>`;
+        } else {
+          console.error('Failed to create certification:', certResponse.data);
+          // Fallback to basic verification page without backend storage
+          const fallbackId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          verificationPageHTML = `
+    <div class="verification-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="verification-box">
+            <div class="verification-header">
+                <div class="verification-icon">🔐</div>
+                <h2 class="verification-title">Translation Verification</h2>
+                <p class="verification-subtitle">Contact Legacy Translations to verify this document</p>
+            </div>
+            <div class="verification-content">
+                <div class="verification-info">
+                    <div class="verification-row">
+                        <span class="verification-label">Reference ID:</span>
+                        <span class="verification-value verification-id">${fallbackId}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Document Type:</span>
+                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Languages:</span>
+                        <span class="verification-value">${sourceLanguage} → ${targetLanguage}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Issue Date:</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="verification-footer">
+                <p class="verification-notice">For verification, please contact Legacy Translations Inc. at contact@legacytranslations.com or call (857) 316-7770.</p>
+            </div>
+        </div>
+    </div>`;
+        }
+      } catch (certError) {
+        console.error('Error creating certification:', certError);
+        // Fallback
+        const fallbackId = `LT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        verificationPageHTML = `
+    <div class="verification-page">
+        ${includeLetterhead ? letterheadHTML : ''}
+        <div class="verification-box">
+            <div class="verification-header">
+                <div class="verification-icon">🔐</div>
+                <h2 class="verification-title">Translation Verification</h2>
+                <p class="verification-subtitle">Contact Legacy Translations to verify this document</p>
+            </div>
+            <div class="verification-content">
+                <div class="verification-info">
+                    <div class="verification-row">
+                        <span class="verification-label">Reference ID:</span>
+                        <span class="verification-value verification-id">${fallbackId}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Document Type:</span>
+                        <span class="verification-value">${order?.document_type || documentType || 'Translation'}</span>
+                    </div>
+                    <div class="verification-row">
+                        <span class="verification-label">Issue Date:</span>
+                        <span class="verification-value">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="verification-footer">
+                <p class="verification-notice">For verification, please contact Legacy Translations Inc. at contact@legacytranslations.com or call (857) 316-7770.</p>
+            </div>
+        </div>
+    </div>`;
+      }
+    }
+
+    setProcessingStatus('Generating package...');
 
     // Complete HTML
     const fullHTML = `<!DOCTYPE html>
