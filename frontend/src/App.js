@@ -2345,53 +2345,61 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
               )}
             </div>
 
-            {/* Coupon Selection - Only show if partner has available coupons */}
-            {availableCoupons.length > 0 && (
-              <div className="border-t pt-4 mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Available Discounts</label>
-                {appliedCoupon ? (
-                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div>
-                      <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
-                      <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={removeCoupon}
-                      className="text-red-500 hover:text-red-700 text-sm font-medium"
-                    >
-                      Remove
-                    </button>
+            {/* Coupon/Discount Section */}
+            <div className="border-t pt-4 mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Discounts
+              </label>
+              {appliedCoupon ? (
+                /* Coupon Applied */
+                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div>
+                    <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
+                    <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <select
-                      value={selectedCoupon}
-                      onChange={(e) => setSelectedCoupon(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white"
-                    >
-                      <option value="">Select a discount...</option>
-                      {availableCoupons.map((coupon) => (
-                        <option key={coupon.code} value={coupon.code}>
-                          {coupon.code} - {coupon.description}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={validateCoupon}
-                      disabled={couponLoading || !selectedCoupon}
-                      className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {couponLoading ? '...' : 'Apply'}
-                    </button>
-                  </div>
-                )}
-                {couponError && (
-                  <p className="text-red-500 text-xs mt-1">{couponError}</p>
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={removeCoupon}
+                    className="text-red-500 hover:text-red-700 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : availableCoupons.length > 0 ? (
+                /* Has Available Coupons - Show Dropdown */
+                <div className="flex gap-2">
+                  <select
+                    value={selectedCoupon}
+                    onChange={(e) => setSelectedCoupon(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white"
+                  >
+                    <option value="">Select a discount...</option>
+                    {availableCoupons.map((coupon) => (
+                      <option key={coupon.code} value={coupon.code}>
+                        {coupon.code} - {coupon.description}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={validateCoupon}
+                    disabled={couponLoading || !selectedCoupon}
+                    className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+              ) : (
+                /* No Coupons Available */
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
+                  <p className="text-gray-500 text-sm">No discounts available for your account</p>
+                  <p className="text-gray-400 text-xs mt-1">Contact us for special pricing</p>
+                </div>
+              )}
+              {couponError && (
+                <p className="text-red-500 text-xs mt-1">{couponError}</p>
+              )}
+            </div>
 
             <div className="text-xs text-gray-500 mt-4">
               * Payment via invoice (Net 30)
