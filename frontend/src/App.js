@@ -2348,10 +2348,10 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
             {/* Coupon/Discount Section */}
             <div className="border-t pt-4 mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Discounts
+                Coupon
               </label>
               {appliedCoupon ? (
-                /* Coupon Applied - No remove option */
+                /* Coupon Applied - Show discount */
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                   <div className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
@@ -2359,35 +2359,35 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                     <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
                   </div>
                 </div>
-              ) : availableCoupons.length > 0 ? (
-                /* Has Available Coupons - Show Dropdown */
+              ) : (
+                /* Coupon Selection - Dropdown + Apply Button */
                 <div className="flex gap-2">
                   <select
                     value={selectedCoupon}
                     onChange={(e) => setSelectedCoupon(e.target.value)}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-teal-500 focus:border-teal-500 bg-white"
                   >
-                    <option value="">Select a discount...</option>
-                    {availableCoupons.map((coupon) => (
-                      <option key={coupon.code} value={coupon.code}>
-                        {coupon.code} - {coupon.description}
-                      </option>
-                    ))}
+                    {availableCoupons.length > 0 ? (
+                      <>
+                        <option value="">Select coupon...</option>
+                        {availableCoupons.map((coupon) => (
+                          <option key={coupon.code} value={coupon.code}>
+                            {coupon.code}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="">No Coupon available now</option>
+                    )}
                   </select>
                   <button
                     type="button"
                     onClick={validateCoupon}
-                    disabled={couponLoading || !selectedCoupon}
+                    disabled={couponLoading || !selectedCoupon || availableCoupons.length === 0}
                     className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                   >
                     {couponLoading ? '...' : 'Apply'}
                   </button>
-                </div>
-              ) : (
-                /* No Coupons Available */
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-                  <p className="text-gray-500 text-sm">No discounts available for your account</p>
-                  <p className="text-gray-400 text-xs mt-1">Contact us for special pricing</p>
                 </div>
               )}
               {couponError && (
