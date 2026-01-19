@@ -20665,9 +20665,13 @@ const FinancesPage = ({ adminKey }) => {
     try {
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
       // API returns { translators: [...], total: X }
-      setTranslators(response.data?.translators || response.data || []);
+      const vendorsList = response.data?.translators || response.data || [];
+      console.log('Fetched vendors:', vendorsList.length);
+      setTranslators(vendorsList);
     } catch (err) {
       console.error('Error fetching translators:', err);
+      // Show error to user instead of silently failing
+      setTranslators([]);
     }
   };
 
@@ -20970,6 +20974,8 @@ const FinancesPage = ({ adminKey }) => {
       alert('Vendor created successfully!');
       setShowQuickAddVendor(false);
       setQuickVendorForm({ name: '', email: '', role: 'translator', rate_per_page: '' });
+      // Small delay to ensure database write completes before refresh
+      await new Promise(resolve => setTimeout(resolve, 500));
       fetchTranslatorsForPayment();
     } catch (err) {
       alert('Error creating vendor: ' + (err.response?.data?.detail || err.message));
