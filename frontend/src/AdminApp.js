@@ -10454,46 +10454,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                 )}
               </div>
 
-              {/* Non-Certified Translation Options */}
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded mb-4">
-                <h3 className="text-sm font-bold text-slate-700 mb-2">📄 For non-certified translations</h3>
-                <p className="text-[10px] text-slate-600 mb-3">Check to EXCLUDE from final document:</p>
+              {/* Document Options */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded mb-4">
+                <h3 className="text-sm font-bold text-green-700 mb-2">📦 Document Options</h3>
+                <p className="text-[10px] text-green-600 mb-3">Select what to include in the final document:</p>
                 <div className="space-y-2">
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeCover}
-                      onChange={(e) => setIncludeCover(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeCover}
+                      onChange={(e) => setIncludeCover(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Certificate of Accuracy</span>
+                    <span className="font-medium">📜 Include Certificate of Accuracy</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeLetterhead}
-                      onChange={(e) => setIncludeLetterhead(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeLetterhead}
+                      onChange={(e) => setIncludeLetterhead(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Letterhead</span>
+                    <span className="font-medium">📋 Include Letterhead on pages</span>
                   </label>
                   <label className="flex items-center text-xs cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={!includeOriginal}
-                      onChange={(e) => setIncludeOriginal(!e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      checked={includeOriginal}
+                      onChange={(e) => setIncludeOriginal(e.target.checked)}
+                      className="mr-3 w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <span className="font-medium">Exclude Original Document</span>
+                    <span className="font-medium">📑 Include Original Documents</span>
                   </label>
-                  <label className="flex items-center text-xs cursor-pointer">
+                  <label className="flex items-center text-xs cursor-pointer p-2 bg-purple-50 border border-purple-200 rounded">
                     <input
                       type="checkbox"
                       checked={includeVerificationPage}
                       onChange={(e) => setIncludeVerificationPage(e.target.checked)}
-                      className="mr-3 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
-                    <span className="font-medium">🔐 Include Verification Page (QR Code)</span>
+                    <span className="font-medium text-purple-700">🔐 Include Verification Page (QR Code)</span>
                   </label>
                 </div>
               </div>
