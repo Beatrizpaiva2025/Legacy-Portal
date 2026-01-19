@@ -2351,19 +2351,13 @@ const NewOrderPage = ({ partner, token, onOrderCreated, t, currency }) => {
                 Discounts
               </label>
               {appliedCoupon ? (
-                /* Coupon Applied */
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div>
+                /* Coupon Applied - No remove option */
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
                     <span className="text-green-700 font-medium">{appliedCoupon.code}</span>
                     <span className="text-green-600 text-sm ml-2">({appliedCoupon.discount_description})</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={removeCoupon}
-                    className="text-red-500 hover:text-red-700 text-sm font-medium"
-                  >
-                    Remove
-                  </button>
                 </div>
               ) : availableCoupons.length > 0 ? (
                 /* Has Available Coupons - Show Dropdown */
