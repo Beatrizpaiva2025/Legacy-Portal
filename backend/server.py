@@ -14610,7 +14610,9 @@ async def create_glossary(data: GlossaryCreate, admin_key: str):
         "language": data.language or f"{data.sourceLang} <> {data.targetLang}",  # Legacy compatibility
         "field": data.field,
         "terms": [t.dict() for t in data.terms],
-        "created_at": datetime.utcnow()
+        "is_uploaded": True,  # All user-created glossaries should be treated as priority
+        "created_at": datetime.utcnow(),
+        "created_by": user_info.get("user_id", "system")
     }
 
     await db.glossaries.insert_one(glossary)
@@ -15189,6 +15191,100 @@ async def upload_glossary(
                             "notes": notes
                         })
                         term_id += 1
+
+        elif filename.endswith('.xlsx') or filename.endswith('.xls'):
+            # Parse Excel file
+            try:
+                import openpyxl
+                import io
+
+                workbook = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+                sheet = workbook.active
+
+                # Try to find header row and determine columns
+                source_col = 0
+                target_col = 1
+                notes_col = -1
+                header_row = list(sheet.iter_rows(min_row=1, max_row=1, values_only=True))[0] if sheet.max_row > 0 else []
+
+                if header_row:
+                    header_lower = [str(h).lower().strip() if h else '' for h in header_row]
+                    for i, h in enumerate(header_lower):
+                        if 'source' in h or 'original' in h or 'origem' in h or 'term' in h or 'português' in h:
+                            source_col = i
+                        elif 'target' in h or 'translation' in h or 'destino' in h or 'tradução' in h or 'english' in h or 'inglês' in h:
+                            target_col = i
+                        elif 'note' in h or 'comment' in h or 'observação' in h:
+                            notes_col = i
+
+                term_id = 1
+                for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header
+                    if len(row) > max(source_col, target_col):
+                        source_text = str(row[source_col]).strip() if row[source_col] else ""
+                        target_text = str(row[target_col]).strip() if row[target_col] else ""
+                        notes = str(row[notes_col]).strip() if notes_col >= 0 and len(row) > notes_col and row[notes_col] else ""
+
+                        if source_text and target_text and source_text != 'None' and target_text != 'None':
+                            terms.append({
+                                "id": term_id,
+                                "source": source_text,
+                                "target": target_text,
+                                "notes": notes
+                            })
+                            term_id += 1
+
+                workbook.close()
+            except ImportError:
+                raise HTTPException(status_code=400, detail="Excel support not available. Please use CSV or TMX format.")
+
+        elif filename.endswith('.sdltm'):
+            # Parse SDL Trados TM file (SQLite database)
+            try:
+                import sqlite3
+                import tempfile
+                import os
+
+                # Write content to temp file (sqlite needs file path)
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.sdltm') as tmp:
+                    tmp.write(content)
+                    tmp_path = tmp.name
+
+                try:
+                    conn = sqlite3.connect(tmp_path)
+                    cursor = conn.cursor()
+
+                    # SDL TM stores translations in translation_units table
+                    cursor.execute("""
+                        SELECT source_segment, target_segment
+                        FROM translation_units
+                        WHERE source_segment IS NOT NULL AND target_segment IS NOT NULL
+                        LIMIT 5000
+                    """)
+
+                    term_id = 1
+                    for row in cursor.fetchall():
+                        source_text = row[0].strip() if row[0] else ""
+                        target_text = row[1].strip() if row[1] else ""
+
+                        if source_text and target_text:
+                            terms.append({
+                                "id": term_id,
+                                "source": source_text,
+                                "target": target_text,
+                                "notes": "from Trados TM"
+                            })
+                            term_id += 1
+
+                    conn.close()
+                finally:
+                    os.unlink(tmp_path)
+
+            except Exception as e:
+                logger.warning(f"Error parsing SDLTM file: {e}")
+                raise HTTPException(status_code=400, detail=f"Error parsing Trados TM file: {str(e)}")
+
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV, Excel (.xlsx), TMX, or Trados TM (.sdltm)")
 
         if not terms:
             raise HTTPException(status_code=400, detail="No valid terms found in the file")
@@ -18327,45 +18423,33 @@ async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
             ]
         }).to_list(50)
 
-        # Collect all terms from all matching glossaries (prioritize uploaded ones)
+        # Collect all terms from all matching glossaries
+        # ALL glossaries created by users are treated as priority
         all_terms = []
-        uploaded_glossary_terms = []
 
         for glossary in glossaries:
             if glossary and glossary.get("terms"):
                 for term in glossary["terms"]:
-                    term_entry = {"source": term["source"], "target": term["target"]}
-                    if glossary.get("is_uploaded"):
-                        uploaded_glossary_terms.append(term_entry)
-                    else:
+                    if term.get("source") and term.get("target"):
+                        term_entry = {"source": term["source"], "target": term["target"]}
                         all_terms.append(term_entry)
 
-        # Build glossary text - uploaded glossaries have priority
-        if uploaded_glossary_terms or all_terms:
-            glossary_text = ""
-
-            if uploaded_glossary_terms:
-                glossary_text += "🔹 PRIORITY GLOSSARY TERMS (MANDATORY - USE EXACTLY):\n"
-                seen_sources = set()
-                for t in uploaded_glossary_terms[:100]:
-                    if t["source"].lower() not in seen_sources:
-                        glossary_text += f"• {t['source']} → {t['target']}\n"
-                        seen_sources.add(t["source"].lower())
-
-            if all_terms:
-                glossary_text += "\n🔸 STANDARD GLOSSARY TERMS (USE EXACTLY):\n"
-                seen_sources = {t["source"].lower() for t in uploaded_glossary_terms}
-                for t in all_terms[:100 - len(uploaded_glossary_terms)]:
-                    if t["source"].lower() not in seen_sources:
-                        glossary_text += f"• {t['source']} → {t['target']}\n"
-                        seen_sources.add(t["source"].lower())
+        # Build glossary text - ALL glossaries are treated as priority/mandatory
+        if all_terms:
+            glossary_text = "🔹 MANDATORY GLOSSARY TERMS (USE EXACTLY):\n"
+            seen_sources = set()
+            for t in all_terms[:200]:  # Allow up to 200 terms
+                if t["source"].lower() not in seen_sources:
+                    glossary_text += f"• {t['source']} → {t['target']}\n"
+                    seen_sources.add(t["source"].lower())
 
             glossary_terms = f"""
 ═══════════════════════════════════════════════════════════════════
                     GLOSSARY - MANDATORY TERMS
 ═══════════════════════════════════════════════════════════════════
-IMPORTANT: You MUST use these EXACT translations for the following terms.
-These terms have been pre-approved and take PRIORITY over any other translation choice.
+CRITICAL: You MUST use these EXACT translations for the following terms.
+These terms have been pre-approved and take ABSOLUTE PRIORITY over any other translation.
+DO NOT translate these terms differently under any circumstances.
 
 {glossary_text}
 """

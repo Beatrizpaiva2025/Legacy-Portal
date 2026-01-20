@@ -11020,7 +11020,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
                 <input
                   type="file"
-                  accept=".csv,.tmx,.xml"
+                  accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
@@ -11289,7 +11289,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
                 <input
                   type="file"
-                  accept=".csv,.tmx,.xml"
+                  accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
