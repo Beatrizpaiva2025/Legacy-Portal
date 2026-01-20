@@ -20601,6 +20601,8 @@ const FinancesPage = ({ adminKey }) => {
   const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
   const [quickVendorForm, setQuickVendorForm] = useState({ name: '', email: '', role: 'translator', rate_per_page: '' });
   const [addingVendor, setAddingVendor] = useState(false);
+  // Error state for debugging API issues
+  const [vendorError, setVendorError] = useState(null);
   // Pages tracking state
   const [pagesLogs, setPagesLogs] = useState([]);
   const [showAddPagesModal, setShowAddPagesModal] = useState(false);
@@ -20677,14 +20679,18 @@ const FinancesPage = ({ adminKey }) => {
   // Translator payments functions
   const fetchTranslatorsForPayment = async () => {
     try {
+      setVendorError(null);
+      console.log('Fetching vendors with adminKey:', adminKey ? 'present' : 'missing');
       const response = await axios.get(`${API}/admin/payments/translators?admin_key=${adminKey}`);
       // API returns { translators: [...], total: X }
       const vendorsList = response.data?.translators || response.data || [];
-      console.log('Fetched vendors:', vendorsList.length);
+      console.log('Fetched vendors:', vendorsList.length, response.data);
       setTranslators(vendorsList);
     } catch (err) {
       console.error('Error fetching translators:', err);
-      // Show error to user instead of silently failing
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to fetch vendors';
+      console.error('Error details:', err.response?.status, errorMsg);
+      setVendorError(`Error ${err.response?.status || ''}: ${errorMsg}`);
       setTranslators([]);
     }
   };

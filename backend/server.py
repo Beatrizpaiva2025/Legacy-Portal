@@ -6623,20 +6623,21 @@ async def request_revision(submission_id: str, admin_key: str, reason: str = "")
 @api_router.get("/admin/payments/translators")
 async def get_translators_payment_summary(admin_key: str):
     """Get payment summary for all translators (admin only)"""
-    # First try master admin key
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        # Try user token with admin role
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        # Also try validate_admin_or_user_token for broader compatibility
-        user_info = await validate_admin_or_user_token(admin_key)
-        if user_info and user_info.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use validate_admin_or_user_token for consistent authentication
+    logger.info(f"Pay Vendors request - admin_key present: {bool(admin_key)}, length: {len(admin_key) if admin_key else 0}")
+    user_info = await validate_admin_or_user_token(admin_key)
+    logger.info(f"Pay Vendors - user_info: {user_info}")
+    if not user_info:
+        logger.warning("Pay Vendors - Token validation failed")
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user has admin role (case-insensitive)
+    user_role = user_info.get("role", "").lower()
+    is_master = user_info.get("is_master", False)
+    logger.info(f"Pay Vendors - role: '{user_role}', is_master: {is_master}")
+    if user_role != "admin" and not is_master:
+        logger.warning(f"Pay Vendors - Access denied: role='{user_role}', is_master={is_master}")
+        raise HTTPException(status_code=403, detail=f"Admin access required. Your role: {user_role}")
 
     try:
         # Get ALL users - show everyone regardless of is_active status
@@ -6684,17 +6685,11 @@ async def get_translators_payment_summary(admin_key: str):
 @api_router.get("/admin/payments/translator/{translator_id}")
 async def get_translator_payment_history(translator_id: str, admin_key: str):
     """Get payment history for a specific translator (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        user_info = await validate_admin_or_user_token(admin_key)
-        if user_info and user_info.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -6752,17 +6747,11 @@ async def register_payment(
     receipt_file: UploadFile = File(None)
 ):
     """Register a payment made to a vendor/contractor (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        user_info = await validate_admin_or_user_token(admin_key)
-        if user_info and user_info.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Find user (translator, sales, or any role)
@@ -6828,17 +6817,12 @@ async def register_payment(
 @api_router.post("/admin/payments/add-pages")
 async def add_translator_pages(admin_key: str, translator_id: str = Body(...), pages: int = Body(...), order_id: str = Body(""), notes: str = Body("")):
     """Add pages to a translator's pending payment count (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        user_info = await validate_admin_or_user_token(admin_key)
-        if user_info and user_info.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         # Include all vendor roles: translator, admin, pm, sales
@@ -6859,17 +6843,12 @@ async def add_translator_pages(admin_key: str, translator_id: str = Body(...), p
 @api_router.get("/admin/payments/report")
 async def get_payment_report(admin_key: str, start_date: str = None, end_date: str = None):
     """Get payment report with totals (admin only)"""
-    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
-    if not is_valid:
-        user = await get_current_admin_user(admin_key)
-        if user and user.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        user_info = await validate_admin_or_user_token(admin_key)
-        if user_info and user_info.get("role", "").lower() == "admin":
-            is_valid = True
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="Admin access required")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         query = {}
@@ -8785,8 +8764,12 @@ async def delete_expense(expense_id: str, admin_key: str):
 @api_router.get("/admin/finances/summary")
 async def get_financial_summary(admin_key: str, period: str = "month"):
     """Get financial summary with income, expenses, profit/loss"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    # Use consistent authentication pattern
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+    if user_info.get("role", "").lower() != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     now = datetime.utcnow()
 
@@ -8949,8 +8932,15 @@ async def get_financial_summary(admin_key: str, period: str = "month"):
 @api_router.get("/admin/finances/partners")
 async def get_partner_statistics(admin_key: str):
     """Get partner statistics: total received and pending amounts by company"""
-    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
-        raise HTTPException(status_code=401, detail="Invalid admin key")
+    # Use consistent authentication with other finance endpoints
+    user_info = await validate_admin_or_user_token(admin_key)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Invalid admin key or token")
+
+    # Check if user has admin role (case-insensitive)
+    user_role = user_info.get("role", "").lower()
+    if user_role != "admin" and not user_info.get("is_master"):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     # Get all partner orders
     partner_orders = await db.translation_orders.find({
