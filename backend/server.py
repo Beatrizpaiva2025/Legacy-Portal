@@ -9893,12 +9893,20 @@ async def admin_update_order(order_id: str, update_data: TranslationOrderUpdate,
                                 accept_url = f"{frontend_url}/#/assignment/{assignment_token}/accept"
                                 decline_url = f"{frontend_url}/#/assignment/{assignment_token}/decline"
 
-                                # Prepare order details for email
+                                # Prepare order details for email - prefer translator_deadline (TD) over client deadline
                                 deadline_str = "To be confirmed"
-                                if current_order.get("deadline"):
-                                    deadline = current_order.get("deadline")
+                                # First try translator_deadline (set by PM specifically for translator), then fall back to client deadline
+                                deadline = current_order.get("translator_deadline") or current_order.get("deadline")
+                                if deadline:
                                     if isinstance(deadline, datetime):
                                         deadline_str = deadline.strftime("%B %d, %Y at %I:%M %p")
+                                    elif isinstance(deadline, str):
+                                        try:
+                                            from dateutil import parser
+                                            parsed = parser.parse(deadline)
+                                            deadline_str = parsed.strftime("%B %d, %Y at %I:%M %p")
+                                        except:
+                                            deadline_str = str(deadline)
                                     else:
                                         deadline_str = str(deadline)
 
