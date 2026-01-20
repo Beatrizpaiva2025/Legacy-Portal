@@ -12213,6 +12213,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
   const [notifyPM, setNotifyPM] = useState(true); // Notify assigned PM
   const [additionalAttachments, setAdditionalAttachments] = useState([]); // Multiple uploaded files
   const [selectedAttachments, setSelectedAttachments] = useState({ workspace: true, uploaded: [] }); // Which attachments to send
+  const [externalAttachment, setExternalAttachment] = useState(null); // External attachment for resend (not saved to system)
 
   // Send message to translator state
   const [messagingTranslator, setMessagingTranslator] = useState(null); // { id, name, email, order_number }
@@ -12676,6 +12677,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     setTranslatedDocInfo(null);
     setAdditionalAttachments([]);
     setSelectedAttachments({ workspace: true, uploaded: [] });
+    setExternalAttachment(null);
     try {
       const response = await axios.get(`${API}/admin/orders/${order.id}/translated-document?admin_key=${adminKey}`);
       setTranslatedDocInfo(response.data);
@@ -12772,11 +12774,19 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         additional_document_ids: selectedAttachments.uploaded
       };
 
-      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, {
+      // Build request payload
+      const payload = {
         bcc_email: sendBccEmail || null,
         notify_pm: notifyPM && sendingOrder?.assigned_pm_id ? true : false,
         attachments: attachmentsToSend
-      });
+      };
+
+      // Add external attachment if present (for resend)
+      if (externalAttachment) {
+        payload.external_attachment = externalAttachment;
+      }
+
+      const response = await axios.post(`${API}/admin/orders/${orderId}/deliver?admin_key=${adminKey}`, payload);
 
       let message = '✅ Email sent to o cliente!\n\n';
 
@@ -12794,6 +12804,10 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         }
       }
 
+      if (response.data.external_attachment_sent) {
+        message += `\n📎 Anexo externo: ${response.data.external_attachment_filename}`;
+      }
+
       if (response.data.pm_notified) {
         message += '\n📧 PM notified.';
       }
@@ -12806,6 +12820,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       setSendBccEmail('');
       setAdditionalAttachments([]);
       setSelectedAttachments({ workspace: true, uploaded: [] });
+      setExternalAttachment(null);
       fetchOrders();
     } catch (err) {
       console.error('Failed to deliver:', err);
@@ -16425,6 +16440,63 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   className="w-full px-2 py-1 border rounded text-xs"
                 />
               </div>
+
+              {/* External Attachment for Resend - only for delivered orders */}
+              {sendingOrder.translation_status === 'delivered' && (
+                <div className="mb-2">
+                  <div className="text-[10px] font-medium text-gray-600 mb-1">📎 Anexo Externo (Reenvio):</div>
+                  <div className="text-[9px] text-gray-500 mb-1">
+                    Anexar arquivo externo sem salvar no sistema
+                  </div>
+                  {!externalAttachment ? (
+                    <>
+                      <input
+                        type="file"
+                        id="externalAttachmentFile"
+                        accept=".pdf,.doc,.docx,.html,.jpg,.jpeg,.png,.xlsx,.xls"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const base64 = reader.result.split(',')[1];
+                              setExternalAttachment({
+                                filename: file.name,
+                                content_type: file.type || 'application/octet-stream',
+                                data: base64
+                              });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <label
+                        htmlFor="externalAttachmentFile"
+                        className="block px-2 py-1.5 border-2 border-dashed border-purple-300 bg-purple-50 rounded text-center cursor-pointer hover:bg-purple-100 text-[10px] text-purple-700"
+                      >
+                        📎 Selecionar anexo externo
+                      </label>
+                    </>
+                  ) : (
+                    <div className="p-2 bg-purple-50 border border-purple-300 rounded flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-purple-700">📎</span>
+                        <span className="text-[10px] text-purple-800 font-medium truncate max-w-[180px]">
+                          {externalAttachment.filename}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setExternalAttachment(null)}
+                        className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[9px] hover:bg-red-200"
+                        title="Remover"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Footer - always visible */}

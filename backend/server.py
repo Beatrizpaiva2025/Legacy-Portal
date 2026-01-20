@@ -10245,6 +10245,11 @@ class AttachmentsSelection(BaseModel):
     include_workspace: bool = True
     additional_document_ids: List[str] = []
 
+class ExternalAttachment(BaseModel):
+    filename: str
+    content_type: str
+    data: str  # Base64 encoded file data
+
 class DeliverOrderRequest(BaseModel):
     bcc_email: Optional[str] = None
     notify_pm: bool = False
@@ -10260,6 +10265,8 @@ class DeliverOrderRequest(BaseModel):
     document_type: Optional[str] = None
     source_language: Optional[str] = None
     target_language: Optional[str] = None
+    # External attachment for resend (not saved to system)
+    external_attachment: Optional[ExternalAttachment] = None
 
 
 async def generate_combined_delivery_pdf(
@@ -11334,6 +11341,25 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
 
         has_attachments = len(all_attachments) > 0
 
+        # Add external attachment if provided (for resend)
+        external_attachment_sent = False
+        external_attachment_filename = None
+        if request.external_attachment:
+            try:
+                ext_att = request.external_attachment
+                all_attachments.append({
+                    "content": ext_att.data,  # Already base64 encoded
+                    "filename": ext_att.filename,
+                    "content_type": ext_att.content_type
+                })
+                attachment_filenames.append(ext_att.filename)
+                external_attachment_sent = True
+                external_attachment_filename = ext_att.filename
+                has_attachments = True
+                logger.info(f"Added external attachment for resend: {ext_att.filename}")
+            except Exception as e:
+                logger.error(f"Failed to add external attachment: {str(e)}")
+
         # Use professional email template
         email_html = get_delivery_email_template(order['client_name'])
 
@@ -11438,6 +11464,8 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
             "combined_pdf": generate_combined_pdf,
             "pm_notified": pm_notified,
             "bcc_sent": bcc_sent,
+            "external_attachment_sent": external_attachment_sent,
+            "external_attachment_filename": external_attachment_filename,
             "certification": {
                 "included": bool(certification_data),
                 "certification_id": certification_data.get("certification_id") if certification_data else None,
