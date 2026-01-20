@@ -18100,34 +18100,68 @@ async def run_ai_translator_stage(pipeline: dict, claude_api_key: str) -> dict:
     config = pipeline["config"]
     original_text = pipeline["original_text"] or ""
 
-    # Get glossary terms if enabled
+    # ALWAYS get glossary terms - glossary is mandatory and has priority
     glossary_terms = ""
     source_lang_full = config.get("source_language", "Portuguese (Brazil)")
     target_lang_full = config.get("target_language", "English")
+    source_lang = source_lang_full.lower()[:2]
+    target_lang = target_lang_full.lower()[:2]
 
-    if config.get("use_glossary"):
-        source_lang = config["source_language"].lower()[:2]
-        target_lang = config["target_language"].lower()[:2]
-
-        # Try to find glossary by language codes or full names
-        glossary = await db.glossaries.find_one({
+    # Always fetch all matching glossaries for the language pair
+    try:
+        glossaries = await db.glossaries.find({
             "$or": [
                 {"source_language": source_lang, "target_language": target_lang},
                 {"language_pair": f"{source_lang}-{target_lang}"},
                 {"sourceLang": source_lang_full, "targetLang": target_lang_full},
                 {"sourceLang": {"$regex": source_lang, "$options": "i"}, "targetLang": {"$regex": target_lang, "$options": "i"}}
             ]
-        })
+        }).to_list(50)
 
-        if glossary and glossary.get("terms"):
-            terms_list = "\n".join([f"• {t['source']} → {t['target']}" for t in glossary["terms"][:100]])
+        # Collect all terms from all matching glossaries (prioritize uploaded ones)
+        all_terms = []
+        uploaded_glossary_terms = []
+
+        for glossary in glossaries:
+            if glossary and glossary.get("terms"):
+                for term in glossary["terms"]:
+                    term_entry = {"source": term["source"], "target": term["target"]}
+                    if glossary.get("is_uploaded"):
+                        uploaded_glossary_terms.append(term_entry)
+                    else:
+                        all_terms.append(term_entry)
+
+        # Build glossary text - uploaded glossaries have priority
+        if uploaded_glossary_terms or all_terms:
+            glossary_text = ""
+
+            if uploaded_glossary_terms:
+                glossary_text += "🔹 PRIORITY GLOSSARY TERMS (MANDATORY - USE EXACTLY):\n"
+                seen_sources = set()
+                for t in uploaded_glossary_terms[:100]:
+                    if t["source"].lower() not in seen_sources:
+                        glossary_text += f"• {t['source']} → {t['target']}\n"
+                        seen_sources.add(t["source"].lower())
+
+            if all_terms:
+                glossary_text += "\n🔸 STANDARD GLOSSARY TERMS (USE EXACTLY):\n"
+                seen_sources = {t["source"].lower() for t in uploaded_glossary_terms}
+                for t in all_terms[:100 - len(uploaded_glossary_terms)]:
+                    if t["source"].lower() not in seen_sources:
+                        glossary_text += f"• {t['source']} → {t['target']}\n"
+                        seen_sources.add(t["source"].lower())
+
             glossary_terms = f"""
 ═══════════════════════════════════════════════════════════════════
                     GLOSSARY - MANDATORY TERMS
 ═══════════════════════════════════════════════════════════════════
-Use these EXACT translations for the following terms:
-{terms_list}
+IMPORTANT: You MUST use these EXACT translations for the following terms.
+These terms have been pre-approved and take PRIORITY over any other translation choice.
+
+{glossary_text}
 """
+    except Exception as e:
+        logger.warning(f"Error fetching glossaries for translation: {e}")
 
     # Get Translation Memory entries (prioritize uploaded TM with score=100)
     tm_terms = ""
