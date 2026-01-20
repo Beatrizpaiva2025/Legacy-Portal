@@ -5423,11 +5423,15 @@ async def register_admin_user(user_data: AdminUserCreate, admin_key: str):
         invite_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=7)  # 7 days to accept invitation
 
-        admin_invitation_tokens[invite_token] = {
+        # Store token in MongoDB (persistent storage) instead of in-memory
+        await db.admin_invitation_tokens.delete_many({"email": user_data.email})  # Remove any existing tokens
+        await db.admin_invitation_tokens.insert_one({
+            "token": invite_token,
             "email": user_data.email,
             "user_id": user.id,
-            "expires": expires
-        }
+            "expires": expires,
+            "created_at": datetime.utcnow()
+        })
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
@@ -5685,14 +5689,14 @@ async def admin_reset_password(request: AdminResetPassword):
 async def accept_admin_invitation(request: AdminInvitationAccept):
     """Accept invitation and set password for new admin user"""
     try:
-        # Check if token exists and is valid
-        token_data = admin_invitation_tokens.get(request.token)
+        # Check MongoDB for token (persistent storage)
+        token_data = await db.admin_invitation_tokens.find_one({"token": request.token})
 
         if not token_data:
             raise HTTPException(status_code=400, detail="Invalid or expired invitation link")
 
         if datetime.utcnow() > token_data["expires"]:
-            del admin_invitation_tokens[request.token]
+            await db.admin_invitation_tokens.delete_one({"token": request.token})
             raise HTTPException(status_code=400, detail="Invitation link has expired")
 
         # Get user to check role
@@ -5756,8 +5760,8 @@ async def accept_admin_invitation(request: AdminInvitationAccept):
         if result.modified_count == 0:
             raise HTTPException(status_code=400, detail="Failed to set up account")
 
-        # Remove used token
-        del admin_invitation_tokens[request.token]
+        # Remove used token from MongoDB
+        await db.admin_invitation_tokens.delete_one({"token": request.token})
 
         # Get user info for response
         user = await db.admin_users.find_one({"email": email})
@@ -5782,13 +5786,14 @@ async def accept_admin_invitation(request: AdminInvitationAccept):
 @api_router.get("/admin/auth/verify-invitation")
 async def verify_invitation_token(token: str):
     """Verify if an invitation token is valid"""
-    token_data = admin_invitation_tokens.get(token)
+    # Check MongoDB for token (persistent storage)
+    token_data = await db.admin_invitation_tokens.find_one({"token": token})
 
     if not token_data:
         raise HTTPException(status_code=400, detail="Invalid invitation link")
 
     if datetime.utcnow() > token_data["expires"]:
-        del admin_invitation_tokens[token]
+        await db.admin_invitation_tokens.delete_one({"token": token})
         raise HTTPException(status_code=400, detail="Invitation link has expired")
 
     # Get user info
@@ -5834,20 +5839,21 @@ async def resend_invitation(request: ResendInvitationRequest, admin_key: str):
         if not target_user.get("invitation_pending", False):
             raise HTTPException(status_code=400, detail="User has already accepted their invitation")
 
-        # Remove any existing invitation tokens for this email
-        tokens_to_remove = [k for k, v in admin_invitation_tokens.items() if v.get("email") == target_user["email"]]
-        for token in tokens_to_remove:
-            del admin_invitation_tokens[token]
+        # Remove any existing invitation tokens for this email from MongoDB
+        await db.admin_invitation_tokens.delete_many({"email": target_user["email"]})
 
         # Generate new invitation token
         invite_token = secrets.token_urlsafe(32)
         expires = datetime.utcnow() + timedelta(days=7)
 
-        admin_invitation_tokens[invite_token] = {
+        # Store new token in MongoDB (persistent storage)
+        await db.admin_invitation_tokens.insert_one({
+            "token": invite_token,
             "email": target_user["email"],
             "user_id": target_user["id"],
-            "expires": expires
-        }
+            "expires": expires,
+            "created_at": datetime.utcnow()
+        })
 
         # Send invitation email
         frontend_url = os.environ.get('FRONTEND_URL', 'https://legacy-portal-frontend.onrender.com')
