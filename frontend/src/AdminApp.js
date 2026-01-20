@@ -5174,6 +5174,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
+        .translation-page:first-of-type { page-break-before: auto; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
             text-align: left;
@@ -5244,9 +5245,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             }
         }
         /* Certification Verification Page Styles */
-        .certification-verification-page { page-break-before: always; padding-top: 20px; }
+        .certification-verification-page { page-break-before: always; padding-top: 10px; }
         .certification-box {
-            max-width: 500px; margin: 60px auto; padding: 30px;
+            max-width: 550px; margin: 15px auto; padding: 25px;
             border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc;
         }
         .cert-header { text-align: center; margin-bottom: 25px; }
