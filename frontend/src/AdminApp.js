@@ -3494,10 +3494,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const config = { timeout: 30000 }; // 30 second timeout
 
+      // Filter out invalid terms (must have both source and target non-empty)
+      // This prevents 422 validation errors from the backend
+      // Don't send 'id' field as it can cause issues with large timestamp values
+      const cleanedData = {
+        ...glossaryForm,
+        terms: (glossaryForm.terms || []).filter(term =>
+          term.source && term.source.trim() && term.target && term.target.trim()
+        ).map((term, index) => ({
+          source: term.source.trim(),
+          target: term.target.trim(),
+          notes: term.notes || '',
+          id: index + 1  // Use simple sequential IDs instead of timestamps
+        }))
+      };
+
       if (editingGlossary) {
-        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm, config);
+        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, cleanedData, config);
       } else {
-        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm, config);
+        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, cleanedData, config);
       }
       setShowGlossaryModal(false);
       setEditingGlossary(null);
@@ -3523,11 +3538,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       });
       localStorage.setItem('backup_glossaries', JSON.stringify(localGlossaries));
 
-      const errorMsg = err.code === 'ECONNABORTED'
-        ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Error'
-          ? 'Network Error - Server may be restarting. Saved locally as backup.'
-          : (err.response?.data?.detail || err.message);
+      let errorMsg = 'Unknown error';
+      if (err.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout - server may be slow. Saved locally as backup.';
+      } else if (err.message === 'Network Error') {
+        errorMsg = 'Network Error - Server may be restarting. Saved locally as backup.';
+      } else if (err.response?.data?.detail) {
+        // Pydantic validation errors come as array of objects
+        const detail = err.response.data.detail;
+        if (Array.isArray(detail)) {
+          errorMsg = detail.map(d => d.msg || d.message || JSON.stringify(d)).join('; ');
+        } else if (typeof detail === 'string') {
+          errorMsg = detail;
+        } else {
+          errorMsg = JSON.stringify(detail);
+        }
+      } else {
+        errorMsg = err.message;
+      }
 
       alert('Failed to save glossary: ' + errorMsg);
       setProcessingStatus('❌ Save failed - backed up locally');
@@ -11008,7 +11036,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
                 <input
                   type="file"
-                  accept=".csv,.tmx,.xml"
+                  accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
@@ -11277,7 +11305,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
               <label className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center cursor-pointer">
                 <input
                   type="file"
-                  accept=".csv,.tmx,.xml"
+                  accept=".csv,.tmx,.xml,.xlsx,.xls,.sdltm"
                   className="hidden"
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
