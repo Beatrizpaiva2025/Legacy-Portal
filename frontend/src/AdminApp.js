@@ -20560,7 +20560,7 @@ const FinancesPage = ({ adminKey }) => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
-  const [activeView, setActiveView] = useState('overview'); // overview, expenses, pay-vendors, quickbooks, partners
+  const [activeView, setActiveView] = useState('overview'); // overview, expenses, quickbooks, partners, pages
   // Translator payments state
   const [translators, setTranslators] = useState([]);
   const [translatorPayments, setTranslatorPayments] = useState([]);
@@ -21248,11 +21248,6 @@ const FinancesPage = ({ adminKey }) => {
       fetchPaymentHistory();
       fetchInvoiceNotifications();
     }
-    if (activeView === 'pay-vendors') {
-      fetchTranslatorsForPayment();
-      fetchPaymentReport();
-      fetchExpenses(); // Fetch expenses for vendor expense display
-    }
     if (activeView === 'pages') {
       fetchPagesLogs();
       fetchTranslatorsForPayment();
@@ -21379,6 +21374,37 @@ const FinancesPage = ({ adminKey }) => {
     }
   };
 
+  const handleUploadExpenseReceipt = async (expenseId, file) => {
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload an image (PNG, JPG, GIF) or PDF file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('receipt', file);
+
+      await axios.post(
+        `${API}/admin/expenses/${expenseId}/upload-receipt?admin_key=${adminKey}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+
+      alert('Receipt uploaded successfully!');
+      fetchExpenses(); // Refresh the list
+    } catch (err) {
+      console.error('Error uploading receipt:', err);
+      alert('Error uploading receipt: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
   };
@@ -21474,12 +21500,6 @@ const FinancesPage = ({ adminKey }) => {
               className={`px-4 py-2 rounded text-sm ${activeView === 'expenses' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               Expenses
-            </button>
-            <button
-              onClick={() => setActiveView('pay-vendors')}
-              className={`px-4 py-2 rounded text-sm ${activeView === 'pay-vendors' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
-            >
-              💰 Pay Vendors
             </button>
             <button
               onClick={() => setActiveView('quickbooks')}
@@ -21638,13 +21658,13 @@ const FinancesPage = ({ adminKey }) => {
             <table className="w-full text-xs">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Data</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Categoria</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Descrição</th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">Fornecedor</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Category</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Description</th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-600">Vendor</th>
                   <th className="px-4 py-3 text-right font-medium text-gray-600">Amount</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Comprovante</th>
-                  <th className="px-4 py-3 text-center font-medium text-gray-600">Ações</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Receipt</th>
+                  <th className="px-4 py-3 text-center font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -21671,20 +21691,28 @@ const FinancesPage = ({ adminKey }) => {
                             <button
                               onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
                               className="text-blue-600 hover:text-blue-800 text-xs"
-                              title="Visualizar comprovante"
+                              title="View receipt"
                             >
-                              👁️ Ver
+                              👁️ View
                             </button>
                             <button
                               onClick={() => handleDownloadExpenseReceipt(expense.id)}
                               className="text-green-600 hover:text-green-800 text-xs"
-                              title="Baixar comprovante"
+                              title="Download receipt"
                             >
-                              ⬇️ Baixar
+                              ⬇️ Download
                             </button>
                           </div>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <label className="cursor-pointer text-blue-600 hover:text-blue-800 text-xs">
+                            📎 Upload
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              className="hidden"
+                              onChange={(e) => handleUploadExpenseReceipt(expense.id, e.target.files[0])}
+                            />
+                          </label>
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -21709,7 +21737,7 @@ const FinancesPage = ({ adminKey }) => {
             </div>
             <form onSubmit={handleCreateExpense} className="p-4 space-y-4 overflow-y-auto flex-1">
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Categoria</label>
+                <label className="block text-xs text-gray-600 mb-1">Category</label>
                 <select
                   value={expenseForm.category}
                   onChange={(e) => setExpenseForm({...expenseForm, category: e.target.value})}
@@ -21722,7 +21750,7 @@ const FinancesPage = ({ adminKey }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Descrição</label>
+                <label className="block text-xs text-gray-600 mb-1">Description</label>
                 <input
                   type="text"
                   value={expenseForm.description}
@@ -21744,7 +21772,7 @@ const FinancesPage = ({ adminKey }) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">Data</label>
+                  <label className="block text-xs text-gray-600 mb-1">Date</label>
                   <input
                     type="date"
                     value={expenseForm.date}
@@ -21755,7 +21783,7 @@ const FinancesPage = ({ adminKey }) => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Vendor / Fornecedor (opcional)</label>
+                <label className="block text-xs text-gray-600 mb-1">Vendor (optional)</label>
                 <select
                   value={expenseForm.vendor_id}
                   onChange={(e) => {
@@ -21811,7 +21839,7 @@ const FinancesPage = ({ adminKey }) => {
               )}
               {/* Notes field */}
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Notes (opcional)</label>
+                <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
                 <textarea
                   value={expenseForm.notes}
                   onChange={(e) => setExpenseForm({...expenseForm, notes: e.target.value})}
@@ -21822,7 +21850,7 @@ const FinancesPage = ({ adminKey }) => {
               </div>
               {/* Receipt Upload */}
               <div>
-                <label className="block text-xs text-gray-600 mb-1">Comprovante / Receipt (opcional)</label>
+                <label className="block text-xs text-gray-600 mb-1">Receipt (optional)</label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
@@ -21849,7 +21877,7 @@ const FinancesPage = ({ adminKey }) => {
                           }}
                           className="text-xs text-red-600 hover:text-red-800"
                         >
-                          Remover
+                          Remove
                         </button>
                       </div>
                     ) : (
@@ -21868,421 +21896,6 @@ const FinancesPage = ({ adminKey }) => {
               </div>
             </form>
           </div>
-        </div>
-      )}
-
-      {/* Pay Vendors View */}
-      {activeView === 'pay-vendors' && (
-        <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-6">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-xs text-gray-500 uppercase mb-1">Total Pending</div>
-              <div className="text-2xl font-bold text-yellow-600">${paymentReport?.total_pending?.toFixed(2) || '0.00'}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-xs text-gray-500 uppercase mb-1">Paid This Month</div>
-              <div className="text-2xl font-bold text-green-600">${paymentReport?.total_paid_month?.toFixed(2) || '0.00'}</div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="text-xs text-gray-500 uppercase mb-1">Total Vendors</div>
-              <div className="text-2xl font-bold text-gray-800">{translators.length}</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Vendors List */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex justify-between items-center mb-3">
-                <h2 className="text-sm font-bold text-gray-700">👥 Vendors / Contractors</h2>
-                <button
-                  onClick={() => setShowQuickAddVendor(true)}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                >
-                  + Add Vendor
-                </button>
-              </div>
-              <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                {translators.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No vendors found.</p>
-                ) : (
-                  translators.map((translator) => (
-                    <div
-                      key={translator.translator_id || translator._id}
-                      onClick={() => {
-                        setSelectedTranslatorForPayment(translator);
-                        const vendorId = translator.translator_id || translator._id;
-                        fetchTranslatorPaymentHistory(vendorId);
-                        fetchVendorExpenses(vendorId);
-                      }}
-                      className={`p-3 border rounded cursor-pointer hover:bg-gray-50 ${
-                        (selectedTranslatorForPayment?.translator_id || selectedTranslatorForPayment?._id) === (translator.translator_id || translator._id) ? 'border-blue-500 bg-blue-50' : ''
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-sm">{translator.name}</div>
-                          <div className="text-xs text-gray-500">{translator.email}</div>
-                          <div className="text-xs text-gray-400 mt-1">
-                            {translator.role === 'translator' ? '📝 Translator' : translator.role === 'sales' ? '💼 Sales' : translator.role === 'pm' ? '📋 PM' : translator.role === 'admin' ? '⚙️ Admin' : '👤 ' + (translator.role || 'Vendor')}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-gray-500">Pending Pages</div>
-                          <div className="font-bold text-lg text-yellow-600">{translator.pages_pending_payment || translator.pending_payment_pages || 0}</div>
-                          <div className="text-xs text-green-600 font-medium">
-                            ${((translator.pages_pending_payment || translator.pending_payment_pages || 0) * (translator.rate_per_page || 25)).toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Payment Form & History */}
-            <div className="space-y-4">
-              {/* Payment Form */}
-              {selectedTranslatorForPayment ? (
-                <div className="bg-white rounded-lg shadow p-4">
-                  <h2 className="text-sm font-bold text-gray-700 mb-3">💳 Register Payment: {selectedTranslatorForPayment.name}</h2>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Amount ($)</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="w-full border rounded p-2 text-sm"
-                          placeholder={`Suggested: $${((selectedTranslatorForPayment.pending_payment_pages || 0) * (selectedTranslatorForPayment.rate_per_page || 25)).toFixed(2)}`}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Payment Method</label>
-                        <select
-                          value={paymentMethod || ''}
-                          onChange={(e) => setPaymentMethod(e.target.value)}
-                          className="w-full border rounded p-2 text-sm"
-                        >
-                          <option value="">Select method...</option>
-                          <option value="zelle">Zelle</option>
-                          <option value="pix">Pix</option>
-                          <option value="wise">Wise</option>
-                          <option value="western_union">Western Union</option>
-                          <option value="paypal">PayPal</option>
-                          <option value="bank_transfer">Bank Transfer</option>
-                          <option value="check">Check</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Payment Type</label>
-                      <select
-                        value={paymentType || 'translation'}
-                        onChange={(e) => setPaymentType(e.target.value)}
-                        className="w-full border rounded p-2 text-sm"
-                      >
-                        <option value="translation">Translation Payment</option>
-                        <option value="sales_commission">Sales Commission</option>
-                        <option value="bonus">Bonus</option>
-                        <option value="reimbursement">Reimbursement</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    {paymentType === 'sales_commission' && (
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Commission Rate (%)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={commissionRate || ''}
-                          onChange={(e) => setCommissionRate(e.target.value)}
-                          className="w-full border rounded p-2 text-sm"
-                          placeholder="e.g., 10 for 10%"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Note (optional)</label>
-                      <textarea
-                        value={paymentNote}
-                        onChange={(e) => setPaymentNote(e.target.value)}
-                        className="w-full border rounded p-2 text-sm"
-                        rows={2}
-                        placeholder="Payment reference, period, order numbers..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Receipt/Proof (optional)</label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={handleReceiptFileChange}
-                          className="hidden"
-                          id="receipt-file-input"
-                        />
-                        <label htmlFor="receipt-file-input" className="cursor-pointer">
-                          {receiptFile ? (
-                            <div className="space-y-2">
-                              {receiptPreview ? (
-                                <img src={receiptPreview} alt="Receipt preview" className="max-h-32 mx-auto rounded" />
-                              ) : (
-                                <div className="text-3xl">📄</div>
-                              )}
-                              <div className="text-sm text-gray-700">{receiptFile.name}</div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setReceiptFile(null);
-                                  setReceiptPreview(null);
-                                }}
-                                className="text-xs text-red-600 hover:text-red-800"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <div className="text-2xl text-gray-400">📎</div>
-                              <div className="text-xs text-gray-500">Click to upload receipt</div>
-                              <div className="text-xs text-gray-400">PNG, JPG, GIF or PDF (max 10MB)</div>
-                            </div>
-                          )}
-                        </label>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleRegisterPayment}
-                      disabled={!paymentAmount || !paymentMethod}
-                      className="w-full py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      ✅ Register Payment
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-lg shadow p-8 text-center">
-                  <div className="text-4xl mb-3">👈</div>
-                  <p className="text-gray-500">Select a vendor to register payment</p>
-                </div>
-              )}
-
-              {/* Payment History */}
-              {selectedTranslatorForPayment && (
-                <div className="bg-white rounded-lg shadow p-4">
-                  <h2 className="text-sm font-bold text-gray-700 mb-3">📜 Payment History</h2>
-                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                    {translatorPayments.length === 0 ? (
-                      <p className="text-gray-500 text-sm text-center py-4">No payments recorded yet.</p>
-                    ) : (
-                      translatorPayments.map((payment, idx) => (
-                        <div key={idx} className="p-3 border rounded text-sm hover:bg-gray-50">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-bold text-green-600">${payment.amount.toFixed(2)}</span>
-                              {payment.payment_method && (
-                                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-                                  {payment.payment_method === 'zelle' ? 'Zelle' :
-                                   payment.payment_method === 'pix' ? 'Pix' :
-                                   payment.payment_method === 'wise' ? 'Wise' :
-                                   payment.payment_method === 'western_union' ? 'Western Union' :
-                                   payment.payment_method === 'paypal' ? 'PayPal' :
-                                   payment.payment_method === 'bank_transfer' ? 'Bank Transfer' :
-                                   payment.payment_method === 'check' ? 'Check' :
-                                   payment.payment_method}
-                                </span>
-                              )}
-                              {payment.payment_type && payment.payment_type !== 'translation' && (
-                                <span className="ml-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-                                  {payment.payment_type === 'sales_commission' ? 'Commission' : payment.payment_type}
-                                </span>
-                              )}
-                              {payment.receipt_filename && (
-                                <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
-                                  📎 Receipt
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {new Date(payment.paid_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
-                            </span>
-                          </div>
-                          {payment.note && (
-                            <div className="text-xs text-gray-500 mt-1">{payment.note}</div>
-                          )}
-                          {payment.receipt_file_data && (
-                            <div className="mt-2">
-                              {payment.receipt_file_type?.startsWith('image/') ? (
-                                <img
-                                  src={`data:${payment.receipt_file_type};base64,${payment.receipt_file_data}`}
-                                  alt="Receipt"
-                                  className="max-h-24 rounded cursor-pointer hover:opacity-80"
-                                  onClick={() => window.open(`data:${payment.receipt_file_type};base64,${payment.receipt_file_data}`, '_blank')}
-                                />
-                              ) : payment.receipt_file_type === 'application/pdf' && (
-                                <a
-                                  href={`data:application/pdf;base64,${payment.receipt_file_data}`}
-                                  download={payment.receipt_filename}
-                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                >
-                                  Download PDF Receipt
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Vendor Expenses Section */}
-              {selectedTranslatorForPayment && (
-                <div className="bg-white rounded-lg shadow p-4">
-                  <h2 className="text-sm font-bold text-gray-700 mb-3">📋 Despesas do Vendor</h2>
-                  <div className="space-y-2 max-h-[250px] overflow-y-auto">
-                    {vendorExpenses.length === 0 ? (
-                      <p className="text-gray-500 text-sm text-center py-4">Nenhuma despesa registrada para este vendor.</p>
-                    ) : (
-                      vendorExpenses.map((expense, idx) => (
-                        <div key={idx} className="p-3 border rounded text-sm hover:bg-gray-50">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <span className="font-bold text-red-600">{formatCurrency(expense.amount)}</span>
-                              <span className="ml-2 px-2 py-0.5 rounded text-xs" style={{
-                                backgroundColor: `${EXPENSE_CATEGORIES[expense.category]?.color}20`,
-                                color: EXPENSE_CATEGORIES[expense.category]?.color
-                              }}>
-                                {EXPENSE_CATEGORIES[expense.category]?.label || expense.category}
-                              </span>
-                              {expense.has_receipt && (
-                                <span className="ml-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
-                                  📎 Comprovante
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {formatDate(expense.date)}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-600 mt-1">{expense.description}</div>
-                          {expense.has_receipt && (
-                            <div className="mt-2 flex gap-2">
-                              <button
-                                onClick={() => handleViewExpenseReceipt(expense.id, expense.receipt_filename)}
-                                className="text-blue-600 hover:text-blue-800 text-xs"
-                              >
-                                👁️ Ver Comprovante
-                              </button>
-                              <button
-                                onClick={() => handleDownloadExpenseReceipt(expense.id)}
-                                className="text-green-600 hover:text-green-800 text-xs"
-                              >
-                                ⬇️ Baixar
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  {/* Total expenses for this vendor */}
-                  {vendorExpenses.length > 0 && (
-                    <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-600">Total de Despesas:</span>
-                      <span className="text-lg font-bold text-red-600">
-                        {formatCurrency(vendorExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Add Vendor Modal */}
-          {showQuickAddVendor && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-gray-800">Add New Vendor</h3>
-                  <button
-                    onClick={() => setShowQuickAddVendor(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Name *</label>
-                    <input
-                      type="text"
-                      value={quickVendorForm.name}
-                      onChange={(e) => setQuickVendorForm({...quickVendorForm, name: e.target.value})}
-                      className="w-full border rounded p-2 text-sm"
-                      placeholder="Vendor name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Email *</label>
-                    <input
-                      type="email"
-                      value={quickVendorForm.email}
-                      onChange={(e) => setQuickVendorForm({...quickVendorForm, email: e.target.value})}
-                      className="w-full border rounded p-2 text-sm"
-                      placeholder="vendor@email.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Role</label>
-                    <select
-                      value={quickVendorForm.role}
-                      onChange={(e) => setQuickVendorForm({...quickVendorForm, role: e.target.value})}
-                      className="w-full border rounded p-2 text-sm"
-                    >
-                      <option value="translator">Translator</option>
-                      <option value="sales">Sales</option>
-                      <option value="pm">Project Manager</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Rate per Page ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={quickVendorForm.rate_per_page}
-                      onChange={(e) => setQuickVendorForm({...quickVendorForm, rate_per_page: e.target.value})}
-                      className="w-full border rounded p-2 text-sm"
-                      placeholder="25.00"
-                    />
-                  </div>
-                  <div className="flex space-x-3 mt-4">
-                    <button
-                      onClick={() => setShowQuickAddVendor(false)}
-                      className="flex-1 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleQuickAddVendor}
-                      disabled={addingVendor || !quickVendorForm.name || !quickVendorForm.email}
-                      className="flex-1 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {addingVendor ? 'Adding...' : 'Add Vendor'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
