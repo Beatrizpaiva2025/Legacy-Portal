@@ -9305,8 +9305,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                       <iframe
                         srcDoc={getHighlightedTranslation()}
                         title="Translation Preview"
-                        className="w-full border-0 flex-1"
-                        style={{minHeight: '540px'}}
+                        className="w-full border-0"
+                        style={{flex: '1 1 0', minHeight: 0}}
                       />
                     ) : (
                       <div
@@ -9316,8 +9316,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         onBlur={(e) => handleTranslationEdit(e.target.innerHTML)}
                         onMouseUp={saveSelection}
                         onKeyUp={saveSelection}
-                        className="p-3 text-xs focus:outline-none overflow-auto flex-1"
-                        style={{minHeight: '540px', width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
+                        className="p-3 text-xs focus:outline-none overflow-auto"
+                        style={{flex: '1 1 0', minHeight: 0, width: '100%', boxSizing: 'border-box', border: '3px solid #10B981', borderRadius: '4px'}}
                       />
                     )}
                   </div>
