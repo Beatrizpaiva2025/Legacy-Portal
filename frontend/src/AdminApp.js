@@ -5174,6 +5174,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
+        .translation-page:first-of-type { page-break-before: auto; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
             text-align: left;
@@ -5260,9 +5261,9 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
             }
         }
         /* Certification Verification Page Styles */
-        .certification-verification-page { page-break-before: always; padding-top: 20px; }
+        .certification-verification-page { page-break-before: always; padding-top: 10px; }
         .certification-box {
-            max-width: 500px; margin: 60px auto; padding: 30px;
+            max-width: 550px; margin: 15px auto; padding: 25px;
             border: 2px solid #2563eb; border-radius: 12px; background: #f8fafc;
         }
         .cert-header { text-align: center; margin-bottom: 25px; }
@@ -10662,8 +10663,8 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   <label className="flex items-center text-xs cursor-pointer p-2 bg-purple-50 border border-purple-200 rounded">
                     <input
                       type="checkbox"
-                      checked={includeVerificationPage}
-                      onChange={(e) => setIncludeVerificationPage(e.target.checked)}
+                      checked={includeCertification}
+                      onChange={(e) => setIncludeCertification(e.target.checked)}
                       className="mr-3 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                     />
                     <span className="font-medium text-purple-700">🔐 Include Verification Page (QR Code)</span>
@@ -10815,7 +10816,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Original</span>
                       </>
                     )}
-                    {includeVerificationPage && (
+                    {includeCertification && (
                       <>
                         <span className="text-gray-400">→</span>
                         <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">🔐 Verification</span>
@@ -10824,7 +10825,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
                   </div>
                   <p className="text-[10px] text-gray-500 mt-2">
                     {includeLetterhead ? '✓ Letterhead on all pages' : '✗ No letterhead'}
-                    {includeVerificationPage ? ' • ✓ Verification page' : ''}
+                    {includeCertification ? ' • ✓ Verification page' : ''}
                   </p>
                 </div>
 
