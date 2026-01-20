@@ -3494,10 +3494,25 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     try {
       const config = { timeout: 30000 }; // 30 second timeout
 
+      // Filter out invalid terms (must have both source and target non-empty)
+      // This prevents 422 validation errors from the backend
+      // Don't send 'id' field as it can cause issues with large timestamp values
+      const cleanedData = {
+        ...glossaryForm,
+        terms: (glossaryForm.terms || []).filter(term =>
+          term.source && term.source.trim() && term.target && term.target.trim()
+        ).map((term, index) => ({
+          source: term.source.trim(),
+          target: term.target.trim(),
+          notes: term.notes || '',
+          id: index + 1  // Use simple sequential IDs instead of timestamps
+        }))
+      };
+
       if (editingGlossary) {
-        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, glossaryForm, config);
+        await axios.put(`${API}/admin/glossaries/${editingGlossary.id}?admin_key=${adminKey}`, cleanedData, config);
       } else {
-        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, glossaryForm, config);
+        await axios.post(`${API}/admin/glossaries?admin_key=${adminKey}`, cleanedData, config);
       }
       setShowGlossaryModal(false);
       setEditingGlossary(null);
