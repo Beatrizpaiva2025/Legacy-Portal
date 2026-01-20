@@ -8663,6 +8663,41 @@ async def get_expense_receipt(expense_id: str, admin_key: str):
         "receipt_filename": expense.get('receipt_filename')
     }
 
+@api_router.post("/admin/expenses/{expense_id}/upload-receipt")
+async def upload_expense_receipt(expense_id: str, admin_key: str, receipt: UploadFile = File(...)):
+    """Upload a receipt to an existing expense"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        raise HTTPException(status_code=401, detail="Invalid admin key")
+
+    expense = await db.expenses.find_one({"id": expense_id})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Validate file type
+    allowed_types = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'application/pdf']
+    if receipt.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PNG, JPG, GIF, and PDF files are allowed.")
+
+    # Read and encode file
+    file_content = await receipt.read()
+    if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=400, detail="File size must be less than 10MB")
+
+    file_base64 = base64.b64encode(file_content).decode('utf-8')
+
+    # Update expense with receipt
+    await db.expenses.update_one(
+        {"id": expense_id},
+        {"$set": {
+            "receipt_file_data": file_base64,
+            "receipt_file_type": receipt.content_type,
+            "receipt_filename": receipt.filename,
+            "has_receipt": True
+        }}
+    )
+
+    return {"success": True, "message": "Receipt uploaded successfully"}
+
 @api_router.put("/admin/expenses/{expense_id}")
 async def update_expense(expense_id: str, update_data: ExpenseUpdate, admin_key: str):
     """Update an expense record"""
