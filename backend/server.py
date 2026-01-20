@@ -11082,6 +11082,11 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 # Generate QR code
                 qr_code_data = generate_qr_code(verification_url)
 
+                # Normalize certifier name - replace "Admin (Self)" with proper name
+                normalized_certifier = certifier_name
+                if normalized_certifier in ["Admin (Self)", "Admin", "Self", None, ""]:
+                    normalized_certifier = "Beatriz Paiva"
+
                 # Create certification record
                 certification = {
                     "certification_id": cert_id,
@@ -11092,7 +11097,7 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                     "target_language": order.get("target_language", ""),
                     "page_count": 1,
                     "document_hash": document_hash,
-                    "certifier_name": certifier_name or "Beatriz Paiva",
+                    "certifier_name": normalized_certifier,
                     "certifier_title": "Legal Representative",
                     "certifier_credentials": "ATA Member # 275993",
                     "company_name": "Legacy Translations Inc.",
@@ -20947,6 +20952,11 @@ async def create_certification(data: CertificationCreate, admin_key: str):
         # Generate QR code
         qr_code_data = generate_qr_code(verification_url)
 
+        # Normalize certifier name - replace "Admin (Self)" with proper name
+        certifier_name = data.certifier_name
+        if certifier_name in ["Admin (Self)", "Admin", "Self", None, ""]:
+            certifier_name = "Beatriz Paiva"
+
         # Create certification record
         certification = {
             "certification_id": cert_id,
@@ -20957,8 +20967,8 @@ async def create_certification(data: CertificationCreate, admin_key: str):
             "target_language": data.target_language,
             "page_count": data.page_count,
             "document_hash": document_hash,
-            "certifier_name": data.certifier_name,
-            "certifier_title": data.certifier_title,
+            "certifier_name": certifier_name,
+            "certifier_title": data.certifier_title or "Legal Representative",
             "certifier_credentials": data.certifier_credentials,
             "company_name": data.company_name,
             "company_address": data.company_address,

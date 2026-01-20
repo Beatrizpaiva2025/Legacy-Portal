@@ -5191,11 +5191,27 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         }
         .translation-content.translation-text table {
             width: 100%;
+            max-width: 100%;
             border-collapse: collapse;
             margin: 10px 0;
-            page-break-inside: avoid;
+            table-layout: fixed;
+            page-break-inside: auto;
         }
-        .translation-content.translation-text td, .translation-content.translation-text th { border: 1px solid #333; padding: 6px; font-size: 10pt; }
+        .translation-content.translation-text td, .translation-content.translation-text th {
+            border: 1px solid #333;
+            padding: 6px;
+            font-size: 10pt;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 200px;
+        }
+        .translation-content.translation-text tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+        .translation-content.translation-text thead {
+            display: table-header-group;
+        }
         .translation-content.translation-text h1, .translation-content.translation-text h2, .translation-content.translation-text h3 {
             margin: 12px 0 8px;
             color: #1a365d;
@@ -24844,8 +24860,10 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
         .translation-image { max-width: 100%; max-height: 700px; border: 1px solid #ddd; object-fit: contain; }
         .translation-text { font-size: 12px; line-height: 1.6; }
         .translation-text p { margin-bottom: 12px; text-align: justify; orphans: 4; widows: 4; }
-        .translation-text table { width: 100%; border-collapse: collapse; margin: 15px 0; page-break-inside: avoid; }
-        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; }
+        .translation-text table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 15px 0; table-layout: fixed; page-break-inside: auto; }
+        .translation-text td, .translation-text th { border: 1px solid #ccc; padding: 6px 8px; font-size: 11px; word-wrap: break-word; overflow-wrap: break-word; }
+        .translation-text tr { page-break-inside: avoid; page-break-after: auto; }
+        .translation-text thead { display: table-header-group; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .original-image-container { text-align: center; margin-bottom: 10px; }
         .original-image { max-width: 100%; max-height: 650px; border: 1px solid #ddd; object-fit: contain; }
