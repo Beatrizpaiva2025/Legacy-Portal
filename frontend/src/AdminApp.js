@@ -5174,7 +5174,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
-        .translation-page:first-of-type { page-break-before: auto; }
+        .cover-page + .translation-page { page-break-before: auto; }
         .translation-content { text-align: center; }
         .translation-content.translation-text {
             text-align: left;
@@ -5785,6 +5785,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         .stamp-ata { font-size: 9px; color: #2563eb; }
         .cover-page { page-break-after: always; padding: 30px 40px; }
         .translation-page { page-break-before: always; padding-top: 15px; }
+        .cover-page + .translation-page { page-break-before: auto; }
         .page-title { font-size: 13px; font-weight: bold; text-align: center; margin: 15px 0 10px 0; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .page-header { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #1a365d; text-transform: uppercase; letter-spacing: 2px; page-break-after: avoid; }
         .translation-content {
@@ -5859,6 +5860,7 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     ${includeCover ? coverLetterHTML : ''}
     ${translationPagesHTML}
     ${originalPagesHTML}
+    ${certificationPageHTML}
 </body>
 </html>`;
 
