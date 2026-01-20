@@ -11072,16 +11072,73 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 include_workspace = attachments_selection.include_workspace
                 additional_doc_ids = attachments_selection.additional_document_ids or []
 
-            # Add workspace translation if selected
+            # Add workspace translation if selected - CONVERT TO PDF instead of sending HTML
             if include_workspace and has_html_translation:
-                translation_html_content = generate_translation_html_for_email(order)
-                all_attachments.append({
-                    "content": base64.b64encode(translation_html_content.encode('utf-8')).decode('utf-8'),
-                    "filename": f"Translation_{order['order_number']}.html",
-                    "content_type": "text/html"
-                })
-                attachment_filenames.append(f"Translation_{order['order_number']}.html")
-                logger.info(f"Added workspace translation to attachments")
+                try:
+                    import fitz
+                    from bs4 import BeautifulSoup
+                    import re
+
+                    # Parse HTML and extract text content
+                    translation_html_content = generate_translation_html_for_email(order)
+                    soup = BeautifulSoup(translation_html_content, 'html.parser')
+
+                    # Remove script and style elements
+                    for script in soup(["script", "style"]):
+                        script.decompose()
+
+                    # Get text content
+                    text_content = soup.get_text(separator='\n')
+                    # Clean up whitespace
+                    lines = [line.strip() for line in text_content.split('\n') if line.strip()]
+
+                    # Create PDF with translation content
+                    pdf_doc = fitz.open()
+                    page_width, page_height = 612, 792  # Letter size
+                    margin = 72  # 1 inch margins
+                    y_position = margin
+                    current_page = pdf_doc.new_page(width=page_width, height=page_height)
+
+                    # Add header
+                    current_page.draw_rect(fitz.Rect(50, 40, page_width - 50, 43), color=(0.11, 0.27, 0.53), fill=(0.11, 0.27, 0.53))
+                    current_page.insert_text((page_width/2 - 60, 30), "Legacy Translations", fontsize=12, fontname="helv", color=(0.11, 0.27, 0.53))
+                    current_page.insert_text((margin, 70), f"Order: {order.get('order_number', '')} | Translation", fontsize=10, fontname="helvB", color=(0.11, 0.27, 0.53))
+                    y_position = 100
+
+                    # Add text content
+                    for line in lines:
+                        if y_position > page_height - margin:
+                            current_page = pdf_doc.new_page(width=page_width, height=page_height)
+                            y_position = margin
+
+                        # Truncate long lines
+                        max_chars = 80
+                        while len(line) > max_chars:
+                            current_page.insert_text((margin, y_position), line[:max_chars], fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                            y_position += 14
+                            line = line[max_chars:]
+                            if y_position > page_height - margin:
+                                current_page = pdf_doc.new_page(width=page_width, height=page_height)
+                                y_position = margin
+
+                        if line:
+                            current_page.insert_text((margin, y_position), line, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+                            y_position += 14
+
+                    pdf_bytes = pdf_doc.tobytes()
+                    pdf_doc.close()
+
+                    all_attachments.append({
+                        "content": base64.b64encode(pdf_bytes).decode('utf-8'),
+                        "filename": f"Translation_{order['order_number']}.pdf",
+                        "content_type": "application/pdf"
+                    })
+                    attachment_filenames.append(f"Translation_{order['order_number']}.pdf")
+                    logger.info(f"Added workspace translation as PDF to attachments")
+
+                except Exception as pdf_err:
+                    logger.error(f"Failed to convert translation HTML to PDF: {str(pdf_err)}")
+                    # Don't send raw HTML to client - skip this attachment
 
             # ONLY add additional documents if explicitly requested via additional_doc_ids
             # Do NOT automatically add all project documents - client should receive only the combined PDF or workspace translation
@@ -11114,14 +11171,89 @@ async def admin_deliver_order(order_id: str, admin_key: str, request: DeliverOrd
                 attachment_filenames.append(order["translated_filename"])
                 logger.info(f"Using fallback uploaded file: {order['translated_filename']}")
 
-            # Add verification page HTML if certification was created and combined PDF not used
+            # Add verification page as PDF if certification was created and combined PDF not used
             if certification_data and include_verification_page:
-                all_attachments.append({
-                    "content": base64.b64encode(verification_page_html.encode('utf-8')).decode('utf-8'),
-                    "filename": f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.html",
-                    "content_type": "text/html"
-                })
-                attachment_filenames.append(f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.html")
+                try:
+                    import fitz
+
+                    # Create verification page PDF
+                    ver_pdf = fitz.open()
+                    ver_page = ver_pdf.new_page(width=612, height=792)
+
+                    # Header
+                    ver_page.draw_rect(fitz.Rect(50, 40, 562, 100), color=(0.11, 0.27, 0.53), fill=(0.11, 0.27, 0.53))
+                    ver_page.insert_text((200, 65), "DOCUMENT VERIFICATION", fontsize=16, fontname="helvB", color=(1, 1, 1))
+                    ver_page.insert_text((180, 85), "Certified Translation Authenticity", fontsize=10, fontname="helv", color=(0.9, 0.9, 0.9))
+
+                    # Content box
+                    ver_page.draw_rect(fitz.Rect(50, 120, 562, 500), color=(0.9, 0.9, 0.9), fill=(0.98, 0.98, 0.98))
+
+                    y = 150
+                    ver_page.insert_text((70, y), "Certification ID:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), certification_data.get('certification_id', ''), fontsize=10, fontname="helv", color=(0.11, 0.27, 0.53))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Document Type:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), certification_data.get('document_type', 'Document'), fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Languages:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), f"{certification_data.get('source_language', '')} → {certification_data.get('target_language', '')}", fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Certified Date:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    cert_date = certification_data.get('certified_at')
+                    if cert_date:
+                        cert_date_str = cert_date.strftime('%B %d, %Y') if hasattr(cert_date, 'strftime') else str(cert_date)
+                    else:
+                        cert_date_str = datetime.utcnow().strftime('%B %d, %Y')
+                    ver_page.insert_text((200, y), cert_date_str, fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    y += 30
+                    ver_page.insert_text((70, y), "Certifier:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((200, y), certification_data.get('certifier_name', 'Beatriz Paiva'), fontsize=10, fontname="helv", color=(0.1, 0.1, 0.1))
+
+                    # QR Code
+                    y += 50
+                    ver_page.insert_text((70, y), "Scan to Verify:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+
+                    qr_data = certification_data.get('qr_code_data')
+                    if qr_data:
+                        try:
+                            qr_bytes = base64.b64decode(qr_data)
+                            qr_rect = fitz.Rect(70, y + 10, 170, y + 110)
+                            ver_page.insert_image(qr_rect, stream=qr_bytes)
+                        except:
+                            pass
+
+                    # Verification URL
+                    y += 130
+                    ver_page.insert_text((70, y), "Verification URL:", fontsize=10, fontname="helvB", color=(0.3, 0.3, 0.3))
+                    ver_page.insert_text((70, y + 20), certification_data.get('verification_url', ''), fontsize=9, fontname="helv", color=(0.11, 0.27, 0.53))
+
+                    # Footer notice
+                    ver_page.insert_text((70, 520), "This document has been digitally certified by Legacy Translations Inc.", fontsize=9, fontname="helv", color=(0.4, 0.4, 0.4))
+                    ver_page.insert_text((70, 535), "Any alterations to this document will invalidate this certification.", fontsize=9, fontname="helv", color=(0.4, 0.4, 0.4))
+
+                    # Company info
+                    ver_page.draw_rect(fitz.Rect(50, 560, 562, 562), color=(0.11, 0.27, 0.53), fill=(0.11, 0.27, 0.53))
+                    ver_page.insert_text((150, 590), "Legacy Translations Inc. | 867 Boylston Street, Boston, MA 02116", fontsize=8, fontname="helv", color=(0.4, 0.4, 0.4))
+                    ver_page.insert_text((200, 605), "(857) 316-7770 | contact@legacytranslations.com", fontsize=8, fontname="helv", color=(0.4, 0.4, 0.4))
+
+                    ver_pdf_bytes = ver_pdf.tobytes()
+                    ver_pdf.close()
+
+                    all_attachments.append({
+                        "content": base64.b64encode(ver_pdf_bytes).decode('utf-8'),
+                        "filename": f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.pdf",
+                        "content_type": "application/pdf"
+                    })
+                    attachment_filenames.append(f"Verification_{order['order_number']}_{certification_data.get('certification_id', '')}.pdf")
+                    logger.info(f"Added verification page as PDF to attachments")
+
+                except Exception as ver_err:
+                    logger.error(f"Failed to create verification PDF: {str(ver_err)}")
+                    # Don't send raw HTML to client - skip this attachment
 
         has_attachments = len(all_attachments) > 0
 
