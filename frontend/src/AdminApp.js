@@ -3538,11 +3538,24 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
       });
       localStorage.setItem('backup_glossaries', JSON.stringify(localGlossaries));
 
-      const errorMsg = err.code === 'ECONNABORTED'
-        ? 'Request timeout - server may be slow. Saved locally as backup.'
-        : err.message === 'Network Error'
-          ? 'Network Error - Server may be restarting. Saved locally as backup.'
-          : (err.response?.data?.detail || err.message);
+      let errorMsg = 'Unknown error';
+      if (err.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout - server may be slow. Saved locally as backup.';
+      } else if (err.message === 'Network Error') {
+        errorMsg = 'Network Error - Server may be restarting. Saved locally as backup.';
+      } else if (err.response?.data?.detail) {
+        // Pydantic validation errors come as array of objects
+        const detail = err.response.data.detail;
+        if (Array.isArray(detail)) {
+          errorMsg = detail.map(d => d.msg || d.message || JSON.stringify(d)).join('; ');
+        } else if (typeof detail === 'string') {
+          errorMsg = detail;
+        } else {
+          errorMsg = JSON.stringify(detail);
+        }
+      } else {
+        errorMsg = err.message;
+      }
 
       alert('Failed to save glossary: ' + errorMsg);
       setProcessingStatus('❌ Save failed - backed up locally');
