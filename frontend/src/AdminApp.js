@@ -2015,26 +2015,46 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState(null);
 
-  // Auto-save to localStorage - save critical workflow data
+  // Auto-save to localStorage - save critical workflow data (without large image data)
   useEffect(() => {
     // Only save if there's actual data to save
     if (originalImages.length > 0 || translationResults.length > 0 || orderNumber) {
+      // Don't save large base64 image data - only save metadata to avoid quota issues
       const workflowData = {
-        originalImages,
-        translationResults,
+        // Save image count and filenames only, not the actual base64 data
+        originalImagesCount: originalImages.length,
+        originalImagesNames: originalImages.map(img => img.filename || 'document'),
+        // Save translation text only (not images) - limit to 500KB
+        translationResults: translationResults.map(r => ({
+          ...r,
+          translatedText: r.translatedText?.substring(0, 500000) || '' // Limit text size
+        })),
         orderNumber,
         documentType,
         sourceLanguage,
         targetLanguage,
         workflowMode,
         activeSubTab,
-        externalOriginalImages,
-        externalTranslationText,
+        // Don't save externalOriginalImages base64 data
+        externalOriginalImagesCount: externalOriginalImages?.length || 0,
+        externalTranslationText: externalTranslationText?.substring(0, 500000) || '', // Limit text size
         timestamp: Date.now()
       };
-      localStorage.setItem('translation_workflow_autosave', JSON.stringify(workflowData));
-      setLastSavedTime(new Date());
-      setHasUnsavedChanges(false);
+
+      try {
+        localStorage.setItem('translation_workflow_autosave', JSON.stringify(workflowData));
+        setLastSavedTime(new Date());
+        setHasUnsavedChanges(false);
+      } catch (e) {
+        // localStorage quota exceeded - silently fail, don't block the user
+        console.warn('Autosave failed (storage quota exceeded):', e.message);
+        // Try to clear old autosave data to free space
+        try {
+          localStorage.removeItem('translation_workflow_autosave');
+        } catch (clearError) {
+          console.warn('Failed to clear autosave:', clearError);
+        }
+      }
     }
   }, [originalImages, translationResults, orderNumber, documentType, sourceLanguage, targetLanguage, workflowMode, activeSubTab, externalOriginalImages, externalTranslationText]);
 
@@ -2046,25 +2066,32 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
         const data = JSON.parse(savedData);
         // Only restore if data is less than 24 hours old
         const isRecent = data.timestamp && (Date.now() - data.timestamp) < 24 * 60 * 60 * 1000;
-        if (isRecent && (data.originalImages?.length > 0 || data.translationResults?.length > 0)) {
-          // Ask user if they want to restore
+        // Check for restorable data (translation text, settings, etc. - not images since we don't save them)
+        const hasRestorableData = data.translationResults?.length > 0 || data.orderNumber || data.originalImagesCount > 0;
+        if (isRecent && hasRestorableData) {
+          // Build info message
+          const docCount = (data.originalImagesCount || 0) + (data.translationResults?.length || 0);
           const shouldRestore = window.confirm(
             `Found unsaved work from ${new Date(data.timestamp).toLocaleString()}.\n\n` +
-            `Documents: ${(data.originalImages?.length || 0) + (data.translationResults?.length || 0)}\n` +
-            `Order: ${data.orderNumber || 'Not set'}\n\n` +
-            `Do you want to restore this session?`
+            `Order: ${data.orderNumber || 'Not set'}\n` +
+            `Document Type: ${data.documentType || 'Not set'}\n` +
+            `Translation texts: ${data.translationResults?.length || 0}\n` +
+            (data.originalImagesCount > 0 ? `\n⚠️ Note: ${data.originalImagesCount} original document(s) need to be re-uploaded.\n` : '') +
+            `\nDo you want to restore this session?`
           );
           if (shouldRestore) {
-            if (data.originalImages?.length > 0) setOriginalImages(data.originalImages);
+            // Restore translation results (text only)
             if (data.translationResults?.length > 0) setTranslationResults(data.translationResults);
             if (data.orderNumber) setOrderNumber(data.orderNumber);
             if (data.documentType) setDocumentType(data.documentType);
             if (data.sourceLanguage) setSourceLanguage(data.sourceLanguage);
             if (data.targetLanguage) setTargetLanguage(data.targetLanguage);
             if (data.workflowMode) setWorkflowMode(data.workflowMode);
-            if (data.externalOriginalImages?.length > 0) setExternalOriginalImages(data.externalOriginalImages);
             if (data.externalTranslationText) setExternalTranslationText(data.externalTranslationText);
-            setProcessingStatus('✅ Previous session restored successfully!');
+            // Note: originalImages and externalOriginalImages are NOT restored (too large for localStorage)
+            setProcessingStatus(data.originalImagesCount > 0
+              ? '✅ Session restored! Please re-upload original documents.'
+              : '✅ Previous session restored successfully!');
           } else {
             // Clear old data if user declines
             localStorage.removeItem('translation_workflow_autosave');
