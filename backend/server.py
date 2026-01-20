@@ -18038,6 +18038,14 @@ STANDARD NOTATIONS:
 
 You MUST replicate the EXACT visual layout of the original document:
 
+🔴 CRITICAL: 1 ORIGINAL PAGE = 1 TRANSLATED PAGE 🔴
+• Each page of the original document MUST fit in exactly ONE page of translation
+• Target page size: US Letter (8.5" × 11") with 0.75" margins
+• If content is dense, REDUCE font sizes to fit (minimum 9pt for body, 8pt for tables)
+• Use compact spacing and padding when needed to fit content
+• NEVER let content overflow to additional pages - scale down to fit
+• This 1:1 page correspondence is MANDATORY for certified translations
+
 📐 STRUCTURE:
 • Match the original document's visual structure EXACTLY
 • If the original has a header, reproduce it with same proportions
@@ -18071,16 +18079,24 @@ You MUST replicate the EXACT visual layout of the original document:
                     OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════════
 
-Output CLEAN, PROFESSIONAL HTML:
+Output CLEAN, PROFESSIONAL HTML that fits on US LETTER pages:
 
 1. Start with <!DOCTYPE html> and proper structure
 2. Include embedded CSS for professional appearance:
-   - Font: Georgia, "Times New Roman", serif (12pt body)
-   - Tables: 1px solid black borders, 8px padding
-   - Margins: 20mm all sides
-   - Line-height: 1.5
+   - Font: Georgia, "Times New Roman", serif (11pt body - smaller for dense content)
+   - Tables: 1px solid black borders, 4-6px padding (compact)
+   - Margins: 0.75in all sides
+   - Line-height: 1.3-1.4 (compact)
+   - Use table-layout: fixed for consistent column widths
+   - Add word-wrap: break-word for long text in cells
 
 3. Page size: {'US Letter (8.5" × 11")' if page_format == "letter" else 'A4 (210mm × 297mm)'}
+   ⚠️ IMPORTANT: Content MUST fit within printable area (7" × 9.5")
+
+4. For tables with many columns:
+   - Use smaller font (9-10pt) to fit horizontally
+   - Abbreviate headers if needed (keep full text in cells)
+   - Split very wide tables into sections if necessary
 
 4. Structure:
    - Center main titles
@@ -18844,14 +18860,16 @@ async def translate_single_chunk(client, config: dict, system_prompt: str, page_
 
 {text}
 
-Produce a complete HTML translation ready for professional use.
+Produce a complete HTML translation ready for professional printing on US Letter format.
+⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
 {"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
         else:
             text_prompt = f"""Translate this {config['document_type']} document from the images{chunk_info}.
 
 Look at {'all ' + str(len(page_images)) + ' pages' if len(page_images) > 1 else 'the document'} carefully and translate ALL visible text from {config['source_language']} to {config['target_language']}.
 
-Produce a complete HTML translation ready for professional use.
+Produce a complete HTML translation ready for professional printing on US Letter format.
+⚠️ CRITICAL: Each original page MUST fit on exactly ONE translated page. Scale font sizes and spacing as needed to fit.
 {"Include page breaks between pages using: <div class='page-break' style='page-break-before: always;'></div>" if len(page_images) > 1 else ""}"""
 
         message_content.append({
