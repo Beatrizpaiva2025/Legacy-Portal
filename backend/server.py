@@ -144,10 +144,10 @@ async def get_exchange_rates():
     global exchange_rate_cache
 
     try:
-        # Check if cache is valid (less than 1 hour old)
+        # Check if cache is valid (less than 24 hours old)
         if exchange_rate_cache["last_updated"]:
             cache_age = datetime.utcnow() - exchange_rate_cache["last_updated"]
-            if cache_age.total_seconds() < 3600 and exchange_rate_cache["rates"]:
+            if cache_age.total_seconds() < 86400 and exchange_rate_cache["rates"]:
                 return {"rates": exchange_rate_cache["rates"], "base": "usd", "cached": True}
 
         # Fetch fresh rates from free API

@@ -2886,7 +2886,7 @@ const OrdersPage = ({ token }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       Due: {order.due_date ? new Date(order.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'N/A'}
                     </div>
@@ -2913,11 +2913,11 @@ const OrdersPage = ({ token }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
@@ -4793,7 +4793,7 @@ function App() {
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600 mb-4">
-                  As a new partner, you receive <strong>1 FREE Certified Translation Page</strong> (value: $24.99)
+                  As a new partner, you receive <strong>1 FREE Certified Translation Page</strong> (value: {formatPrice(24.99)})
                 </p>
 
                 {/* Coupon Code Box */}
@@ -4804,7 +4804,7 @@ function App() {
                       {welcomeCouponCode}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">$24.99 discount on your first order</p>
+                  <p className="text-xs text-gray-500 mt-2">{formatPrice(24.99)} discount on your first order</p>
                 </div>
 
                 <div className="text-sm text-gray-500 space-y-1">
