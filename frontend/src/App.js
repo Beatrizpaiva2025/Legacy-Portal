@@ -571,34 +571,36 @@ const UI_LANGUAGES = [
   { code: 'pt', countryCode: 'br', name: 'Português' }
 ];
 
-// Get user's language preference (English is default)
+// Check if user is in Brazil based on timezone
+const isInBrazil = () => {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
+           timezone.includes('Recife') || timezone.includes('Bahia') ||
+           timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
+           timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
+           timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
+           timezone.includes('Araguaina') || timezone.includes('Maceio') ||
+           timezone.includes('Campo_Grande') || timezone.includes('Noronha');
+  } catch {
+    return false;
+  }
+};
+
+// Get user's language preference (Portuguese for Brazil, English for others)
 const getInitialLanguage = () => {
   const saved = localStorage.getItem('ui_language');
   if (saved && ['en', 'es', 'pt'].includes(saved)) return saved;
-  return 'en'; // Always default to English
+  // Auto-detect: Portuguese for Brazil, English for everyone else
+  return isInBrazil() ? 'pt' : 'en';
 };
 
 // Detect currency based on timezone (only Brazil changes to BRL)
 const getLocalCurrency = () => {
-  try {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Only Brazil (based on timezone, not locale)
-    if (timezone.includes('Sao_Paulo') || timezone.includes('Fortaleza') ||
-        timezone.includes('Recife') || timezone.includes('Bahia') ||
-        timezone.includes('Manaus') || timezone.includes('Cuiaba') ||
-        timezone.includes('Porto_Velho') || timezone.includes('Boa_Vista') ||
-        timezone.includes('Rio_Branco') || timezone.includes('Belem') ||
-        timezone.includes('Araguaina') || timezone.includes('Maceio') ||
-        timezone.includes('Campo_Grande') || timezone.includes('Noronha')) {
-      return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
-    }
-
-    // Default USD for everyone else
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
-  } catch {
-    return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
+  if (isInBrazil()) {
+    return { code: 'BRL', symbol: 'R$', rate: 5.0, isUSA: false };
   }
+  return { code: 'USD', symbol: '$', rate: 1, isUSA: true };
 };
 
 // Translation stages
