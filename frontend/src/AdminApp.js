@@ -12305,7 +12305,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
     client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
-    service_type: 'standard',
+    service_type: 'certified',
     document_type: '',
     page_count: 1,
     word_count: 0,
@@ -13198,7 +13198,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
       client_email: viewingOrder.client_email || '',
       translate_from: viewingOrder.translate_from || 'Portuguese',
       translate_to: viewingOrder.translate_to || 'English',
-      service_type: viewingOrder.service_type || 'standard',
+      service_type: viewingOrder.service_type || 'certified',
       page_count: viewingOrder.page_count || 1,
       urgency: viewingOrder.urgency || 'no',
       deadline: viewingOrder.deadline ? new Date(viewingOrder.deadline).toISOString().slice(0, 16) : '',
@@ -13673,7 +13673,7 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
         client_email: '',
         translate_from: 'Portuguese',
         translate_to: 'English',
-        service_type: 'standard',
+        service_type: 'certified',
         document_type: '',
         page_count: 1,
         word_count: 0,
@@ -14417,8 +14417,8 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                   onChange={(e) => setNewProject({...newProject, service_type: e.target.value})}
                   className="w-full px-2 py-1.5 text-xs border rounded"
                 >
-                  <option value="standard">Certified</option>
-                  <option value="standard_basic">Standard</option>
+                  <option value="certified">Certified</option>
+                  <option value="standard">Standard</option>
                   <option value="rmv">RMV</option>
                   <option value="sworn">Sworn Translation</option>
                 </select>
@@ -15398,12 +15398,12 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">Service Type</label>
                             <select
-                              value={editFormData.service_type || 'standard'}
+                              value={editFormData.service_type || 'certified'}
                               onChange={(e) => setEditFormData(prev => ({ ...prev, service_type: e.target.value }))}
                               className="w-full px-2 py-1.5 border rounded text-sm"
                             >
-                              <option value="standard">Certified</option>
-                              <option value="standard_basic">Standard</option>
+                              <option value="certified">Certified</option>
+                              <option value="standard">Standard</option>
                               <option value="rmv">RMV</option>
                               <option value="sworn">Sworn Translation</option>
                             </select>
@@ -16771,7 +16771,7 @@ const NewQuotePage = ({ adminKey, user }) => {
     client_phone: '',
     translate_from: 'Portuguese',
     translate_to: 'English',
-    service_type: 'standard',
+    service_type: 'certified',
     turnaround: 'standard',
     delivery_method: 'digital',
     discount: 0,
@@ -16935,7 +16935,7 @@ const NewQuotePage = ({ adminKey, user }) => {
           client_phone: '',
           translate_from: 'Portuguese',
           translate_to: 'English',
-          service_type: 'standard',
+          service_type: 'certified',
           turnaround: 'standard',
           special_instructions: ''
         });
