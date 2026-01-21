@@ -4793,7 +4793,7 @@ function App() {
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600 mb-4">
-                  As a new partner, you receive <strong>1 FREE Certified Translation Page</strong> (value: {formatPrice(24.99)})
+                  As a new partner, you receive <strong>1 FREE Page</strong> (up to 250 words) + Certification (value: {formatPrice(24.99)})
                 </p>
 
                 {/* Coupon Code Box */}
@@ -4804,7 +4804,7 @@ function App() {
                       {welcomeCouponCode}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">{formatPrice(24.99)} discount on your first order</p>
+                  <p className="text-xs text-gray-500 mt-2">1 free page (up to 250 words) + certification</p>
                 </div>
 
                 <div className="text-sm text-gray-500 space-y-1">
