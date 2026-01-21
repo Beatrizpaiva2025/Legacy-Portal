@@ -22581,40 +22581,123 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
         invite_link = f"{frontend_url}/#/sales-invite?token={invite_token}"
 
         email_html = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 10px;">
-                <h1 style="color: white; margin: 0;">🎉 Welcome to the Team!</h1>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #ffffff;">
+            <!-- Header -->
+            <div style="text-align: center; padding: 30px 20px; background: linear-gradient(135deg, #4F46E5, #7C3AED); border-radius: 15px 15px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">🚀 Finder Fee Program</h1>
+                <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Legacy Translations</p>
             </div>
 
-            <div style="padding: 30px 20px;">
-                <p>Hi <strong>{salesperson['name']}</strong>,</p>
+            <!-- Congratulations Banner -->
+            <div style="background: linear-gradient(135deg, #10B981, #059669); padding: 20px; text-align: center;">
+                <h2 style="color: white; margin: 0; font-size: 24px;">🎉 CONGRATULATIONS, {salesperson['name'].upper()}!</h2>
+            </div>
 
-                <p>You've been invited to join <strong>Legacy Translations</strong> as a Sales Partner!</p>
+            <!-- Main Content -->
+            <div style="padding: 30px 25px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
 
-                <p>As a sales partner, you'll be able to:</p>
-                <ul>
-                    <li>✅ Register new partners and earn commissions</li>
-                    <li>📊 Track your performance and earnings</li>
-                    <li>💰 View your monthly commission reports</li>
-                </ul>
+                <!-- ENGLISH -->
+                <div style="margin-bottom: 30px; padding-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
+                    <p style="color: #1e293b; font-size: 16px; line-height: 1.6;">
+                        You have just joined the <strong>Legacy Translations</strong> partner team!
+                    </p>
 
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-                        Set Up Your Account
-                    </a>
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #4F46E5;">
+                        <h3 style="color: #4F46E5; margin: 0 0 15px 0; font-size: 16px;">💰 HOW YOU EARN (as agreed in the "Finder's Agreement"):</h3>
+                        <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">
+                            <li>$100 bonus for each new partner you refer</li>
+                            <li>Commission on your referrals' orders</li>
+                            <li>Hit monthly goal? +$100 extra bonus!</li>
+                            <li>Monthly payments via Zelle or transfer</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
+                        <h3 style="color: #10B981; margin: 0 0 10px 0; font-size: 16px;">🔗 YOUR EXCLUSIVE REFERRAL LINK:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">After setting up your account, you'll get a personalized link. Every partner who signs up through it will be automatically linked to you!</p>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                        <h3 style="color: #F59E0B; margin: 0 0 10px 0; font-size: 16px;">📊 IN YOUR DASHBOARD YOU CAN:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">✓ Track referrals in real time &nbsp; ✓ View pending and received commissions<br>✓ Monitor your monthly goal progress &nbsp; ✓ Access complete payment history</p>
+                    </div>
                 </div>
 
-                <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days.</p>
+                <!-- PORTUGUÊS -->
+                <div style="margin-bottom: 30px; padding-bottom: 30px; border-bottom: 2px solid #e2e8f0;">
+                    <p style="color: #1e293b; font-size: 16px; line-height: 1.6;">
+                        Você acaba de entrar para o time de parceiros da <strong>Legacy Translations</strong>!
+                    </p>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #4F46E5;">
+                        <h3 style="color: #4F46E5; margin: 0 0 15px 0; font-size: 16px;">💰 COMO VOCÊ GANHA (conforme acordado no "Finder's Agreement"):</h3>
+                        <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">
+                            <li>$100 de bônus por cada novo parceiro que você indicar</li>
+                            <li>Comissão sobre os pedidos dos seus indicados</li>
+                            <li>Bateu a meta mensal? +$100 de bônus extra!</li>
+                            <li>Pagamentos mensais via Zelle ou transferência</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
+                        <h3 style="color: #10B981; margin: 0 0 10px 0; font-size: 16px;">🔗 SEU LINK EXCLUSIVO DE INDICAÇÃO:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">Após configurar sua conta, você terá acesso ao seu link personalizado. Cada parceiro que se cadastrar através dele será automaticamente vinculado a você!</p>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                        <h3 style="color: #F59E0B; margin: 0 0 10px 0; font-size: 16px;">📊 NO SEU PAINEL VOCÊ PODE:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">✓ Acompanhar indicações em tempo real &nbsp; ✓ Visualizar comissões pendentes e recebidas<br>✓ Monitorar o progresso da meta mensal &nbsp; ✓ Acessar histórico completo de pagamentos</p>
+                    </div>
+                </div>
+
+                <!-- ESPAÑOL -->
+                <div>
+                    <p style="color: #1e293b; font-size: 16px; line-height: 1.6;">
+                        ¡Acabas de unirte al equipo de socios de <strong>Legacy Translations</strong>!
+                    </p>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #4F46E5;">
+                        <h3 style="color: #4F46E5; margin: 0 0 15px 0; font-size: 16px;">💰 CÓMO GANAS (según lo acordado en el "Finder's Agreement"):</h3>
+                        <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">
+                            <li>$100 de bono por cada nuevo socio que refieras</li>
+                            <li>Comisión sobre los pedidos de tus referidos</li>
+                            <li>¿Alcanzaste la meta mensual? ¡+$100 de bono extra!</li>
+                            <li>Pagos mensuales vía Zelle o transferencia</li>
+                        </ul>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
+                        <h3 style="color: #10B981; margin: 0 0 10px 0; font-size: 16px;">🔗 TU ENLACE EXCLUSIVO DE REFERIDOS:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">Después de configurar tu cuenta, tendrás acceso a tu enlace personalizado. ¡Cada socio que se registre a través de él quedará automáticamente vinculado a ti!</p>
+                    </div>
+
+                    <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #F59E0B;">
+                        <h3 style="color: #F59E0B; margin: 0 0 10px 0; font-size: 16px;">📊 EN TU PANEL PUEDES:</h3>
+                        <p style="color: #475569; margin: 0; font-size: 14px;">✓ Seguir referidos en tiempo real &nbsp; ✓ Ver comisiones pendientes y recibidas<br>✓ Monitorear el progreso de tu meta mensual &nbsp; ✓ Acceder al historial completo de pagos</p>
+                    </div>
+                </div>
+
             </div>
 
-            <div style="text-align: center; padding: 20px; background: #f5f5f5; border-radius: 10px;">
-                <p style="margin: 0; color: #666;">Legacy Translation Services</p>
+            <!-- CTA Button -->
+            <div style="text-align: center; padding: 30px; background: #f8fafc; border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
+                <a href="{invite_link}" style="background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 18px 50px; text-decoration: none; border-radius: 10px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);">
+                    CONFIGURE MY ACCOUNT / CONFIGURAR MINHA CONTA
+                </a>
+                <p style="color: #94a3b8; font-size: 13px; margin: 15px 0 0 0;">⏰ This invite expires in 7 days / Este convite expira em 7 dias</p>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding: 25px; background: linear-gradient(135deg, #1e293b, #334155); border-radius: 0 0 15px 15px;">
+                <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 14px;">We're excited to have you on the team! / Estamos felizes em ter você no time!</p>
+                <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.7); font-size: 12px;">With love / Com carinho ❤️</p>
+                <p style="margin: 10px 0 0 0; color: white; font-weight: bold;">Legacy Translations 🌎</p>
             </div>
         </div>
         """
 
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = "🎉 You're Invited to Join Legacy Translations Sales Team!"
+        msg['Subject'] = "🚀 Welcome to Finder Fee Program! / Bem-vindo ao Programa Finder Fee! - Legacy Translations"
         msg['From'] = EMAIL_USER
         msg['To'] = salesperson['email']
         msg.attach(MIMEText(email_html, 'html'))
