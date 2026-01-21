@@ -2711,6 +2711,22 @@ const TranslationWorkspace = ({ adminKey, selectedOrder, onBack, user }) => {
     }
   };
 
+  // Delete project document (Admin only - for project modal)
+  const deleteProjectDocument = async (docId, filename) => {
+    if (!confirm(`Tem certeza que deseja excluir "${filename}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    try {
+      await axios.delete(`${API}/admin/order-documents/${docId}?admin_key=${adminKey}`);
+      alert(`Documento "${filename}" excluído com sucesso`);
+      // Update local state to remove the deleted document
+      setProjectDocuments(prev => prev.filter(doc => doc.id !== docId));
+    } catch (err) {
+      console.error('Failed to delete document:', err);
+      alert('Erro ao excluir documento');
+    }
+  };
+
   // Load file to workspace (download and convert PDF to images automatically)
   const loadFileToWorkspace = async (docId, filename) => {
     try {
@@ -27446,12 +27462,21 @@ const PMDashboard = ({ adminKey, user, onNavigateToTranslation }) => {
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => downloadProjectDocument(doc.id, doc.filename)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                        >
-                          ⬇️ Download
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => downloadProjectDocument(doc.id, doc.filename)}
+                            className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          >
+                            ⬇️ Download
+                          </button>
+                          <button
+                            onClick={() => deleteProjectDocument(doc.id, doc.filename)}
+                            className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                            title="Excluir documento"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
 
                       {/* Translator Assignment */}
