@@ -20768,6 +20768,10 @@ const FinancesPage = ({ adminKey }) => {
   // Invoice payment management state
   const [pendingZelleInvoices, setPendingZelleInvoices] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  // Email search state
+  const [emailSearchQuery, setEmailSearchQuery] = useState('');
+  const [emailSearchResult, setEmailSearchResult] = useState(null);
+  const [emailSearching, setEmailSearching] = useState(false);
   const [invoiceNotifications, setInvoiceNotifications] = useState([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   // Quick add vendor modal state
@@ -21328,6 +21332,48 @@ const FinancesPage = ({ adminKey }) => {
       fetchPartnerStats(); // Refresh the list
     } catch (err) {
       alert('Error deleting partner: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const findEmailInSystem = async () => {
+    if (!emailSearchQuery.trim()) {
+      alert('Please enter an email to search');
+      return;
+    }
+    setEmailSearching(true);
+    setEmailSearchResult(null);
+    try {
+      const response = await axios.get(`${API}/admin/find-email/${encodeURIComponent(emailSearchQuery.trim())}?admin_key=${adminKey}`);
+      setEmailSearchResult(response.data);
+    } catch (err) {
+      if (err.response?.status === 404) {
+        setEmailSearchResult({ status: 'not_found', message: `Email '${emailSearchQuery}' not found in any collection` });
+      } else {
+        alert('Error searching email: ' + (err.response?.data?.detail || err.message));
+      }
+    } finally {
+      setEmailSearching(false);
+    }
+  };
+
+  const deleteEmailFromSystem = async (collection = null) => {
+    if (!emailSearchQuery.trim()) return;
+    const confirmMsg = collection
+      ? `Delete email '${emailSearchQuery}' from ${collection}?`
+      : `Delete email '${emailSearchQuery}' from ALL collections where it exists?`;
+    if (!window.confirm(confirmMsg + '\n\nThis action cannot be undone.')) return;
+
+    try {
+      const url = collection
+        ? `${API}/admin/delete-email/${encodeURIComponent(emailSearchQuery.trim())}?admin_key=${adminKey}&collection=${collection}`
+        : `${API}/admin/delete-email/${encodeURIComponent(emailSearchQuery.trim())}?admin_key=${adminKey}`;
+      const response = await axios.delete(url);
+      alert(`Email deleted successfully from: ${response.data.deleted_from.map(d => d.collection).join(', ')}`);
+      setEmailSearchResult(null);
+      setEmailSearchQuery('');
+      fetchPartnerStats(); // Refresh partner list
+    } catch (err) {
+      alert('Error deleting email: ' + (err.response?.data?.detail || err.message));
     }
   };
 
@@ -22487,6 +22533,70 @@ const FinancesPage = ({ adminKey }) => {
             <div className="bg-white rounded-lg shadow p-4">
               <div className="text-xs text-gray-500 uppercase mb-1">Total Pending</div>
               <div className="text-2xl font-bold text-yellow-600">{formatCurrency(partnerStats.summary?.total_pending || 0)}</div>
+            </div>
+          </div>
+
+          {/* Email Search Tool */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-4 border-b bg-blue-50">
+              <h2 className="text-sm font-bold text-gray-700">🔍 Find Email in System</h2>
+              <p className="text-xs text-gray-500 mt-1">Search where an email is registered (partners, customers, admin users, salespersons)</p>
+            </div>
+            <div className="p-4">
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="email"
+                  value={emailSearchQuery}
+                  onChange={(e) => setEmailSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && findEmailInSystem()}
+                  placeholder="Enter email to search..."
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={findEmailInSystem}
+                  disabled={emailSearching}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {emailSearching ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              {emailSearchResult && (
+                <div className={`p-3 rounded-lg ${emailSearchResult.status === 'found' ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'}`}>
+                  {emailSearchResult.status === 'not_found' ? (
+                    <p className="text-sm text-green-700">{emailSearchResult.message}</p>
+                  ) : (
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800 mb-2">Email found in {emailSearchResult.found_in.length} collection(s):</p>
+                      <div className="space-y-2">
+                        {emailSearchResult.found_in.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between bg-white p-2 rounded border">
+                            <div>
+                              <span className="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-700">{item.collection}</span>
+                              <span className="ml-2 text-sm text-gray-600">{item.name || 'N/A'}</span>
+                              {item.role && <span className="ml-2 text-xs text-gray-500">({item.role})</span>}
+                            </div>
+                            <button
+                              onClick={() => deleteEmailFromSystem(item.collection)}
+                              className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                            >
+                              Delete from {item.collection}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {emailSearchResult.found_in.length > 1 && (
+                        <button
+                          onClick={() => deleteEmailFromSystem()}
+                          className="mt-3 px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Delete from ALL collections
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
