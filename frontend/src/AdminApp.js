@@ -27547,7 +27547,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
-    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10
+    name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
   });
   const [newAcquisition, setNewAcquisition] = useState({
     salesperson_id: '', partner_id: '', partner_name: '', partner_tier: 'bronze', notes: ''
@@ -27608,7 +27608,7 @@ const SalesControlPage = ({ adminKey }) => {
       if (res.ok) {
         alert('Salesperson added successfully!');
         setShowAddSalesperson(false);
-        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10 });
+        setNewSalesperson({ name: '', email: '', phone: '', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
         fetchAllData();
       } else {
         alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
@@ -27997,6 +27997,24 @@ const SalesControlPage = ({ adminKey }) => {
                     <td className="px-4 py-3">
                       <p className="text-sm text-gray-600">{sp.email}</p>
                       <p className="text-xs text-gray-400">{sp.phone}</p>
+                      {sp.referral_code && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-purple-600 font-mono bg-purple-50 px-1 rounded">
+                            {sp.referral_code}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const link = `${window.location.origin}/#/partner?ref=${sp.referral_code}`;
+                              navigator.clipboard.writeText(link);
+                              alert('Link copiado!\n' + link);
+                            }}
+                            className="text-xs text-purple-500 hover:text-purple-700"
+                            title="Copiar link de referral"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium capitalize">
@@ -28494,11 +28512,13 @@ const SalesControlPage = ({ adminKey }) => {
                   <option value="tier">Por Tier ($50-150/parceiro)</option>
                   <option value="fixed">Valor Fixo por Parceiro</option>
                   <option value="percentage">Percentual sobre Vendas</option>
+                  <option value="referral_plus_commission">Bônus Referral + Comissão %</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
                   {newSalesperson.commission_type === 'tier' && 'Comissão baseada no tier do parceiro (Bronze $50, Silver $75, Gold $100, Platinum $150)'}
                   {newSalesperson.commission_type === 'fixed' && 'Valor fixo por cada parceiro registrado'}
                   {newSalesperson.commission_type === 'percentage' && 'Percentual sobre todas as vendas geradas pelo parceiro'}
+                  {newSalesperson.commission_type === 'referral_plus_commission' && 'Bônus fixo por referral + percentual sobre vendas do parceiro'}
                 </p>
               </div>
               {newSalesperson.commission_type === 'fixed' && (
@@ -28530,6 +28550,39 @@ const SalesControlPage = ({ adminKey }) => {
                     Ex: 10% = $50 de comissão para cada $500 em vendas do parceiro
                   </p>
                 </div>
+              )}
+              {newSalesperson.commission_type === 'referral_plus_commission' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bônus por Referral ($)</label>
+                    <input
+                      type="number"
+                      value={newSalesperson.referral_bonus}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="50"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Valor fixo pago por cada novo parceiro indicado
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Comissão sobre Vendas (%)</label>
+                    <input
+                      type="number"
+                      value={newSalesperson.commission_rate}
+                      onChange={(e) => setNewSalesperson({...newSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="5"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Percentual adicional sobre as vendas geradas pelo parceiro
+                    </p>
+                  </div>
+                </>
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
@@ -28616,6 +28669,7 @@ const SalesControlPage = ({ adminKey }) => {
                   <option value="tier">By Tier ($50-150/partner)</option>
                   <option value="fixed">Fixed Amount</option>
                   <option value="percentage">Percentage</option>
+                  <option value="referral_plus_commission">Referral Bonus + Commission %</option>
                 </select>
               </div>
               {editingSalesperson.commission_type === 'fixed' && (
@@ -28628,6 +28682,47 @@ const SalesControlPage = ({ adminKey }) => {
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+              )}
+              {editingSalesperson.commission_type === 'percentage' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Commission Rate (%)</label>
+                  <input
+                    type="number"
+                    value={editingSalesperson.commission_rate}
+                    onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_rate: parseFloat(e.target.value)})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                  />
+                </div>
+              )}
+              {editingSalesperson.commission_type === 'referral_plus_commission' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Referral Bonus ($)</label>
+                    <input
+                      type="number"
+                      value={editingSalesperson.referral_bonus || 0}
+                      onChange={(e) => setEditingSalesperson({...editingSalesperson, referral_bonus: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Commission Rate (%)</label>
+                    <input
+                      type="number"
+                      value={editingSalesperson.commission_rate}
+                      onChange={(e) => setEditingSalesperson({...editingSalesperson, commission_rate: parseFloat(e.target.value) || 0})}
+                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="5"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                    />
+                  </div>
+                </>
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Salary ($)</label>
