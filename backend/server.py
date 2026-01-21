@@ -14035,6 +14035,84 @@ At the very end of the translation content (but inside the HTML body), add the f
 This marker must appear AFTER all translated content but BEFORE the closing body/html tags.
 {currency_conversion_instructions}{additional_instructions}"""
 
+            # Fetch glossary and TM terms if use_glossary is enabled
+            if getattr(request, 'use_glossary', True):
+                glossary_and_tm_section = ""
+                source_lang_full = request.source_language
+                target_lang_full = request.target_language
+                source_lang_code = request.source_language.lower()[:2]
+                target_lang_code = request.target_language.lower()[:2]
+
+                # Fetch matching glossaries
+                try:
+                    glossaries = await db.glossaries.find({
+                        "$or": [
+                            {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                            {"sourceLang": {"$regex": source_lang_code, "$options": "i"}, "targetLang": {"$regex": target_lang_code, "$options": "i"}},
+                            {"source_language": source_lang_code, "target_language": target_lang_code}
+                        ]
+                    }).to_list(10)
+
+                    if glossaries:
+                        all_terms = []
+                        for glossary in glossaries:
+                            if glossary.get("terms"):
+                                for term in glossary["terms"][:100]:
+                                    all_terms.append(f"• {term.get('source', '')} → {term.get('target', '')}")
+
+                        if all_terms:
+                            glossary_and_tm_section += f"""
+
+═══════════════════════════════════════════════════════════════════
+                    GLOSSARY - MANDATORY TERMS
+═══════════════════════════════════════════════════════════════════
+You MUST use these EXACT translations for the following terms:
+{chr(10).join(all_terms[:100])}
+"""
+                except Exception as e:
+                    logger.warning(f"Error fetching glossaries for translation: {e}")
+
+                # Fetch Translation Memory entries
+                try:
+                    tm_entries = await db.translation_memory.find({
+                        "$or": [
+                            {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                            {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                             "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+                        ]
+                    }).sort("score", -1).to_list(100)
+
+                    if tm_entries:
+                        uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+                        auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+                        tm_text = ""
+                        if uploaded_tm:
+                            tm_text += "🔹 PRIORITY TERMS (from uploaded TM - USE EXACTLY):\n"
+                            for tm in uploaded_tm[:50]:
+                                tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')}\n"
+
+                        if auto_tm and len(uploaded_tm) < 50:
+                            tm_text += "\n🔸 APPROVED TRANSLATIONS (from high-quality translations):\n"
+                            for tm in auto_tm[:50 - len(uploaded_tm)]:
+                                tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')} (score: {tm.get('score', 0)}%)\n"
+
+                        if tm_text:
+                            glossary_and_tm_section += f"""
+
+═══════════════════════════════════════════════════════════════════
+                    TRANSLATION MEMORY
+═══════════════════════════════════════════════════════════════════
+Use these approved translations when translating similar content:
+{tm_text}
+"""
+                except Exception as e:
+                    logger.warning(f"Error fetching TM for translation: {e}")
+
+                # Append glossary/TM section to system prompt
+                if glossary_and_tm_section:
+                    system_prompt += glossary_and_tm_section
+
             user_message = f"Translate this {request.document_type} document to professional HTML format:\n\n{request.text}"
 
         elif request.action == 'improve_formality':
