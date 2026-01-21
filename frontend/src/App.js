@@ -85,10 +85,9 @@ const TRANSLATIONS = {
     submitUpgradeRequest: 'Submit Upgrade Request',
     upgradeSuccess: 'Upgrade request submitted successfully!',
     // Payment Plan Terms Explanation
-    paymentPlanTermsTitle: 'How Payment Plans Work',
-    paymentPlanTerm1: 'Complete 10 paid translations to qualify for Biweekly Invoice payment.',
-    paymentPlanTerm2: 'After 3 consecutive months of on-time payments (by invoice due date), you unlock 30-day payment terms.',
-    paymentPlanTerm3: 'On-time payment means paying by the invoice due date.',
+    paymentPlanTermsTitle: 'Payment Terms',
+    paymentPlanTerm1: 'Biweekly invoicing available upon completion of 10 paid translations.',
+    paymentPlanTerm2: 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.',
     currentTerms: 'Current Terms',
     paymentDueOnInvoice: 'Payment due on invoice date',
     net30Terms: '30-day payment terms',
@@ -256,13 +255,12 @@ const TRANSLATIONS = {
     submitUpgradeRequest: 'Enviar Solicitud',
     upgradeSuccess: '¡Solicitud de mejora enviada exitosamente!',
     // Payment Plan Terms Explanation
-    paymentPlanTermsTitle: 'Cómo Funcionan los Planes de Pago',
-    paymentPlanTerm1: 'Complete 10 traducciones pagas para calificar para Factura Quincenal.',
-    paymentPlanTerm2: 'Después de 3 meses consecutivos de pagos puntuales (en la fecha de vencimiento), desbloquea términos de pago de 30 días.',
-    paymentPlanTerm3: 'Pago puntual significa pagar antes de la fecha de vencimiento de la factura.',
-    currentTerms: 'Términos Actuales',
+    paymentPlanTermsTitle: 'Condiciones de Pago',
+    paymentPlanTerm1: 'Facturación quincenal disponible tras completar 10 traducciones pagadas.',
+    paymentPlanTerm2: 'Plazo de pago Net 30 otorgado después de 3 meses consecutivos con facturas liquidadas puntualmente.',
+    currentTerms: 'Condiciones Actuales',
     paymentDueOnInvoice: 'Pago vence en fecha de factura',
-    net30Terms: 'Términos de pago de 30 días',
+    net30Terms: 'Plazo de pago de 30 días',
     monthsOnTime: 'meses de pagos puntuales',
     monthsRequired: '3 meses requeridos',
     // Invoice Page
@@ -426,13 +424,12 @@ const TRANSLATIONS = {
     submitUpgradeRequest: 'Enviar Solicitação',
     upgradeSuccess: 'Solicitação de upgrade enviada com sucesso!',
     // Payment Plan Terms Explanation
-    paymentPlanTermsTitle: 'Como Funcionam os Planos de Pagamento',
-    paymentPlanTerm1: 'Complete 10 traduções pagas para se qualificar para Fatura Quinzenal.',
-    paymentPlanTerm2: 'Após 3 meses consecutivos de pagamentos em dia (na data de vencimento da fatura), você libera condições de pagamento de 30 dias.',
-    paymentPlanTerm3: 'Pagamento em dia significa pagar até a data de vencimento da fatura.',
+    paymentPlanTermsTitle: 'Condições de Pagamento',
+    paymentPlanTerm1: 'Faturamento quinzenal disponível após a conclusão de 10 traduções pagas.',
+    paymentPlanTerm2: 'Prazo de pagamento Net 30 concedido após 3 meses consecutivos com faturas quitadas pontualmente.',
     currentTerms: 'Condições Atuais',
     paymentDueOnInvoice: 'Pagamento vence na data da fatura',
-    net30Terms: 'Condições de pagamento de 30 dias',
+    net30Terms: 'Prazo de pagamento de 30 dias',
     monthsOnTime: 'meses de pagamentos em dia',
     monthsRequired: '3 meses necessários',
     // Invoice Page
@@ -3524,25 +3521,18 @@ const PaymentPlanPage = ({ token, t }) => {
       <h1 className="text-2xl font-bold text-gray-800 mb-6">{t?.paymentPlanTitle || 'Payment Plan'}</h1>
 
       {/* Payment Plan Terms Explanation */}
-      <div className="bg-blue-50 rounded-lg border border-blue-200 p-6 mb-6">
-        <h2 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"/>
-          </svg>
-          {t?.paymentPlanTermsTitle || 'How Payment Plans Work'}
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 mb-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+          {t?.paymentPlanTermsTitle || 'Payment Terms'}
         </h2>
-        <ul className="space-y-2 text-sm text-blue-700">
+        <ul className="space-y-2 text-sm text-gray-600">
           <li className="flex items-start gap-2">
-            <span className="font-bold text-blue-600 mt-0.5">1.</span>
-            <span>{t?.paymentPlanTerm1 || 'Complete 10 paid translations to qualify for Biweekly Invoice payment.'}</span>
+            <span className="text-gray-400">•</span>
+            <span>{t?.paymentPlanTerm1 || 'Biweekly invoicing available upon completion of 10 paid translations.'}</span>
           </li>
           <li className="flex items-start gap-2">
-            <span className="font-bold text-blue-600 mt-0.5">2.</span>
-            <span>{t?.paymentPlanTerm2 || 'After 3 consecutive months of on-time payments (by invoice due date), you unlock 30-day payment terms.'}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="font-bold text-blue-600 mt-0.5">3.</span>
-            <span>{t?.paymentPlanTerm3 || 'On-time payment means paying by the invoice due date.'}</span>
+            <span className="text-gray-400">•</span>
+            <span>{t?.paymentPlanTerm2 || 'Net 30 payment terms granted after 3 consecutive months of timely invoice settlement.'}</span>
           </li>
         </ul>
       </div>
