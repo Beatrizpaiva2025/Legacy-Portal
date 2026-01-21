@@ -5320,7 +5320,7 @@ async def get_partner_assigned_coupons(partner_id: str, admin_key: str):
 
 # ==================== PARTNER CREDIT QUALIFICATION ====================
 
-CREDIT_QUALIFICATION_MIN_ORDERS = 3  # Minimum paid orders to qualify for invoice plans
+CREDIT_QUALIFICATION_MIN_TRANSLATIONS = 10  # Minimum paid translations to qualify for biweekly invoice
 
 @api_router.get("/partner/credit-qualification")
 async def get_partner_credit_qualification(token: str):
@@ -5334,8 +5334,8 @@ async def get_partner_credit_qualification(token: str):
     plan_approved = partner.get("payment_plan_approved", False)
 
     # Calculate qualification status
-    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_ORDERS
-    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders)
+    qualifies = total_paid_orders >= CREDIT_QUALIFICATION_MIN_TRANSLATIONS
+    orders_remaining = max(0, CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders)
 
     # Check if upgrade is pending
     upgrade_pending = partner.get("payment_plan_upgrade_requested", False)
@@ -5346,7 +5346,7 @@ async def get_partner_credit_qualification(token: str):
         "plan_approved": plan_approved,
         "qualifies_for_invoice": qualifies,
         "total_paid_orders": total_paid_orders,
-        "orders_required": CREDIT_QUALIFICATION_MIN_ORDERS,
+        "orders_required": CREDIT_QUALIFICATION_MIN_TRANSLATIONS,
         "orders_remaining": orders_remaining,
         "upgrade_pending": upgrade_pending,
         "requested_plan": requested_plan
@@ -5365,10 +5365,10 @@ async def request_payment_plan_upgrade(token: str, plan: str):
 
     # Check qualification
     total_paid_orders = partner.get("total_paid_orders", 0)
-    if total_paid_orders < CREDIT_QUALIFICATION_MIN_ORDERS:
+    if total_paid_orders < CREDIT_QUALIFICATION_MIN_TRANSLATIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_ORDERS - total_paid_orders} more paid orders to qualify."
+            detail=f"Not yet qualified. Complete {CREDIT_QUALIFICATION_MIN_TRANSLATIONS - total_paid_orders} more paid translations to qualify."
         )
 
     # Check if already on invoice plan
