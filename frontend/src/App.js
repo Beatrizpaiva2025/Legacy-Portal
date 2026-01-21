@@ -4488,6 +4488,8 @@ function App() {
   const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
+  const [showWelcomeCouponModal, setShowWelcomeCouponModal] = useState(false);
+  const [welcomeCouponCode, setWelcomeCouponCode] = useState(null);
 
   // Get translations for current language
   const t = TRANSLATIONS[lang];
@@ -4550,10 +4552,17 @@ function App() {
         // Validate token with backend
         const response = await axios.get(`${API}/partner/verify-token?token=${savedToken}`);
         if (response.data.valid && response.data.partner) {
-          setPartner(response.data.partner);
+          const partnerData = response.data.partner;
+          setPartner(partnerData);
           setToken(savedToken);
           // Update localStorage with fresh partner data
-          localStorage.setItem('partner', JSON.stringify(response.data.partner));
+          localStorage.setItem('partner', JSON.stringify(partnerData));
+
+          // Show welcome coupon modal if partner hasn't seen it yet
+          if (!partnerData.has_seen_welcome_coupon && partnerData.welcome_coupon_code) {
+            setWelcomeCouponCode(partnerData.welcome_coupon_code);
+            setShowWelcomeCouponModal(true);
+          }
         }
       } catch (err) {
         // Token is invalid or expired, clear localStorage
@@ -4572,6 +4581,29 @@ function App() {
     setToken(data.token);
     localStorage.setItem('partner', JSON.stringify(data));
     localStorage.setItem('token', data.token);
+
+    // Show welcome coupon modal if partner hasn't seen it yet
+    if (!data.has_seen_welcome_coupon && data.welcome_coupon_code) {
+      setWelcomeCouponCode(data.welcome_coupon_code);
+      setShowWelcomeCouponModal(true);
+    }
+  };
+
+  const dismissWelcomeCoupon = async () => {
+    try {
+      await axios.post(`${API}/partner/dismiss-welcome-coupon?token=${token}`);
+      setShowWelcomeCouponModal(false);
+      setWelcomeCouponCode(null);
+      // Update local partner data
+      if (partner) {
+        const updatedPartner = { ...partner, has_seen_welcome_coupon: true };
+        setPartner(updatedPartner);
+        localStorage.setItem('partner', JSON.stringify(updatedPartner));
+      }
+    } catch (err) {
+      console.error('Error dismissing welcome coupon:', err);
+      setShowWelcomeCouponModal(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -4680,6 +4712,53 @@ function App() {
         {renderContent()}
       </div>
       <PartnerFloatingChatWidget token={token} partner={partner} onNavigateToMessages={() => setActiveTab('messages')} />
+
+      {/* Welcome Coupon Modal - First Login */}
+      {showWelcomeCouponModal && welcomeCouponCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-fade-in">
+            {/* Header with gradient */}
+            <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white text-center">
+              <div className="text-5xl mb-3">🎁</div>
+              <h2 className="text-2xl font-bold">Welcome Gift!</h2>
+              <p className="text-teal-100 mt-2">Thank you for joining Legacy Translations</p>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <p className="text-gray-600 mb-4">
+                  As a new partner, you receive <strong>1 FREE Certified Translation Page</strong> (value: $24.99)
+                </p>
+
+                {/* Coupon Code Box */}
+                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-dashed border-teal-400 rounded-xl p-4 mb-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Your Coupon Code</p>
+                  <div className="bg-white rounded-lg px-4 py-3 shadow-inner">
+                    <span className="text-2xl font-bold text-teal-600 font-mono tracking-wider">
+                      {welcomeCouponCode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">$24.99 discount on your first order</p>
+                </div>
+
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>Valid for 90 days</p>
+                  <p>Use at checkout on your first order</p>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <button
+                onClick={dismissWelcomeCoupon}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl"
+              >
+                Got it! Start ordering
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

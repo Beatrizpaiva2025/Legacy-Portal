@@ -1192,6 +1192,9 @@ class Partner(BaseModel):
     # Agreement
     agreed_to_terms: bool = False
     agreed_at: Optional[datetime] = None
+    # Welcome coupon notification
+    has_seen_welcome_coupon: bool = False  # True after partner sees the welcome coupon popup
+    welcome_coupon_code: Optional[str] = None  # Store the welcome coupon code for display
     # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_order_at: Optional[datetime] = None
@@ -1262,6 +1265,8 @@ class PartnerResponse(BaseModel):
     contact_name: str
     phone: Optional[str] = None
     token: str
+    has_seen_welcome_coupon: bool = False
+    welcome_coupon_code: Optional[str] = None
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -4595,6 +4600,12 @@ async def register_partner(partner_data: PartnerCreate):
         )
         await db.coupons.insert_one(welcome_coupon.dict())
 
+        # Store the welcome coupon code in the partner record for first login popup
+        await db.partners.update_one(
+            {"id": partner.id},
+            {"$set": {"welcome_coupon_code": welcome_coupon.code}}
+        )
+
         # Send welcome email with coupon code
         try:
             welcome_subject = f"Welcome to Legacy Translations, {partner.contact_name}!"
@@ -4758,7 +4769,9 @@ async def login_partner(login_data: PartnerLogin):
             email=partner["email"],
             contact_name=partner["contact_name"],
             phone=partner.get("phone"),
-            token=token
+            token=token,
+            has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
+            welcome_coupon_code=partner.get("welcome_coupon_code")
         )
 
     except HTTPException:
@@ -4790,7 +4803,9 @@ async def verify_partner_token(token: str):
                 "email": partner["email"],
                 "contact_name": partner["contact_name"],
                 "phone": partner.get("phone"),
-                "token": token
+                "token": token,
+                "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
+                "welcome_coupon_code": partner.get("welcome_coupon_code")
             }
         }
     except HTTPException:
@@ -4914,7 +4929,7 @@ async def get_current_partner_info(token: str):
 # ==================== COUPON SYSTEM ====================
 
 # Price for one certified page (used for WELCOME coupon discount calculation)
-CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
+CERTIFIED_PAGE_PRICE = 24.99  # $24.99 per certified page
 
 @api_router.get("/partner/coupons")
 async def get_partner_coupons(token: str):
@@ -5072,6 +5087,21 @@ async def apply_coupon_to_order(token: str, code: str, order_id: str):
     )
 
     return {"success": True, "message": "Coupon applied successfully"}
+
+@api_router.post("/partner/dismiss-welcome-coupon")
+async def dismiss_welcome_coupon(token: str):
+    """Mark the welcome coupon popup as seen by the partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Update the partner to mark welcome coupon as seen
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {"has_seen_welcome_coupon": True}}
+    )
+
+    return {"success": True, "message": "Welcome coupon dismissed"}
 
 # ==================== ADMIN COUPON MANAGEMENT ====================
 
