@@ -4596,7 +4596,7 @@ async def register_partner(partner_data: PartnerCreate):
             discount_value=1.0,  # 1 free certified page
             max_uses=1,
             first_order_only=True,
-            valid_until=datetime.utcnow() + timedelta(days=90)  # Valid for 90 days
+            valid_until=datetime.utcnow() + timedelta(days=30)  # Valid for 30 days
         )
         await db.coupons.insert_one(welcome_coupon.dict())
 
@@ -4625,7 +4625,7 @@ async def register_partner(partner_data: PartnerCreate):
                     <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
                         {welcome_coupon.code}
                     </div>
-                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 90 days • Use on your first order</p>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 30 days • Use on your first order</p>
                 </div>
 
                 <h3 style="color: #374151;">How to use your coupon:</h3>

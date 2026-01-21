@@ -4743,7 +4743,7 @@ function App() {
                 </div>
 
                 <div className="text-sm text-gray-500 space-y-1">
-                  <p>Valid for 90 days</p>
+                  <p>Valid for 30 days</p>
                   <p>Use at checkout on your first order</p>
                 </div>
               </div>
