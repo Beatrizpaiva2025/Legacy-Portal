@@ -144,7 +144,11 @@ const translations = {
     // Status
     pending: 'Pending',
     approved: 'Approved',
-    paid: 'Paid'
+    paid: 'Paid',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'Partner referrals are exclusively for companies with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other businesses that regularly require translation services.',
+    partnerReferralImportant: 'Important: Individuals (natural persons) cannot be registered as partners.'
   },
   pt: {
     // Login
@@ -267,7 +271,11 @@ const translations = {
     // Status
     pending: 'Pendente',
     approved: 'Aprovado',
-    paid: 'Pago'
+    paid: 'Pago',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
+    partnerReferralImportant: 'Importante: Pessoas físicas não poderão ser cadastradas como partners.'
   },
   es: {
     // Login
@@ -390,7 +398,11 @@ const translations = {
     // Status
     pending: 'Pendiente',
     approved: 'Aprobado',
-    paid: 'Pagado'
+    paid: 'Pagado',
+
+    // Partner Referral Notice
+    partnerReferralNotice: 'Las indicaciones de socios son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como despachos de abogados, oficinas de contabilidad, instituciones financieras, inmobiliarias, hospitales y otras empresas que requieren regularmente servicios de traducción.',
+    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como socios.'
   }
 };
 
@@ -917,6 +929,12 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
           <div className="max-w-2xl mx-auto">
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.registerNewPartner}</h2>
+
+              {/* Partner Referral Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                <p className="text-amber-800 text-sm mb-3">{t.partnerReferralNotice}</p>
+                <p className="text-amber-900 text-sm font-bold bg-amber-100 px-3 py-2 rounded-lg">{t.partnerReferralImportant}</p>
+              </div>
 
               {registerSuccess ? (
                 <div className="bg-teal-50 border border-teal-200 rounded-xl p-6 text-center">
