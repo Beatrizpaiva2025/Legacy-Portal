@@ -195,7 +195,15 @@ const TRANSLATIONS = {
     net30Terms: 'Net 30 payment terms',
     volumeDiscounts: 'Volume discounts on translations',
     dedicatedSupport: 'Dedicated account support',
-    priorityProcessing: 'Priority order processing'
+    priorityProcessing: 'Priority order processing',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Welcome Gift!',
+    welcomeGiftThankYou: 'Thank you for joining Legacy Translations',
+    welcomeGiftDescription: '1 FREE Page (up to 250 words) + Certification of Accuracy',
+    welcomeGiftCouponLabel: 'Your Coupon Code',
+    welcomeGiftCouponDesc: '1 free page (up to 250 words) + certification',
+    welcomeGiftValid: 'Valid for 30 days',
+    welcomeGiftUse: 'Use at checkout on your first order'
   },
   es: {
     // Login
@@ -364,7 +372,15 @@ const TRANSLATIONS = {
     net30Terms: 'Términos de pago Net 30',
     volumeDiscounts: 'Descuentos por volumen en traducciones',
     dedicatedSupport: 'Soporte de cuenta dedicado',
-    priorityProcessing: 'Procesamiento prioritario de pedidos'
+    priorityProcessing: 'Procesamiento prioritario de pedidos',
+    // Welcome Gift Modal
+    welcomeGiftTitle: '¡Regalo de Bienvenida!',
+    welcomeGiftThankYou: 'Gracias por unirse a Legacy Translations',
+    welcomeGiftDescription: '1 Página GRATIS (hasta 250 palabras) + Certificación de Precisión',
+    welcomeGiftCouponLabel: 'Tu Código de Cupón',
+    welcomeGiftCouponDesc: '1 página gratis (hasta 250 palabras) + certificación',
+    welcomeGiftValid: 'Válido por 30 días',
+    welcomeGiftUse: 'Usar al finalizar tu primer pedido'
   },
   pt: {
     // Login
@@ -533,7 +549,15 @@ const TRANSLATIONS = {
     net30Terms: 'Condições de pagamento Net 30',
     volumeDiscounts: 'Descontos por volume em traduções',
     dedicatedSupport: 'Suporte de conta dedicado',
-    priorityProcessing: 'Processamento prioritário de pedidos'
+    priorityProcessing: 'Processamento prioritário de pedidos',
+    // Welcome Gift Modal
+    welcomeGiftTitle: 'Presente de Boas-vindas!',
+    welcomeGiftThankYou: 'Obrigado por se juntar à Legacy Translations',
+    welcomeGiftDescription: '1 Página GRÁTIS (até 250 palavras) + Certificação de Precisão',
+    welcomeGiftCouponLabel: 'Seu Código de Cupom',
+    welcomeGiftCouponDesc: '1 página grátis (até 250 palavras) + certificação',
+    welcomeGiftValid: 'Válido por 30 dias',
+    welcomeGiftUse: 'Use no checkout do seu primeiro pedido'
   }
 };
 
@@ -2886,7 +2910,7 @@ const OrdersPage = ({ token }) => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-800">${order.total_price?.toFixed(2)}</div>
+                    <div className="text-xl font-bold text-gray-800">{formatPrice(order.total_price || 0)}</div>
                     <div className="text-sm text-gray-500">
                       Due: {order.due_date ? new Date(order.due_date).toLocaleDateString('en-US', { timeZone: 'America/New_York' }) : 'N/A'}
                     </div>
@@ -2913,11 +2937,11 @@ const OrdersPage = ({ token }) => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Base Price</div>
-                      <div className="font-medium">${order.base_price?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.base_price || 0)}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Urgency Fee</div>
-                      <div className="font-medium">${order.urgency_fee?.toFixed(2)}</div>
+                      <div className="font-medium">{formatPrice(order.urgency_fee || 0)}</div>
                     </div>
                   </div>
                   {order.reference && (
@@ -4785,31 +4809,31 @@ function App() {
             {/* Header with gradient */}
             <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white text-center">
               <div className="text-5xl mb-3">🎁</div>
-              <h2 className="text-2xl font-bold">Welcome Gift!</h2>
-              <p className="text-teal-100 mt-2">Thank you for joining Legacy Translations</p>
+              <h2 className="text-2xl font-bold">{t.welcomeGiftTitle}</h2>
+              <p className="text-teal-100 mt-2">{t.welcomeGiftThankYou}</p>
             </div>
 
             {/* Content */}
             <div className="p-6">
               <div className="text-center mb-6">
                 <p className="text-gray-600 mb-4">
-                  As a new partner, you receive <strong>1 FREE Certified Translation Page</strong> (value: $24.99)
+                  {t.welcomeGiftDescription}
                 </p>
 
                 {/* Coupon Code Box */}
                 <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-dashed border-teal-400 rounded-xl p-4 mb-4">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Your Coupon Code</p>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">{t.welcomeGiftCouponLabel}</p>
                   <div className="bg-white rounded-lg px-4 py-3 shadow-inner">
                     <span className="text-2xl font-bold text-teal-600 font-mono tracking-wider">
                       {welcomeCouponCode}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">$24.99 discount on your first order</p>
+                  <p className="text-xs text-gray-500 mt-2">{t.welcomeGiftCouponDesc}</p>
                 </div>
 
                 <div className="text-sm text-gray-500 space-y-1">
-                  <p>Valid for 30 days</p>
-                  <p>Use at checkout on your first order</p>
+                  <p>{t.welcomeGiftValid}</p>
+                  <p>{t.welcomeGiftUse}</p>
                 </div>
               </div>
 
@@ -4818,7 +4842,7 @@ function App() {
                 onClick={dismissWelcomeCoupon}
                 className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-teal-600 hover:to-cyan-600 transition-all shadow-lg hover:shadow-xl"
               >
-                Got it! Start ordering
+                {lang === 'es' ? '¡Entendido! Empezar a pedir' : lang === 'pt' ? 'Entendi! Começar a pedir' : 'Got it! Start ordering'}
               </button>
             </div>
           </div>
