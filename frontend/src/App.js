@@ -645,18 +645,19 @@ const LANGUAGES = TO_LANGUAGES;
 
 // ==================== LOGIN PAGE ====================
 const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
-  // Check for registration params from B2B form
+  // Check for registration params from B2B form or referral link
   const getInitialState = () => {
     const hash = window.location.hash;
     const queryString = hash.includes('?') ? hash.split('?')[1] : '';
     const params = new URLSearchParams(queryString);
-    const isRegister = params.get('register') === 'true';
+    const isRegister = params.get('register') === 'true' || params.get('ref');
     return {
       isLogin: !isRegister,
       email: params.get('email') || '',
       company: params.get('company') || '',
       name: params.get('name') || '',
-      phone: params.get('phone') || ''
+      phone: params.get('phone') || '',
+      referral_code: params.get('ref') || ''
     };
   };
 
@@ -685,7 +686,9 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
     payment_plan: 'pay_per_order',
     default_payment_method: 'zelle',
     // Agreement
-    agreed_to_terms: false
+    agreed_to_terms: false,
+    // Referral
+    referral_code: initialState.referral_code || ''
   });
   const [showAgreement, setShowAgreement] = useState(false);
   const [error, setError] = useState('');
@@ -744,7 +747,9 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
           payment_plan: formData.payment_plan,
           default_payment_method: formData.default_payment_method,
           // Agreement
-          agreed_to_terms: formData.agreed_to_terms
+          agreed_to_terms: formData.agreed_to_terms,
+          // Referral
+          referral_code: formData.referral_code || null
         });
         onLogin(response.data);
       }
@@ -774,6 +779,14 @@ const LoginPage = ({ onLogin, onRegister, t, lang, changeLanguage }) => {
             <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-lg p-3 mb-4 text-center">
               <span className="font-semibold text-sm">{t.welcomeGift}</span>
             </div>
+
+            {/* Referral Indicator */}
+            {formData.referral_code && (
+              <div className="bg-purple-100 text-purple-700 rounded-lg p-3 mb-4 text-center text-sm">
+                <span>🤝 Você foi indicado! Código: </span>
+                <span className="font-mono font-bold">{formData.referral_code.toUpperCase()}</span>
+              </div>
+            )}
 
             <div className="space-y-2 text-xs text-gray-700">
               <div className="flex items-center gap-2">

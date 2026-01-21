@@ -1241,6 +1241,8 @@ class PartnerCreate(BaseModel):
     default_payment_method: str = "zelle"
     # Agreement
     agreed_to_terms: bool = False
+    # Referral tracking
+    referral_code: Optional[str] = None  # Salesperson referral code
 
 class PartnerLogin(BaseModel):
     email: EmailStr
@@ -4663,6 +4665,47 @@ async def register_partner(partner_data: PartnerCreate):
                 await send_email("contact@legacytranslations.com", admin_subject, admin_content)
             except Exception as email_error:
                 logger.error(f"Failed to send admin notification: {email_error}")
+
+        # Handle referral code - auto-create acquisition for salesperson
+        if partner_data.referral_code:
+            try:
+                salesperson = await db.salespeople.find_one({
+                    "referral_code": partner_data.referral_code.upper(),
+                    "status": "active"
+                })
+                if salesperson:
+                    # Create acquisition record
+                    acquisition = {
+                        "id": str(uuid.uuid4())[:8],
+                        "salesperson_id": salesperson["id"],
+                        "partner_id": partner.id,
+                        "partner_name": partner.company_name,
+                        "partner_tier": "bronze",  # New partners start as bronze
+                        "acquisition_date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+                        "commission_paid": 0,
+                        "commission_status": "pending",
+                        "partner_monthly_sales": 0,
+                        "notes": f"Auto-registered via referral link (code: {partner_data.referral_code.upper()})",
+                        "created_at": datetime.now(ZoneInfo("America/New_York")).isoformat(),
+                        "approved_at": None,
+                        "paid_at": None
+                    }
+                    await db.partner_acquisitions.insert_one(acquisition)
+
+                    # Update partner record to track referral source
+                    await db.partners.update_one(
+                        {"id": partner.id},
+                        {"$set": {
+                            "referred_by_salesperson_id": salesperson["id"],
+                            "referred_by_salesperson_name": salesperson["name"],
+                            "referral_code_used": partner_data.referral_code.upper()
+                        }}
+                    )
+
+                    logger.info(f"Partner {partner.company_name} registered via referral from {salesperson['name']}")
+            except Exception as ref_error:
+                logger.error(f"Error processing referral: {ref_error}")
+                # Don't fail registration if referral processing fails
 
         return PartnerResponse(
             id=partner.id,
@@ -21504,13 +21547,15 @@ class Salesperson(BaseModel):
     name: str
     email: str
     phone: str = ""
-    commission_type: str = "tier"  # tier, fixed, percentage
+    commission_type: str = "tier"  # tier, fixed, percentage, referral_plus_commission
     commission_rate: float = 0  # percentage or fixed amount per partner
+    referral_bonus: float = 0  # Fixed bonus per referral (for referral_plus_commission type)
     base_salary: float = 0
     monthly_target: int = 10  # partners per month
     status: str = "active"  # active, inactive, pending
     hired_date: str = None
     notes: str = ""
+    referral_code: str = None  # Unique referral code for tracking partner acquisitions
     created_at: str = None
     # Authentication fields
     password_hash: str = None
@@ -21591,6 +21636,15 @@ async def get_salespeople(admin_key: str = Header(None)):
 
     return salespeople
 
+# Generate unique referral code for salesperson
+def generate_referral_code(name: str) -> str:
+    """Generate a unique referral code based on name + random string"""
+    # Take first 3-4 letters of name (uppercase, no spaces)
+    name_part = ''.join(c for c in name.upper() if c.isalpha())[:4]
+    # Add random alphanumeric suffix
+    random_part = secrets.token_hex(2).upper()
+    return f"{name_part}{random_part}"
+
 # Create salesperson
 @app.post("/admin/salespeople")
 async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
@@ -21600,6 +21654,13 @@ async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(N
     salesperson.id = str(uuid.uuid4())[:8]
     salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
     salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+    # Generate unique referral code
+    referral_code = generate_referral_code(salesperson.name)
+    # Ensure uniqueness
+    while await db.salespeople.find_one({"referral_code": referral_code}):
+        referral_code = generate_referral_code(salesperson.name)
+    salesperson.referral_code = referral_code
 
     await db.salespeople.insert_one(salesperson.dict())
 
@@ -21635,6 +21696,23 @@ async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None))
         raise HTTPException(status_code=404, detail="Salesperson not found")
 
     return {"success": True}
+
+# Get salesperson by referral code (public endpoint for partner registration)
+@app.get("/api/referral/{referral_code}")
+async def get_salesperson_by_referral(referral_code: str):
+    """Public endpoint to validate referral code and get salesperson info"""
+    salesperson = await db.salespeople.find_one({"referral_code": referral_code.upper(), "status": "active"})
+
+    if not salesperson:
+        raise HTTPException(status_code=404, detail="Invalid referral code")
+
+    # Return only public info
+    return {
+        "valid": True,
+        "salesperson_id": salesperson["id"],
+        "salesperson_name": salesperson["name"],
+        "referral_code": salesperson["referral_code"]
+    }
 
 # Get sales goals
 @app.get("/admin/sales-goals")

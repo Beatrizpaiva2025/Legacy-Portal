@@ -27867,6 +27867,24 @@ const SalesControlPage = ({ adminKey }) => {
                     <td className="px-4 py-3">
                       <p className="text-sm text-gray-600">{sp.email}</p>
                       <p className="text-xs text-gray-400">{sp.phone}</p>
+                      {sp.referral_code && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-purple-600 font-mono bg-purple-50 px-1 rounded">
+                            {sp.referral_code}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const link = `${window.location.origin}/#/partner?ref=${sp.referral_code}`;
+                              navigator.clipboard.writeText(link);
+                              alert('Link copiado!\n' + link);
+                            }}
+                            className="text-xs text-purple-500 hover:text-purple-700"
+                            title="Copiar link de referral"
+                          >
+                            📋
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium capitalize">
