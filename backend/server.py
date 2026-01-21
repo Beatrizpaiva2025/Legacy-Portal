@@ -1192,6 +1192,9 @@ class Partner(BaseModel):
     # Agreement
     agreed_to_terms: bool = False
     agreed_at: Optional[datetime] = None
+    # Welcome coupon notification
+    has_seen_welcome_coupon: bool = False  # True after partner sees the welcome coupon popup
+    welcome_coupon_code: Optional[str] = None  # Store the welcome coupon code for display
     # Dates
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_order_at: Optional[datetime] = None
@@ -1262,6 +1265,8 @@ class PartnerResponse(BaseModel):
     contact_name: str
     phone: Optional[str] = None
     token: str
+    has_seen_welcome_coupon: bool = False
+    welcome_coupon_code: Optional[str] = None
 
 # Admin User Models (with roles: admin, pm, translator)
 class AdminUser(BaseModel):
@@ -4591,9 +4596,15 @@ async def register_partner(partner_data: PartnerCreate):
             discount_value=1.0,  # 1 free certified page
             max_uses=1,
             first_order_only=True,
-            valid_until=datetime.utcnow() + timedelta(days=90)  # Valid for 90 days
+            valid_until=datetime.utcnow() + timedelta(days=30)  # Valid for 30 days
         )
         await db.coupons.insert_one(welcome_coupon.dict())
+
+        # Store the welcome coupon code in the partner record for first login popup
+        await db.partners.update_one(
+            {"id": partner.id},
+            {"$set": {"welcome_coupon_code": welcome_coupon.code}}
+        )
 
         # Send welcome email with coupon code
         try:
@@ -4614,7 +4625,7 @@ async def register_partner(partner_data: PartnerCreate):
                     <div style="background: white; color: #0d9488; padding: 12px 25px; border-radius: 8px; display: inline-block; font-size: 20px; font-weight: bold; letter-spacing: 2px;">
                         {welcome_coupon.code}
                     </div>
-                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 90 days • Use on your first order</p>
+                    <p style="margin: 15px 0 0 0; font-size: 12px; opacity: 0.9;">Valid for 30 days • Use on your first order</p>
                 </div>
 
                 <h3 style="color: #374151;">How to use your coupon:</h3>
@@ -4758,7 +4769,9 @@ async def login_partner(login_data: PartnerLogin):
             email=partner["email"],
             contact_name=partner["contact_name"],
             phone=partner.get("phone"),
-            token=token
+            token=token,
+            has_seen_welcome_coupon=partner.get("has_seen_welcome_coupon", False),
+            welcome_coupon_code=partner.get("welcome_coupon_code")
         )
 
     except HTTPException:
@@ -4790,7 +4803,9 @@ async def verify_partner_token(token: str):
                 "email": partner["email"],
                 "contact_name": partner["contact_name"],
                 "phone": partner.get("phone"),
-                "token": token
+                "token": token,
+                "has_seen_welcome_coupon": partner.get("has_seen_welcome_coupon", False),
+                "welcome_coupon_code": partner.get("welcome_coupon_code")
             }
         }
     except HTTPException:
@@ -4914,7 +4929,7 @@ async def get_current_partner_info(token: str):
 # ==================== COUPON SYSTEM ====================
 
 # Price for one certified page (used for WELCOME coupon discount calculation)
-CERTIFIED_PAGE_PRICE = 35.00  # $35 per certified page
+CERTIFIED_PAGE_PRICE = 24.99  # $24.99 per certified page
 
 @api_router.get("/partner/coupons")
 async def get_partner_coupons(token: str):
@@ -5072,6 +5087,21 @@ async def apply_coupon_to_order(token: str, code: str, order_id: str):
     )
 
     return {"success": True, "message": "Coupon applied successfully"}
+
+@api_router.post("/partner/dismiss-welcome-coupon")
+async def dismiss_welcome_coupon(token: str):
+    """Mark the welcome coupon popup as seen by the partner"""
+    partner = await get_current_partner(token)
+    if not partner:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    # Update the partner to mark welcome coupon as seen
+    await db.partners.update_one(
+        {"id": partner["id"]},
+        {"$set": {"has_seen_welcome_coupon": True}}
+    )
+
+    return {"success": True, "message": "Welcome coupon dismissed"}
 
 # ==================== ADMIN COUPON MANAGEMENT ====================
 
