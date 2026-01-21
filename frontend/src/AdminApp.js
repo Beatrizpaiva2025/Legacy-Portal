@@ -27585,7 +27585,7 @@ const SalesControlPage = ({ adminKey }) => {
 
   // Form states
   const [newSalesperson, setNewSalesperson] = useState({
-    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0
+    name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en'
   });
   const [createdSalesperson, setCreatedSalesperson] = useState(null); // For success modal with referral link
   const [newAcquisition, setNewAcquisition] = useState({
@@ -27652,7 +27652,7 @@ const SalesControlPage = ({ adminKey }) => {
       if (res.ok) {
         setShowAddSalesperson(false);
         setCreatedSalesperson(data.salesperson); // Show success modal with referral link
-        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0 });
+        setNewSalesperson({ name: '', email: '', phone: '', country_code: '+1', commission_type: 'tier', commission_rate: 0, base_salary: 0, monthly_target: 10, referral_bonus: 0, preferred_language: 'en' });
         fetchAllData();
       } else {
         alert(`Error: ${data.detail || 'Failed to add salesperson'}`);
@@ -28645,6 +28645,35 @@ const SalesControlPage = ({ adminKey }) => {
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     placeholder="10"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Idioma do Email</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewSalesperson({...newSalesperson, preferred_language: 'en'})}
+                      className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-all ${newSalesperson.preferred_language === 'en' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'}`}
+                    >
+                      <img src="https://flagcdn.com/w40/us.png" alt="English" className="w-6 h-4 object-cover rounded" />
+                      <span>EN</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewSalesperson({...newSalesperson, preferred_language: 'pt'})}
+                      className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-all ${newSalesperson.preferred_language === 'pt' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'}`}
+                    >
+                      <img src="https://flagcdn.com/w40/br.png" alt="Português" className="w-6 h-4 object-cover rounded" />
+                      <span>PT</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewSalesperson({...newSalesperson, preferred_language: 'es'})}
+                      className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm transition-all ${newSalesperson.preferred_language === 'es' ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500' : 'border-gray-300 hover:border-gray-400'}`}
+                    >
+                      <img src="https://flagcdn.com/w40/es.png" alt="Español" className="w-6 h-4 object-cover rounded" />
+                      <span>ES</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
