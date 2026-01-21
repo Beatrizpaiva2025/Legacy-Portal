@@ -9212,6 +9212,127 @@ async def delete_partner_by_email(email: str, admin_key: str):
         raise HTTPException(status_code=500, detail="Failed to delete partner")
 
 
+@api_router.get("/admin/find-email/{email}")
+async def find_email_in_system(email: str, admin_key: str):
+    """Find where an email is registered in the system (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    found_in = []
+
+    try:
+        # Check partners collection
+        partner = await db.partners.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if partner:
+            found_in.append({
+                "collection": "partners",
+                "id": partner.get("id"),
+                "name": partner.get("company_name") or partner.get("name"),
+                "email": partner.get("email")
+            })
+
+        # Check customers collection
+        customer = await db.customers.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if customer:
+            found_in.append({
+                "collection": "customers",
+                "id": customer.get("id"),
+                "name": customer.get("full_name") or customer.get("name"),
+                "email": customer.get("email")
+            })
+
+        # Check admin_users collection
+        admin_user = await db.admin_users.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if admin_user:
+            found_in.append({
+                "collection": "admin_users",
+                "id": admin_user.get("id"),
+                "name": admin_user.get("name"),
+                "email": admin_user.get("email"),
+                "role": admin_user.get("role")
+            })
+
+        # Check salespersons collection
+        salesperson = await db.salespersons.find_one({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+        if salesperson:
+            found_in.append({
+                "collection": "salespersons",
+                "id": salesperson.get("id"),
+                "name": salesperson.get("name"),
+                "email": salesperson.get("email")
+            })
+
+        if not found_in:
+            return {"status": "not_found", "message": f"Email '{email}' not found in any collection"}
+
+        return {"status": "found", "email": email, "found_in": found_in}
+
+    except Exception as e:
+        logger.error(f"Error finding email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search for email")
+
+
+@api_router.delete("/admin/delete-email/{email}")
+async def delete_email_from_system(email: str, admin_key: str, collection: str = None):
+    """Delete an email from specified collection or all collections (admin only)"""
+    if admin_key != os.environ.get("ADMIN_KEY", "legacy_admin_2024"):
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") != "admin":
+            raise HTTPException(status_code=401, detail="Admin access required")
+
+    email_lower = email.lower().strip()
+    deleted_from = []
+
+    try:
+        collections_to_check = [collection] if collection else ["partners", "customers", "admin_users", "salespersons"]
+
+        for coll_name in collections_to_check:
+            if coll_name == "partners":
+                result = await db.partners.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    # Mark orders as orphaned
+                    await db.translation_orders.update_many(
+                        {"partner_id": result.get("id")},
+                        {"$set": {"partner_deleted": True, "partner_deleted_at": datetime.utcnow()}}
+                    )
+                    deleted_from.append({"collection": "partners", "name": result.get("company_name") or result.get("name")})
+
+            elif coll_name == "customers":
+                result = await db.customers.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "customers", "name": result.get("full_name") or result.get("name")})
+
+            elif coll_name == "admin_users":
+                result = await db.admin_users.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "admin_users", "name": result.get("name"), "role": result.get("role")})
+
+            elif coll_name == "salespersons":
+                result = await db.salespersons.find_one_and_delete({"email": {"$regex": f"^{email_lower}$", "$options": "i"}})
+                if result:
+                    deleted_from.append({"collection": "salespersons", "name": result.get("name")})
+
+        if not deleted_from:
+            raise HTTPException(status_code=404, detail=f"Email '{email}' not found in any collection")
+
+        logger.info(f"Email '{email}' deleted from: {[d['collection'] for d in deleted_from]}")
+
+        return {
+            "status": "success",
+            "message": f"Email '{email}' deleted successfully",
+            "deleted_from": deleted_from
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete email")
+
+
 # ==================== PARTNER INVOICE ENDPOINTS ====================
 
 @api_router.get("/admin/partner-invoices")
