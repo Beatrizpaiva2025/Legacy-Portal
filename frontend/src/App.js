@@ -3138,7 +3138,8 @@ const InvoicesPage = ({ token, t }) => {
     try {
       const response = await axios.post(`${API}/partner/invoices/${selectedInvoice.id}/pay-stripe`, {
         invoice_id: selectedInvoice.id,
-        origin_url: window.location.origin
+        origin_url: window.location.origin,
+        currency: currency.code.toLowerCase() // Pass currency for BRL/PIX support
       });
       if (response.data.checkout_url) {
         window.location.href = response.data.checkout_url;

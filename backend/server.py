@@ -1511,6 +1511,7 @@ class PartnerInvoiceCreate(BaseModel):
 class PartnerInvoicePayStripe(BaseModel):
     invoice_id: str
     origin_url: str
+    currency: Optional[str] = "usd"  # Support multi-currency (usd, brl, etc.)
 
 class PartnerInvoicePayZelle(BaseModel):
     invoice_id: str
@@ -9510,17 +9511,35 @@ async def create_invoice_stripe_checkout(invoice_id: str, request: PartnerInvoic
         if invoice.get("status") == "paid":
             raise HTTPException(status_code=400, detail="Invoice already paid")
 
+        # Get currency configuration for multi-currency support (BRL includes PIX)
+        currency = request.currency.lower() if request.currency else "usd"
+        if currency not in CURRENCY_CONFIG:
+            currency = "usd"
+
+        currency_info = CURRENCY_CONFIG[currency]
+        payment_methods = currency_info["payment_methods"]
+
+        # Calculate amount in target currency
+        base_amount_usd = invoice.get("total_amount", 0)
+        if currency != "usd":
+            rates_response = await get_exchange_rates()
+            rates = rates_response.get("rates", {"usd": 1.0, "brl": 5.0, "eur": 0.92, "gbp": 0.79})
+            exchange_rate = rates.get(currency, 1.0)
+            amount_in_currency = base_amount_usd * exchange_rate
+        else:
+            amount_in_currency = base_amount_usd
+
         # Create Stripe checkout session
         checkout_params = {
-            'payment_method_types': ['card'],
+            'payment_method_types': payment_methods,
             'line_items': [{
                 'price_data': {
-                    'currency': 'usd',
+                    'currency': currency,
                     'product_data': {
                         'name': f'Invoice {invoice.get("invoice_number")}',
                         'description': f'Partner Invoice - {invoice.get("partner_company")} - {len(invoice.get("order_ids", []))} orders',
                     },
-                    'unit_amount': int(invoice.get("total_amount", 0) * 100),
+                    'unit_amount': int(amount_in_currency * 100),
                 },
                 'quantity': 1,
             }],
