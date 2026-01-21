@@ -22068,7 +22068,7 @@ async def aws_diagnostic():
 # ==================== SALES CONTROL ENDPOINTS ====================
 
 class Salesperson(BaseModel):
-    id: str = None
+    id: Optional[str] = None
     name: str
     email: str
     phone: str = ""
@@ -22078,15 +22078,15 @@ class Salesperson(BaseModel):
     base_salary: float = 0
     monthly_target: int = 10  # partners per month
     status: str = "active"  # active, inactive, pending
-    hired_date: str = None
+    hired_date: Optional[str] = None
     notes: str = ""
-    referral_code: str = None  # Unique referral code for tracking partner acquisitions
-    created_at: str = None
+    referral_code: Optional[str] = None  # Unique referral code for tracking partner acquisitions
+    created_at: Optional[str] = None
     # Authentication fields
-    password_hash: str = None
-    token: str = None
-    invite_token: str = None
-    invite_sent_at: str = None
+    password_hash: Optional[str] = None
+    token: Optional[str] = None
+    invite_token: Optional[str] = None
+    invite_sent_at: Optional[str] = None
 
 class SalesGoal(BaseModel):
     id: str = None
@@ -22143,23 +22143,36 @@ async def get_salespeople(admin_key: str = Header(None)):
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    # Get acquisition counts for each salesperson
-    for sp in salespeople:
-        sp["_id"] = str(sp["_id"])
-        acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
-        sp["total_acquisitions"] = acquisitions
+    try:
+        salespeople = await db.salespeople.find().sort("created_at", -1).to_list(100)
 
-        # Get current month acquisitions
-        current_month = datetime.now().strftime("%Y-%m")
-        month_acquisitions = await db.partner_acquisitions.count_documents({
-            "salesperson_id": sp["id"],
-            "acquisition_date": {"$regex": f"^{current_month}"}
-        })
-        sp["month_acquisitions"] = month_acquisitions
+        # Get acquisition counts for each salesperson
+        for sp in salespeople:
+            sp["_id"] = str(sp["_id"])
+            acquisitions = await db.partner_acquisitions.count_documents({"salesperson_id": sp["id"]})
+            sp["total_acquisitions"] = acquisitions
 
-    return salespeople
+            # Get current month acquisitions
+            current_month = datetime.now().strftime("%Y-%m")
+            month_acquisitions = await db.partner_acquisitions.count_documents({
+                "salesperson_id": sp["id"],
+                "acquisition_date": {"$regex": f"^{current_month}"}
+            })
+            sp["month_acquisitions"] = month_acquisitions
+
+        return salespeople
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching salespeople: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch salespeople: {str(e)}")
 
 # Generate unique referral code for salesperson
 def generate_referral_code(name: str) -> str:
@@ -22173,23 +22186,36 @@ def generate_referral_code(name: str) -> str:
 # Create salesperson
 @app.post("/admin/salespeople")
 async def create_salesperson(salesperson: Salesperson, admin_key: str = Header(None)):
+    # Validate admin key or user token
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    salesperson.id = str(uuid.uuid4())[:8]
-    salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
-    salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    # Generate unique referral code
-    referral_code = generate_referral_code(salesperson.name)
-    # Ensure uniqueness
-    while await db.salespeople.find_one({"referral_code": referral_code}):
+    try:
+        salesperson.id = str(uuid.uuid4())[:8]
+        salesperson.created_at = datetime.now(ZoneInfo("America/New_York")).isoformat()
+        salesperson.hired_date = salesperson.hired_date or datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
+
+        # Generate unique referral code
         referral_code = generate_referral_code(salesperson.name)
-    salesperson.referral_code = referral_code
+        # Ensure uniqueness
+        while await db.salespeople.find_one({"referral_code": referral_code}):
+            referral_code = generate_referral_code(salesperson.name)
+        salesperson.referral_code = referral_code
 
-    await db.salespeople.insert_one(salesperson.dict())
+        await db.salespeople.insert_one(salesperson.dict())
 
-    return {"success": True, "salesperson": salesperson.dict()}
+        return {"success": True, "salesperson": salesperson.dict()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create salesperson: {str(e)}")
 
 # Update salesperson
 @app.put("/admin/salespeople/{salesperson_id}")
@@ -22197,17 +22223,32 @@ async def update_salesperson(salesperson_id: str, salesperson: Salesperson, admi
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    result = await db.salespeople.update_one(
-        {"id": salesperson_id},
-        {"$set": update_data}
-    )
+    try:
+        # First check if salesperson exists
+        existing = await db.salespeople.find_one({"id": salesperson_id})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
 
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+        update_data = {k: v for k, v in salesperson.dict().items() if v is not None and k != "id"}
 
-    return {"success": True}
+        await db.salespeople.update_one(
+            {"id": salesperson_id},
+            {"$set": update_data}
+        )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update salesperson: {str(e)}")
 
 # Delete salesperson
 @app.delete("/admin/salespeople/{salesperson_id}")
@@ -22215,12 +22256,25 @@ async def delete_salesperson(salesperson_id: str, admin_key: str = Header(None))
     if not admin_key:
         raise HTTPException(status_code=401, detail="Admin key required")
 
-    result = await db.salespeople.delete_one({"id": salesperson_id})
+    # Validate admin key or user token
+    is_valid = admin_key == os.environ.get("ADMIN_KEY", "legacy_admin_2024")
+    if not is_valid:
+        user = await get_current_admin_user(admin_key)
+        if not user or user.get("role") not in ["admin", "pm", "sales"]:
+            raise HTTPException(status_code=401, detail="Invalid admin key or insufficient permissions")
 
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Salesperson not found")
+    try:
+        result = await db.salespeople.delete_one({"id": salesperson_id})
 
-    return {"success": True}
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Salesperson not found")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting salesperson: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete salesperson: {str(e)}")
 
 # Get salesperson by referral code (public endpoint for partner registration)
 @app.get("/api/referral/{referral_code}")
