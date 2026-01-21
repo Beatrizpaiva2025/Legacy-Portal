@@ -14346,8 +14346,8 @@ TERMINOLOGIA GERAL:
 """
 }
 
-def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str) -> str:
-    """Generate document-type specific proofreading prompt."""
+def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str, glossary_and_tm_terms: str = "") -> str:
+    """Generate document-type specific proofreading prompt with glossary and TM support."""
 
     special_chars = LANGUAGE_SPECIAL_CHARS.get(source_lang, "")
 
@@ -14362,6 +14362,19 @@ def get_proofreading_prompt(source_lang: str, target_lang: str, doc_type: str) -
     else:
         terminology = DOCUMENT_TERMINOLOGY["general"]
 
+    # Add glossary and TM terms section if provided
+    glossary_section = ""
+    if glossary_and_tm_terms:
+        glossary_section = f"""
+{glossary_and_tm_terms}
+
+IMPORTANTE: Os termos acima do GLOSSÁRIO e MEMÓRIA DE TRADUÇÃO são OBRIGATÓRIOS.
+- Se a tradução usar termos diferentes dos especificados no glossário, marque como erro de "Terminologia" com gravidade ALTA.
+- Os termos do glossário são a ÚNICA tradução aceitável para esses termos.
+- A memória de tradução contém traduções previamente aprovadas que devem ser seguidas.
+
+"""
+
     prompt = f"""Você é um revisor de traduções certificado.
 
 IDIOMA FONTE: {source_lang}
@@ -14372,7 +14385,7 @@ CARACTERES ESPECIAIS DO IDIOMA FONTE (devem ser PRESERVADOS em nomes próprios):
 {special_chars}
 
 {terminology}
-
+{glossary_section}
 INSTRUÇÕES DE REVISÃO:
 
 1. Compare CADA elemento dos dois documentos minuciosamente
@@ -14590,10 +14603,83 @@ async def admin_proofread(request: ProofreadRequest, admin_key: str):
         raise HTTPException(status_code=400, detail="Claude API key is required")
 
     try:
+        # Fetch glossary terms for this language pair
+        glossary_and_tm_terms = ""
+        source_lang_full = request.source_language
+        target_lang_full = request.target_language
+        source_lang_code = request.source_language.lower()[:2]
+        target_lang_code = request.target_language.lower()[:2]
+
+        # Fetch matching glossaries
+        try:
+            glossaries = await db.glossaries.find({
+                "$or": [
+                    {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                    {"sourceLang": {"$regex": source_lang_code, "$options": "i"}, "targetLang": {"$regex": target_lang_code, "$options": "i"}},
+                    {"source_language": source_lang_code, "target_language": target_lang_code}
+                ]
+            }).to_list(10)
+
+            if glossaries:
+                all_terms = []
+                for glossary in glossaries:
+                    if glossary.get("terms"):
+                        for term in glossary["terms"][:100]:
+                            all_terms.append(f"• {term.get('source', '')} → {term.get('target', '')}")
+
+                if all_terms:
+                    glossary_and_tm_terms += f"""
+═══════════════════════════════════════════════════════════════════
+                    GLOSSÁRIO - TERMOS OBRIGATÓRIOS
+═══════════════════════════════════════════════════════════════════
+Use EXATAMENTE estas traduções para os seguintes termos:
+{chr(10).join(all_terms[:100])}
+"""
+        except Exception as e:
+            logger.warning(f"Error fetching glossaries for proofreading: {e}")
+
+        # Fetch Translation Memory entries
+        try:
+            tm_entries = await db.translation_memory.find({
+                "$or": [
+                    {"sourceLang": source_lang_full, "targetLang": target_lang_full},
+                    {"sourceLang": {"$regex": source_lang_full[:10], "$options": "i"},
+                     "targetLang": {"$regex": target_lang_full[:10], "$options": "i"}}
+                ]
+            }).sort("score", -1).to_list(100)
+
+            if tm_entries:
+                # Separate uploaded TM (priority) from auto-generated TM
+                uploaded_tm = [tm for tm in tm_entries if tm.get("is_uploaded") or tm.get("score", 0) == 100]
+                auto_tm = [tm for tm in tm_entries if not tm.get("is_uploaded") and tm.get("score", 0) != 100]
+
+                tm_text = ""
+                if uploaded_tm:
+                    tm_text += "🔹 TERMOS PRIORITÁRIOS (TM importada - USE EXATAMENTE):\n"
+                    for tm in uploaded_tm[:50]:
+                        tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')}\n"
+
+                if auto_tm and len(uploaded_tm) < 50:
+                    tm_text += "\n🔸 TRADUÇÕES APROVADAS (de traduções de alta qualidade):\n"
+                    for tm in auto_tm[:50 - len(uploaded_tm)]:
+                        tm_text += f"• {tm.get('source', '')} → {tm.get('target', '')} (score: {tm.get('score', 0)}%)\n"
+
+                if tm_text:
+                    glossary_and_tm_terms += f"""
+═══════════════════════════════════════════════════════════════════
+                    MEMÓRIA DE TRADUÇÃO
+═══════════════════════════════════════════════════════════════════
+Referência de traduções aprovadas - verifique se foram seguidas:
+{tm_text}
+"""
+        except Exception as e:
+            logger.warning(f"Error fetching TM for proofreading: {e}")
+
         system_prompt = get_proofreading_prompt(
             request.source_language,
             request.target_language,
-            request.document_type
+            request.document_type,
+            glossary_and_tm_terms
         )
 
         # Build the message content based on whether we have an image or just text
