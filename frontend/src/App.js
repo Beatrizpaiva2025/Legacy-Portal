@@ -4528,7 +4528,7 @@ function App() {
   const [token, setToken] = useState(null);
   const [activeTab, setActiveTab] = useState('new-order');
   const [lang, setLang] = useState(getInitialLanguage);
-  const [currency] = useState(getLocalCurrency);
+  const [currency, setCurrency] = useState(getLocalCurrency);
   const [verificationId, setVerificationId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
   const [isValidatingSession, setIsValidatingSession] = useState(true);
@@ -4543,6 +4543,26 @@ function App() {
     setLang(newLang);
     localStorage.setItem('ui_language', newLang);
   };
+
+  // Fetch real-time exchange rate for BRL if user is in Brazil
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      if (currency.code !== 'BRL') return; // Only fetch for Brazilian users
+
+      try {
+        const response = await axios.get(`${API}/exchange-rates`);
+        if (response.data?.rates?.brl) {
+          setCurrency(prev => ({
+            ...prev,
+            rate: response.data.rates.brl
+          }));
+        }
+      } catch (err) {
+        console.log('Using default BRL rate');
+      }
+    };
+    fetchExchangeRate();
+  }, [currency.code]);
 
   // Check for reset token and verification route in URL
   useEffect(() => {
