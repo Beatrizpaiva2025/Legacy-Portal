@@ -22609,11 +22609,12 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
                 'welcome': 'You have just joined the <strong>Legacy Translations</strong> partner team!',
                 'how_earn_title': '💰 HOW YOU EARN (as agreed in the "Finder\'s Agreement"):',
                 'how_earn_items': [
-                    '$100 bonus for each new partner you refer',
+                    '$100 bonus* for each new partner you refer',
                     'Commission on your referrals\' orders',
                     'Hit monthly goal? +$100 extra bonus!',
                     'Monthly payments via Zelle or transfer'
                 ],
+                'bonus_note': '*Partner referrals are exclusively for businesses with recurring demand for certified translations, such as law firms, accounting offices, financial institutions, real estate agencies, hospitals, and other companies that regularly need translation services.',
                 'link_title': '🔗 YOUR EXCLUSIVE REFERRAL LINK:',
                 'link_desc': 'After setting up your account, you\'ll get a personalized link. Every partner who signs up through it will be automatically linked to you!',
                 'dashboard_title': '📊 IN YOUR DASHBOARD YOU CAN:',
@@ -22629,11 +22630,12 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
                 'welcome': 'Você acaba de entrar para o time de parceiros da <strong>Legacy Translations</strong>!',
                 'how_earn_title': '💰 COMO VOCÊ GANHA (conforme acordado no "Finder\'s Agreement"):',
                 'how_earn_items': [
-                    '$100 de bônus por cada novo parceiro que você indicar',
+                    '$100 de bônus* por cada novo parceiro que você indicar',
                     'Comissão sobre os pedidos dos seus indicados',
                     'Bateu a meta mensal? +$100 de bônus extra!',
                     'Pagamentos mensais via Zelle ou transferência'
                 ],
+                'bonus_note': '*As indicações de parceiros são exclusivamente para empresas com demanda recorrente por traduções certificadas, como escritórios de advocacia, contabilidade, instituições financeiras, imobiliárias, hospitais e outras empresas que necessitam regularmente de serviços de tradução.',
                 'link_title': '🔗 SEU LINK EXCLUSIVO DE INDICAÇÃO:',
                 'link_desc': 'Após configurar sua conta, você terá acesso ao seu link personalizado. Cada parceiro que se cadastrar através dele será automaticamente vinculado a você!',
                 'dashboard_title': '📊 NO SEU PAINEL VOCÊ PODE:',
@@ -22649,11 +22651,12 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
                 'welcome': '¡Acabas de unirte al equipo de socios de <strong>Legacy Translations</strong>!',
                 'how_earn_title': '💰 CÓMO GANAS (según lo acordado en el "Finder\'s Agreement"):',
                 'how_earn_items': [
-                    '$100 de bono por cada nuevo socio que refieras',
+                    '$100 de bono* por cada nuevo socio que refieras',
                     'Comisión sobre los pedidos de tus referidos',
                     '¿Alcanzaste la meta mensual? ¡+$100 de bono extra!',
                     'Pagos mensuales vía Zelle o transferencia'
                 ],
+                'bonus_note': '*Las referencias de socios son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como bufetes de abogados, oficinas contables, instituciones financieras, agencias inmobiliarias, hospitales y otras empresas que necesitan regularmente servicios de traducción.',
                 'link_title': '🔗 TU ENLACE EXCLUSIVO DE REFERIDOS:',
                 'link_desc': 'Después de configurar tu cuenta, tendrás acceso a tu enlace personalizado. ¡Cada socio que se registre a través de él quedará automáticamente vinculado a ti!',
                 'dashboard_title': '📊 EN TU PANEL PUEDES:',
@@ -22695,6 +22698,9 @@ async def invite_salesperson(salesperson_id: str, admin_key: str = Header(None))
                     <ul style="color: #475569; margin: 0; padding-left: 20px; line-height: 2;">
                         {items_html}
                     </ul>
+                    <p style="color: #64748b; font-size: 12px; margin: 15px 0 0 0; font-style: italic; line-height: 1.5;">
+                        {content['bonus_note']}
+                    </p>
                 </div>
 
                 <div style="background: white; border-radius: 10px; padding: 20px; margin: 20px 0; border-left: 4px solid #10B981;">
