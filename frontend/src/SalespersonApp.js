@@ -308,41 +308,41 @@ const translations = {
 
     // Tabs
     dashboard: 'Panel',
-    registerPartner: 'Registrar Socio',
+    registerPartner: 'Registrar Partner',
     myCommissions: 'Mis Comisiones',
     paymentHistory: 'Historial de Pagos',
     howItWorks: 'Cómo Funciona',
 
     // Dashboard
     thisMonth: 'Este Mes',
-    partnersRegistered: 'socios registrados',
+    partnersRegistered: 'partners registrados',
     pendingCommission: 'Comisión Pendiente',
     awaitingPayment: 'esperando pago',
     totalEarned: 'Total Ganado',
     allTime: 'desde el inicio',
-    totalPartners: 'Total de Socios',
+    totalPartners: 'Total de Partners',
     registeredByYou: 'registrados por usted',
     monthlyGoal: 'Progreso de Meta Mensual',
     progress: 'Progreso',
-    partners: 'socios',
+    partners: 'partners',
     recentRegistrations: 'Registros Recientes',
     date: 'Fecha',
-    partner: 'Socio',
+    partner: 'Partner',
     tier: 'Nivel',
     commission: 'Comisión',
     status: 'Estado',
-    noRegistrations: '¡Sin registros aún. Comience registrando su primer socio!',
+    noRegistrations: '¡Sin registros aún. Comience registrando su primer partner!',
 
     // Register Partner
-    registerNewPartner: 'Registrar Nuevo Socio',
+    registerNewPartner: 'Registrar Nuevo Partner',
     companyName: 'Nombre de Empresa',
     contactName: 'Nombre de Contacto',
     phone: 'Teléfono',
-    expectedTier: 'Nivel Esperado del Socio',
+    expectedTier: 'Nivel Esperado del Partner',
     notes: 'Notas',
-    register: 'Registrar Socio',
+    register: 'Registrar Partner',
     registering: 'Registrando...',
-    partnerRegistered: '¡Socio Registrado!',
+    partnerRegistered: '¡Partner Registrado!',
     addedSuccessfully: 'fue agregado exitosamente.',
     yourCommission: 'Su comisión',
 
@@ -352,7 +352,7 @@ const translations = {
     gold: 'Oro',
     platinum: 'Platino',
     pagesMonth: 'páginas/mes',
-    perPartner: 'por socio',
+    perPartner: 'por partner',
 
     // Commissions
     monthlyEarnings: 'Ganancias Mensuales',
@@ -365,7 +365,7 @@ const translations = {
     sinceStart: 'desde el inicio',
     payments: 'Pagos',
     transactionsCompleted: 'transacciones completadas',
-    partnersPaid: 'Socios Pagados',
+    partnersPaid: 'Partners Pagados',
     commissionsPaid: 'comisiones pagadas',
     paymentHistoryReceived: 'Historial de Pagos Recibidos',
     value: 'Valor',
@@ -380,7 +380,7 @@ const translations = {
     // How It Works
     commissionStructure: 'Estructura de Comisiones',
     yourCommissionType: 'Su Tipo de Comisión:',
-    byPartnerTier: 'Por Nivel del Socio',
+    byPartnerTier: 'Por Nivel del Partner',
     fixedValue: 'Valor Fijo',
     percentageOfSales: 'Porcentaje de Ventas',
     paymentInformation: 'Información de Pago',
@@ -389,7 +389,7 @@ const translations = {
     minimumPayout: 'Pago Mínimo',
     bonusOpportunities: 'Oportunidades de Bonificación',
     howTiersWork: 'Cómo Funcionan los Niveles',
-    tiersExplanation: 'Los niveles de socios se basan en el volumen mensual esperado de traducción. Al registrar un socio, estime el nivel según las necesidades del negocio:',
+    tiersExplanation: 'Los niveles de partners se basan en el volumen mensual esperado de traducción. Al registrar un partner, estime el nivel según las necesidades del negocio:',
     bronzeDesc: 'Pequeños negocios, abogados individuales, necesidades ocasionales',
     silverDesc: 'Firmas en crecimiento, pequeñas oficinas de inmigración, volumen regular',
     goldDesc: 'Oficinas medianas, contadores en época de impuestos, volumen constante',
@@ -401,8 +401,8 @@ const translations = {
     paid: 'Pagado',
 
     // Partner Referral Notice
-    partnerReferralNotice: 'Las indicaciones de socios son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como despachos de abogados, oficinas de contabilidad, instituciones financieras, inmobiliarias, hospitales y otras empresas que requieren regularmente servicios de traducción.',
-    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como socios.'
+    partnerReferralNotice: 'Las indicaciones de partners son exclusivamente para empresas con demanda recurrente de traducciones certificadas, como despachos de abogados, oficinas de contabilidad, instituciones financieras, inmobiliarias, hospitales y otras empresas que requieren regularmente servicios de traducción.',
+    partnerReferralImportant: 'Importante: Las personas físicas no pueden ser registradas como partners.'
   }
 };
 
@@ -931,9 +931,9 @@ const SalespersonPortal = ({ token, salesperson, onLogout, lang, setLang }) => {
               <h2 className="text-xl font-semibold text-slate-800 mb-6">{t.registerNewPartner}</h2>
 
               {/* Partner Referral Notice */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-                <p className="text-amber-800 text-sm mb-3">{t.partnerReferralNotice}</p>
-                <p className="text-amber-900 text-sm font-bold bg-amber-100 px-3 py-2 rounded-lg">{t.partnerReferralImportant}</p>
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+                <p className="text-slate-600 text-sm mb-3">{t.partnerReferralNotice}</p>
+                <p className="text-slate-700 text-sm font-semibold bg-slate-100 px-3 py-2 rounded-lg">{t.partnerReferralImportant}</p>
               </div>
 
               {registerSuccess ? (
