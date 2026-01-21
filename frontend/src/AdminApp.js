@@ -15856,12 +15856,23 @@ const ProjectsPage = ({ adminKey, onTranslate, user }) => {
                                 </div>
                               </div>
                             </div>
-                            <button
-                              onClick={() => downloadDocument(doc.id, doc.filename)}
-                              className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
-                            >
-                              <span>⬇️</span> Download
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => downloadDocument(doc.id, doc.filename)}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 flex items-center gap-1"
+                              >
+                                <span>⬇️</span> Download
+                              </button>
+                              {(isAdmin || isPM) && (
+                                <button
+                                  onClick={() => deleteOrderDocument(doc.id, doc.filename)}
+                                  className="px-2 py-1.5 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                                  title="Excluir documento"
+                                >
+                                  🗑️
+                                </button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
